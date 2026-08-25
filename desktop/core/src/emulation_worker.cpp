@@ -2,6 +2,7 @@
 
 #include "genplusgx/bounded_queue.h"
 
+#include <array>
 #include <condition_variable>
 #include <mutex>
 #include <system_error>
@@ -13,6 +14,8 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr auto normalFrameInterval = std::chrono::microseconds{16'667};
 constexpr auto fastFrameInterval = std::chrono::milliseconds{1};
+constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
+constexpr std::size_t defaultAudioRingFrames = 12'000U;
 
 EmulationWorkerStatus success()
 {
@@ -90,13 +93,17 @@ public:
     std::size_t commandCapacity,
     std::size_t eventCapacity,
     int audioSampleRate,
-    std::shared_ptr<VideoFrameExchange> videoFrames)
+    std::shared_ptr<VideoFrameExchange> videoFrames,
+    std::shared_ptr<StereoAudioRingBuffer> audioFrames)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
       audioSampleRate_(audioSampleRate),
       videoFrames_(videoFrames ? std::move(videoFrames)
-                               : std::make_shared<VideoFrameExchange>())
+                               : std::make_shared<VideoFrameExchange>()),
+      audioFrames_(audioFrames ? std::move(audioFrames)
+                               : std::make_shared<StereoAudioRingBuffer>(
+                                   defaultAudioRingFrames))
   {
   }
 
@@ -209,6 +216,11 @@ public:
   std::shared_ptr<VideoFrameExchange> videoFrames() const
   {
     return videoFrames_;
+  }
+
+  std::shared_ptr<StereoAudioRingBuffer> audioFrames() const
+  {
+    return audioFrames_;
   }
 
 private:
@@ -450,6 +462,29 @@ private:
     if (!result) {
       return result;
     }
+
+    CoreAudioBatchInfo audioInfo;
+    const auto describedAudio = adapter.audioBatchInfo(audioInfo);
+    if (!describedAudio && describedAudio.error != CoreError::noAudioAvailable) {
+      return describedAudio;
+    }
+    if (describedAudio) {
+      if (audioInfo.frameCount > audioScratch_.size()) {
+        return {
+          CoreError::invalidAudioBatch,
+          "The core audio batch exceeds the worker's fixed transfer buffer.",
+        };
+      }
+      const auto copiedAudio = adapter.copyAudioFrames(
+        std::span<StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount),
+        audioInfo);
+      if (!copiedAudio) {
+        return copiedAudio;
+      }
+      static_cast<void>(audioFrames_->write(
+        std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
+    }
+
     auto write = videoFrames_->beginWrite();
     if (!write) {
       return {};
@@ -510,6 +545,8 @@ private:
   bool stopRequested_{false};
   bool fastForward_{false};
   std::shared_ptr<VideoFrameExchange> videoFrames_;
+  std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
+  std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
   std::uint64_t coalescedInputCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
@@ -519,9 +556,15 @@ EmulationWorker::EmulationWorker(
   std::size_t commandCapacity,
   std::size_t eventCapacity,
   int audioSampleRate,
-  std::shared_ptr<VideoFrameExchange> videoFrames)
+  std::shared_ptr<VideoFrameExchange> videoFrames,
+  std::shared_ptr<StereoAudioRingBuffer> audioFrames)
   : private_(std::make_unique<Private>(
-      *this, commandCapacity, eventCapacity, audioSampleRate, std::move(videoFrames)))
+      *this,
+      commandCapacity,
+      eventCapacity,
+      audioSampleRate,
+      std::move(videoFrames),
+      std::move(audioFrames)))
 {
 }
 
@@ -569,6 +612,11 @@ EmulationWorkerMetrics EmulationWorker::metrics() const
 std::shared_ptr<VideoFrameExchange> EmulationWorker::videoFrames() const
 {
   return private_->videoFrames();
+}
+
+std::shared_ptr<StereoAudioRingBuffer> EmulationWorker::audioFrames() const
+{
+  return private_->audioFrames();
 }
 
 } // namespace genplusgx

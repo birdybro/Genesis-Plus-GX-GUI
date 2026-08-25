@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/input_snapshot.h"
+#include "genplusgx/audio_ring_buffer.h"
 #include "genplusgx/video/frame_exchange.h"
 
 #include <atomic>
@@ -131,7 +132,8 @@ public:
     std::size_t commandCapacity = 64U,
     std::size_t eventCapacity = 64U,
     int audioSampleRate = 48'000,
-    std::shared_ptr<VideoFrameExchange> videoFrames = {});
+    std::shared_ptr<VideoFrameExchange> videoFrames = {},
+    std::shared_ptr<StereoAudioRingBuffer> audioFrames = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;
@@ -149,6 +151,7 @@ public:
   [[nodiscard]] EmulationWorkerState state() const noexcept;
   [[nodiscard]] EmulationWorkerMetrics metrics() const;
   [[nodiscard]] std::shared_ptr<VideoFrameExchange> videoFrames() const;
+  [[nodiscard]] std::shared_ptr<StereoAudioRingBuffer> audioFrames() const;
 
 private:
   class Private;

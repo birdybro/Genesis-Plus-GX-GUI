@@ -5,6 +5,7 @@ qt_add_executable(genplusgx_desktop
 target_link_libraries(
   genplusgx_desktop
   PRIVATE
+    GenesisPlusGX::Audio
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
     genplusgx_project_options

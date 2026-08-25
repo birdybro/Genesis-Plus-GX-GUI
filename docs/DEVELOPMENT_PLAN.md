@@ -24,8 +24,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | `0312e53` |
 | 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | `0a04aa1` |
 | 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | `3ee78c1` |
-| 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | recorded by milestone 14 |
-| 14 Audio playback | PLANNED | SDL3 output, device lifecycle, pause/resume | `desktop/audio` | null-device init and buffer integrity | Clean bounded low-latency pipeline | pending |
+| 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | `71692a3` |
+| 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | recorded by milestone 15 |
 | 15 Timing/pacing | PLANNED | NTSC/PAL/CD pacing, FF, pause, frame advance | timing service | rate tolerance and state tests | Monotonic non-busy pacing | pending |
 | 16 Keyboard controls | PLANNED | Excellent default Genesis keyboard mappings | input/UI integration | synthetic key-to-core workflow | 3/6-button controls work | pending |
 | 17 Controllers | PLANNED | SDL3 discovery, hot-plug, assignments, mappings | controller service | injected SDL event tests | Multi-controller lifecycle is safe | pending |
@@ -732,4 +732,60 @@ asynchronously falls back to the same deterministic software renderer used by of
 tests and by `GENPLUSGX_FORCE_SOFTWARE_VIDEO`. Viewports convert logical coordinates to
 device pixels for high-DPI/Retina surfaces. No GUI timer performs scaling or emulation.
 
-**Commit SHA:** recorded by milestone 14
+**Commit SHA:** `71692a3`
+
+## Milestone 14 detail
+
+**Status:** COMPLETE
+
+**Goal:** Play the core's stereo S16 output through a lifecycle-safe SDL3 host stream
+without coupling device callbacks to either Qt or the Genesis Plus GX global state.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/audio/CMakeLists.txt`
+- `desktop/audio/include/genplusgx/audio_output.h`
+- `desktop/audio/src/audio_output.cpp`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/audio_output_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.audio_output` runs SDL3's real device-stream lifecycle against
+the deterministic dummy backend. It verifies configuration bounds, latency-derived
+ring capacity, typed pre-init/repeated-init failures, initial paused state, device
+identity, callback-driven consumption, exact supplied/silence accounting, submission
+instrumentation, repeated pause/resume, queue clearing, and idempotent shutdown. The
+worker test now requires generated core audio to reach its shared bounded ring.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (21/21).
+- Audio output, ring, and worker integration tests: passed.
+- Audio output, ring, and worker integration tests each passed five consecutive Debug
+  executions.
+- Release build and complete CTest: passed (21/21).
+- ASan/UBSan preset build and complete CTest: passed (21/21).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New audio service, integration, and test code compiled under the frontend warning
+  policy without warnings.
+
+**Acceptance criteria:** The application initializes SDL3 audio independently and
+continues with a warning if no device is available. The emulation thread drains each
+complete core batch into a shared SPSC ring using one fixed 4,096-frame transfer
+surface. The SDL callback uses one fixed 1,024-frame scratch surface, reads only whole
+stereo frames, supplies silence on underrun, and adds only SDL's current demand to its
+stream. Default 80 ms latency produces a bounded 3,840-frame ring. Device streams begin
+paused, track callback/ring underruns and overruns, clear stale data on pause, and close
+before the audio subsystem. Application shutdown stops and joins emulation before
+closing audio.
+
+**Commit SHA:** recorded by milestone 15

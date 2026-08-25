@@ -15,6 +15,20 @@ set_tests_properties(
   unit.audio_ring_buffer PROPERTIES LABELS "unit;audio;concurrency" TIMEOUT 30
 )
 
+add_executable(genplusgx_audio_output_test audio_output_test.cpp)
+target_link_libraries(
+  genplusgx_audio_output_test
+  PRIVATE GenesisPlusGX::Audio genplusgx_project_warnings Threads::Threads
+)
+add_test(NAME unit.audio_output COMMAND genplusgx_audio_output_test)
+set_tests_properties(
+  unit.audio_output
+  PROPERTIES
+    LABELS "unit;audio;device"
+    TIMEOUT 30
+    ENVIRONMENT "SDL_AUDIODRIVER=dummy"
+)
+
 add_executable(genplusgx_input_snapshot_test input_snapshot_test.cpp)
 target_link_libraries(
   genplusgx_input_snapshot_test

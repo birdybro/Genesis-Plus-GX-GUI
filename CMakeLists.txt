@@ -81,8 +81,8 @@ message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
 
 add_subdirectory(desktop/video)
-add_subdirectory(desktop/core)
 add_subdirectory(desktop/audio)
+add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
 
 if(GENPLUSGX_BUILD_DESKTOP)

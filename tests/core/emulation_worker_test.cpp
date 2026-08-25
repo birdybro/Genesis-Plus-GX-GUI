@@ -141,6 +141,8 @@ int main()
   std::uint64_t videoGeneration = 0;
   if (!check(runningFrame && runningFrame->frameNumber >= 1U,
         "Running worker did not publish a frame") ||
+      !check(worker.audioFrames()->occupancyFrames() > 0U,
+        "Worker did not transfer core audio into its bounded output ring") ||
       !check(worker.videoFrames()->copyLatest(
           videoPixels, videoInfo, videoGeneration),
         "Worker frame was not transferred through the bounded exchange") ||

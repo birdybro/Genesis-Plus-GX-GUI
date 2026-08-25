@@ -218,7 +218,11 @@ add_library(
 add_library(GenesisPlusGX::CoreAdapter ALIAS genplusgx_core_adapter)
 target_link_libraries(
   genplusgx_core_adapter
-  PUBLIC GenesisPlusGX::Core GenesisPlusGX::FrontendTypes GenesisPlusGX::VideoExchange
+  PUBLIC
+    GenesisPlusGX::Audio
+    GenesisPlusGX::Core
+    GenesisPlusGX::FrontendTypes
+    GenesisPlusGX::VideoExchange
   PRIVATE genplusgx_project_warnings
 )
 set_target_properties(

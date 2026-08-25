@@ -254,6 +254,22 @@ ring accepts only whole stereo frames, preserves existing queued audio on overru
 reports overrun, underrun, dropped/missing frames, occupancy, and peak occupancy without
 locking either real-time endpoint.
 
+`AudioOutput` owns SDL's reference-counted audio-subsystem lease and one
+`SDL_OpenAudioDeviceStream` playback stream. Its source format is native-endian stereo
+S16 at the same configured rate as `CoreAdapter`; SDL performs any host-device format
+conversion. The stream begins paused. Its demand callback reads through a reusable
+1,024-frame scratch surface, zero-fills shortages, and submits only the current SDL
+request. Callback count, requested, supplied, silent, and failed-submission totals are
+atomic. Pause first stops callbacks, then clears SDL and ring backlog, so resume cannot
+play stale samples. Device initialization failure is reported but does not prevent the
+emulator UI or core worker from running.
+
+The composition root creates `AudioOutput` before `EmulationWorker` and passes the
+service's shared ring to the worker. Non-frame worker events synchronize host pause with
+worker state; the GUI event timer never supplies samples. Exit stops the event pump,
+stops and joins the worker, and only then destroys the SDL stream and releases the audio
+subsystem.
+
 ## Input data flow
 
 ```text
