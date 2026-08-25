@@ -20,8 +20,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | `ac02374` |
 | 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | `4b5e5b5` |
 | 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | `1e4dc1e` |
-| 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | recorded by milestone 10 |
-| 10 Qt shell | PLANNED | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | pending |
+| 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | `0422e36` |
+| 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | recorded by milestone 11 |
 | 11 Emulation worker | PLANNED | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | pending |
 | 12 Display widget | PLANNED | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable texture path | pending |
 | 13 Video scaling | PLANNED | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | pending |
@@ -511,4 +511,55 @@ before core entry. Slots replace atomically and a failed core load restores the 
 machine state. Raw loads must exactly match the active hardware's core-generated state
 size, preventing truncated buffers from reaching `state_load()`.
 
-**Commit SHA:** recorded by milestone 10
+**Commit SHA:** `0422e36`
+
+## Milestone 10 detail
+
+**Status:** COMPLETE
+
+**Goal:** Establish the installable Qt Widgets process and a conventional, accessible
+main-window shell whose stable identities support behavior-driven headless tests.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/about_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/about_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `tests/CMakeLists.txt`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/main_window_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `gui.main_window` constructs and shows the real shell on Qt's offscreen
+platform, verifies its title/size/drop/accessibility contract, central canvas, all seven
+top-level menus and six structural submenus, stable action identifiers, no-game enabled
+state, checkable actions, five status fields, asynchronous About dialog build/license
+identity, and functional Exit action. `gui.desktop_help` and `gui.desktop_version` run
+the packaged executable entry point and verify its command-line identity without
+entering the event loop.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (15/15).
+- Main-window GUI test passed three consecutive offscreen executions.
+- Release build and complete CTest: passed (15/15).
+- ASan/UBSan preset build and complete CTest: passed (15/15).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New app, UI, and GUI-test code compiled under the frontend warning policy without
+  warnings.
+
+**Acceptance criteria:** `genesis-plus-gx-gui` starts as a native Qt Widgets application
+with platform identity/version metadata, a black accessible display surface, complete
+desktop menu hierarchy, informative empty-state status bar, and nonblocking About dialog.
+Every significant shell object has a stable `objectName`; tests require no human dialogs
+or real display server. The install target is a GUI executable/app bundle as appropriate
+for the host platform.
+
+**Commit SHA:** recorded by milestone 11

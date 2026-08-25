@@ -78,6 +78,22 @@ tests/                   unit, core, integration, GUI, fixtures, utilities
 cmake/                   target helpers and packaging modules
 ```
 
+## Desktop process and shell
+
+`desktop/app` is the sole process composition root. It establishes the stable
+organization, application, desktop-file, and version identity before constructing the
+Qt shell. Command-line help and version reporting finish before the GUI event loop.
+`desktop/ui` owns native widgets but has no dependency on core headers; later runtime
+services are connected through narrow coordinator interfaces rather than by giving the
+window direct core access.
+
+`MainWindow` provides the conventional File, Emulation, Video, Audio, Input, Tools, and
+Help hierarchy, a central accessible display surface, and separate game/system/region,
+FPS, and state-slot status fields. Controls and dialogs have stable Qt `objectName`
+values. Modal-looking dialogs use asynchronous `QDialog::open()` so neither production
+coordination nor GUI tests require a nested blocking event loop. The empty shell and its
+real executable are tested using Qt's offscreen platform.
+
 ## Core adapter
 
 The adapter is the only production component permitted to include the core's broad

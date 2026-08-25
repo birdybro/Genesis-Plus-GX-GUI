@@ -76,6 +76,11 @@ add_subdirectory(desktop/core)
 add_subdirectory(desktop/audio)
 add_subdirectory(desktop/persistence)
 
+if(GENPLUSGX_BUILD_DESKTOP)
+  add_subdirectory(desktop/ui)
+  add_subdirectory(desktop/app)
+endif()
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
