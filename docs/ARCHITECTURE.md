@@ -261,8 +261,9 @@ and balances it during thread teardown. This is required because the platform's 
 scheduler tick is coarser than the 4.17 ms deadline used by bounded 4x fast-forward.
 macOS converts the remaining steady-clock duration to a native `mach_wait_until`
 deadline because hosted libc++ deadline sleeps can be coalesced far beyond a video
-interval; Linux uses the standard library sleep directly. These services change only
-wait resolution; all cadence and drift decisions remain in the platform-independent
+interval; its dedicated worker also requests the user-interactive thread QoS class.
+Linux uses the standard library sleep directly. These services change only scheduling
+resolution; all cadence and drift decisions remain in the platform-independent
 `FramePacer`.
 
 Pause removes the active deadline. Resume starts immediately from a fresh origin, and

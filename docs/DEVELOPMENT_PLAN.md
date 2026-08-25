@@ -2385,6 +2385,11 @@ filesystem, timing, generated-fixture, and stability suites.
   hosted Apple Silicon worker. The platform timing service now converts the remaining
   steady-clock duration into an absolute Mach deadline and repeats interrupted waits;
   a portable unit check guards against early return and unbounded oversleep.
+- Run `32912292676` showed the native wait primitive passes its focused test while the
+  worker remains scheduled at approximately 20 Hz. The dedicated macOS emulation thread
+  now requests `QOS_CLASS_USER_INTERACTIVE`, matching its latency-sensitive desktop
+  workload; pacing failures also emit measured duration, rate, and scheduled-frame
+  counts for objective follow-up.
 - Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
   timing portability fix. Static workflow validation and hosted verification are
   pending this workflow-bearing commit.

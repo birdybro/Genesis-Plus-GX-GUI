@@ -450,6 +450,7 @@ private:
   void threadMain()
   {
     const ScopedHostTimerResolution timerResolution;
+    static_cast<void>(configureCurrentThreadForInteractiveTiming());
     CoreAdapter adapter{audioSampleRate_};
     const auto initialized = adapter.initialize();
     if (!initialized) {

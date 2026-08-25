@@ -7,6 +7,7 @@ namespace genplusgx {
 
 void sleepUntilHostDeadline(
   std::chrono::steady_clock::time_point deadline) noexcept;
+[[nodiscard]] bool configureCurrentThreadForInteractiveTiming() noexcept;
 
 // Requests a process timer resolution suitable for short emulation deadlines.
 // Windows requires an explicit request for condition-variable waits below the

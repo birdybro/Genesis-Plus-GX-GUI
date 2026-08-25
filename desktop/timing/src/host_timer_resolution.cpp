@@ -6,6 +6,7 @@
 
 #if defined(__APPLE__)
 #include <mach/mach_time.h>
+#include <pthread.h>
 #endif
 
 #if defined(_WIN32)
@@ -17,6 +18,15 @@
 #endif
 
 namespace genplusgx {
+
+bool configureCurrentThreadForInteractiveTiming() noexcept
+{
+#if defined(__APPLE__)
+  return pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0) == 0;
+#else
+  return true;
+#endif
+}
 
 void sleepUntilHostDeadline(
   std::chrono::steady_clock::time_point deadline) noexcept

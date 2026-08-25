@@ -102,6 +102,10 @@ int main()
   const auto normalElapsed = std::chrono::steady_clock::now() - normalStart;
   const auto normalSeconds = std::chrono::duration<double>(normalElapsed).count();
   const auto normalRate = static_cast<double>(normalFrames) / normalSeconds;
+  if (!(normalElapsed > 400ms && normalElapsed < 800ms)) {
+    std::cerr << "Measured normal cadence: " << normalSeconds << " s, "
+              << normalRate << " fps\n";
+  }
   if (!check(normalElapsed > 400ms && normalElapsed < 800ms,
         "Normal pacing ran wildly outside the NTSC frame interval") ||
       !check(normalRate > 40.0 && normalRate < 80.0,
@@ -152,6 +156,11 @@ int main()
   const auto fastRate =
     static_cast<double>(fastFrames) /
     std::chrono::duration<double>(fastElapsed).count();
+  if (!(fastElapsed > 100ms && fastElapsed < 400ms)) {
+    std::cerr << "Measured fast-forward cadence: "
+              << std::chrono::duration<double>(fastElapsed).count() << " s, "
+              << fastRate << " fps\n";
+  }
   if (!check(fastElapsed > 100ms && fastElapsed < 400ms,
         "Fast-forward pacing ran outside its bounded 4x interval") ||
       !check(fastRate > normalRate * 2.5 && fastRate < 350.0,

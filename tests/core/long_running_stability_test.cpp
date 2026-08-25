@@ -244,8 +244,13 @@ int main()
     return 10;
   }
   const auto normalTarget = worker.metrics().pacedFrameCount + 90U;
-  if (!check(waitForScheduledFrames(
-        worker, normalTarget, std::chrono::steady_clock::now() + 3s),
+  const auto reachedNormalTarget = waitForScheduledFrames(
+    worker, normalTarget, std::chrono::steady_clock::now() + 3s);
+  if (!reachedNormalTarget) {
+    std::cerr << "Normal stress frames: " << worker.metrics().pacedFrameCount
+              << " / " << normalTarget << '\n';
+  }
+  if (!check(reachedNormalTarget,
         "Normal stress pacing did not reach its frame target") ||
       !check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
@@ -272,8 +277,13 @@ int main()
     return 13;
   }
   const auto fastTarget = worker.metrics().pacedFrameCount + 600U;
-  if (!check(waitForScheduledFrames(
-        worker, fastTarget, std::chrono::steady_clock::now() + 5s),
+  const auto reachedFastTarget = waitForScheduledFrames(
+    worker, fastTarget, std::chrono::steady_clock::now() + 5s);
+  if (!reachedFastTarget) {
+    std::cerr << "Fast-forward stress frames: "
+              << worker.metrics().pacedFrameCount << " / " << fastTarget << '\n';
+  }
+  if (!check(reachedFastTarget,
         "Fast-forward stress did not reach 600 scheduled frames") ||
       !check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
