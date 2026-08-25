@@ -1,5 +1,8 @@
 # Keyboard Controls and Shortcuts
 
+The same default shortcut reference is available in the application through **Help →
+Keyboard Shortcuts**.
+
 ## Default Player 1 controls
 
 The emulator display accepts the following keyboard controls when it has focus. These
@@ -24,9 +27,8 @@ restores the still-held direction. Switching away from, hiding, or deactivating 
 emulator display releases every held key to prevent stuck input.
 
 Ctrl, Alt, and Command/Meta chords are reserved for application shortcuts and are not
-interpreted as gameplay input. The standalone hotkey list will expand alongside the
-emulation actions and configurable binding UI in later milestones; the menu always
-shows the currently assigned application shortcuts.
+interpreted as gameplay input. The menu shows the currently assigned application
+shortcuts.
 
 ## Application shortcuts
 

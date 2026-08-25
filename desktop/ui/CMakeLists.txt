@@ -9,6 +9,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/diagnostics_dialog.h
   include/genplusgx/ui/game_information_dialog.h
   include/genplusgx/ui/game_library_dialog.h
+  include/genplusgx/ui/help_dialog.h
   include/genplusgx/ui/input_configuration_dialog.h
   include/genplusgx/ui/main_window.h
   include/genplusgx/ui/per_game_settings_dialog.h
@@ -26,6 +27,7 @@ add_library(genplusgx_ui STATIC
   src/diagnostics_dialog.cpp
   src/game_information_dialog.cpp
   src/game_library_dialog.cpp
+  src/help_dialog.cpp
   src/input_configuration_dialog.cpp
   src/main_window.cpp
   src/per_game_settings_dialog.cpp

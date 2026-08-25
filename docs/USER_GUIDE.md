@@ -329,5 +329,8 @@ timing/audio anomalies without per-frame noise. See
 [LOGGING_AND_DIAGNOSTICS.md](LOGGING_AND_DIAGNOSTICS.md) for the schema and support
 workflow.
 
-Features whose menus are visible but remain disabled without a loaded game will be
-enabled as their corresponding milestones connect the remaining frontend services.
+## In-application help
+
+**Help → User Guide** opens a keyboard-accessible getting-started reference without a
+browser or network connection. **Help → Keyboard Shortcuts** lists the active default
+application shortcuts. The complete source-build guide remains this document.

@@ -1073,6 +1073,7 @@ int main(int argc, char* argv[])
     PendingLoadPhase phase{PendingLoadPhase::metadata};
   };
   std::uint64_t lifecycleOperationId = 2'000'000U;
+  std::uint64_t emulationControlOperationId = 2'100'000U;
   std::uint64_t loadMetadataOperationId = 2'250'000U;
   std::uint64_t stateOperationId = 3'000'000U;
   std::uint64_t gameGeneration = 0U;
@@ -1296,6 +1297,45 @@ int main(int argc, char* argv[])
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
     });
+  window.setEmulationControlSink(
+    [&emulationControlOperationId, &worker](
+      genplusgx::ui::EmulationUiOperation operation, bool enabled) {
+      using UiOperation = genplusgx::ui::EmulationUiOperation;
+      using CommandType = genplusgx::EmulationCommandType;
+      const auto operationId = ++emulationControlOperationId;
+      genplusgx::EmulationCommand command;
+      switch (operation) {
+        case UiOperation::pause:
+          command = genplusgx::EmulationCommand::simple(
+            CommandType::pause, operationId);
+          break;
+        case UiOperation::resume:
+          command = genplusgx::EmulationCommand::simple(
+            CommandType::resume, operationId);
+          break;
+        case UiOperation::hardReset:
+          command = genplusgx::EmulationCommand::simple(
+            CommandType::hardReset, operationId);
+          break;
+        case UiOperation::softReset:
+          command = genplusgx::EmulationCommand::simple(
+            CommandType::softReset, operationId);
+          break;
+        case UiOperation::frameAdvance:
+          command = genplusgx::EmulationCommand::simple(
+            CommandType::frameAdvance, operationId);
+          break;
+        case UiOperation::setFastForward:
+          command = genplusgx::EmulationCommand::fastForward(
+            operationId, enabled);
+          break;
+      }
+      const auto submitted = worker.submit(std::move(command));
+      if (!submitted) {
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+      }
+      return submitted.ok();
+    });
   window.setDiscOperationSink(
     [&discOperationId, &pendingDisc, &window, &worker](
       genplusgx::ui::DiscUiOperation operation,
@@ -1479,6 +1519,14 @@ int main(int argc, char* argv[])
       nextInstrumentationLog = instrumentationNow + std::chrono::seconds{5};
     }
     while (auto event = worker.pollEvent()) {
+      if (event->type != genplusgx::EmulationEventType::frameCompleted &&
+          window.isGameLoaded() &&
+          (event->workerState == genplusgx::EmulationWorkerState::paused ||
+           event->workerState == genplusgx::EmulationWorkerState::running)) {
+        window.setEmulationControlState(
+          event->workerState == genplusgx::EmulationWorkerState::paused,
+          event->fastForward);
+      }
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
         continue;
@@ -1561,6 +1609,7 @@ int main(int argc, char* argv[])
             ? discRegionName(event->disc.region)
             : completedLoad.diagnosticRegion;
           window.setGameLoaded(loadedPath);
+          window.setEmulationControlState(true, false);
           if (activePerGameIdentity) {
             window.setPerGameSettingsSession(
               activePerGameSettings, globalGameSettings());

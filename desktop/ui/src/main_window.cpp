@@ -10,6 +10,7 @@
 #include "genplusgx/ui/diagnostics_dialog.h"
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
+#include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
@@ -139,12 +140,31 @@ void MainWindow::buildMenus()
   auto* emulation = createMenu(tr("&Emulation"), "emulationMenu");
   auto* pause = addAction(*emulation, tr("&Pause"), "pauseAction", QKeySequence{tr("Space")});
   pause->setCheckable(true);
-  addAction(*emulation, tr("&Reset"), "resetAction", QKeySequence{tr("Ctrl+R")});
-  addAction(*emulation, tr("&Soft Reset"), "softResetAction");
+  connect(pause, &QAction::toggled, this, [this](bool paused) {
+    requestEmulationControl(
+      paused ? EmulationUiOperation::pause : EmulationUiOperation::resume);
+  });
+  auto* reset = addAction(
+    *emulation, tr("&Reset"), "resetAction", QKeySequence{tr("Ctrl+R")});
+  connect(reset, &QAction::triggered, this, [this] {
+    requestEmulationControl(EmulationUiOperation::hardReset);
+  });
+  auto* softReset = addAction(
+    *emulation, tr("&Soft Reset"), "softResetAction");
+  connect(softReset, &QAction::triggered, this, [this] {
+    requestEmulationControl(EmulationUiOperation::softReset);
+  });
   auto* fastForward = addAction(
     *emulation, tr("&Fast Forward"), "fastForwardAction", QKeySequence{tr("Tab")});
   fastForward->setCheckable(true);
-  addAction(*emulation, tr("Frame &Advance"), "frameAdvanceAction", QKeySequence{tr("N")});
+  connect(fastForward, &QAction::toggled, this, [this](bool enabled) {
+    requestEmulationControl(EmulationUiOperation::setFastForward, enabled);
+  });
+  auto* frameAdvance = addAction(
+    *emulation, tr("Frame &Advance"), "frameAdvanceAction", QKeySequence{tr("N")});
+  connect(frameAdvance, &QAction::triggered, this, [this] {
+    requestEmulationControl(EmulationUiOperation::frameAdvance);
+  });
   emulation->addSeparator();
   auto* saveState = addAction(
     *emulation, tr("&Save State"), "saveStateAction", QKeySequence{tr("F5")});
@@ -447,13 +467,43 @@ void MainWindow::buildMenus()
   connect(diagnostics, &QAction::triggered, this, &MainWindow::showDiagnostics);
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
-  addAction(*help, tr("&User Guide"), "userGuideAction", QKeySequence::HelpContents);
-  addAction(*help, tr("&Keyboard Shortcuts"), "keyboardShortcutsAction");
+  auto* userGuide = addAction(
+    *help, tr("&User Guide"), "userGuideAction", QKeySequence::HelpContents);
+  connect(userGuide, &QAction::triggered, this, &MainWindow::showUserGuide);
+  auto* shortcuts = addAction(
+    *help, tr("&Keyboard Shortcuts"), "keyboardShortcutsAction");
+  connect(shortcuts, &QAction::triggered,
+    this, &MainWindow::showKeyboardShortcuts);
   help->addSeparator();
   auto* about = addAction(*help, tr("&About Genesis Plus GX GUI"), "aboutAction");
   connect(about, &QAction::triggered, this, &MainWindow::showAboutDialog);
   auto* aboutQt = addAction(*help, tr("About &Qt"), "aboutQtAction");
   connect(aboutQt, &QAction::triggered, qApp, &QApplication::aboutQt);
+}
+
+void MainWindow::showUserGuide()
+{
+  if (auto* existing = findChild<HelpDialog*>(QStringLiteral("userGuideDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new HelpDialog(HelpTopic::userGuide, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->open();
+}
+
+void MainWindow::showKeyboardShortcuts()
+{
+  if (auto* existing = findChild<HelpDialog*>(
+        QStringLiteral("keyboardShortcutsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new HelpDialog(HelpTopic::keyboardShortcuts, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->open();
 }
 
 void MainWindow::buildStatusBar()
@@ -483,6 +533,72 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateScreenshotAction();
   updateCheatAction();
   updatePerGameSettingsAction();
+  updateEmulationControls();
+}
+
+void MainWindow::setEmulationControlSink(EmulationControlSink sink)
+{
+  emulationControlSink_ = std::move(sink);
+  updateEmulationControls();
+}
+
+void MainWindow::setEmulationControlState(bool paused, bool fastForward)
+{
+  emulationPaused_ = isGameLoaded() && paused;
+  fastForwardActive_ = isGameLoaded() && fastForward;
+  updateEmulationControls();
+}
+
+void MainWindow::requestEmulationControl(
+  EmulationUiOperation operation,
+  bool enabled)
+{
+  if (!isGameLoaded() || !emulationControlSink_ ||
+      !emulationControlSink_(operation, enabled)) {
+    updateEmulationControls();
+    statusBar()->showMessage(tr("The emulation command could not be queued."), 5'000);
+    return;
+  }
+
+  if (operation == EmulationUiOperation::pause) {
+    emulationPaused_ = true;
+  } else if (operation == EmulationUiOperation::resume) {
+    emulationPaused_ = false;
+  } else if (operation == EmulationUiOperation::setFastForward) {
+    fastForwardActive_ = enabled;
+  }
+  updateEmulationControls();
+}
+
+void MainWindow::updateEmulationControls()
+{
+  const bool available = isGameLoaded() && !gameLoading_ &&
+                         static_cast<bool>(emulationControlSink_);
+  auto* pause = findChild<QAction*>(QStringLiteral("pauseAction"));
+  auto* reset = findChild<QAction*>(QStringLiteral("resetAction"));
+  auto* softReset = findChild<QAction*>(QStringLiteral("softResetAction"));
+  auto* fastForward = findChild<QAction*>(QStringLiteral("fastForwardAction"));
+  auto* frameAdvance = findChild<QAction*>(QStringLiteral("frameAdvanceAction"));
+  if (pause != nullptr) {
+    const QSignalBlocker blocker{pause};
+    pause->setChecked(available && emulationPaused_);
+    pause->setText(available && emulationPaused_ ? tr("&Resume") : tr("&Pause"));
+    pause->setEnabled(available);
+  }
+  if (reset != nullptr) {
+    reset->setEnabled(available);
+  }
+  if (softReset != nullptr) {
+    softReset->setEnabled(available);
+  }
+  if (fastForward != nullptr) {
+    const QSignalBlocker blocker{fastForward};
+    fastForward->setChecked(available && fastForwardActive_);
+    fastForward->setEnabled(available);
+  }
+  if (frameAdvance != nullptr) {
+    frameAdvance->setEnabled(available && emulationPaused_);
+  }
 }
 
 void MainWindow::setCheatSession(
@@ -1579,6 +1695,8 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
     perGame->reject();
   }
   gameLoading_ = true;
+  emulationPaused_ = false;
+  fastForwardActive_ = false;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
   displayWidget_->clearFrame();
@@ -1626,6 +1744,8 @@ void MainWindow::setNoGameLoaded()
   gameInformationBusy_ = false;
   stateSessionReady_ = false;
   stateOperationBusy_ = false;
+  emulationPaused_ = false;
+  fastForwardActive_ = false;
   segaCdSession_ = false;
   discEjected_ = false;
   discPresent_ = false;

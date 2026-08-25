@@ -67,6 +67,15 @@ enum class DiscUiOperation {
   setEjected,
 };
 
+enum class EmulationUiOperation {
+  pause,
+  resume,
+  hardReset,
+  softReset,
+  frameAdvance,
+  setFastForward,
+};
+
 class MainWindow final : public QMainWindow {
 public:
   using InputConfigurationSink =
@@ -78,6 +87,8 @@ public:
   using ClearRecentGamesSink = std::function<void()>;
   using StateOperationSink =
     std::function<void(StateUiOperation, std::uint32_t)>;
+  using EmulationControlSink =
+    std::function<bool(EmulationUiOperation, bool)>;
   using VideoSettingsSink =
     std::function<void(const settings::VideoSettings&)>;
   using AudioSettingsSink =
@@ -106,6 +117,8 @@ public:
   explicit MainWindow(QWidget* parent = nullptr);
 
   void showAboutDialog();
+  void showUserGuide();
+  void showKeyboardShortcuts();
   void showInputConfiguration(
     InputConfigurationTab tab = InputConfigurationTab::bindings);
   void setInputConfiguration(input::InputConfiguration configuration);
@@ -124,6 +137,8 @@ public:
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
   void setStateOperationSink(StateOperationSink sink);
+  void setEmulationControlSink(EmulationControlSink sink);
+  void setEmulationControlState(bool paused, bool fastForward);
   void setVideoSettings(settings::VideoSettings settings);
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
@@ -248,6 +263,8 @@ private:
   void requestGameInformation();
   void updateGameInformationAction();
   void requestStateOperation(StateUiOperation operation);
+  void requestEmulationControl(EmulationUiOperation operation, bool enabled = false);
+  void updateEmulationControls();
   void updateStateActions();
   void updateStateSlotPresentation();
   void requestScreenshot();
@@ -281,6 +298,7 @@ private:
   GameCloseSink gameCloseSink_;
   ClearRecentGamesSink clearRecentGamesSink_;
   StateOperationSink stateOperationSink_;
+  EmulationControlSink emulationControlSink_;
   settings::VideoSettings videoSettings_{settings::defaultVideoSettings()};
   VideoSettingsSink videoSettingsSink_;
   settings::AudioSettings audioSettings_{settings::defaultAudioSettings()};
@@ -315,6 +333,8 @@ private:
   bool gameLoading_{false};
   bool stateSessionReady_{false};
   bool stateOperationBusy_{false};
+  bool emulationPaused_{false};
+  bool fastForwardActive_{false};
   bool segaCdSession_{false};
   bool discEjected_{false};
   bool discPresent_{false};

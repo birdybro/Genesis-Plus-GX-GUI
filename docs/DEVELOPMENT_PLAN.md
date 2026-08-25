@@ -46,8 +46,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | `7756e2b` |
 | 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | `cf3e7ac` |
 | 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | `824adf5` |
-| 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | recorded by milestone 36 |
-| 36 GUI regression | PLANNED | Cover every significant menu/dialog workflow | `tests/gui` and seams | complete headless GUI suite | Behavior, not construction-only, asserted | pending |
+| 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | `88313f1` |
+| 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | recorded by milestone 37 |
 | 37 Sanitizer/stress | PLANNED | ASan/UBSan, lifecycle and long-frame hardening | presets/tests | sanitizers and bounded stability test | No new-code sanitizer defects | pending |
 | 38 Linux CI | PLANNED | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation | Clean Linux matrix definition | pending |
 | 39 Windows CI | PLANNED | MSVC x64 build and tests | GitHub workflow/platform fixes | matrix definition and cross-platform review | Clean Windows matrix definition | pending |
@@ -2145,3 +2145,58 @@ states/hash prefixes, and logger counters. Copy uses the exact filtered report a
 includes ROM, BIOS, log, or home-directory paths.
 
 **Commit SHA:** recorded by milestone 36
+
+## Milestone 36 detail
+
+**Status:** COMPLETE
+
+**Goal:** Exercise every significant desktop menu/dialog workflow headlessly, close
+remaining action wiring gaps discovered by the inventory, and make the GUI coverage
+matrix explicit and repeatable.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/help_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/help_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/emulation_controls_test.cpp`
+- `tests/gui/navigation_regression_test.cpp`
+- `docs/TEST_MATRIX.md`
+- `docs/USER_GUIDE.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `gui.emulation_controls` drives Pause/Resume, hard and soft reset,
+fast-forward enable/disable, and single-frame advance through real MainWindow actions,
+a bounded emulation worker, and a generated Genesis ROM. It verifies canonical worker
+state is reflected back into action check/enabled state and rejected submissions roll
+back optimistic UI state. `gui.navigation_regression` enforces unique stable object names
+and non-conflicting shortcuts for every production action, and exercises both embedded
+Help dialogs, accessibility text, one-dialog ownership, close buttons, and Escape.
+
+**Gate evidence:**
+
+- Focused emulation-control, navigation, MainWindow, loading, and state tests passed.
+- Complete headless GUI label suite: passed (15/15).
+- Debug build and complete CTest: passed (60/60).
+- Release build and complete CTest: passed (60/60).
+- ASan/UBSan build and complete CTest: passed (60/60). The first sanitizer run
+  exposed a test-only raw-pointer dereference after `WA_DeleteOnClose`; the assertion
+  now uses `QPointer`, and both the focused and complete sanitizer reruns are clean.
+- Legacy libretro regression: passed; the two pre-existing `extract_name`
+  const-qualification warnings remain confined to `libretro/libretro.c`.
+
+**Acceptance criteria:** Every significant menu and dialog has behavioral coverage in
+`docs/TEST_MATRIX.md`. The previously inert Pause/Resume, Reset, Soft Reset, Fast Forward,
+Frame Advance, User Guide, and Keyboard Shortcuts actions are connected. Emulation
+commands cross a typed callback into the worker queue; action state is synchronized from
+completed worker events and fails closed if a submission is rejected. Help content is
+offline, read-only, modal, keyboard closable, accessible, and bounded to one instance per
+topic. The platform-independent GUI suite validates behavior rather than widget
+construction or native-window pixel goldens.
+
+**Commit SHA:** recorded by milestone 37

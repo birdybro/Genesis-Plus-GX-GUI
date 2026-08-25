@@ -2,6 +2,46 @@ qt_add_executable(genplusgx_main_window_test
   main_window_test.cpp
 )
 
+qt_add_executable(genplusgx_emulation_controls_test emulation_controls_test.cpp)
+set_target_properties(genplusgx_emulation_controls_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_emulation_controls_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx::ui
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+
+qt_add_executable(genplusgx_navigation_regression_test navigation_regression_test.cpp)
+set_target_properties(genplusgx_navigation_regression_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_navigation_regression_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.navigation_regression COMMAND genplusgx_navigation_regression_test)
+set_tests_properties(
+  gui.navigation_regression
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;regression;navigation;accessibility;hotkeys"
+    TIMEOUT 30
+)
+add_test(NAME gui.emulation_controls COMMAND genplusgx_emulation_controls_test)
+set_tests_properties(
+  gui.emulation_controls
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;integration;emulation;fixture;concurrency;timing"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_diagnostics_dialog_test diagnostics_dialog_test.cpp)
 set_target_properties(genplusgx_diagnostics_dialog_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
