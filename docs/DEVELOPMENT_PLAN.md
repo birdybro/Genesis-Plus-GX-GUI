@@ -18,8 +18,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | `447bc21` |
 | 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | `8c99cd6` |
 | 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | `ac02374` |
-| 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
-| 08 Persistence | PLANNED | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
+| 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | `4b5e5b5` |
+| 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
 | 09 Save states | PLANNED | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | pending |
 | 10 Qt shell | PLANNED | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | pending |
 | 11 Emulation worker | PLANNED | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | pending |
@@ -415,4 +415,49 @@ At the boundary, players map in order to active core devices, all unused/disconn
 slots are zeroed, digital and analog state is translated, and the emulated program
 observes the result through the real Genesis controller I/O path.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 08.
+**Commit SHA:** `4b5e5b5`
+
+## Milestone 08 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace current-directory save conventions with absolute platform application
+paths, collision-resistant per-game identities, bounded reads, and atomic cartridge/CD
+RAM files.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/persistence.h`
+- `desktop/persistence/src/persistence.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/persistence_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.persistence` uses only `QTemporaryDir` and verifies hierarchy
+creation, separator/traversal/device-name/length sanitization, deterministic SHA-256,
+changed-content identity, full-hash directory collision avoidance, cartridge SRAM, CD
+internal BRAM, CD RAM cartridge, missing-file behavior, atomic replacement, rejected
+oversized writes preserving prior data, bounded-load corruption rejection, non-file
+corruption, invalid/traversal identity rejection, blocked roots, and rejection of
+current-directory-relative roots.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (10/10).
+- Persistence tests passed three consecutive Debug executions.
+- Release build and complete CTest: passed (10/10).
+- ASan/UBSan preset build and complete CTest: passed (10/10).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New persistence code compiled under the frontend warning policy without warnings.
+
+**Acceptance criteria:** Production roots come from Qt's platform standard and must be
+absolute; tests cannot touch real application data. Filenames are portable and cannot
+traverse. Per-game directories include the full SHA-256. All three RAM forms use stable
+distinct names, at most 8 MiB is accepted, reads validate before allocating, and Qt
+atomic transactions never fall back to truncating direct writes.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 09.

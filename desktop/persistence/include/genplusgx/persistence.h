@@ -1,0 +1,112 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <span>
+#include <string>
+#include <string_view>
+#include <vector>
+
+namespace genplusgx {
+
+enum class PersistenceError {
+  none,
+  invalidRoot,
+  invalidGameIdentity,
+  directoryCreationFailed,
+  fileOpenFailed,
+  fileReadFailed,
+  fileWriteFailed,
+  fileCommitFailed,
+  dataTooLarge,
+  hashFailed,
+};
+
+struct PersistenceStatus final {
+  PersistenceError error{PersistenceError::none};
+  std::string message;
+
+  [[nodiscard]] bool ok() const noexcept { return error == PersistenceError::none; }
+  [[nodiscard]] operator bool() const noexcept { return ok(); }
+};
+
+class ApplicationPaths final {
+public:
+  explicit ApplicationPaths(std::filesystem::path root = {});
+
+  [[nodiscard]] static ApplicationPaths fromPlatform();
+  [[nodiscard]] PersistenceStatus initialize() const;
+
+  [[nodiscard]] const std::filesystem::path& root() const noexcept;
+  [[nodiscard]] std::filesystem::path configDirectory() const;
+  [[nodiscard]] std::filesystem::path savesDirectory() const;
+  [[nodiscard]] std::filesystem::path statesDirectory() const;
+  [[nodiscard]] std::filesystem::path screenshotsDirectory() const;
+  [[nodiscard]] std::filesystem::path libraryDirectory() const;
+  [[nodiscard]] std::filesystem::path logsDirectory() const;
+
+private:
+  std::filesystem::path root_;
+};
+
+struct GameIdentity final {
+  std::string sha256;
+  std::string titleSlug;
+
+  [[nodiscard]] bool valid() const noexcept;
+  [[nodiscard]] std::string directoryName() const;
+};
+
+struct GameIdentityResult final {
+  PersistenceStatus status;
+  GameIdentity identity;
+};
+
+[[nodiscard]] std::string sanitizeFilename(
+  std::string_view input,
+  std::size_t maximumLength = 64U);
+[[nodiscard]] GameIdentityResult identifyGame(
+  const std::filesystem::path& path,
+  std::string_view preferredTitle = {});
+
+enum class SaveRamKind {
+  cartridge,
+  scdInternal,
+  scdRamCartridge,
+};
+
+struct PersistenceLoadResult final {
+  PersistenceStatus status;
+  bool exists{false};
+  std::vector<std::uint8_t> data;
+};
+
+class PersistenceStore final {
+public:
+  static constexpr std::size_t maximumRamBytes = 8U * 1024U * 1024U;
+
+  explicit PersistenceStore(ApplicationPaths paths);
+
+  [[nodiscard]] PersistenceStatus initialize() const;
+  [[nodiscard]] const ApplicationPaths& paths() const noexcept;
+  [[nodiscard]] std::filesystem::path gameSaveDirectory(
+    const GameIdentity& identity) const;
+  [[nodiscard]] std::filesystem::path ramPath(
+    const GameIdentity& identity,
+    SaveRamKind kind) const;
+
+  [[nodiscard]] PersistenceStatus saveRam(
+    const GameIdentity& identity,
+    SaveRamKind kind,
+    std::span<const std::uint8_t> data) const;
+  [[nodiscard]] PersistenceLoadResult loadRam(
+    const GameIdentity& identity,
+    SaveRamKind kind,
+    std::size_t maximumBytes = maximumRamBytes) const;
+
+private:
+  ApplicationPaths paths_;
+};
+
+} // namespace genplusgx

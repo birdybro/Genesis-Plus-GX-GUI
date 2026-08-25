@@ -25,3 +25,17 @@ target_link_libraries(
 
 add_test(NAME unit.input_snapshot COMMAND genplusgx_input_snapshot_test)
 set_tests_properties(unit.input_snapshot PROPERTIES LABELS "unit;input")
+
+add_executable(genplusgx_persistence_test persistence_test.cpp)
+target_link_libraries(
+  genplusgx_persistence_test
+  PRIVATE
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+
+add_test(NAME unit.persistence COMMAND genplusgx_persistence_test)
+set_tests_properties(
+  unit.persistence PROPERTIES LABELS "unit;persistence;filesystem" TIMEOUT 30
+)

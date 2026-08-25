@@ -74,6 +74,7 @@ message(STATUS "Tests: ${BUILD_TESTING}")
 
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/audio)
+add_subdirectory(desktop/persistence)
 
 if(BUILD_TESTING)
   add_subdirectory(tests)

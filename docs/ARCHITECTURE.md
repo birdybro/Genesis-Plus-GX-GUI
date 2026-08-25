@@ -243,6 +243,15 @@ an existing per-game override is applied only for fields explicitly marked overr
 Defaults and validation are pure, testable logic. UI Apply sends a complete validated
 snapshot rather than mutating core globals piecemeal.
 
+`ApplicationPaths::fromPlatform()` resolves the root through Qt's standard application
+data location; every test constructs it with an absolute temporary root. Relative roots
+are rejected so persistence can never silently fall back to the process working
+directory. A per-game directory uses a conservative ASCII title slug plus the complete
+lowercase SHA-256 content identifier. Raw cartridge SRAM, CD internal BRAM, and CD RAM
+cartridge files retain distinct stable names. Writes use `QSaveFile` with direct-write
+fallback disabled, so a failed transaction cannot truncate an existing save; reads are
+regular-file checked and size bounded before allocation.
+
 ## Game loading and library
 
 The file loader normalizes a path, checks that it is a bounded regular file (or a valid
