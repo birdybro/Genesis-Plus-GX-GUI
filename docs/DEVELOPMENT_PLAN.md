@@ -45,8 +45,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | `7f04063` |
 | 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | `7756e2b` |
 | 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | `cf3e7ac` |
-| 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | recorded by milestone 35 |
-| 35 Diagnostics/logging | PLANNED | Structured logs and copyable safe diagnostics | logging/diagnostics dialog | redaction/log creation/GUI tests | Useful bounded diagnostics, no secrets | pending |
+| 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | `824adf5` |
+| 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | recorded by milestone 36 |
 | 36 GUI regression | PLANNED | Cover every significant menu/dialog workflow | `tests/gui` and seams | complete headless GUI suite | Behavior, not construction-only, asserted | pending |
 | 37 Sanitizer/stress | PLANNED | ASan/UBSan, lifecycle and long-frame hardening | presets/tests | sanitizers and bounded stability test | No new-code sanitizer defects | pending |
 | 38 Linux CI | PLANNED | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation | Clean Linux matrix definition | pending |
@@ -2080,4 +2080,68 @@ so native widgets remain device-independent while the emulator display retains i
 separate pixel/integer-scaling policy. Schema 1 persistence is bounded and atomic;
 malformed or unsupported settings fail closed to the system theme.
 
-**Commit SHA:** recorded by milestone 35
+**Commit SHA:** `824adf5`
+
+## Milestone 35 detail
+
+**Status:** COMPLETE
+
+**Goal:** Retain actionable frontend lifecycle and anomaly evidence in bounded
+machine-readable logs, and expose a live support report that is useful without leaking
+personal filesystem or credential data.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/diagnostics/CMakeLists.txt`
+- `desktop/diagnostics/include/genplusgx/diagnostics/diagnostics.h`
+- `desktop/diagnostics/src/diagnostics.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/diagnostics_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/diagnostics_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/video/src/display_widget.cpp`
+- `tests/unit/diagnostics_test.cpp`
+- `tests/gui/diagnostics_dialog_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/gui/CMakeLists.txt`
+- `docs/LOGGING_AND_DIAGNOSTICS.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.diagnostics` verifies home and arbitrary absolute-path removal,
+credential-key redaction, safe report formatting, build/Qt/SDL identity, invalid logger
+configuration, installed Qt-handler capture, valid JSON Lines, strict byte ceilings,
+three-file rotation, retained redaction, and metrics. `gui.diagnostics` drives the real
+Tools action, live provider refresh, read-only accessible report, runtime/audio/BIOS
+content, privacy filtering, one-dialog ownership, and clipboard equality.
+
+**Gate evidence:**
+
+- Focused logger, formatter, dialog, renderer, and MainWindow tests passed.
+- Debug build and complete CTest: passed (58/58).
+- Release build and complete CTest: passed (58/58).
+- ASan/UBSan build and complete CTest: passed (58/58).
+- Legacy libretro regression: passed; the two pre-existing `extract_name`
+  const-qualification warnings remain confined to `libretro/libretro.c`.
+- New C++/Qt code compiles under the frontend warning policy without warnings;
+  authoritative `core/` sources remain unchanged.
+
+**Acceptance criteria:** The process-wide Qt handler writes compact UTF-8 JSON Lines to
+`logs/frontend.jsonl`, flushes each event, rotates at 1 MiB through three backups, and
+drops rather than grows when rotation/writing fails. Every record has UTC timestamp,
+severity, category, and message; home/absolute paths and password/token/secret/
+authorization/API-key values are redacted before disk. Startup/build, BIOS status,
+renderer, audio, controllers, game load/unload, save states, screenshots, persistence
+failures, clean shutdown, and five-second rate-limited timing/audio anomalies are
+covered without frame logging. **Tools → Log and Diagnostics…** refreshes a read-only,
+keyboard-accessible snapshot containing version/commit, Qt/SDL/OS/architecture,
+renderer, audio metrics/device, controller count, loaded title/system/region, safe BIOS
+states/hash prefixes, and logger counters. Copy uses the exact filtered report and never
+includes ROM, BIOS, log, or home-directory paths.
+
+**Commit SHA:** recorded by milestone 36

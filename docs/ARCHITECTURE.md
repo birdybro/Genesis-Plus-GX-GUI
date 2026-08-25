@@ -757,6 +757,27 @@ and bounded timing/audio anomalies without frame-by-frame noise or secrets.
 Dialogs are routed through an interface so GUI tests can replace native file and
 message boxes. Important widgets and actions have stable `objectName` values.
 
+The composition root installs `FrontendLogger` after platform application directories
+exist and removes it after the final service shutdown record. The Qt message handler
+redacts before serializing one compact JSON object per line; its mutex covers rotation
+and the stream only, and it retains fixed byte/file bounds. It forwards to Qt's previous
+handler so development stderr behavior is preserved. No emulation frame emits a log.
+
+```text
+Qt/frontend events --> redact --> JSONL encoder --> 1 MiB active log
+                                                    |
+                                                    +--> .1 --> .2 --> .3
+
+safe runtime providers --> DiagnosticsSnapshot --> formatter --> read-only dialog
+                                                               --> clipboard
+```
+
+The diagnostics provider runs only on the GUI thread when the dialog is opened or
+refreshed. It samples lock-free/bounded audio and logger counters, current controller
+inventory, display backend, metadata-derived title/system/region, and BIOS validation
+states. It never receives content paths. The formatter applies the same path and
+credential redaction as a defense in depth before display or clipboard transfer.
+
 ## Appearance, DPI, and accessibility
 
 `AppearanceSettingsStore` is a bounded, versioned JSON boundary under the application

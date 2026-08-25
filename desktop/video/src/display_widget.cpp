@@ -1,6 +1,7 @@
 #include "genplusgx/video/display_widget.h"
 
 #include <QGuiApplication>
+#include <QDebug>
 #include <QImage>
 #include <QLabel>
 #include <QOpenGLBuffer>
@@ -111,6 +112,10 @@ protected:
     initialized_ = texture_ != 0U;
     if (!initialized_) {
       owner_.scheduleSoftwareFallback();
+    } else {
+      qInfo().noquote() << "OpenGL renderer initialized:"
+                        << context()->format().majorVersion() << '.'
+                        << context()->format().minorVersion();
     }
   }
 
@@ -345,6 +350,7 @@ void DisplayWidget::scheduleSoftwareFallback()
   }
   QTimer::singleShot(0, this, [this] {
     if (openGLCanvas_ != nullptr) {
+      qWarning() << "OpenGL renderer initialization failed; using Qt software rendering.";
       openGLCanvas_->hide();
       openGLCanvas_->deleteLater();
       openGLCanvas_ = nullptr;

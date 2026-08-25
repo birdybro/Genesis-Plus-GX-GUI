@@ -7,6 +7,7 @@
 #include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/cheat_manager_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
+#include "genplusgx/ui/diagnostics_dialog.h"
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
@@ -441,7 +442,9 @@ void MainWindow::buildMenus()
     *tools, tr("&BIOS Settings…"), "biosSettingsAction");
   connect(biosSettings, &QAction::triggered,
     this, &MainWindow::showBiosSettings);
-  addAction(*tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
+  auto* diagnostics = addAction(
+    *tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
+  connect(diagnostics, &QAction::triggered, this, &MainWindow::showDiagnostics);
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
   addAction(*help, tr("&User Guide"), "userGuideAction", QKeySequence::HelpContents);
@@ -997,6 +1000,29 @@ void MainWindow::showAppearanceSettings()
       statusBar()->showMessage(tr("Appearance settings applied."), 3'000);
       return PersistenceStatus{};
     });
+  dialog->open();
+}
+
+void MainWindow::setDiagnosticsSnapshotProvider(
+  DiagnosticsSnapshotProvider provider)
+{
+  diagnosticsSnapshotProvider_ = std::move(provider);
+}
+
+void MainWindow::showDiagnostics()
+{
+  auto snapshot = diagnosticsSnapshotProvider_
+    ? diagnosticsSnapshotProvider_()
+    : diagnostics::staticDiagnosticsSnapshot();
+  if (auto* existing = findChild<DiagnosticsDialog*>(
+        QStringLiteral("diagnosticsDialog"))) {
+    existing->setSnapshot(std::move(snapshot));
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new DiagnosticsDialog(std::move(snapshot), this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->open();
 }
 

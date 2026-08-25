@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/cheats/cheat_manager.h"
+#include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/library/game_metadata.h"
 #include "genplusgx/library/game_library_database.h"
@@ -99,6 +100,8 @@ public:
     const settings::PerGameSettings&)>;
   using AppearanceSettingsSink = std::function<PersistenceStatus(
     const settings::AppearanceSettings&)>;
+  using DiagnosticsSnapshotProvider =
+    std::function<diagnostics::DiagnosticsSnapshot()>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -115,6 +118,8 @@ public:
   [[nodiscard]] const settings::AppearanceSettings&
     appearanceSettings() const noexcept;
   void showAppearanceSettings();
+  void setDiagnosticsSnapshotProvider(DiagnosticsSnapshotProvider provider);
+  void showDiagnostics();
   void setGameLoadSink(GameLoadSink sink);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
@@ -293,6 +298,7 @@ private:
   CheatConfigurationSink cheatConfigurationSink_;
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
+  DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   cheats::CheatConfiguration cheatConfiguration_;
   cheats::CheatSystem cheatSystem_{cheats::CheatSystem::genesis};
   settings::PerGameSettings perGameSettings_;

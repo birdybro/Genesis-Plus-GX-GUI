@@ -310,5 +310,24 @@ Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).
 
+## Logs and diagnostics
+
+Choose **Tools → Log and Diagnostics…** to inspect a live support report. It includes
+the application version and Git commit, Qt and SDL versions, operating system and CPU
+architecture, active renderer and audio device, bounded audio metrics, connected
+controller count, loaded game/system/region, BIOS validity and short checksum prefixes,
+and structured-logger counters. Reopening the action refreshes the existing dialog.
+**Copy Diagnostics** copies exactly the visible privacy-filtered text.
+
+Frontend messages are stored as compact JSON Lines in `logs/frontend.jsonl` beneath the
+platform application-data directory. Each line has UTC timestamp, severity, category,
+and message. The active file is limited to 1 MiB and keeps up to three rotated backups.
+Filesystem paths and credential-like values are redacted before writing; diagnostics
+never include ROM/BIOS paths or the log path. Logging covers startup/shutdown, build,
+BIOS, renderer, audio, controller, game, state, screenshot, persistence, and rate-limited
+timing/audio anomalies without per-frame noise. See
+[LOGGING_AND_DIAGNOSTICS.md](LOGGING_AND_DIAGNOSTICS.md) for the schema and support
+workflow.
+
 Features whose menus are visible but remain disabled without a loaded game will be
 enabled as their corresponding milestones connect the remaining frontend services.

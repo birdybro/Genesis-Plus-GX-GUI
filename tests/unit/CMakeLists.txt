@@ -1,5 +1,16 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_diagnostics_test diagnostics_test.cpp)
+target_link_libraries(
+  genplusgx_diagnostics_test
+  PRIVATE GenesisPlusGX::Diagnostics genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.diagnostics COMMAND genplusgx_diagnostics_test)
+set_tests_properties(
+  unit.diagnostics
+  PROPERTIES LABELS "unit;diagnostics;logging;filesystem;privacy" TIMEOUT 30
+)
+
 add_executable(genplusgx_appearance_settings_test appearance_settings_test.cpp)
 target_link_libraries(
   genplusgx_appearance_settings_test

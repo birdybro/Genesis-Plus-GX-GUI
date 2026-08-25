@@ -2,6 +2,25 @@ qt_add_executable(genplusgx_main_window_test
   main_window_test.cpp
 )
 
+qt_add_executable(genplusgx_diagnostics_dialog_test diagnostics_dialog_test.cpp)
+set_target_properties(genplusgx_diagnostics_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_diagnostics_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.diagnostics COMMAND genplusgx_diagnostics_dialog_test)
+set_tests_properties(
+  gui.diagnostics
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;diagnostics;logging;privacy;accessibility"
+    TIMEOUT 30
+)
+
 qt_add_executable(
   genplusgx_appearance_accessibility_test appearance_accessibility_test.cpp
 )

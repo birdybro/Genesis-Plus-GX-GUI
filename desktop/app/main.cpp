@@ -5,6 +5,7 @@
 #include "genplusgx/backup_store.h"
 #include "genplusgx/bounded_queue.h"
 #include "genplusgx/cheats/cheat_manager.h"
+#include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/input_aggregator.h"
@@ -149,6 +150,23 @@ genplusgx::PersistenceStatus workerPersistenceFailure(std::string message)
   };
 }
 
+std::string biosValidationStateName(
+  genplusgx::platform::BiosValidationState state)
+{
+  using State = genplusgx::platform::BiosValidationState;
+  switch (state) {
+    case State::notConfigured: return "Not configured";
+    case State::missing: return "Missing";
+    case State::notRegularFile: return "Not a regular file";
+    case State::unreadable: return "Unreadable";
+    case State::pathTooLong: return "Path too long";
+    case State::invalidSize: return "Invalid size";
+    case State::invalidContent: return "Invalid content";
+    case State::valid: return "Valid";
+  }
+  return "Unknown";
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -183,6 +201,16 @@ int main(int argc, char* argv[])
   if (!pathsInitialized) {
     qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
   }
+  genplusgx::diagnostics::FrontendLogger frontendLogger;
+  const auto loggerInitialized = frontendLogger.initialize(
+    applicationPaths.logsDirectory() / "frontend.jsonl");
+  if (!loggerInitialized || !frontendLogger.install()) {
+    qWarning().noquote() << QString::fromStdString(loggerInitialized
+        ? "The frontend logger could not install its Qt message handler."
+        : loggerInitialized.message);
+  }
+  qInfo().noquote() << "Application startup:" << GENPLUSGX_APP_NAME
+                    << GENPLUSGX_VERSION << '(' << GENPLUSGX_GIT_COMMIT << ')';
   genplusgx::settings::AppearanceSettingsStore appearanceSettingsStore{
     applicationPaths.configDirectory() / "appearance-settings.json"};
   auto loadedAppearanceSettings = appearanceSettingsStore.load();
@@ -317,6 +345,19 @@ int main(int argc, char* argv[])
   const auto biosLoaded = biosManager.load();
   if (!biosLoaded) {
     qWarning().noquote() << QString::fromStdString(biosLoaded.message);
+  }
+  for (std::size_t index = 0U;
+       index < genplusgx::platform::biosSlotCount;
+       ++index) {
+    const auto slot = static_cast<genplusgx::platform::BiosSlot>(index);
+    const auto& descriptor = genplusgx::platform::biosDescriptor(slot);
+    const auto& validation = biosManager.snapshot().validation[index];
+    qInfo().noquote() << "BIOS status:"
+                      << QString::fromUtf8(descriptor.displayName.data(),
+                           static_cast<qsizetype>(descriptor.displayName.size()))
+                      << '-'
+                      << QString::fromStdString(
+                           biosValidationStateName(validation.state));
   }
 
   const auto audioDevices = genplusgx::availableAudioOutputDevices();
@@ -1012,6 +1053,9 @@ int main(int argc, char* argv[])
     metadata,
     coreLoad,
   };
+  std::string diagnosticLoadedGame;
+  std::string diagnosticLoadedSystem;
+  std::string diagnosticLoadedRegion;
   struct PendingLoad final {
     std::uint64_t operationId{0};
     std::uint64_t metadataOperationId{0};
@@ -1022,6 +1066,9 @@ int main(int argc, char* argv[])
     std::optional<genplusgx::GameIdentity> previousIdentity;
     genplusgx::settings::PerGameSettings previousOverrides;
     genplusgx::settings::EffectiveGameSettings previousEffective;
+    std::string diagnosticGame;
+    std::string diagnosticSystem;
+    std::string diagnosticRegion;
     std::string warning;
     PendingLoadPhase phase{PendingLoadPhase::metadata};
   };
@@ -1078,6 +1125,60 @@ int main(int argc, char* argv[])
   genplusgx::cheats::CheatConfiguration activeCheatConfiguration;
   std::uint64_t screenshotOperationId = 4'500'000U;
   std::optional<std::uint64_t> pendingScreenshot;
+  window.setDiagnosticsSnapshotProvider(
+    [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
+     &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
+     &window] {
+      auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
+      snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
+        ? "OpenGL texture renderer"
+        : "Qt software painter";
+      snapshot.audioDevice = audioOutput.isInitialized()
+        ? audioOutput.deviceName()
+        : "Unavailable";
+      if (window.isGameLoaded()) {
+        snapshot.loadedGame = diagnosticLoadedGame.empty()
+          ? "Loaded game (metadata unavailable)"
+          : diagnosticLoadedGame;
+        snapshot.loadedSystem = diagnosticLoadedSystem.empty()
+          ? "Unknown"
+          : diagnosticLoadedSystem;
+        snapshot.loadedRegion = diagnosticLoadedRegion.empty()
+          ? "Unknown"
+          : diagnosticLoadedRegion;
+      } else {
+        snapshot.loadedGame = "None";
+        snapshot.loadedSystem = "None";
+        snapshot.loadedRegion = "None";
+      }
+      snapshot.controllerCount = controllerInput.controllers().size();
+      const auto audioMetrics = audioOutput.metrics();
+      snapshot.audioUnderruns = audioMetrics.ring.underrunCount;
+      snapshot.audioOverruns = audioMetrics.ring.overrunCount;
+      if (const auto ring = audioOutput.ringBuffer()) {
+        snapshot.audioBufferedFrames = ring->occupancyFrames();
+        snapshot.audioCapacityFrames = ring->capacityFrames();
+      }
+      snapshot.loggerActive = frontendLogger.installed();
+      snapshot.logger = frontendLogger.metrics();
+      const auto& bios = biosManager.snapshot();
+      snapshot.bios.reserve(genplusgx::platform::biosSlotCount);
+      for (std::size_t index = 0U;
+           index < genplusgx::platform::biosSlotCount;
+           ++index) {
+        const auto slot = static_cast<genplusgx::platform::BiosSlot>(index);
+        const auto& descriptor = genplusgx::platform::biosDescriptor(slot);
+        const auto& validation = bios.validation[index];
+        snapshot.bios.push_back({
+          .name = std::string{descriptor.displayName},
+          .status = biosValidationStateName(validation.state),
+          .sha256Prefix = validation.valid()
+            ? validation.sha256.substr(0U, 12U)
+            : std::string{},
+        });
+      }
+      return snapshot;
+    });
   if (screenshotServiceStarted) {
     window.setScreenshotSink(
       [&pendingScreenshot, &screenshotOperationId, &screenshotService,
@@ -1148,6 +1249,9 @@ int main(int argc, char* argv[])
         .previousIdentity = activePerGameIdentity,
         .previousOverrides = activePerGameSettings,
         .previousEffective = activeEffectiveSettings,
+        .diagnosticGame = {},
+        .diagnosticSystem = {},
+        .diagnosticRegion = {},
         .warning = {},
         .phase = PendingLoadPhase::metadata,
       };
@@ -1311,6 +1415,12 @@ int main(int argc, char* argv[])
       activeCheatConfiguration = configuration;
       return genplusgx::PersistenceStatus{};
     });
+  auto nextInstrumentationLog = std::chrono::steady_clock::now() +
+    std::chrono::seconds{5};
+  std::uint64_t loggedAudioUnderruns = 0U;
+  std::uint64_t loggedAudioOverruns = 0U;
+  std::uint64_t loggedLateFrames = 0U;
+  std::uint64_t loggedPacingResynchronizations = 0U;
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
@@ -1319,8 +1429,11 @@ int main(int argc, char* argv[])
     &window,
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &applyEffectiveSettings, &audioOutput, &controllerInput,
+     &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
+     &loggedPacingResynchronizations, &nextInstrumentationLog,
      &deferredLibraryLaunches, &flushDeferredLibraryLaunches, &gameGeneration,
      &gameLibraryScanner, &globalGameSettings,
+     &diagnosticLoadedGame, &diagnosticLoadedRegion, &diagnosticLoadedSystem,
      &inputAggregator, &inputConfiguration, &inputOperationId,
      &libraryScansInFlight,
      &lifecycleOperationId,
@@ -1335,6 +1448,36 @@ int main(int argc, char* argv[])
      &stateOperationId,
      &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
+    const auto instrumentationNow = std::chrono::steady_clock::now();
+    if (instrumentationNow >= nextInstrumentationLog) {
+      const auto audioMetrics = audioOutput.metrics().ring;
+      if (audioMetrics.underrunCount > loggedAudioUnderruns ||
+          audioMetrics.overrunCount > loggedAudioOverruns) {
+        qWarning().noquote()
+          << "Audio buffer anomaly: underruns="
+          << static_cast<qulonglong>(audioMetrics.underrunCount)
+          << "overruns="
+          << static_cast<qulonglong>(audioMetrics.overrunCount);
+      }
+      loggedAudioUnderruns = audioMetrics.underrunCount;
+      loggedAudioOverruns = audioMetrics.overrunCount;
+      const auto timingMetrics = worker.metrics();
+      if (timingMetrics.lateFrameCount > loggedLateFrames ||
+          timingMetrics.pacingResynchronizations >
+            loggedPacingResynchronizations) {
+        qWarning().noquote()
+          << "Timing anomaly: late frames="
+          << static_cast<qulonglong>(timingMetrics.lateFrameCount)
+          << "resynchronizations="
+          << static_cast<qulonglong>(timingMetrics.pacingResynchronizations)
+          << "maximum lateness us="
+          << static_cast<qlonglong>(
+               timingMetrics.maximumLatenessMicroseconds);
+      }
+      loggedLateFrames = timingMetrics.lateFrameCount;
+      loggedPacingResynchronizations = timingMetrics.pacingResynchronizations;
+      nextInstrumentationLog = instrumentationNow + std::chrono::seconds{5};
+    }
     while (auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
@@ -1384,7 +1527,11 @@ int main(int argc, char* argv[])
           window.setStateOperationBusy(false);
           if (event->succeeded()) {
             window.showStateOperationSuccess(operation, slot);
+            qInfo().noquote() << "Save state loaded: slot"
+                              << static_cast<qulonglong>(slot);
           } else {
+            qWarning().noquote() << "Save-state restore failed:"
+                                 << QString::fromStdString(event->message);
             window.showStateOperationError(operation, event->message);
           }
         }
@@ -1406,6 +1553,13 @@ int main(int argc, char* argv[])
           activePerGameIdentity = completedLoad.identity;
           activePerGameSettings = completedLoad.overrides;
           activeEffectiveSettings = completedLoad.effective;
+          diagnosticLoadedGame = completedLoad.diagnosticGame;
+          diagnosticLoadedSystem = event->disc.segaCd
+            ? "Sega CD / Mega CD"
+            : completedLoad.diagnosticSystem;
+          diagnosticLoadedRegion = event->disc.segaCd
+            ? discRegionName(event->disc.region)
+            : completedLoad.diagnosticRegion;
           window.setGameLoaded(loadedPath);
           if (activePerGameIdentity) {
             window.setPerGameSettingsSession(
@@ -1420,6 +1574,16 @@ int main(int argc, char* argv[])
             event->disc.path,
             event->disc.trayOpen,
             event->disc.discPresent);
+          qInfo().noquote() << "Game loaded:"
+                            << QString::fromStdString(
+                                 diagnosticLoadedGame.empty()
+                                   ? "Metadata unavailable"
+                                   : diagnosticLoadedGame)
+                            << '-'
+                            << QString::fromStdString(
+                                 diagnosticLoadedSystem.empty()
+                                   ? "Unknown system"
+                                   : diagnosticLoadedSystem);
           ++gameGeneration;
           stateSessionAvailable = false;
           const auto activationId = ++stateOperationId;
@@ -1480,6 +1644,8 @@ int main(int argc, char* argv[])
               cheatMetadataSubmitted.message);
           }
         } else {
+          qWarning().noquote() << "Game load failed:"
+                               << QString::fromStdString(event->message);
           const bool previousGameRemainsLoaded =
             event->coreError == genplusgx::CoreError::persistenceFailed &&
             (event->workerState == genplusgx::EmulationWorkerState::paused ||
@@ -1565,6 +1731,7 @@ int main(int argc, char* argv[])
           activePerGameSettings = {};
           activeEffectiveSettings = globalEffective;
           window.setNoGameLoaded();
+          qInfo() << "Game unloaded.";
           window.clearCheatSession();
           activeCheatIdentity.reset();
           activeCheatSystem.reset();
@@ -1683,6 +1850,8 @@ int main(int argc, char* argv[])
         pendingState.reset();
         window.setStateOperationBusy(false);
         window.showStateOperationSuccess(operation, slot);
+        qInfo().noquote() << "Save state written: slot"
+                          << static_cast<qulonglong>(slot);
       } else if (event->type == genplusgx::StateStorageEventType::slotDeleted &&
                  pendingState->phase == PendingStatePhase::deleting) {
         const auto operation = pendingState->operation;
@@ -1691,6 +1860,8 @@ int main(int argc, char* argv[])
         pendingState.reset();
         window.setStateOperationBusy(false);
         window.showStateOperationSuccess(operation, slot);
+        qInfo().noquote() << "Save state deleted: slot"
+                          << static_cast<qulonglong>(slot);
       }
     }
     while (auto event = screenshotService.pollEvent()) {
@@ -1739,6 +1910,10 @@ int main(int argc, char* argv[])
           event->operationId == pendingLoad->metadataOperationId &&
           event->path == pendingLoad->path) {
         if (event->succeeded()) {
+          pendingLoad->diagnosticGame = event->metadata.displayTitle();
+          pendingLoad->diagnosticSystem = std::string{
+            genplusgx::library::gameSystemName(event->metadata.system)};
+          pendingLoad->diagnosticRegion = event->metadata.region;
           pendingLoad->identity = metadataIdentity(event->metadata);
           if (!pendingLoad->identity) {
             pendingLoad->warning =
@@ -1923,6 +2098,10 @@ int main(int argc, char* argv[])
   });
   eventPump.start();
   window.show();
+  qInfo().noquote() << "Renderer selected:"
+                    << (window.displayWidget()->usesAcceleratedRenderer()
+                          ? "OpenGL texture renderer"
+                          : "Qt software painter");
   if (commandLine.fullscreen) {
     window.setFullscreen(true);
   }
@@ -1953,6 +2132,7 @@ int main(int argc, char* argv[])
   window.setCheatConfigurationSink({});
   window.setPerGameSettingsSink({});
   window.setAppearanceSettingsSink({});
+  window.setDiagnosticsSnapshotProvider({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});
@@ -1982,5 +2162,7 @@ int main(int argc, char* argv[])
       gameLibraryScannerStopped.message);
   }
   static_cast<void>(audioOutput.shutdown());
+  qInfo() << "Application shutdown complete.";
+  frontendLogger.shutdown();
   return result;
 }
