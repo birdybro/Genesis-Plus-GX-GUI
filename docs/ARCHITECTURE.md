@@ -176,6 +176,15 @@ pacing uses audio occupancy plus a monotonic frame deadline without low-resoluti
 timers. Pausing stops production and silences/pauses the host stream. Fast-forward may
 mute or drain samples according to settings, but cannot accumulate backlog.
 
+`CoreAdapter::runFrame()` drains `audio_update()` immediately into one fixed-capacity
+scratch batch so the core's resamplers cannot accumulate merely because the host is
+late. The worker copies that batch as structured stereo frames into
+`StereoAudioRingBuffer`. An unconsumed scratch batch is replaced by the newest complete
+batch with dropped-frame/batch counters; an undersized copy leaves it pending. The SPSC
+ring accepts only whole stereo frames, preserves existing queued audio on overrun, and
+reports overrun, underrun, dropped/missing frames, occupancy, and peak occupancy without
+locking either real-time endpoint.
+
 ## Input data flow
 
 ```text

@@ -210,15 +210,19 @@ set_target_properties(
     OUTPUT_NAME genplusgx_core
 )
 
+add_library(genplusgx_frontend_types INTERFACE)
+add_library(GenesisPlusGX::FrontendTypes ALIAS genplusgx_frontend_types)
+target_include_directories(
+  genplusgx_frontend_types
+  INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+)
+target_link_libraries(genplusgx_frontend_types INTERFACE genplusgx_project_options)
+
 add_library(genplusgx_core_adapter STATIC src/core_adapter.cpp)
 add_library(GenesisPlusGX::CoreAdapter ALIAS genplusgx_core_adapter)
-target_include_directories(
-  genplusgx_core_adapter
-  PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-)
 target_link_libraries(
   genplusgx_core_adapter
-  PUBLIC GenesisPlusGX::Core genplusgx_project_options
+  PUBLIC GenesisPlusGX::Core GenesisPlusGX::FrontendTypes
   PRIVATE genplusgx_project_warnings
 )
 set_target_properties(

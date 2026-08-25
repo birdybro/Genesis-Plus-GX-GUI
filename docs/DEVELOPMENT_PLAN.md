@@ -16,8 +16,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 02 Core library | COMPLETE | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | Debug/Release/ASan core link smoke; libretro regression | Static core compiles without Qt dependency | `df2985a` |
 | 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | `16b56c9` |
 | 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | `447bc21` |
-| 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | pending |
-| 06 Core audio | PLANNED | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
+| 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | `8c99cd6` |
+| 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
 | 07 Core input | PLANNED | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
 | 08 Persistence | PLANNED | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
 | 09 Save states | PLANNED | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | pending |
@@ -310,4 +310,60 @@ Copying requires bounded caller-owned storage, produces a complete immutable sna
 and consumes the viewport-change notification only after success. The generated legal
 ROM drives a real VDP geometry and pixel-output regression.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 06.
+**Commit SHA:** `8c99cd6`
+
+## Milestone 06 detail
+
+**Status:** COMPLETE
+
+**Goal:** Drain deterministic stereo samples from every emulated frame into a bounded
+adapter batch and provide a lock-free SPSC ring suitable for the later SDL3 host audio
+device.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/audio_frame.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/audio/CMakeLists.txt`
+- `desktop/audio/include/genplusgx/audio_ring_buffer.h`
+- `desktop/audio/src/audio_ring_buffer.cpp`
+- `tests/CMakeLists.txt`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_audio_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/audio_ring_buffer_test.cpp`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.audio_samples` verifies no pre-frame audio, format/count/frame
+metadata, undersized-copy retention, non-silent centered PSG output, consume-on-success,
+hard-reset sample equality, the investigated stereo FNV-1a regression hash
+`0x3fdb01d7287ae391`, and bounded pending-batch overwrite instrumentation.
+`unit.audio_ring_buffer` verifies construction validation, capacity/occupancy, stereo
+order, wraparound, preserve-oldest overrun behavior, partial underrun behavior, metrics,
+clear/reset, and a 20,000-frame concurrent SPSC transfer without corruption or drops.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (7/7).
+- Core audio and ring-buffer tests each passed three consecutive Debug executions.
+- Release build and complete CTest: passed (7/7).
+- ASan/UBSan preset build and complete CTest: passed (7/7).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New core-adapter and audio-ring code compiled with the project warning policy without
+  warnings.
+
+**Acceptance criteria:** `runFrame()` always drains the core into fixed 4,096-frame
+scratch storage. Copies use whole typed stereo frames, preserve pending data when the
+destination is too small, and expose dropped-batch counters. The SPSC host ring has a
+fixed construction-time capacity, never allocates in producer/consumer calls, uses
+acquire/release publication, and instruments every bounded loss/short read. The legal
+generated ROM produces stable real PSG samples rather than a silence-only hash.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 07.

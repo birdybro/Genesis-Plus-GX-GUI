@@ -121,6 +121,19 @@ std::vector<std::uint8_t> makeGenesisRamMarkerRom()
   emit16(0x0000U);
   emit16(0x34BCU);
   emit16(0x0EEEU);
+
+  // Program PSG channel zero with a deterministic centered square wave.
+  // move.l #$00c00011,a3 (PSG byte-write port)
+  emit16(0x267CU);
+  emit16(0x00C0U);
+  emit16(0x0011U);
+  // Tone divider 0x0fe (latch low nibble, then upper six bits), full volume.
+  emit16(0x16BCU);
+  emit16(0x008EU);
+  emit16(0x16BCU);
+  emit16(0x000FU);
+  emit16(0x16BCU);
+  emit16(0x0090U);
   // bra.s to this instruction
   emit16(0x60FEU);
 

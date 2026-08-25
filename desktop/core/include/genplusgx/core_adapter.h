@@ -1,5 +1,7 @@
 #pragma once
 
+#include "genplusgx/audio_frame.h"
+
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -25,6 +27,9 @@ enum class CoreError {
   audioInitializationFailed,
   invalidVideoFrame,
   videoBufferTooSmall,
+  noAudioAvailable,
+  audioBufferTooSmall,
+  invalidAudioBatch,
 };
 
 struct CoreResult final {
@@ -62,6 +67,18 @@ struct CoreVideoFrameInfo final {
 [[nodiscard]] std::uint64_t hashVideoFrame(
   std::span<const std::uint16_t> pixels) noexcept;
 
+struct CoreAudioBatchInfo final {
+  std::uint32_t sampleRate{0};
+  std::uint32_t channels{2};
+  std::size_t frameCount{0};
+  std::uint64_t emulatedFrameNumber{0};
+  std::uint64_t droppedFrameCount{0};
+  std::uint64_t droppedBatchCount{0};
+};
+
+[[nodiscard]] std::uint64_t hashAudioFrames(
+  std::span<const StereoAudioFrame> frames) noexcept;
+
 class CoreAdapter final {
 public:
   explicit CoreAdapter(int audioSampleRate = 48'000);
@@ -83,6 +100,10 @@ public:
   [[nodiscard]] CoreResult copyVideoFrame(
     std::span<std::uint16_t> destination,
     CoreVideoFrameInfo& output);
+  [[nodiscard]] CoreResult audioBatchInfo(CoreAudioBatchInfo& output) const;
+  [[nodiscard]] CoreResult copyAudioFrames(
+    std::span<StereoAudioFrame> destination,
+    CoreAudioBatchInfo& output);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;
@@ -92,6 +113,7 @@ public:
 private:
   [[nodiscard]] CoreResult requireOwner(bool requireLoaded) const;
   [[nodiscard]] CoreResult describeVideoFrame(CoreVideoFrameInfo& output) const;
+  [[nodiscard]] CoreResult describeAudioBatch(CoreAudioBatchInfo& output) const;
   void unloadUnchecked() noexcept;
   void releaseOwnership() noexcept;
 

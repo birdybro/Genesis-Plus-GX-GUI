@@ -24,6 +24,7 @@ constexpr std::size_t framebufferWidth = 720U;
 constexpr std::size_t framebufferHeight = 576U;
 constexpr std::size_t bytesPerPixel = 2U;
 constexpr std::size_t maximumCorePathBytes = 255U;
+constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 
 std::mutex coreMutex;
 CoreAdapter* activeAdapter = nullptr;
@@ -44,6 +45,11 @@ class CoreAdapter::Private final {
 public:
   std::thread::id ownerThread;
   std::vector<std::uint8_t> framebuffer;
+  std::vector<std::int16_t> audioScratch;
+  std::size_t pendingAudioFrames{0};
+  std::uint64_t pendingAudioFrameNumber{0};
+  std::uint64_t droppedAudioFrames{0};
+  std::uint64_t droppedAudioBatches{0};
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -77,6 +83,7 @@ CoreResult CoreAdapter::initialize()
   privateState->ownerThread = std::this_thread::get_id();
   privateState->framebuffer.resize(
     framebufferWidth * framebufferHeight * bytesPerPixel, 0U);
+  privateState->audioScratch.resize(maximumAudioFramesPerBatch * 2U, 0);
 
   private_ = privateState.release();
   activeAdapter = this;
@@ -147,6 +154,10 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
   loadedPath_ = path;
   frameCount_ = 0;
   hardware_ = system_hw;
+  private_->pendingAudioFrames = 0;
+  private_->pendingAudioFrameNumber = 0;
+  private_->droppedAudioFrames = 0;
+  private_->droppedAudioBatches = 0;
   state_ = CoreLifecycleState::loaded;
   return success();
 }
@@ -171,6 +182,8 @@ CoreResult CoreAdapter::reset()
 
   system_reset();
   frameCount_ = 0;
+  private_->pendingAudioFrames = 0;
+  private_->pendingAudioFrameNumber = 0;
   return success();
 }
 
@@ -189,6 +202,20 @@ CoreResult CoreAdapter::runFrame(bool skipVideo)
     system_frame_sms(skipVideo ? 1 : 0);
   }
   ++frameCount_;
+
+  if (private_->pendingAudioFrames > 0U) {
+    private_->droppedAudioFrames += private_->pendingAudioFrames;
+    ++private_->droppedAudioBatches;
+  }
+  const int generatedAudioFrames = audio_update(private_->audioScratch.data());
+  if (generatedAudioFrames < 0 ||
+      static_cast<std::size_t>(generatedAudioFrames) > maximumAudioFramesPerBatch) {
+    private_->pendingAudioFrames = 0;
+    private_->pendingAudioFrameNumber = 0;
+    return failure(CoreError::invalidAudioBatch, "The core generated an invalid audio batch size.");
+  }
+  private_->pendingAudioFrames = static_cast<std::size_t>(generatedAudioFrames);
+  private_->pendingAudioFrameNumber = frameCount_;
   return success();
 }
 
@@ -225,6 +252,41 @@ CoreResult CoreAdapter::copyVideoFrame(
       copiedRowBytes);
   }
   bitmap.viewport.changed &= ~1;
+  return success();
+}
+
+CoreResult CoreAdapter::audioBatchInfo(CoreAudioBatchInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  return describeAudioBatch(output);
+}
+
+CoreResult CoreAdapter::copyAudioFrames(
+  std::span<StereoAudioFrame> destination,
+  CoreAudioBatchInfo& output)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (const auto described = describeAudioBatch(output); !described) {
+    return described;
+  }
+  if (destination.size() < output.frameCount) {
+    return failure(CoreError::audioBufferTooSmall, "The destination cannot hold the pending stereo audio batch.");
+  }
+
+  for (std::size_t index = 0; index < output.frameCount; ++index) {
+    destination[index] = {
+      .left = private_->audioScratch[index * 2U],
+      .right = private_->audioScratch[(index * 2U) + 1U],
+    };
+  }
+  private_->pendingAudioFrames = 0;
+  private_->pendingAudioFrameNumber = 0;
   return success();
 }
 
@@ -308,6 +370,23 @@ CoreResult CoreAdapter::describeVideoFrame(CoreVideoFrameInfo& output) const
   return success();
 }
 
+CoreResult CoreAdapter::describeAudioBatch(CoreAudioBatchInfo& output) const
+{
+  if (private_->pendingAudioFrames == 0U) {
+    output = {};
+    return failure(CoreError::noAudioAvailable, "No generated audio batch is pending.");
+  }
+  output = {
+    .sampleRate = static_cast<std::uint32_t>(audioSampleRate_),
+    .channels = 2,
+    .frameCount = private_->pendingAudioFrames,
+    .emulatedFrameNumber = private_->pendingAudioFrameNumber,
+    .droppedFrameCount = private_->droppedAudioFrames,
+    .droppedBatchCount = private_->droppedAudioBatches,
+  };
+  return success();
+}
+
 void CoreAdapter::unloadUnchecked() noexcept
 {
   audio_shutdown();
@@ -320,6 +399,12 @@ void CoreAdapter::unloadUnchecked() noexcept
   loadedPath_.clear();
   frameCount_ = 0;
   hardware_ = 0;
+  if (private_ != nullptr) {
+    private_->pendingAudioFrames = 0;
+    private_->pendingAudioFrameNumber = 0;
+    private_->droppedAudioFrames = 0;
+    private_->droppedAudioBatches = 0;
+  }
   if (state_ != CoreLifecycleState::uninitialized) {
     state_ = CoreLifecycleState::ready;
   }
@@ -346,6 +431,23 @@ std::uint64_t hashVideoFrame(std::span<const std::uint16_t> pixels) noexcept
     hash *= fnvPrime;
     hash ^= static_cast<std::uint8_t>(pixel >> 8U);
     hash *= fnvPrime;
+  }
+  return hash;
+}
+
+std::uint64_t hashAudioFrames(std::span<const StereoAudioFrame> frames) noexcept
+{
+  constexpr std::uint64_t fnvOffsetBasis = 14'695'981'039'346'656'037ULL;
+  constexpr std::uint64_t fnvPrime = 1'099'511'628'211ULL;
+  std::uint64_t hash = fnvOffsetBasis;
+  for (const auto& frame : frames) {
+    for (const auto sample : {frame.left, frame.right}) {
+      const auto bits = static_cast<std::uint16_t>(sample);
+      hash ^= static_cast<std::uint8_t>(bits & 0xFFU);
+      hash *= fnvPrime;
+      hash ^= static_cast<std::uint8_t>(bits >> 8U);
+      hash *= fnvPrime;
+    }
   }
   return hash;
 }

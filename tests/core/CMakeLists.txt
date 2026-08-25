@@ -51,3 +51,18 @@ add_test(NAME core.video_frame COMMAND genplusgx_core_video_test)
 set_tests_properties(
   core.video_frame PROPERTIES LABELS "core;integration;video;fixture" TIMEOUT 30
 )
+
+add_executable(genplusgx_core_audio_test core_audio_test.cpp)
+target_link_libraries(
+  genplusgx_core_audio_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_options
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+
+add_test(NAME core.audio_samples COMMAND genplusgx_core_audio_test)
+set_tests_properties(
+  core.audio_samples PROPERTIES LABELS "core;integration;audio;fixture" TIMEOUT 30
+)
