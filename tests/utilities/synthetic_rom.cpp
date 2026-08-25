@@ -134,8 +134,16 @@ std::vector<std::uint8_t> makeGenesisRamMarkerRom()
   emit16(0x000FU);
   emit16(0x16BCU);
   emit16(0x0090U);
-  // bra.s to this instruction
-  emit16(0x60FEU);
+  // Poll the controller A data port and expose its active-low result in work RAM.
+  // move.b $00a10003.l,d0
+  emit16(0x1039U);
+  emit16(0x00A1U);
+  emit16(0x0003U);
+  // move.b d0,8(a0)
+  emit16(0x1140U);
+  emit16(0x0008U);
+  // bra.s back twelve bytes to the controller read
+  emit16(0x60F4U);
 
   std::uint32_t checksum = 0U;
   for (std::size_t offset = 0x200U; offset < rom.size(); offset += 2U) {

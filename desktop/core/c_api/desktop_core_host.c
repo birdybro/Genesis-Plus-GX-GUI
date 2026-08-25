@@ -62,6 +62,11 @@ void set_config_defaults(void)
 void genplusgx_host_reset_defaults(void)
 {
   set_config_defaults();
+  memset(&input, 0, sizeof(input));
+  input.system[0] = SYSTEM_GAMEPAD;
+  input.system[1] = SYSTEM_GAMEPAD;
+  old_system[0] = -1;
+  old_system[1] = -1;
 }
 
 void osd_input_update(void)

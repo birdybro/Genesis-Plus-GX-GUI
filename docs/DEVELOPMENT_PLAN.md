@@ -17,8 +17,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | `16b56c9` |
 | 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | `447bc21` |
 | 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | `8c99cd6` |
-| 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
-| 07 Core input | PLANNED | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
+| 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | `ac02374` |
+| 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
 | 08 Persistence | PLANNED | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
 | 09 Save states | PLANNED | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | pending |
 | 10 Qt shell | PLANNED | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | pending |
@@ -366,4 +366,53 @@ fixed construction-time capacity, never allocates in producer/consumer calls, us
 acquire/release publication, and instruments every bounded loss/short read. The legal
 generated ROM produces stable real PSG samples rather than a silence-only hash.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 07.
+**Commit SHA:** `ac02374`
+
+## Milestone 07 detail
+
+**Status:** COMPLETE
+
+**Goal:** Define a keyboard/controller-independent player snapshot and translate only
+the newest valid state into Genesis Plus GX device slots at the start of an emulated
+frame.
+
+**Files changed:**
+
+- `desktop/core/c_api/desktop_core_host.c`
+- `desktop/core/include/genplusgx/input_snapshot.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_input_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/input_snapshot_test.cpp`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.input_snapshot` verifies twelve unique logical buttons,
+composition/membership, eight-player capacity, and neutral disconnected defaults.
+`core.input_snapshot` verifies two default gamepads, queue-versus-frame-boundary
+semantics, released input, all twelve exact core mappings, signed analog values,
+logical player-two routing to core slot four, disconnected clearing, applied sequences,
+stale-sequence rejection, and newest-state coalescing. The generated 68000 loop also
+proves active-low port bytes `0x7f` (released) and `0x67` (B+Right).
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (9/9).
+- Core input and logical-snapshot tests each passed three consecutive Debug executions.
+- Release build and complete CTest: passed (9/9).
+- ASan/UBSan preset build and complete CTest: passed (9/9).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New C/C++ host, model, adapter, generator, and test code compiled without warnings.
+
+**Acceptance criteria:** Frontend snapshots contain no core constants. They cannot
+mutate input globals between frames, and an older command cannot replace a newer one.
+At the boundary, players map in order to active core devices, all unused/disconnected
+slots are zeroed, digital and analog state is translated, and the emulated program
+observes the result through the real Genesis controller I/O path.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 08.

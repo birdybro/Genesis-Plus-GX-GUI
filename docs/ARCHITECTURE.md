@@ -204,6 +204,15 @@ Device adapters translate the logical snapshot only on the emulation thread. Hot
 are evaluated before gameplay mappings with explicit conflict diagnostics. Controller
 hot-plug changes assignments through a stable device identity where SDL provides one.
 
+`InputSnapshot` contains eight logical player states, a monotonic sequence, twelve
+Genesis-named digital controls, connection state, and signed analog coordinates. Its
+bit layout is deliberately independent from the core's `INPUT_*` constants. The
+adapter coalesces equal/newer snapshots, rejects older sequence numbers, and translates
+the newest pending snapshot immediately before executing a frame. Logical players are
+assigned in order to active core device slots, which correctly maps a normal second pad
+to slot four while naturally covering Team Player, Master Tap, and J-Cart slot layouts.
+Every unused/disconnected core slot is cleared at the same boundary.
+
 ## Persistence and settings
 
 Platform services resolve data locations using Qt standard paths. Tests inject a

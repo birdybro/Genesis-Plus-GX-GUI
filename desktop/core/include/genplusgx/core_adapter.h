@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/audio_frame.h"
+#include "genplusgx/input_snapshot.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -30,6 +31,7 @@ enum class CoreError {
   noAudioAvailable,
   audioBufferTooSmall,
   invalidAudioBatch,
+  staleInputSnapshot,
 };
 
 struct CoreResult final {
@@ -104,16 +106,19 @@ public:
   [[nodiscard]] CoreResult copyAudioFrames(
     std::span<StereoAudioFrame> destination,
     CoreAudioBatchInfo& output);
+  [[nodiscard]] CoreResult setInputSnapshot(const InputSnapshot& snapshot);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;
   [[nodiscard]] std::uint64_t frameCount() const noexcept;
   [[nodiscard]] std::uint8_t hardware() const noexcept;
+  [[nodiscard]] std::uint64_t appliedInputSequence() const noexcept;
 
 private:
   [[nodiscard]] CoreResult requireOwner(bool requireLoaded) const;
   [[nodiscard]] CoreResult describeVideoFrame(CoreVideoFrameInfo& output) const;
   [[nodiscard]] CoreResult describeAudioBatch(CoreAudioBatchInfo& output) const;
+  void applyPendingInput() noexcept;
   void unloadUnchecked() noexcept;
   void releaseOwnership() noexcept;
 

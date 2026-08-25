@@ -50,6 +50,10 @@ public:
   std::uint64_t pendingAudioFrameNumber{0};
   std::uint64_t droppedAudioFrames{0};
   std::uint64_t droppedAudioBatches{0};
+  InputSnapshot pendingInput{};
+  std::uint64_t appliedInputSequence{0};
+  std::uint64_t newestInputSequence{0};
+  bool hasPendingInput{false};
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -158,6 +162,10 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
   private_->pendingAudioFrameNumber = 0;
   private_->droppedAudioFrames = 0;
   private_->droppedAudioBatches = 0;
+  private_->pendingInput = {};
+  private_->appliedInputSequence = 0;
+  private_->newestInputSequence = 0;
+  private_->hasPendingInput = false;
   state_ = CoreLifecycleState::loaded;
   return success();
 }
@@ -194,6 +202,7 @@ CoreResult CoreAdapter::runFrame(bool skipVideo)
     return owner;
   }
 
+  applyPendingInput();
   if (system_hw == SYSTEM_MCD) {
     system_frame_scd(skipVideo ? 1 : 0);
   } else if ((system_hw & SYSTEM_PBC) == SYSTEM_MD) {
@@ -290,6 +299,22 @@ CoreResult CoreAdapter::copyAudioFrames(
   return success();
 }
 
+CoreResult CoreAdapter::setInputSnapshot(const InputSnapshot& snapshot)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (snapshot.sequence < private_->newestInputSequence) {
+    return failure(CoreError::staleInputSnapshot, "The input snapshot is older than the newest queued state.");
+  }
+
+  private_->pendingInput = snapshot;
+  private_->newestInputSequence = snapshot.sequence;
+  private_->hasPendingInput = true;
+  return success();
+}
+
 CoreLifecycleState CoreAdapter::state() const noexcept
 {
   std::scoped_lock lock{coreMutex};
@@ -312,6 +337,12 @@ std::uint8_t CoreAdapter::hardware() const noexcept
 {
   std::scoped_lock lock{coreMutex};
   return hardware_;
+}
+
+std::uint64_t CoreAdapter::appliedInputSequence() const noexcept
+{
+  std::scoped_lock lock{coreMutex};
+  return private_ == nullptr ? 0U : private_->appliedInputSequence;
 }
 
 CoreResult CoreAdapter::requireOwner(bool requireLoaded) const
@@ -387,6 +418,74 @@ CoreResult CoreAdapter::describeAudioBatch(CoreAudioBatchInfo& output) const
   return success();
 }
 
+void CoreAdapter::applyPendingInput() noexcept
+{
+  if (!private_->hasPendingInput) {
+    return;
+  }
+
+  for (std::size_t slot = 0; slot < MAX_DEVICES; ++slot) {
+    input.pad[slot] = 0;
+    input.analog[slot][0] = 0;
+    input.analog[slot][1] = 0;
+  }
+
+  std::size_t player = 0;
+  for (std::size_t slot = 0;
+       slot < MAX_DEVICES && player < InputSnapshot::maximumPlayers;
+       ++slot) {
+    if (input.dev[slot] == NO_DEVICE) {
+      continue;
+    }
+
+    const auto& source = private_->pendingInput.players[player++];
+    std::uint16_t coreButtons = 0;
+    if (source.connected) {
+      if (hasButton(source.buttons, InputButton::up)) {
+        coreButtons |= INPUT_UP;
+      }
+      if (hasButton(source.buttons, InputButton::down)) {
+        coreButtons |= INPUT_DOWN;
+      }
+      if (hasButton(source.buttons, InputButton::left)) {
+        coreButtons |= INPUT_LEFT;
+      }
+      if (hasButton(source.buttons, InputButton::right)) {
+        coreButtons |= INPUT_RIGHT;
+      }
+      if (hasButton(source.buttons, InputButton::a)) {
+        coreButtons |= INPUT_A;
+      }
+      if (hasButton(source.buttons, InputButton::b)) {
+        coreButtons |= INPUT_B;
+      }
+      if (hasButton(source.buttons, InputButton::c)) {
+        coreButtons |= INPUT_C;
+      }
+      if (hasButton(source.buttons, InputButton::start)) {
+        coreButtons |= INPUT_START;
+      }
+      if (hasButton(source.buttons, InputButton::x)) {
+        coreButtons |= INPUT_X;
+      }
+      if (hasButton(source.buttons, InputButton::y)) {
+        coreButtons |= INPUT_Y;
+      }
+      if (hasButton(source.buttons, InputButton::z)) {
+        coreButtons |= INPUT_Z;
+      }
+      if (hasButton(source.buttons, InputButton::mode)) {
+        coreButtons |= INPUT_MODE;
+      }
+      input.analog[slot][0] = source.analogX;
+      input.analog[slot][1] = source.analogY;
+    }
+    input.pad[slot] = coreButtons;
+  }
+  private_->appliedInputSequence = private_->pendingInput.sequence;
+  private_->hasPendingInput = false;
+}
+
 void CoreAdapter::unloadUnchecked() noexcept
 {
   audio_shutdown();
@@ -404,6 +503,10 @@ void CoreAdapter::unloadUnchecked() noexcept
     private_->pendingAudioFrameNumber = 0;
     private_->droppedAudioFrames = 0;
     private_->droppedAudioBatches = 0;
+    private_->pendingInput = {};
+    private_->appliedInputSequence = 0;
+    private_->newestInputSequence = 0;
+    private_->hasPendingInput = false;
   }
   if (state_ != CoreLifecycleState::uninitialized) {
     state_ = CoreLifecycleState::ready;

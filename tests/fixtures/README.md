@@ -25,12 +25,13 @@ move.w #$cafe,4(a0)
 move.b #$42,6(a0)
 configure VDP Mode 5, 320x224, with an original solid-color test image
 program PSG channel zero with a deterministic centered square wave
-bra.s  <same instruction>
+poll controller port A into work RAM and repeat
 ```
 
 The test runs a real emulated frame and checks the resulting work-RAM values and bounded
 program counter. Video tests run the viewport change through a second frame and verify
 the tightly packed RGB565 frame hash. Audio tests drain the core after each emulated
 frame and verify stereo sample values and their hash. The header checksum is calculated
-by the generator. There is no third-party program code, game content, artwork, sampled
-audio, or trademark graphic in the fixture.
+by the generator. Input tests inject neutral frontend snapshots and verify both mapped
+core state and the active-low byte observed by the 68000 program. There is no third-party
+program code, game content, artwork, sampled audio, or trademark graphic in the fixture.
