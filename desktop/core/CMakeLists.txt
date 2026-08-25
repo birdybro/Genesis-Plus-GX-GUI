@@ -189,7 +189,9 @@ if(GENPLUSGX_ENABLE_CHD)
   target_compile_definitions(genplusgx_chd PRIVATE Z7_ST ZSTD_DISABLE_ASM)
   if(MSVC)
     target_compile_definitions(genplusgx_chd PRIVATE _CRT_SECURE_NO_WARNINGS)
-  else()
+  elseif(NOT APPLE)
+    # Apple's sysctl headers require BSD integer aliases hidden by strict POSIX
+    # feature selection. The macOS SDK already supplies the APIs libchdr needs.
     target_compile_definitions(genplusgx_chd PRIVATE _POSIX_C_SOURCE=200809L)
   endif()
   set_target_properties(

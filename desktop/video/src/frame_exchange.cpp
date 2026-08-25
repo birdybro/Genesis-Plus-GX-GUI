@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cstddef>
 #include <mutex>
 #include <stdexcept>
 #include <utility>
@@ -174,7 +175,9 @@ VideoExchangeStatus VideoFrameExchange::copyLatest(
 
   const auto pixelCount = frame.pixelCount();
   std::ranges::copy_n(
-    private_->slots[slotIndex].pixels.begin(), pixelCount, destination.begin());
+    private_->slots[slotIndex].pixels.begin(),
+    static_cast<std::ptrdiff_t>(pixelCount),
+    destination.begin());
 
   {
     std::scoped_lock lock{private_->mutex};

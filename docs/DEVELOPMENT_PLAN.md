@@ -2370,6 +2370,11 @@ filesystem, timing, generated-fixture, and stability suites.
   moving `macos-latest` alias are not used.
 - Qt 6.8.3 is installed as the host-native package, SDL 3.4.14 is built natively for each
   runner, and all third-party actions retain immutable commit pins.
+- Hosted run `32911157563` configured both Apple Silicon variants, then exposed a
+  libchdr-only feature-test conflict: strict `_POSIX_C_SOURCE` hides BSD integer aliases
+  required by Apple's `sysctl` headers. That Linux-only definition is now excluded on
+  Apple without changing vendored sources. The same Clang build identified and corrected
+  a safe-size-to-iterator-difference conversion in the frontend video exchange.
 - Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
   timing portability fix. Static workflow validation and hosted verification are
   pending this workflow-bearing commit.
