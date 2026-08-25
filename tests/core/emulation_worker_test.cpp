@@ -66,6 +66,18 @@ bool submitAndSucceed(
   return true;
 }
 
+bool waitForReplacedFrameEvent(genplusgx::EmulationWorker& worker)
+{
+  const auto deadline = std::chrono::steady_clock::now() + 2s;
+  while (std::chrono::steady_clock::now() < deadline) {
+    if (worker.metrics().replacedFrameEvents > 0U) {
+      return true;
+    }
+    std::this_thread::sleep_for(5ms);
+  }
+  return worker.metrics().replacedFrameEvents > 0U;
+}
+
 } // namespace
 
 int main()
@@ -315,15 +327,15 @@ int main()
     return 11;
   }
   const auto fastFrame = waitForType(worker, genplusgx::EmulationEventType::frameCompleted);
-  std::this_thread::sleep_for(20ms);
   if (!check(fastFrame && fastFrame->fastForward,
         "Fast-forward frame was not marked") ||
+      !check(waitForReplacedFrameEvent(worker),
+        "Frame notifications did not exercise replacement") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::pause, 16U), event),
         "Fast-forward pause failed") ||
-      !check(worker.metrics().replacedFrameEvents > 0U &&
-          worker.metrics().eventQueueDepth <= 65U,
+      !check(worker.metrics().eventQueueDepth <= 65U,
         "Frame notifications were not coalesced within bounded event storage") ||
       !check(worker.submit(genplusgx::EmulationCommand::load(
           17U, invalidFixture.path())),

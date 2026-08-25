@@ -50,7 +50,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | `3aa0f41` |
 | 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | `34e709f` |
 | 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
-| 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | recorded by milestone 40 |
+| 39 Windows CI | IN PROGRESS | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | pending |
 | 40 macOS CI | PLANNED | Apple Silicon and practical Intel build/tests | GitHub workflow/platform fixes | matrix definition and deployment review | Clean macOS matrix definition | pending |
 | 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
@@ -2288,7 +2288,7 @@ uploads useful failure logs, and does not enable proprietary external fixtures.
 
 ## Milestone 39 detail
 
-**Status:** COMPLETE
+**Status:** IN PROGRESS
 
 **Goal:** Prove the desktop frontend and complete automated suite build and run as
 native 64-bit Windows applications using Microsoft's supported compiler toolchain.
@@ -2296,6 +2296,15 @@ native 64-bit Windows applications using Microsoft's supported compiler toolchai
 **Files changed:**
 
 - `.github/workflows/ci.yml`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/c_api/config.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/timing/CMakeLists.txt`
+- `desktop/timing/include/genplusgx/timing/host_timer_resolution.h`
+- `desktop/timing/src/host_timer_resolution.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/unit/per_game_settings_test.cpp`
+- `docs/ARCHITECTURE.md`
 - `docs/TESTING.md`
 - `docs/DEVELOPMENT_PLAN.md`
 
@@ -2316,8 +2325,16 @@ all 61 CTest registrations in both Debug and Release using Visual Studio 2022 x6
   hidden by ELF symbol behavior: the frontend `config` global was declared before an
   outer C-linkage block. Its frontend-owned header now gives the variable and reset
   function explicit C linkage on every compiler.
-- `actionlint` and the first hosted Windows run are verified before milestone 40 begins;
-  its run identifier and final result are recorded by milestone 40.
+- Run `32909748818` built both Windows configurations and passed all 15 GUI tests. Its
+  remaining failures identified two test portability defects—a POSIX-only absolute BIOS
+  path and a fixed 20 ms frame-replacement sleep—and a real coarse-timer pacing issue at
+  the 4.17 ms fast-forward interval.
+- Test BIOS paths now derive from a native temporary directory, frame coalescing waits on
+  its observable replacement metric, and the Windows worker owns a balanced 1 ms timer
+  resolution request. No core algorithm or target rate was relaxed.
+- Local Debug, Release, and ASan/UBSan builds and complete CTest suites pass (61/61 in
+  each configuration); `actionlint` 1.7.7 reports no findings. Final hosted verification
+  is pending this corrective push.
 
 **Acceptance criteria:** Windows Server 2022 obtains Qt 6.8.3 for MSVC 2022 x64, builds
 matching SDL 3.4.14 libraries, compiles the entire application with `/W4`, and runs the

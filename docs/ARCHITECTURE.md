@@ -254,6 +254,12 @@ shutdown; no busy loop or Qt timer executes frames. A frame more than one full i
 behind resynchronizes to one interval after the current monotonic time instead of
 running an unbounded catch-up burst.
 
+Windows begins the worker thread with a scoped 1 ms Multimedia Timer resolution request
+and balances it during thread teardown. This is required because the platform's default
+scheduler tick is coarser than the 4.17 ms deadline used by bounded 4x fast-forward.
+Linux and macOS use the same scope as a no-op. The request changes only wait resolution;
+all cadence and drift decisions remain in the platform-independent `FramePacer`.
+
 Pause removes the active deadline. Resume starts immediately from a fresh origin, and
 frame advance runs exactly one frame without activating the pacer. Fast-forward rebuilds
 the same rational interval at a bounded 4x rate. Its core audio batch is drained but not

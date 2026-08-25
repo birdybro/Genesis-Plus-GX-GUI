@@ -32,12 +32,23 @@ int main()
   using namespace genplusgx;
   using namespace genplusgx::settings;
 
+  QTemporaryDir temporary;
+  if (!check(temporary.isValid(), "Temporary directory could not be created")) {
+    return 1;
+  }
+#if defined(_WIN32)
+  const auto temporaryPath = std::filesystem::path{temporary.path().toStdWString()};
+#else
+  const auto temporaryPath = std::filesystem::path{temporary.path().toStdString()};
+#endif
+
   GlobalGameSettings global;
   global.video.aspect = video::AspectMode::native;
   global.audio.masterVolumePercent = 80;
   global.system.region = CoreSystemRegion::ntscU;
   global.inputProfile = "Default";
-  global.bios.setPath(platform::BiosSlot::segaCdUsa, "/global/us.bin");
+  global.bios.setPath(
+    platform::BiosSlot::segaCdUsa, temporaryPath / "global" / "us.bin");
 
   PerGameSettings overrides;
   auto overrideVideo = global.video;
@@ -54,7 +65,8 @@ int main()
   overrides.system = overrideSystem;
   overrides.inputProfile = "Arcade Stick";
   auto overrideBios = global.bios;
-  overrideBios.setPath(platform::BiosSlot::segaCdUsa, "/games/us.bin");
+  overrideBios.setPath(
+    platform::BiosSlot::segaCdUsa, temporaryPath / "games" / "us.bin");
   overrides.bios = overrideBios;
 
   const auto effective = resolvePerGameSettings(global, overrides);
@@ -95,11 +107,7 @@ int main()
     return 4;
   }
 
-  QTemporaryDir temporary;
-  if (!check(temporary.isValid(), "Temporary directory could not be created")) {
-    return 5;
-  }
-  const auto root = std::filesystem::path{temporary.path().toStdString()} / "per-game";
+  const auto root = temporaryPath / "per-game";
   PerGameSettingsStore store{root};
   const auto firstIdentity = identity('a', "first-game");
   const auto secondIdentity = identity('b', "second-game");

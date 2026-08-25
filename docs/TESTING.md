@@ -95,7 +95,9 @@ QT_QPA_PLATFORM=offscreen SDL_AUDIODRIVER=dummy \
 CI has least-privilege read-only repository contents permission, cancels obsolete runs
 on the same ref, and never enables external proprietary-BIOS fixtures. Windows uses
 Qt's MSVC 2022 x64 binaries and a matching source-built SDL library; SDL's DLL directory
-is exported for test and application startup.
+is exported for test and application startup. Its emulation worker requests 1 ms timer
+resolution only while the thread is alive so sub-default-tick fast-forward deadlines
+retain the same bounded pacing semantics as Linux.
 
 ## Optional external BIOS test
 

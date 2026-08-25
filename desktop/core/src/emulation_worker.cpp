@@ -1,6 +1,7 @@
 #include "genplusgx/emulation_worker.h"
 
 #include "genplusgx/bounded_queue.h"
+#include "genplusgx/timing/host_timer_resolution.h"
 
 #include <array>
 #include <condition_variable>
@@ -448,6 +449,7 @@ private:
 
   void threadMain()
   {
+    const ScopedHostTimerResolution timerResolution;
     CoreAdapter adapter{audioSampleRate_};
     const auto initialized = adapter.initialize();
     if (!initialized) {
