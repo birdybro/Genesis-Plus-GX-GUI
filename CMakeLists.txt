@@ -83,6 +83,7 @@ message(STATUS "Tests: ${BUILD_TESTING}")
 add_subdirectory(desktop/video)
 add_subdirectory(desktop/audio)
 add_subdirectory(desktop/timing)
+add_subdirectory(desktop/input)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
 

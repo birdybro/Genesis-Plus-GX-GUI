@@ -321,6 +321,19 @@ assigned in order to active core device slots, which correctly maps a normal sec
 to slot four while naturally covering Team Player, Master Tap, and J-Cart slot layouts.
 Every unused/disconnected core slot is cleared at the same boundary.
 
+The implemented `KeyboardInput` service installs an event filter on the emulator
+display and maps Qt keys to Player 1 without referencing core constants. Its default
+layout is arrows, Z/X/C for A/B/C, A/S/D for X/Y/Z, Return for Start, and Shift for
+Mode. Physical held keys are tracked separately from the logical snapshot so the most
+recent opposite direction wins and the earlier direction resumes when it is released.
+Auto-repeat never changes sequence state. Focus loss, window deactivation, hide,
+detach, and shutdown release all held keys. Ctrl/Alt/Meta press chords bypass gameplay
+mapping for application shortcuts; releases are still observed so a chord cannot leave
+a previously held gameplay key stuck. Only changed snapshots receive a new monotonic
+sequence and enter the worker's coalescing command path. Destruction disconnects the
+snapshot sink before clearing internal state, preventing teardown callbacks into
+already-destroyed coordinator captures.
+
 ## Persistence and settings
 
 Platform services resolve data locations using Qt standard paths. Tests inject a

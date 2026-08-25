@@ -2,6 +2,7 @@
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
 #include "genplusgx/emulation_worker.h"
+#include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
@@ -53,6 +54,22 @@ int main(int argc, char* argv[])
 
   genplusgx::ui::MainWindow window;
   window.displayWidget()->setFrameExchange(videoFrames);
+  genplusgx::input::KeyboardInput keyboardInput{&window};
+  keyboardInput.attach(*window.displayWidget());
+  std::uint64_t inputOperationId = 1'000'000U;
+  keyboardInput.setSnapshotSink(
+    [&inputOperationId, &worker](const genplusgx::InputSnapshot& snapshot) {
+      const auto state = worker.state();
+      if (state != genplusgx::EmulationWorkerState::paused &&
+          state != genplusgx::EmulationWorkerState::running) {
+        return;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateInput(++inputOperationId, snapshot));
+      if (!submitted) {
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+      }
+    });
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
@@ -89,6 +106,8 @@ int main(int argc, char* argv[])
   window.show();
   const int result = application.exec();
   eventPump.stop();
+  keyboardInput.setSnapshotSink({});
+  keyboardInput.detach();
   static_cast<void>(worker.stop());
   static_cast<void>(audioOutput.shutdown());
   return result;

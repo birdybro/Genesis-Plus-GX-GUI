@@ -6,6 +6,7 @@ target_link_libraries(
   genplusgx_desktop
   PRIVATE
     GenesisPlusGX::Audio
+    GenesisPlusGX::Input
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
     genplusgx_project_options

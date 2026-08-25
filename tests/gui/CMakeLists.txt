@@ -38,6 +38,27 @@ set_tests_properties(
   PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" LABELS "gui;integration;video"
 )
 
+qt_add_executable(genplusgx_keyboard_input_test keyboard_input_test.cpp)
+set_target_properties(genplusgx_keyboard_input_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_keyboard_input_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Input
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.keyboard_input COMMAND genplusgx_keyboard_input_test)
+set_tests_properties(
+  gui.keyboard_input
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;input;fixture"
+    TIMEOUT 30
+)
+
 add_test(NAME gui.desktop_help COMMAND genplusgx_desktop --help)
 set_tests_properties(
   gui.desktop_help

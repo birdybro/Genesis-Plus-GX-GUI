@@ -27,6 +27,7 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   widget.show();
   QApplication::processEvents();
 
+  QCOMPARE(widget.focusPolicy(), Qt::StrongFocus);
   QVERIFY(!widget.usesAcceleratedRenderer());
   QVERIFY(!widget.hasFrame());
   QVERIFY(!widget.presentLatestFrame());

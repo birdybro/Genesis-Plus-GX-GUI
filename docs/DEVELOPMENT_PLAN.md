@@ -26,8 +26,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | `3ee78c1` |
 | 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | `71692a3` |
 | 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | `1fbc570` |
-| 15 Timing/pacing | COMPLETE | NTSC/PAL/CD pacing, FF, pause, frame advance | `desktop/timing`, core timing metadata, worker scheduler | rational/property and live rate/state tests | Monotonic non-busy pacing | recorded by milestone 16 |
-| 16 Keyboard controls | PLANNED | Excellent default Genesis keyboard mappings | input/UI integration | synthetic key-to-core workflow | 3/6-button controls work | pending |
+| 15 Timing/pacing | COMPLETE | NTSC/PAL/CD pacing, FF, pause, frame advance | `desktop/timing`, core timing metadata, worker scheduler | rational/property and live rate/state tests | Monotonic non-busy pacing | `3235274` |
+| 16 Keyboard controls | COMPLETE | Excellent default Genesis keyboard mappings | `desktop/input`, display/app integration | mapping, event-filter, focus, worker/core pipeline tests | 3/6-button controls work | recorded by milestone 17 |
 | 17 Controllers | PLANNED | SDL3 discovery, hot-plug, assignments, mappings | controller service | injected SDL event tests | Multi-controller lifecycle is safe | pending |
 | 18 Input UI | PLANNED | Capture, profiles, deadzones, conflicts, advanced devices | settings/input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | pending |
 | 19 Game loading UI | PLANNED | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | pending |
@@ -849,4 +849,62 @@ audio; the application pauses and clears the SDL stream until normal speed resum
 Sega CD automatically uses its loaded region's VDP cadence while its core sub-clock
 remains synchronized by Genesis Plus GX.
 
-**Commit SHA:** recorded by milestone 16
+**Commit SHA:** `3235274`
+
+## Milestone 16 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide responsive, safe Player 1 keyboard controls for Genesis three- and
+six-button layouts and deliver their logical state through the existing bounded worker
+protocol at frame boundaries.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/input/CMakeLists.txt`
+- `desktop/input/include/genplusgx/input/keyboard_input.h`
+- `desktop/input/src/keyboard_input.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `desktop/video/src/display_widget.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/keyboard_input_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+
+**Tests added:** `gui.keyboard_input` verifies all twelve unique default bindings,
+connected neutral state, monotonic change-only sequences, ignored unknown keys,
+auto-repeat suppression, last-pressed opposite-direction resolution and restoration,
+all three-/six-button controls, Ctrl/Alt/Meta shortcut bypass, event-filter delivery,
+focus-loss release, and end-to-end snapshot submission to a real worker. Its generated
+ROM workflow confirms both pressed and released sequences are applied at explicit frame
+boundaries; the existing semantic core input test continues to verify B+Right as the
+expected active-low value in synthetic work RAM.
+
+**Gate evidence:**
+
+- Focused keyboard, core-input, and worker integration tests: passed.
+- Keyboard and core-input tests each passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (24/24).
+- Release build and complete CTest: passed (24/24).
+- The first ASan/UBSan run found a destructor-time callback into an expired test sink;
+  destruction now disconnects the sink before cleanup, and the complete rerun passed
+  (24/24).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New input service, application integration, and test code compiled under the frontend
+  warning policy without warnings.
+
+**Acceptance criteria:** The display is keyboard-focusable. Player 1 defaults use
+arrows, Z/X/C, A/S/D, Return, and Shift; no core-specific bit value enters the Qt
+service. Input is emitted only when logical state changes, auto-repeat is consumed,
+opposite axes have deterministic last-input priority, and every focus/lifecycle exit
+clears held keys. Destruction disconnects the callback before internal cleanup so a
+sink can never be invoked after its captured state has expired. Modified application
+shortcuts bypass gameplay presses. The GUI
+submits snapshots only while a game is paused or running, and the worker coalesces and
+applies them on its core-owning thread at the next frame boundary.
+
+**Commit SHA:** recorded by milestone 17

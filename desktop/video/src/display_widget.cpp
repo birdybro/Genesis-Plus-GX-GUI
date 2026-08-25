@@ -191,6 +191,7 @@ DisplayWidget::DisplayWidget(QWidget* parent)
 {
   setObjectName(QStringLiteral("emulatorCanvas"));
   setAccessibleName(tr("Emulator display"));
+  setFocusPolicy(Qt::StrongFocus);
   setAutoFillBackground(false);
   setAttribute(Qt::WA_OpaquePaintEvent);
   setMinimumSize(320, 240);
