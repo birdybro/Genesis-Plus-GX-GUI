@@ -132,10 +132,11 @@ separate workers only through their service interfaces.
 
 Commands are a finite tagged set: load, unload, start, pause, resume, hard reset, soft
 reset, frame advance, fast-forward mode, save/load/delete state, input snapshot,
-settings snapshot, disc change/eject, and shutdown. Commands with superseding semantics
-(input and live settings) are coalesced. Lifecycle and persistence commands retain
-ordering. The queue has a fixed capacity and reports saturation rather than growing
-without bound.
+settings and firmware snapshots, disc change/eject, and shutdown. Commands with
+superseding semantics (input and live settings) are coalesced. A failed coalescing
+search does not move from the command that is subsequently queued. Lifecycle,
+persistence, and disc commands retain ordering. The queue has a fixed capacity and
+reports saturation rather than growing without bound.
 
 The worker emits immutable events containing operation IDs. The coordinator discards
 stale completion events after a newer load/unload generation, preventing late UI
@@ -571,8 +572,44 @@ existence, regular-file status, the size shape accepted by the corresponding ups
 loader, bounded readability, and obviously blank repeated-byte content. SHA-256 and
 detected family are identification aids, not a proprietary hash allowlist. This permits
 legitimate revisions and user dumps without claiming authenticity. The manager never
-downloads, modifies, or copies a firmware file. Milestone 27 consumes only this typed
-configuration when it connects Sega CD startup to the core-owning emulation thread.
+downloads, modifies, or copies a firmware file. Only structurally valid Sega CD paths
+are projected into a `CoreFirmwareSettings` value and queued to the core-owning thread;
+changing them does not mutate a running machine and takes effect on the next load.
+
+## Sega CD session and disc flow
+
+The adapter stages independent USA, Europe, and Japan firmware paths. Before each game
+load it copies them into the desktop host boundary and clears the core's cached CD BIOS
+marker. Genesis Plus GX remains authoritative for disc format and region detection,
+then selects the detected region's firmware. A missing BIOS is translated into a typed,
+region-specific frontend error after the core has unmounted the attempted image.
+
+```text
+BIOS manager -- validated regional paths --> bounded firmware command
+                                                  |
+Open Game / CLI / drop --> load command ----------+--> emulation thread
+                                                        |
+                                           core disc detection + BIOS load
+                                                        |
+                                      Paused Sega CD session + disc metadata
+
+Change Disc / Eject --> typed command --> cdd mount/tray state --> result event --> GUI
+```
+
+Disc UI is enabled only when a loaded event identifies `SYSTEM_MCD`. Change requests
+preflight the build's `.bin`, `.cue`, `.iso`, and conditional `.chd` set, then the core
+mounts the complete image on its owner thread. Mount failure leaves the existing CD
+session alive, the tray open, audio output cleared, and no stale disc path exposed.
+Closing the tray resumes the mounted image through the same status transition used by
+the upstream libretro frontend. CUE/BIN, CDDA, and CHD decoding remain upstream core
+responsibilities; the frontend adds no alternate sector or audio algorithms.
+
+Internal 8 KiB BRAM and the 512 KiB RAM cartridge are discovered immediately after CD
+initialization and use the normal per-content atomic persistence lifecycle. Disc swaps
+do not change the game identity or reinitialize backup memory. Tests exercise ISO and
+CUE/BIN mounting, USA/Europe BIOS selection, eject/close, failed swap recovery, a frame,
+both BRAM files, clean worker shutdown, and an opt-in user-firmware smoke path. No
+proprietary fixture is part of the default build or CI.
 
 The library scanner runs outside the GUI thread, parses bounded metadata without
 initializing the emulator, and submits database batches. SQLite operations use

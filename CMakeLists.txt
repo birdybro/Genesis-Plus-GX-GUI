@@ -17,6 +17,11 @@ option(GENPLUSGX_BUILD_DESKTOP "Build the Qt desktop application" ON)
 option(GENPLUSGX_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
 option(GENPLUSGX_ENABLE_CHD "Enable CHD disc-image support" ON)
 option(GENPLUSGX_ENABLE_TREMOR "Enable bundled Tremor Ogg/Vorbis decoding" ON)
+option(
+  GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS
+  "Enable tests that require user-supplied firmware or hardware fixtures"
+  OFF
+)
 
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)

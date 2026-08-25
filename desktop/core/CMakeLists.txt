@@ -212,6 +212,7 @@ set_target_properties(
 
 add_library(
   genplusgx_core_adapter STATIC
+  include/genplusgx/core_firmware_settings.h
   src/core_adapter.cpp
   src/emulation_worker.cpp
 )

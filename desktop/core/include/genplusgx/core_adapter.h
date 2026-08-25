@@ -3,6 +3,7 @@
 #include "genplusgx/audio_frame.h"
 #include "genplusgx/backup_memory.h"
 #include "genplusgx/core_audio_settings.h"
+#include "genplusgx/core_firmware_settings.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/core_video_settings.h"
 #include "genplusgx/input_snapshot.h"
@@ -38,6 +39,9 @@ enum class CoreError {
   invalidAudioBatch,
   invalidTiming,
   invalidSettings,
+  missingFirmware,
+  notSegaCd,
+  invalidDiscImage,
   staleInputSnapshot,
   invalidStatePayload,
   invalidBackupMemory,
@@ -111,6 +115,22 @@ struct CoreTimingInfo final {
   }
 };
 
+enum class CoreDiscRegion {
+  unknown,
+  usa,
+  europe,
+  japan,
+};
+
+struct CoreDiscInfo final {
+  bool segaCd{false};
+  bool trayOpen{false};
+  bool discPresent{false};
+  std::uint32_t trackCount{0};
+  CoreDiscRegion region{CoreDiscRegion::unknown};
+  std::filesystem::path path;
+};
+
 [[nodiscard]] std::uint64_t hashAudioFrames(
   std::span<const StereoAudioFrame> frames) noexcept;
 
@@ -164,6 +184,13 @@ public:
   [[nodiscard]] CoreResult applySystemSettings(
     const CoreSystemSettings& settings);
   [[nodiscard]] CoreResult systemSettings(CoreSystemSettings& output) const;
+  [[nodiscard]] CoreResult applyFirmwareSettings(
+    const CoreFirmwareSettings& settings);
+  [[nodiscard]] CoreResult firmwareSettings(
+    CoreFirmwareSettings& output) const;
+  [[nodiscard]] CoreResult discInfo(CoreDiscInfo& output) const;
+  [[nodiscard]] CoreResult setDiscEjected(bool ejected);
+  [[nodiscard]] CoreResult changeDisc(const std::filesystem::path& path);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

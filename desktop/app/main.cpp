@@ -59,6 +59,36 @@ std::array<genplusgx::ui::StateSlotView, 10> stateSlotViews(
   return views;
 }
 
+genplusgx::CoreFirmwareSettings coreFirmwareSettings(
+  const genplusgx::platform::BiosSnapshot& snapshot)
+{
+  const auto validPath = [&snapshot](genplusgx::platform::BiosSlot slot) {
+    const auto index = static_cast<std::size_t>(slot);
+    return snapshot.validation[index].valid()
+      ? snapshot.configuration.path(slot) : std::filesystem::path{};
+  };
+  return {
+    .segaCdUsa = validPath(genplusgx::platform::BiosSlot::segaCdUsa),
+    .segaCdEurope = validPath(genplusgx::platform::BiosSlot::segaCdEurope),
+    .segaCdJapan = validPath(genplusgx::platform::BiosSlot::segaCdJapan),
+  };
+}
+
+std::string discRegionName(genplusgx::CoreDiscRegion region)
+{
+  switch (region) {
+    case genplusgx::CoreDiscRegion::usa:
+      return "USA";
+    case genplusgx::CoreDiscRegion::europe:
+      return "Europe";
+    case genplusgx::CoreDiscRegion::japan:
+      return "Japan";
+    case genplusgx::CoreDiscRegion::unknown:
+      return "Unknown";
+  }
+  return "Unknown";
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -226,14 +256,35 @@ int main(int argc, char* argv[])
   window.setAudioSettings(audioSettings);
   window.setSystemSettings(systemSettings);
   window.setBiosSnapshot(biosManager.snapshot());
+  std::uint64_t firmwareSettingsOperationId = 800'000U;
+  const auto initialFirmwareSettings = worker.submit(
+    genplusgx::EmulationCommand::updateFirmwareSettings(
+      ++firmwareSettingsOperationId,
+      coreFirmwareSettings(biosManager.snapshot())));
+  if (!initialFirmwareSettings) {
+    qWarning().noquote() << QString::fromStdString(
+      initialFirmwareSettings.message);
+  }
   window.setBiosConfigurationSink(
-    [&biosManager, &window](
+    [&biosManager, &firmwareSettingsOperationId, &window, &worker](
       const genplusgx::platform::BiosConfiguration& configuration) {
       const auto saved = biosManager.apply(configuration);
-      if (saved) {
-        window.setBiosSnapshot(biosManager.snapshot());
+      if (!saved) {
+        return saved;
       }
-      return saved;
+      window.setBiosSnapshot(biosManager.snapshot());
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateFirmwareSettings(
+          ++firmwareSettingsOperationId,
+          coreFirmwareSettings(biosManager.snapshot())));
+      if (!submitted) {
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = "BIOS paths were saved, but the emulation worker could not "
+                     "accept the update: " + submitted.message,
+        };
+      }
+      return genplusgx::PersistenceStatus{};
     });
   std::vector<std::string> audioDeviceNames;
   audioDeviceNames.reserve(audioDevices.size());
@@ -427,6 +478,13 @@ int main(int argc, char* argv[])
   bool stateSessionAvailable = false;
   std::optional<PendingLoad> pendingLoad;
   std::optional<std::uint64_t> pendingUnload;
+  struct PendingDisc final {
+    std::uint64_t operationId{0};
+    genplusgx::ui::DiscUiOperation operation{
+      genplusgx::ui::DiscUiOperation::change};
+  };
+  std::uint64_t discOperationId = 2'500'000U;
+  std::optional<PendingDisc> pendingDisc;
   std::filesystem::path closingGamePath;
   enum class PendingStatePhase {
     capturing,
@@ -470,6 +528,26 @@ int main(int argc, char* argv[])
         window.showGameCloseError(submitted.message);
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
+    });
+  window.setDiscOperationSink(
+    [&discOperationId, &pendingDisc, &window, &worker](
+      genplusgx::ui::DiscUiOperation operation,
+      const std::filesystem::path& path,
+      bool ejected) {
+      const auto operationId = ++discOperationId;
+      const auto command = operation == genplusgx::ui::DiscUiOperation::change
+        ? genplusgx::EmulationCommand::changeDisc(operationId, path)
+        : genplusgx::EmulationCommand::discEjected(operationId, ejected);
+      const auto submitted = worker.submit(command);
+      if (!submitted) {
+        window.setDiscOperationBusy(false);
+        window.showDiscOperationError(operation, submitted.message);
+        return;
+      }
+      pendingDisc = PendingDisc{
+        .operationId = operationId,
+        .operation = operation,
+      };
     });
   window.setStateOperationSink(
     [&gameGeneration, &pendingState, &stateOperationId, &stateStorage,
@@ -524,8 +602,8 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&audioOutput, &controllerInput, &gameGeneration, &inputAggregator,
-     &inputOperationId, &lifecycleOperationId, &pendingLoad, &pendingState,
-     &pendingUnload, &closingGamePath, &recentGames, &recentGamesStore,
+     &inputOperationId, &lifecycleOperationId, &pendingDisc, &pendingLoad,
+     &pendingState, &pendingUnload, &closingGamePath, &recentGames, &recentGamesStore,
      &refreshRecentGamesMenu, &stateActivationOperation, &stateOperationId,
      &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
@@ -580,6 +658,12 @@ int main(int argc, char* argv[])
         pendingLoad.reset();
         if (event->succeeded()) {
           window.setGameLoaded(loadedPath);
+          window.setSegaCdSession(
+            event->disc.segaCd,
+            discRegionName(event->disc.region),
+            event->disc.path,
+            event->disc.trayOpen,
+            event->disc.discPresent);
           ++gameGeneration;
           stateSessionAvailable = false;
           const auto activationId = ++stateOperationId;
@@ -623,6 +707,12 @@ int main(int argc, char* argv[])
             loadedPath, event->message, !previousGameRemainsLoaded);
           if (previousGameRemainsLoaded) {
             window.setStateSessionReady(stateSessionAvailable);
+            window.setSegaCdSession(
+              event->disc.segaCd,
+              discRegionName(event->disc.region),
+              event->disc.path,
+              event->disc.trayOpen,
+              event->disc.discPresent);
           }
           if (!previousGameRemainsLoaded && gameGeneration != 0U) {
             static_cast<void>(stateStorage.submit(
@@ -657,8 +747,31 @@ int main(int argc, char* argv[])
           closingGamePath.clear();
         } else {
           window.setGameLoaded(closingGamePath);
+          window.setSegaCdSession(
+            event->disc.segaCd,
+            discRegionName(event->disc.region),
+            event->disc.path,
+            event->disc.trayOpen,
+            event->disc.discPresent);
           window.showGameCloseError(event->message);
           qWarning().noquote() << QString::fromStdString(event->message);
+        }
+      }
+      if (pendingDisc && event->operationId == pendingDisc->operationId &&
+          (event->command == genplusgx::EmulationCommandType::changeDisc ||
+           event->command == genplusgx::EmulationCommandType::setDiscEjected)) {
+        const auto operation = pendingDisc->operation;
+        pendingDisc.reset();
+        window.setSegaCdSession(
+          event->disc.segaCd,
+          discRegionName(event->disc.region),
+          event->disc.path,
+          event->disc.trayOpen,
+          event->disc.discPresent);
+        if (event->succeeded()) {
+          window.showDiscOperationSuccess(operation);
+        } else {
+          window.showDiscOperationError(operation, event->message);
         }
       }
       if (!audioOutput.isInitialized()) {

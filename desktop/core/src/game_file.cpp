@@ -29,6 +29,15 @@ constexpr std::array baseExtensions{
 #endif
 };
 
+constexpr std::array discExtensions{
+  std::string_view{".bin"},
+  std::string_view{".cue"},
+  std::string_view{".iso"},
+#if defined(GENPLUSGX_HAVE_CHD)
+  std::string_view{".chd"},
+#endif
+};
+
 GameFileStatus failure(GameFileError error, std::string message)
 {
   return {.error = error, .message = std::move(message)};
@@ -53,6 +62,17 @@ bool hasSupportedGameExtension(const std::filesystem::path& path)
 {
   const auto extension = lowercase(path.extension().string());
   return std::ranges::find(baseExtensions, extension) != baseExtensions.end();
+}
+
+std::span<const std::string_view> supportedDiscExtensions() noexcept
+{
+  return discExtensions;
+}
+
+bool hasSupportedDiscExtension(const std::filesystem::path& path)
+{
+  const auto extension = lowercase(path.extension().string());
+  return std::ranges::find(discExtensions, extension) != discExtensions.end();
 }
 
 GameFileStatus validateGameFile(const std::filesystem::path& path)
@@ -88,6 +108,24 @@ GameFileStatus validateGameFile(const std::filesystem::path& path)
     return failure(GameFileError::unreadable, "The selected game file cannot be read.");
   }
   return {};
+}
+
+GameFileStatus validateDiscImageFile(const std::filesystem::path& path)
+{
+  if (path.empty()) {
+    return failure(GameFileError::emptyPath, "No disc image was selected.");
+  }
+  const auto nativePath = path.string();
+  if (nativePath.size() < 3U || nativePath.size() > maximumCorePathBytes) {
+    return failure(
+      GameFileError::pathTooLong,
+      "The disc image path must be between 3 and 255 bytes for the emulator core.");
+  }
+  if (!hasSupportedDiscExtension(path)) {
+    return failure(GameFileError::unsupportedDiscExtension,
+      "The selected file type is not a supported Sega CD / Mega CD image.");
+  }
+  return validateGameFile(path);
 }
 
 } // namespace genplusgx

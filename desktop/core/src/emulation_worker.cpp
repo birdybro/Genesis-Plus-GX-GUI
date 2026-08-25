@@ -115,6 +115,33 @@ EmulationCommand EmulationCommand::updateSystemSettings(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateFirmwareSettings(
+  std::uint64_t operationId,
+  CoreFirmwareSettings settings)
+{
+  auto command = simple(EmulationCommandType::firmwareSettings, operationId);
+  command.coreFirmwareSettings = std::move(settings);
+  return command;
+}
+
+EmulationCommand EmulationCommand::discEjected(
+  std::uint64_t operationId,
+  bool ejected)
+{
+  auto command = simple(EmulationCommandType::setDiscEjected, operationId);
+  command.enabled = ejected;
+  return command;
+}
+
+EmulationCommand EmulationCommand::changeDisc(
+  std::uint64_t operationId,
+  std::filesystem::path path)
+{
+  auto command = simple(EmulationCommandType::changeDisc, operationId);
+  command.path = std::move(path);
+  return command;
+}
+
 EmulationCommand EmulationCommand::restore(
   std::uint64_t operationId,
   std::span<const std::uint8_t> rawState)
@@ -229,6 +256,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::firmwareSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::firmwareSettings;
+          },
+          std::move(command))) {
+      ++coalescedFirmwareSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -283,6 +320,7 @@ public:
       .coalescedVideoSettingsCommands = coalescedVideoSettingsCommands_,
       .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,
       .coalescedSystemSettingsCommands = coalescedSystemSettingsCommands_,
+      .coalescedFirmwareSettingsCommands = coalescedFirmwareSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -609,6 +647,25 @@ private:
       case EmulationCommandType::systemSettings:
         coreResult = adapter.applySystemSettings(command.coreSystemSettings);
         break;
+      case EmulationCommandType::firmwareSettings:
+        coreResult = adapter.applyFirmwareSettings(command.coreFirmwareSettings);
+        break;
+      case EmulationCommandType::setDiscEjected:
+        validTransition = current == EmulationWorkerState::paused ||
+                          current == EmulationWorkerState::running;
+        if (validTransition) {
+          audioFrames_->clear();
+          coreResult = adapter.setDiscEjected(command.enabled);
+        }
+        break;
+      case EmulationCommandType::changeDisc:
+        validTransition = current == EmulationWorkerState::paused ||
+                          current == EmulationWorkerState::running;
+        if (validTransition) {
+          audioFrames_->clear();
+          coreResult = adapter.changeDisc(command.path);
+        }
+        break;
       case EmulationCommandType::captureState:
         coreResult = adapter.saveRawState(capturedState);
         if (coreResult) {
@@ -637,6 +694,9 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      if (adapter.state() == CoreLifecycleState::loaded) {
+        static_cast<void>(adapter.discInfo(event.disc));
+      }
       publishOperation(std::move(event));
       return;
     }
@@ -652,6 +712,9 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      if (adapter.state() == CoreLifecycleState::loaded) {
+        static_cast<void>(adapter.discInfo(event.disc));
+      }
       publishOperation(std::move(event));
       return;
     }
@@ -666,6 +729,9 @@ private:
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
     event.rawState = std::move(capturedState);
+    if (adapter.state() == CoreLifecycleState::loaded) {
+      static_cast<void>(adapter.discInfo(event.disc));
+    }
     publishOperation(std::move(event));
   }
 
@@ -837,6 +903,7 @@ private:
   std::uint64_t coalescedVideoSettingsCommands_{0};
   std::uint64_t coalescedAudioSettingsCommands_{0};
   std::uint64_t coalescedSystemSettingsCommands_{0};
+  std::uint64_t coalescedFirmwareSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

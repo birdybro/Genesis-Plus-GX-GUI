@@ -35,6 +35,23 @@ QString gameFileDialogFilter()
   return QObject::tr("Supported games (%1);;All files (*)").arg(patterns.join(u' '));
 }
 
+QString discFileDialogFilter()
+{
+  QStringList patterns;
+  for (const auto extension : supportedDiscExtensions()) {
+    patterns.push_back(QStringLiteral("*") + QString::fromLatin1(extension));
+  }
+  return QObject::tr("Sega CD / Mega CD images (%1);;All files (*)")
+    .arg(patterns.join(u' '));
+}
+
+std::optional<std::filesystem::path> DialogService::chooseDisc(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  return chooseGame(parent, initialDirectory);
+}
+
 std::optional<std::filesystem::path> QtDialogService::chooseGame(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -44,6 +61,21 @@ std::optional<std::filesystem::path> QtDialogService::chooseGame(
     QObject::tr("Open Game"),
     pathToQString(initialDirectory),
     gameFileDialogFilter());
+  if (selected.isEmpty()) {
+    return std::nullopt;
+  }
+  return pathFromQString(selected);
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseDisc(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Change Sega CD / Mega CD Disc"),
+    pathToQString(initialDirectory),
+    discFileDialogFilter());
   if (selected.isEmpty()) {
     return std::nullopt;
   }

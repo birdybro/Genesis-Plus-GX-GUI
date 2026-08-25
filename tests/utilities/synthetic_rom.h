@@ -7,8 +7,17 @@
 
 namespace genplusgx::test {
 
+enum class SyntheticSegaCdRegion : std::uint8_t {
+  usa,
+  europe,
+  japan,
+};
+
 [[nodiscard]] std::vector<std::uint8_t> makeGenesisRamMarkerRom();
 [[nodiscard]] std::vector<std::uint8_t> makeGenesisSramWriterRom();
+[[nodiscard]] std::vector<std::uint8_t> makeSegaCdBios();
+[[nodiscard]] std::vector<std::uint8_t> makeSegaCdDiscImage(
+  SyntheticSegaCdRegion region = SyntheticSegaCdRegion::usa);
 
 class TemporaryFixture final {
 public:

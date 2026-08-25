@@ -44,6 +44,9 @@ enum class EmulationCommandType {
   videoSettings,
   audioSettings,
   systemSettings,
+  firmwareSettings,
+  setDiscEjected,
+  changeDisc,
   captureState,
   restoreState,
 };
@@ -57,6 +60,7 @@ struct EmulationCommand final {
   CoreVideoSettings coreVideoSettings;
   CoreAudioSettings coreAudioSettings;
   CoreSystemSettings coreSystemSettings;
+  CoreFirmwareSettings coreFirmwareSettings;
   std::vector<std::uint8_t> rawState;
 
   [[nodiscard]] static EmulationCommand simple(
@@ -80,6 +84,15 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand updateSystemSettings(
     std::uint64_t operationId,
     CoreSystemSettings settings);
+  [[nodiscard]] static EmulationCommand updateFirmwareSettings(
+    std::uint64_t operationId,
+    CoreFirmwareSettings settings);
+  [[nodiscard]] static EmulationCommand discEjected(
+    std::uint64_t operationId,
+    bool ejected);
+  [[nodiscard]] static EmulationCommand changeDisc(
+    std::uint64_t operationId,
+    std::filesystem::path path);
   [[nodiscard]] static EmulationCommand restore(
     std::uint64_t operationId,
     std::span<const std::uint8_t> rawState);
@@ -128,6 +141,7 @@ struct EmulationEvent final {
   bool fastForward{false};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
+  CoreDiscInfo disc;
 
   [[nodiscard]] bool succeeded() const noexcept
   {
@@ -142,6 +156,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedVideoSettingsCommands{0};
   std::uint64_t coalescedAudioSettingsCommands{0};
   std::uint64_t coalescedSystemSettingsCommands{0};
+  std::uint64_t coalescedFirmwareSettingsCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
   std::uint64_t pacedFrameCount{0};

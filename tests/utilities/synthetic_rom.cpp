@@ -14,6 +14,9 @@ namespace {
 
 constexpr std::size_t romSize = 64U * 1024U;
 constexpr std::size_t programAddress = 0x200U;
+constexpr std::size_t segaCdBiosSize = 128U * 1024U;
+constexpr std::size_t segaCdSectorSize = 2'048U;
+constexpr std::size_t minimumSegaCdSectors = 150U;
 
 void write16(std::vector<std::uint8_t>& rom, std::size_t offset, std::uint16_t value)
 {
@@ -184,6 +187,58 @@ std::vector<std::uint8_t> makeGenesisSramWriterRom()
   emit16(0x60FEU);
   updateChecksum(rom);
   return rom;
+}
+
+std::vector<std::uint8_t> makeSegaCdBios()
+{
+  std::vector<std::uint8_t> bios(segaCdBiosSize, 0U);
+
+  // A test-only 68000 boot image. It contains no Sega firmware code: every
+  // vector enters a two-byte self-loop, which is sufficient to exercise core
+  // lifecycle, video/audio initialization, and backup-memory plumbing without
+  // attempting to boot copyrighted software.
+  write32(bios, 0x000U, 0x00FFFF00U);
+  for (std::size_t vector = 1; vector < 64U; ++vector) {
+    write32(bios, vector * 4U, static_cast<std::uint32_t>(programAddress));
+  }
+  writeText(bios, 0x100U, std::to_array("OPEN TEST BIOS  "));
+  writeText(bios, 0x120U, std::to_array("GENPLUSGX TEST   "));
+  write16(bios, programAddress, 0x60FEU); // bra.s $200
+
+  // Make the image intentionally non-uniform and deterministic so the BIOS
+  // validator can reject trivial repeated-byte files while accepting this one.
+  for (std::size_t offset = 0x400U; offset < bios.size(); ++offset) {
+    bios[offset] = static_cast<std::uint8_t>((offset * 37U + 11U) & 0xFFU);
+  }
+  return bios;
+}
+
+std::vector<std::uint8_t> makeSegaCdDiscImage(SyntheticSegaCdRegion region)
+{
+  std::vector<std::uint8_t> image(
+    segaCdSectorSize * minimumSegaCdSectors, 0U);
+  writeText(image, 0x000U, std::to_array("SEGADISCSYSTEM"));
+  writeText(image, 0x100U, std::to_array("SEGA MEGA DRIVE "));
+  writeText(image, 0x110U, std::to_array("(C)OPEN 2026    "));
+  std::fill_n(image.begin() + 0x120, 48, static_cast<std::uint8_t>(' '));
+  writeText(image, 0x120U, std::to_array("GENPLUSGX SYNTHETIC SEGA CD FIXTURE"));
+  std::fill_n(image.begin() + 0x150, 48, static_cast<std::uint8_t>(' '));
+  writeText(image, 0x150U, std::to_array("GENPLUSGX TEST DISC"));
+
+  // Genesis Plus GX follows the Sega CD security-area region marker used by
+  // known images: 0x64 Europe, 0xa1 Japan, and any other value USA.
+  switch (region) {
+    case SyntheticSegaCdRegion::usa:
+      image[0x20BU] = 0x00U;
+      break;
+    case SyntheticSegaCdRegion::europe:
+      image[0x20BU] = 0x64U;
+      break;
+    case SyntheticSegaCdRegion::japan:
+      image[0x20BU] = 0xA1U;
+      break;
+  }
+  return image;
 }
 
 TemporaryFixture::TemporaryFixture(

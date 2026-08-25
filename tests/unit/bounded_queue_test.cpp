@@ -2,6 +2,7 @@
 
 #include <iostream>
 #include <stdexcept>
+#include <string>
 
 namespace {
 
@@ -72,5 +73,19 @@ int main()
   }
 
   queue.clear();
-  return check(queue.empty(), "Queue clear retained values") ? 0 : 7;
+  if (!check(queue.empty(), "Queue clear retained values")) {
+    return 7;
+  }
+
+  genplusgx::BoundedQueue<std::string> strings{2U};
+  std::string replacement{"firmware/path.bin"};
+  if (!check(strings.tryPush("unrelated") &&
+        !strings.replaceNewestMatching(
+          [](const std::string& value) { return value == "missing"; },
+          std::move(replacement)) &&
+        replacement == "firmware/path.bin",
+      "A failed coalescing search consumed its path-bearing replacement")) {
+    return 8;
+  }
+  return 0;
 }

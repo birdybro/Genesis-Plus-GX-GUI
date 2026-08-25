@@ -37,8 +37,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | `d3f5a69` |
 | 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | `56eeff4` |
 | 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | `97db779` |
-| 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | recorded by milestone 27 |
-| 27 Sega CD workflow | PLANNED | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | pending |
+| 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | `77a562d` |
+| 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | recorded by milestone 28 |
 | 28 Game information | PLANNED | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | pending |
 | 29 Library database | PLANNED | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | pending |
 | 30 Library UI | PLANNED | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | pending |
@@ -1546,7 +1546,86 @@ obviously blank repeated-byte images, calculates SHA-256, and reports an expecte
 region plus detected firmware family. Checksums are informational rather than a brittle
 proprietary hash allowlist. The GUI stages choices until Apply/OK, reports save errors,
 and contains stable accessible controls. No firmware is bundled, fetched, modified, or
-written. Connecting validated Sega CD paths to disc initialization remains milestone
-27 so the manager never crosses the emulation-thread boundary itself.
+written. The manager itself never crosses the emulation-thread boundary; milestone 27
+projects only its validated Sega CD paths into a typed worker command.
 
-**Commit SHA:** recorded by milestone 27
+**Commit SHA:** `77a562d`
+
+## Milestone 27 detail
+
+**Status:** COMPLETE
+
+**Goal:** Make Sega CD/Mega CD a first-class desktop session with validated regional
+BIOS startup, typed disc change/eject operations, CUE/BIN and conditional CHD routing,
+live CD audio continuity, and automatic internal/RAM-cartridge backup persistence.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/bounded_queue.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/core_firmware_settings.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/include/genplusgx/game_file.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/core/src/game_file.cpp`
+- `desktop/ui/include/genplusgx/ui/dialog_service.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/dialog_service.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/sega_cd_workflow_test.cpp`
+- `tests/core/sega_cd_external_bios_test.cpp`
+- `tests/unit/bounded_queue_test.cpp`
+- `tests/unit/game_file_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/main_window_test.cpp`
+- `tests/utilities/synthetic_rom.h`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/BIOS.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.sega_cd_workflow` generates original CC0 test firmware and USA/
+Europe cooked images, proves region-specific missing-BIOS behavior, initializes real
+Sega CD core hardware, executes a frame, exercises tray open/close and transactional
+malformed/valid CUE-BIN swaps through both adapter and worker, and verifies exact 8 KiB
+internal BRAM plus 512 KiB RAM-cartridge files on unload. `unit.game_file` checks the
+disc-only format boundary. `unit.bounded_queue` protects path-bearing coalesced commands
+from destructive failed searches. `gui.main_window` drives the injected disc chooser,
+busy states, typed swap/eject requests, status labels, failure dialog, and cartridge
+disablement. An opt-in external test uses `GENPLUSGX_TEST_SEGA_CD_US_BIOS`; it is not
+configured or run by default.
+
+**Gate evidence:**
+
+- Focused core, file validation, bounded queue, and GUI tests passed five consecutive
+  Debug executions.
+- Debug build and complete CTest: passed (43/43).
+- Release build and complete CTest: passed (43/43).
+- ASan/UBSan build and complete CTest: passed (43/43) with no findings.
+- A CHD-disabled build compiled and passed the Sega CD workflow plus disc-extension
+  tests, confirming conditional format advertisement.
+- The opt-in external-firmware test target configured and compiled; it was not run
+  because no proprietary user fixture is present.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New core-adapter, worker, GUI, composition, and test code compiled under the frontend
+  warning policy without warnings.
+
+**Acceptance criteria:** BIOS paths reach the core only as an immutable validated
+snapshot on the emulation thread, and firmware changes affect the next load. Disc
+region and tray/presence/path metadata return on bounded worker events. The native UI
+enables change/eject only for active Sega CD sessions and supplies recoverable errors.
+ISO and CUE/BIN work through the authoritative core, while CHD is advertised only when
+the build includes libchdr. Failed swaps leave a live CD machine with its tray open.
+Internal BRAM and RAM-cartridge memory persist under the loaded disc's content identity.
+No proprietary BIOS, security program, game data, or fetched fixture enters source,
+build output, or CI. Authoritative `core/` files are unchanged.
+
+**Commit SHA:** recorded by milestone 28

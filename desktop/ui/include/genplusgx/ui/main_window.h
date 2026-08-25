@@ -52,6 +52,11 @@ enum class StateUiOperation {
   remove,
 };
 
+enum class DiscUiOperation {
+  change,
+  setEjected,
+};
+
 class MainWindow final : public QMainWindow {
 public:
   using InputConfigurationSink =
@@ -70,6 +75,8 @@ public:
   using SystemSettingsSink = std::function<void(const CoreSystemSettings&)>;
   using BiosConfigurationSink = std::function<PersistenceStatus(
     const platform::BiosConfiguration&)>;
+  using DiscOperationSink = std::function<void(
+    DiscUiOperation, const std::filesystem::path&, bool)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -102,6 +109,18 @@ public:
   void setBiosConfigurationSink(BiosConfigurationSink sink);
   [[nodiscard]] const platform::BiosSnapshot& biosSnapshot() const noexcept;
   void showBiosSettings();
+  void setDiscOperationSink(DiscOperationSink sink);
+  void setSegaCdSession(
+    bool enabled,
+    std::string region,
+    std::filesystem::path discPath,
+    bool ejected,
+    bool discPresent);
+  void setDiscOperationBusy(bool busy);
+  void showDiscOperationSuccess(DiscUiOperation operation);
+  void showDiscOperationError(
+    DiscUiOperation operation,
+    const std::string& detail);
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -142,6 +161,9 @@ private:
   void setGameActionsEnabled(bool enabled);
   void chooseGame();
   void closeGame();
+  void chooseDisc();
+  void requestDiscEjected(bool ejected);
+  void updateDiscActions();
   void requestStateOperation(StateUiOperation operation);
   void updateStateActions();
   void updateStateSlotPresentation();
@@ -181,6 +203,7 @@ private:
   SystemSettingsSink systemSettingsSink_;
   platform::BiosSnapshot biosSnapshot_;
   BiosConfigurationSink biosConfigurationSink_;
+  DiscOperationSink discOperationSink_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;
@@ -188,6 +211,12 @@ private:
   bool gameLoading_{false};
   bool stateSessionReady_{false};
   bool stateOperationBusy_{false};
+  bool segaCdSession_{false};
+  bool discEjected_{false};
+  bool discPresent_{false};
+  bool discOperationBusy_{false};
+  std::string discRegion_;
+  std::filesystem::path currentDiscPath_;
   std::uint32_t selectedStateSlot_{0};
 };
 

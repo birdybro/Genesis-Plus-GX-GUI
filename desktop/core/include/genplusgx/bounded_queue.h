@@ -34,7 +34,7 @@ public:
   }
 
   template<typename Predicate>
-  [[nodiscard]] bool replaceNewestMatching(Predicate predicate, Value replacement)
+  [[nodiscard]] bool replaceNewestMatching(Predicate predicate, Value&& replacement)
   {
     for (auto iterator = values_.rbegin(); iterator != values_.rend(); ++iterator) {
       if (predicate(*iterator)) {

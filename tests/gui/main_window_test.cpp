@@ -8,6 +8,8 @@
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
 
+#include "synthetic_rom.h"
+
 #include <QAction>
 #include <QApplication>
 #include <QCheckBox>
@@ -33,11 +35,22 @@ namespace {
 class FakeDialogService final : public genplusgx::ui::DialogService {
 public:
   std::vector<QString> errors;
+  std::optional<std::filesystem::path> discSelection;
+  std::filesystem::path discInitialDirectory;
+  int chooseDiscCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
   {
     return std::nullopt;
+  }
+
+  std::optional<std::filesystem::path> chooseDisc(
+    QWidget*, const std::filesystem::path& initialDirectory) override
+  {
+    ++chooseDiscCount;
+    discInitialDirectory = initialDirectory;
+    return discSelection;
   }
 
   void showError(QWidget*, const QString& title, const QString& message) override
@@ -61,6 +74,7 @@ private slots:
   void systemSettingsWorkflowIsValidatedAndDeferred();
   void biosSettingsValidatePersistAndCancel();
   void saveStateActionsExposeSlotSemantics();
+  void segaCdDiscActionsAreTypedAndRecoverable();
 };
 
 void MainWindowTest::shellIsVisibleAndIdentified()
@@ -691,6 +705,82 @@ void MainWindowTest::saveStateActionsExposeSlotSemantics()
   QVERIFY(!menu->isEnabled());
   QVERIFY(!save->isEnabled());
   QVERIFY(!load->isEnabled());
+}
+
+void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
+{
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  genplusgx::test::TemporaryFixture disc{
+    genplusgx::test::makeSegaCdDiscImage(), ".iso"};
+  auto dialogs = std::make_shared<FakeDialogService>();
+  dialogs->discSelection = disc.path();
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+  window.setGameLoaded(game.path());
+
+  auto* change = window.findChild<QAction*>(QStringLiteral("changeDiscAction"));
+  auto* eject = window.findChild<QAction*>(QStringLiteral("ejectDiscAction"));
+  QVERIFY(change != nullptr && eject != nullptr);
+  QVERIFY(eject->isCheckable());
+  QVERIFY(!change->isEnabled() && !eject->isEnabled());
+
+  using Request = std::tuple<
+    genplusgx::ui::DiscUiOperation, std::filesystem::path, bool>;
+  std::vector<Request> requests;
+  window.setDiscOperationSink(
+    [&requests](auto operation, const auto& path, bool ejected) {
+      requests.emplace_back(operation, path, ejected);
+    });
+  window.setSegaCdSession(true, "USA", disc.path(), false, true);
+  QVERIFY(change->isEnabled() && eject->isEnabled());
+  QVERIFY(change->toolTip().contains(
+    genplusgx::ui::pathToQString(disc.path())));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: Sega CD / Mega CD"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("regionStatusLabel"))->text(),
+    QStringLiteral("Region: USA"));
+
+  change->trigger();
+  QCOMPARE(dialogs->chooseDiscCount, 1);
+  QCOMPARE(dialogs->discInitialDirectory, disc.path().parent_path());
+  QCOMPARE(requests.size(), std::size_t{1});
+  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::DiscUiOperation::change);
+  QCOMPARE(std::get<1>(requests.back()), disc.path());
+  QVERIFY(!change->isEnabled() && !eject->isEnabled());
+
+  window.setSegaCdSession(true, "USA", disc.path(), false, true);
+  eject->trigger();
+  QCOMPARE(requests.size(), std::size_t{2});
+  QCOMPARE(std::get<0>(requests.back()),
+    genplusgx::ui::DiscUiOperation::setEjected);
+  QVERIFY(std::get<2>(requests.back()));
+  window.setSegaCdSession(true, "USA", disc.path(), true, true);
+  QVERIFY(eject->isChecked());
+  QVERIFY(eject->text().contains(QStringLiteral("Close Disc")));
+  window.showDiscOperationSuccess(genplusgx::ui::DiscUiOperation::setEjected);
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("opened")));
+
+  eject->trigger();
+  QCOMPARE(requests.size(), std::size_t{3});
+  QVERIFY(!std::get<2>(requests.back()));
+  window.setSegaCdSession(true, "USA", disc.path(), false, true);
+  QVERIFY(!eject->isChecked());
+
+  genplusgx::test::TemporaryFixture unsupported{{1U}, ".zip"};
+  dialogs->discSelection = unsupported.path();
+  change->trigger();
+  QCOMPARE(requests.size(), std::size_t{3});
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("Unable to Change Disc")));
+
+  window.setSegaCdSession(false, "stale", disc.path(), true, true);
+  QVERIFY(!change->isEnabled() && !eject->isEnabled());
+  QVERIFY(!eject->isChecked());
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: —"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("regionStatusLabel"))->text(),
+    QStringLiteral("Region: —"));
 }
 
 } // namespace

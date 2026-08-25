@@ -66,6 +66,44 @@ set_tests_properties(
   PROPERTIES LABELS "core;integration;persistence;fixture;lifecycle" TIMEOUT 30
 )
 
+add_executable(genplusgx_sega_cd_workflow_test sega_cd_workflow_test.cpp)
+target_link_libraries(
+  genplusgx_sega_cd_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(NAME core.sega_cd_workflow COMMAND genplusgx_sega_cd_workflow_test)
+set_tests_properties(
+  core.sega_cd_workflow
+  PROPERTIES LABELS "core;integration;sega-cd;firmware;disc;persistence;fixture;lifecycle" TIMEOUT 30
+)
+
+if(GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS)
+  add_executable(
+    genplusgx_sega_cd_external_bios_test
+    sega_cd_external_bios_test.cpp
+  )
+  target_link_libraries(
+    genplusgx_sega_cd_external_bios_test
+    PRIVATE
+      GenesisPlusGX::CoreAdapter
+      genplusgx_project_warnings
+      genplusgx_test_utilities
+  )
+  add_test(
+    NAME core.sega_cd_external_bios
+    COMMAND genplusgx_sega_cd_external_bios_test
+  )
+  set_tests_properties(
+    core.sega_cd_external_bios
+    PROPERTIES LABELS "core;integration;sega-cd;firmware;external" TIMEOUT 30
+  )
+endif()
+
 add_executable(genplusgx_core_video_test core_video_test.cpp)
 target_link_libraries(
   genplusgx_core_video_test

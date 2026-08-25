@@ -50,6 +50,23 @@ and core-rejected images produce a concise error dialog instead of crashing. Sel
 an invalid file while a game is running leaves that game alone. Proprietary ROMs and
 Sega CD BIOS files are never included with the application.
 
+## Sega CD and Mega CD discs
+
+Configure the USA, Europe, and/or Japan BIOS you legally provide under **Tools → BIOS
+Settings…** before opening a disc from **File → Open Game…**. The emulator detects the
+disc's console region and selects that region's configured BIOS. If the required file
+is absent or cannot be loaded, the error identifies the region and the emulator returns
+to its no-game state safely.
+
+The direct disc workflow accepts cooked ISO and CUE/BIN images. CHD is included when
+the build enables bundled libchdr (the standard presets do). After a Sega CD game has
+loaded, **Emulation → Change Disc…** selects a replacement disc and **Eject Disc** opens
+the virtual tray; the same checkable action becomes **Close Disc Tray** while open.
+Those actions remain disabled for cartridge games. A failed replacement leaves the
+tray open with no partially mounted image, allowing another selection or closing the
+application normally. CDDA tracks described by a supported image are played by the
+existing Genesis Plus GX CD subsystem through the normal bounded audio pipeline.
+
 ## Save memory
 
 Cartridge SRAM is loaded automatically before the first emulated frame and saved
@@ -178,13 +195,12 @@ correct for a particular game revision.
 Configuration is written atomically to `config/bios.json` beneath the platform
 application-data directory. Firmware files themselves remain wherever you put them;
 the application does not copy, modify, download, or bundle Sega firmware. Sega CD/Mega
-CD software requires a suitable user-supplied regional BIOS when the disc workflow is
-used. See [BIOS.md](BIOS.md) for sizes, privacy, and troubleshooting.
+CD software requires a suitable user-supplied regional BIOS. See [BIOS.md](BIOS.md) for
+sizes, privacy, optional external-fixture testing, and troubleshooting.
 
 Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).
 
 Features whose menus are visible but remain disabled without a loaded game will be
-enabled as their corresponding milestones connect persistence, state, system, and disc
-services.
+enabled as their corresponding milestones connect the remaining frontend services.

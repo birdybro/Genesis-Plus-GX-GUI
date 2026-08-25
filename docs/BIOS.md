@@ -27,10 +27,17 @@ revisions are not rejected merely because a checksum is unfamiliar.
 
 Select the BIOS matching the console region used by the disc. The USA, Europe, and
 Japan settings are independent. Sega CD/Mega CD emulation cannot boot without a usable
-regional firmware image. The manager currently validates and retains those selections;
-the standalone disc startup/swap workflow is connected in milestone 27. Its automated
-tests use generated non-proprietary fixtures, while real-hardware compatibility tests
-require the user's own firmware and remain optional.
+regional firmware image. At game load, only paths currently marked valid by the BIOS
+manager are sent through the bounded command queue to the emulation thread. The core
+detects the disc region before choosing the corresponding path. A missing, moved, or
+unreadable file produces a region-specific error and leaves no half-loaded session.
+
+The default automated workflow uses a generated non-proprietary test BIOS and synthetic
+disc. An optional real-firmware smoke test can be enabled at configure time with
+`-DGENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS=ON`; set
+`GENPLUSGX_TEST_SEGA_CD_US_BIOS` to a legally obtained 128 KiB USA BIOS before running
+CTest. That path is read locally, never copied into the source/build tree, and never
+uploaded by project automation.
 
 ## Troubleshooting statuses
 

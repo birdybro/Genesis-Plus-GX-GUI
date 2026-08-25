@@ -47,6 +47,12 @@ int main()
   passed &= check(
     std::ranges::find(extensions, ".zip") == extensions.end(),
     "ZIP is not advertised by the raw desktop loader");
+  const auto discExtensions = genplusgx::supportedDiscExtensions();
+  passed &= check(
+    std::ranges::find(discExtensions, ".cue") != discExtensions.end() &&
+      std::ranges::find(discExtensions, ".iso") != discExtensions.end() &&
+      std::ranges::find(discExtensions, ".md") == discExtensions.end(),
+    "the disc replacement list is restricted to supported image containers");
 
   genplusgx::test::TemporaryFixture fixture{
     genplusgx::test::makeGenesisRamMarkerRom(), ".MD"};
@@ -55,6 +61,15 @@ int main()
   passed &= check(
     genplusgx::hasSupportedGameExtension(fixture.path()),
     "extension checks are case insensitive");
+  passed &= check(
+    genplusgx::validateDiscImageFile(fixture.path()).error ==
+      genplusgx::GameFileError::unsupportedDiscExtension,
+    "a cartridge-only extension is rejected by the disc validator");
+  genplusgx::test::TemporaryFixture discFixture{
+    genplusgx::test::makeSegaCdDiscImage(), ".ISO"};
+  passed &= check(
+    genplusgx::validateDiscImageFile(discFixture.path()),
+    "an existing uppercase Sega CD image validates for disc replacement");
 
   const auto empty = genplusgx::validateGameFile({});
   passed &= check(

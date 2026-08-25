@@ -53,3 +53,36 @@ observe erased `0xff` SRAM, execute one frame, then observe that actual mapped w
 Persistence tests generate the image in a temporary directory and verify unload/reload,
 corruption rejection, atomic-save failure behavior, and shutdown flushing. No binary is
 committed and no third-party program or game content is incorporated.
+
+## Generated Sega CD test BIOS
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; runtime extension is `.bin` |
+| Generator | `makeSegaCdBios()` in `tests/utilities/synthetic_rom.cpp` |
+| Purpose | Exercise regional firmware selection and Sega CD lifecycle without proprietary firmware |
+| Size | 128 KiB |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+| Expected system | Sega CD / Mega CD (`SYSTEM_MCD`) |
+
+This is not a dump or reimplementation of Sega firmware. Its original vector table
+directs the 68000 to a two-byte self-loop, with deterministic non-uniform padding so
+the frontend's structural BIOS validation can inspect it. It can initialize and execute
+the core for plumbing tests but is not intended to boot any game.
+
+## Generated Sega CD test disc
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; runtime extension is `.iso`, or a temporary `.cue` plus `.bin` |
+| Generator | `makeSegaCdDiscImage()` in `tests/utilities/synthetic_rom.cpp` |
+| Purpose | Exercise disc detection, region selection, CUE/BIN mounting, eject/change, pacing, and BRAM persistence |
+| Size | 150 cooked 2,048-byte sectors (300 KiB) |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+| Expected system | Sega CD / Mega CD (`SYSTEM_MCD`) |
+
+The first sector contains only the minimum original `SEGADISCSYSTEM` identifier,
+test titles, and one generated region marker. The rest is zero-filled. Tests generate
+USA and Europe variants and a CUE sheet that references a generated local BIN file.
+There is no game program, Sega security program, sampled audio, artwork, or third-party
+data. Real-BIOS testing is excluded by default and never creates or fetches firmware.

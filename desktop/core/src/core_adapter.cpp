@@ -16,6 +16,7 @@ extern sms_ntsc_t* sms_ntsc;
 
 #include <algorithm>
 #include <array>
+#include <cctype>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -107,6 +108,99 @@ void configureSystem(const CoreSystemSettings& settings) noexcept
   config.addr_error = settings.enableAddressErrors ? 1U : 0U;
 }
 
+bool copyHostPath(
+  const std::filesystem::path& path,
+  char* destination,
+  std::size_t capacity)
+{
+  const auto value = path.string();
+  if (value.size() >= capacity) {
+    return false;
+  }
+  std::memset(destination, 0, capacity);
+  std::memcpy(destination, value.data(), value.size());
+  return true;
+}
+
+void configureFirmware(const CoreFirmwareSettings& settings)
+{
+  static_cast<void>(copyHostPath(
+    settings.segaCdUsa, CD_BIOS_US, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.segaCdEurope, CD_BIOS_EU, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.segaCdJapan, CD_BIOS_JP, GENPLUSGX_HOST_PATH_CAPACITY));
+  system_bios &= static_cast<uint8>(~0x10U);
+}
+
+CoreDiscRegion discRegion() noexcept
+{
+  switch (region_code) {
+    case REGION_USA:
+      return CoreDiscRegion::usa;
+    case REGION_EUROPE:
+      return CoreDiscRegion::europe;
+    case REGION_JAPAN_NTSC:
+    case REGION_JAPAN_PAL:
+      return CoreDiscRegion::japan;
+    default:
+      return CoreDiscRegion::unknown;
+  }
+}
+
+const std::filesystem::path& firmwareForRegion(
+  const CoreFirmwareSettings& settings,
+  CoreDiscRegion region) noexcept
+{
+  switch (region) {
+    case CoreDiscRegion::usa:
+      return settings.segaCdUsa;
+    case CoreDiscRegion::europe:
+      return settings.segaCdEurope;
+    case CoreDiscRegion::japan:
+    case CoreDiscRegion::unknown:
+      return settings.segaCdJapan;
+  }
+  return settings.segaCdJapan;
+}
+
+const char* discRegionName(CoreDiscRegion region) noexcept
+{
+  switch (region) {
+    case CoreDiscRegion::usa:
+      return "USA";
+    case CoreDiscRegion::europe:
+      return "Europe";
+    case CoreDiscRegion::japan:
+      return "Japan";
+    case CoreDiscRegion::unknown:
+      return "unknown";
+  }
+  return "unknown";
+}
+
+std::string lowercaseExtension(const std::filesystem::path& path)
+{
+  auto extension = path.extension().string();
+  std::ranges::transform(extension, extension.begin(), [](unsigned char value) {
+    return static_cast<char>(std::tolower(value));
+  });
+  return extension;
+}
+
+bool requiresDiscImage(const std::filesystem::path& path)
+{
+  const auto extension = lowercaseExtension(path);
+  return extension == ".cue" || extension == ".iso" || extension == ".chd";
+}
+
+bool supportsDiscChange(const std::filesystem::path& path)
+{
+  const auto extension = lowercaseExtension(path);
+  return extension == ".bin" || extension == ".cue" ||
+         extension == ".iso" || extension == ".chd";
+}
+
 std::span<std::uint8_t> backupMemory(BackupMemoryKind kind)
 {
   switch (kind) {
@@ -178,6 +272,8 @@ public:
   CoreVideoSettings videoSettings;
   CoreAudioSettings audioSettings;
   CoreSystemSettings systemSettings;
+  CoreFirmwareSettings firmwareSettings;
+  std::filesystem::path discPath;
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -269,12 +365,31 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
     unloadUnchecked();
   }
   configureSystem(private_->systemSettings);
+  configureFirmware(private_->firmwareSettings);
 
   std::vector<char> mutablePath(nativePath.begin(), nativePath.end());
   mutablePath.push_back('\0');
   if (load_rom(mutablePath.data()) == 0) {
+    const bool segaCdDetected = system_hw == SYSTEM_MCD;
+    const auto detectedRegion = discRegion();
+    const auto firmwarePath = firmwareForRegion(
+      private_->firmwareSettings, detectedRegion);
     unloadUnchecked();
+    if (segaCdDetected) {
+      return failure(CoreError::missingFirmware,
+        "A readable 128 KiB Sega CD / Mega CD BIOS is required for the detected " +
+          std::string{discRegionName(detectedRegion)} +
+          " region. Configure a valid user-supplied file in BIOS Settings" +
+          (firmwarePath.empty() ? std::string{"."}
+                                : std::string{"; the configured file could not be loaded."}));
+    }
     return failure(CoreError::loadFailed, "Genesis Plus GX could not load the selected game image.");
+  }
+
+  if (requiresDiscImage(path) && system_hw != SYSTEM_MCD) {
+    unloadUnchecked();
+    return failure(CoreError::invalidDiscImage,
+      "The selected file did not contain a supported Sega CD / Mega CD data track.");
   }
 
   if (audio_init(audioSampleRate_, 0.0) != 0) {
@@ -294,6 +409,8 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
   loadedPath_ = path;
   frameCount_ = 0;
   hardware_ = system_hw;
+  private_->discPath = system_hw == SYSTEM_MCD && cdd.loaded != 0
+    ? path : std::filesystem::path{};
   private_->pendingAudioFrames = 0;
   private_->pendingAudioFrameNumber = 0;
   private_->droppedAudioFrames = 0;
@@ -624,6 +741,108 @@ CoreResult CoreAdapter::initializeBackupMemory(BackupMemoryKind kind)
   if (kind != BackupMemoryKind::cartridgeSram) {
     formatBram(memory);
   }
+  return success();
+}
+
+CoreResult CoreAdapter::applyFirmwareSettings(
+  const CoreFirmwareSettings& settings)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    return owner;
+  }
+  if (!validateCoreFirmwareSettings(settings)) {
+    return failure(CoreError::invalidSettings,
+      "The requested firmware settings contain a path that exceeds the core host boundary.");
+  }
+  private_->firmwareSettings = settings;
+  return success();
+}
+
+CoreResult CoreAdapter::firmwareSettings(CoreFirmwareSettings& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    output = {};
+    return owner;
+  }
+  output = private_->firmwareSettings;
+  return success();
+}
+
+CoreResult CoreAdapter::discInfo(CoreDiscInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    output = {};
+    return owner;
+  }
+  output = {
+    .segaCd = system_hw == SYSTEM_MCD,
+    .trayOpen = system_hw == SYSTEM_MCD && cdd.status == CD_OPEN,
+    .discPresent = system_hw == SYSTEM_MCD && cdd.loaded != 0,
+    .trackCount = system_hw == SYSTEM_MCD && cdd.toc.last > 0
+      ? static_cast<std::uint32_t>(cdd.toc.last) : 0U,
+    .region = system_hw == SYSTEM_MCD ? discRegion() : CoreDiscRegion::unknown,
+    .path = private_->discPath,
+  };
+  return success();
+}
+
+CoreResult CoreAdapter::setDiscEjected(bool ejected)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (system_hw != SYSTEM_MCD) {
+    return failure(CoreError::notSegaCd,
+      "Disc operations require an active Sega CD / Mega CD session.");
+  }
+  if (ejected) {
+    cdd.status = CD_OPEN;
+    scd.regs[0x36U >> 1U].byte.h = 0x01U;
+  } else if (cdd.status == CD_OPEN) {
+    cdd.status = cdd.loaded != 0 ? CD_TOC : NO_DISC;
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::changeDisc(const std::filesystem::path& path)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (system_hw != SYSTEM_MCD) {
+    return failure(CoreError::notSegaCd,
+      "Disc operations require an active Sega CD / Mega CD session.");
+  }
+  std::error_code pathError;
+  if (path.empty() || !supportsDiscChange(path) ||
+      !std::filesystem::is_regular_file(path, pathError) || pathError) {
+    return failure(CoreError::invalidDiscImage,
+      "The replacement disc path is missing, unreadable, or unsupported.");
+  }
+  const auto nativePath = path.string();
+  if (nativePath.size() < 3U || nativePath.size() > maximumCorePathBytes) {
+    return failure(CoreError::invalidPath,
+      "The replacement disc path cannot be represented safely by the core file interface.");
+  }
+
+  cdd.status = CD_OPEN;
+  scd.regs[0x36U >> 1U].byte.h = 0x01U;
+  std::array<char, 0x210U> header{};
+  std::vector<char> mutablePath(nativePath.begin(), nativePath.end());
+  mutablePath.push_back('\0');
+  if (cdd_load(mutablePath.data(), header.data()) <= 0 || cdd.loaded == 0) {
+    private_->discPath.clear();
+    cdd.status = CD_OPEN;
+    return failure(CoreError::invalidDiscImage,
+      "Genesis Plus GX could not mount the replacement Sega CD / Mega CD image.");
+  }
+  private_->discPath = path;
+  cdd.status = CD_TOC;
   return success();
 }
 
@@ -1001,6 +1220,7 @@ void CoreAdapter::unloadUnchecked() noexcept
     private_->appliedInputSequence = 0;
     private_->newestInputSequence = 0;
     private_->hasPendingInput = false;
+    private_->discPath.clear();
   }
   if (state_ != CoreLifecycleState::uninitialized) {
     state_ = CoreLifecycleState::ready;

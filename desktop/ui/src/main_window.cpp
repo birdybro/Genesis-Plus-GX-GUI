@@ -182,8 +182,14 @@ void MainWindow::buildMenus()
   connect(deleteState, &QAction::triggered, this, [this] {
     requestStateOperation(StateUiOperation::remove);
   });
-  addAction(*emulation, tr("Change &Disc…"), "changeDiscAction");
-  addAction(*emulation, tr("&Eject Disc"), "ejectDiscAction");
+  auto* changeDisc = addAction(
+    *emulation, tr("Change &Disc…"), "changeDiscAction");
+  connect(changeDisc, &QAction::triggered, this, &MainWindow::chooseDisc);
+  auto* ejectDisc = addAction(
+    *emulation, tr("&Eject Disc"), "ejectDiscAction");
+  ejectDisc->setCheckable(true);
+  connect(ejectDisc, &QAction::toggled,
+    this, &MainWindow::requestDiscEjected);
 
   auto* video = createMenu(tr("&Video"), "videoMenu");
   auto* fullscreen = addAction(
@@ -440,11 +446,12 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   static constexpr const char* gameActionNames[]{
     "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
     "softResetAction", "fastForwardAction", "frameAdvanceAction",
-    "changeDiscAction", "ejectDiscAction", "cheatsAction",
+    "cheatsAction",
     "gameInformationAction"};
   for (const auto* name : gameActionNames) {
     findChild<QAction*>(QString::fromLatin1(name))->setEnabled(enabled);
   }
+  updateDiscActions();
   updateStateActions();
 }
 
@@ -638,6 +645,64 @@ void MainWindow::setBiosSnapshot(platform::BiosSnapshot snapshot)
 void MainWindow::setBiosConfigurationSink(BiosConfigurationSink sink)
 {
   biosConfigurationSink_ = std::move(sink);
+}
+
+void MainWindow::setDiscOperationSink(DiscOperationSink sink)
+{
+  discOperationSink_ = std::move(sink);
+}
+
+void MainWindow::setSegaCdSession(
+  bool enabled,
+  std::string region,
+  std::filesystem::path discPath,
+  bool ejected,
+  bool discPresent)
+{
+  segaCdSession_ = enabled && isGameLoaded();
+  discRegion_ = std::move(region);
+  currentDiscPath_ = std::move(discPath);
+  discEjected_ = segaCdSession_ && ejected;
+  discPresent_ = segaCdSession_ && discPresent;
+  discOperationBusy_ = false;
+  if (segaCdSession_) {
+    systemStatus_->setText(tr("System: Sega CD / Mega CD"));
+    regionStatus_->setText(tr("Region: %1").arg(
+      QString::fromStdString(discRegion_.empty() ? "Unknown" : discRegion_)));
+  } else {
+    discRegion_.clear();
+    currentDiscPath_.clear();
+    systemStatus_->setText(tr("System: —"));
+    regionStatus_->setText(tr("Region: —"));
+  }
+  updateDiscActions();
+}
+
+void MainWindow::setDiscOperationBusy(bool busy)
+{
+  discOperationBusy_ = busy && segaCdSession_;
+  updateDiscActions();
+}
+
+void MainWindow::showDiscOperationSuccess(DiscUiOperation operation)
+{
+  statusBar()->showMessage(
+    operation == DiscUiOperation::change
+      ? tr("Replacement disc inserted.")
+      : (discEjected_ ? tr("Disc tray opened.") : tr("Disc tray closed.")),
+    3'000);
+}
+
+void MainWindow::showDiscOperationError(
+  DiscUiOperation operation,
+  const std::string& detail)
+{
+  discOperationBusy_ = false;
+  updateDiscActions();
+  const auto title = operation == DiscUiOperation::change
+    ? tr("Unable to Change Disc") : tr("Unable to Operate Disc Tray");
+  statusBar()->showMessage(title, 5'000);
+  dialogService_->showError(this, title, QString::fromStdString(detail));
 }
 
 const platform::BiosSnapshot& MainWindow::biosSnapshot() const noexcept
@@ -978,6 +1043,12 @@ void MainWindow::setNoGameLoaded()
   gameLoading_ = false;
   stateSessionReady_ = false;
   stateOperationBusy_ = false;
+  segaCdSession_ = false;
+  discEjected_ = false;
+  discPresent_ = false;
+  discOperationBusy_ = false;
+  discRegion_.clear();
+  currentDiscPath_.clear();
   for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
     stateSlotViews_[slot] = StateSlotView{};
     stateSlotViews_[slot].slot = slot;
@@ -991,6 +1062,58 @@ void MainWindow::setNoGameLoaded()
   fpsStatus_->setText(tr("0.0 FPS"));
   displayWidget_->clearFrame();
   updateStateSlotPresentation();
+}
+
+void MainWindow::chooseDisc()
+{
+  if (!segaCdSession_ || discOperationBusy_) {
+    return;
+  }
+  const auto initial = currentDiscPath_.empty()
+    ? loadedGamePath_.parent_path() : currentDiscPath_.parent_path();
+  const auto selected = dialogService_->chooseDisc(this, initial);
+  if (!selected) {
+    return;
+  }
+  if (const auto status = validateDiscImageFile(*selected); !status) {
+    showDiscOperationError(DiscUiOperation::change, status.message);
+    return;
+  }
+  if (!discOperationSink_) {
+    showDiscOperationError(
+      DiscUiOperation::change, "The emulation service is not available.");
+    return;
+  }
+  setDiscOperationBusy(true);
+  discOperationSink_(DiscUiOperation::change, *selected, false);
+}
+
+void MainWindow::requestDiscEjected(bool ejected)
+{
+  if (!segaCdSession_ || discOperationBusy_ || !discOperationSink_) {
+    updateDiscActions();
+    return;
+  }
+  setDiscOperationBusy(true);
+  discOperationSink_(DiscUiOperation::setEjected, {}, ejected);
+}
+
+void MainWindow::updateDiscActions()
+{
+  auto* change = findChild<QAction*>(QStringLiteral("changeDiscAction"));
+  auto* eject = findChild<QAction*>(QStringLiteral("ejectDiscAction"));
+  if (change == nullptr || eject == nullptr) {
+    return;
+  }
+  const bool available = isGameLoaded() && segaCdSession_ && !discOperationBusy_;
+  change->setEnabled(available);
+  eject->setEnabled(available);
+  change->setToolTip(discPresent_ && !currentDiscPath_.empty()
+    ? tr("Current disc: %1").arg(pathToQString(currentDiscPath_))
+    : tr("No disc inserted"));
+  const QSignalBlocker blocker{eject};
+  eject->setChecked(discEjected_);
+  eject->setText(discEjected_ ? tr("Close Disc &Tray") : tr("&Eject Disc"));
 }
 
 void MainWindow::showGameLoadError(

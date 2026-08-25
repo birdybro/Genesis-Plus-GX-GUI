@@ -8,6 +8,7 @@ target_link_libraries(
   genplusgx_main_window_test
   PRIVATE
     genplusgx::ui
+    genplusgx_test_utilities
     genplusgx_project_options
     genplusgx_project_warnings
     Qt6::Test
