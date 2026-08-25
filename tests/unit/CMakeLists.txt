@@ -11,6 +11,22 @@ target_link_libraries(
 add_test(NAME unit.game_file COMMAND genplusgx_game_file_test)
 set_tests_properties(unit.game_file PROPERTIES LABELS "unit;filesystem;loading")
 
+add_executable(genplusgx_game_metadata_test game_metadata_test.cpp)
+target_link_libraries(
+  genplusgx_game_metadata_test
+  PRIVATE
+    GenesisPlusGX::Library
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+    Threads::Threads
+)
+add_test(NAME unit.game_metadata COMMAND genplusgx_game_metadata_test)
+set_tests_properties(
+  unit.game_metadata
+  PROPERTIES LABELS "unit;library;metadata;filesystem;fuzz;concurrency" TIMEOUT 30
+)
+
 if(TARGET genplusgx_app_support)
   add_executable(genplusgx_command_line_test command_line_test.cpp)
   target_link_libraries(

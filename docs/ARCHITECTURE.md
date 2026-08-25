@@ -611,10 +611,33 @@ CUE/BIN mounting, USA/Europe BIOS selection, eject/close, failed swap recovery, 
 both BRAM files, clean worker shutdown, and an opt-in user-firmware smoke path. No
 proprietary fixture is part of the default build or CI.
 
-The library scanner runs outside the GUI thread, parses bounded metadata without
-initializing the emulator, and submits database batches. SQLite operations use
-transactions, schema migrations, integrity checks, and recoverable rebuild behavior.
-No network access is part of scanning or artwork handling.
+## Read-only game metadata flow
+
+```text
+Tools / Game Information
+          |
+          v
+bounded metadata request queue --> metadata thread --> streaming file reader
+          ^                                               |
+          |                                 bounded header parser + SHA-256
+          +-------- bounded result queue <----------------+
+                              |
+                       Qt information dialog
+```
+
+`GameMetadataService` owns one non-core worker thread and fixed-capacity command/event
+queues. It streams files in 64 KiB chunks, retains at most the 64 KiB header window,
+and sends owned results back to the GUI event pump. The composition root matches both
+operation ID and path to the still-visible loaded game; stale results after a load or
+close are discarded. The parser contains no core calls and therefore cannot mutate or
+race Genesis Plus GX globals. Genesis, SMD, 8-bit Sega, raw/cooked Sega CD, CUE, and
+conditional CHD paths remain descriptive only. CUE references are constrained to safe
+relative paths before a small data-header read.
+
+The next library milestone reuses this parser from a scanner outside the GUI thread
+and submits database batches. SQLite operations use transactions, schema migrations,
+integrity checks, and recoverable rebuild behavior. No network access is part of
+scanning or artwork handling.
 
 ## Error handling and diagnostics
 
@@ -636,9 +659,10 @@ Shutdown is an explicit, idempotent workflow:
    SRAM/BRAM on the core-owning thread;
 4. shut down the core, release the active persistence identity, publish final status,
    and join the emulation thread even when a save failed;
-5. stop and close the SDL3 audio stream/device;
-6. release OpenGL resources while their context is current;
-7. persist remaining frontend settings/library state and destroy the GUI.
+5. join independent metadata/library workers and discard their queued UI results;
+6. stop and close the SDL3 audio stream/device;
+7. release OpenGL resources while their context is current;
+8. persist remaining frontend settings/library state and destroy the GUI.
 
 Each stage has tests for no-game, running, paused, audio-disabled, dirty-save, and
 fullscreen variants. No detached thread is permitted.

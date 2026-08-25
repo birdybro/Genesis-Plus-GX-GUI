@@ -2,6 +2,7 @@
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
+#include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -75,6 +76,7 @@ private slots:
   void biosSettingsValidatePersistAndCancel();
   void saveStateActionsExposeSlotSemantics();
   void segaCdDiscActionsAreTypedAndRecoverable();
+  void gameInformationWorkflowIsAsynchronousAndInspectable();
 };
 
 void MainWindowTest::shellIsVisibleAndIdentified()
@@ -781,6 +783,92 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
     QStringLiteral("System: —"));
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("regionStatusLabel"))->text(),
     QStringLiteral("Region: —"));
+}
+
+void MainWindowTest::gameInformationWorkflowIsAsynchronousAndInspectable()
+{
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisSramWriterRom(), ".md"};
+  auto dialogs = std::make_shared<FakeDialogService>();
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+  window.setGameLoaded(game.path());
+
+  std::optional<std::filesystem::path> requestedPath;
+  window.setGameInformationRequestSink(
+    [&requestedPath](const std::filesystem::path& path) {
+      requestedPath = path;
+    });
+  auto* action = window.findChild<QAction*>(
+    QStringLiteral("gameInformationAction"));
+  QVERIFY(action != nullptr);
+  QVERIFY(action->isEnabled());
+  action->trigger();
+  QCOMPARE(requestedPath, std::optional{game.path()});
+  QVERIFY(!action->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("Reading")));
+
+  genplusgx::library::GameMetadata metadata;
+  metadata.path = game.path();
+  metadata.fileSize = 65'536U;
+  metadata.system = genplusgx::library::GameSystem::genesis;
+  metadata.format = "Genesis / Mega Drive ROM";
+  metadata.domesticTitle = "GENPLUSGX CORE TEST";
+  metadata.internationalTitle = "GENPLUSGX SYNTHETIC SRAM WRITER";
+  metadata.productCode = "TEST-000001";
+  metadata.region = "Americas";
+  metadata.romType = "GM";
+  metadata.peripheralSupport = "J";
+  metadata.mapper = "Cartridge SRAM (2097152-2162687)";
+  metadata.sha256 = std::string(64U, 'a');
+  metadata.notes = "Generated CC0 test fixture.";
+  metadata.headerChecksum = 0x1234U;
+  metadata.computedChecksum = 0x1234U;
+  metadata.declaredRomSize = 65'536U;
+  metadata.headerRecognized = true;
+  window.showGameInformation(metadata);
+  QApplication::processEvents();
+
+  auto* information = window.findChild<genplusgx::ui::GameInformationDialog*>(
+    QStringLiteral("gameInformationDialog"));
+  QVERIFY(information != nullptr);
+  QVERIFY(information->isVisible());
+  QVERIFY(information->isModal());
+  QVERIFY(action->isEnabled());
+  const auto field = [information](const char* name) {
+    return information->findChild<QLineEdit*>(QString::fromLatin1(name));
+  };
+  QCOMPARE(field("gameInfoTitleValue")->text(),
+    QStringLiteral("GENPLUSGX SYNTHETIC SRAM WRITER"));
+  QCOMPARE(field("gameInfoDomesticTitleValue")->text(),
+    QStringLiteral("GENPLUSGX CORE TEST"));
+  QCOMPARE(field("gameInfoSystemValue")->text(),
+    QStringLiteral("Sega Genesis / Mega Drive"));
+  QCOMPARE(field("gameInfoRegionValue")->text(), QStringLiteral("Americas"));
+  QVERIFY(field("gameInfoChecksumValue")->text().contains(
+    QStringLiteral("0x1234")));
+  QCOMPARE(field("gameInfoSha256Value")->text(), QString(64, QLatin1Char{'a'}));
+  QCOMPARE(field("gameInfoFilePathValue")->text(),
+    genplusgx::ui::pathToQString(game.path()));
+  QVERIFY(!field("gameInfoSystemValue")->accessibleName().isEmpty());
+  auto* close = information->findChild<QPushButton*>(
+    QStringLiteral("closeGameInformationButton"));
+  QVERIFY(close != nullptr);
+  QTest::mouseClick(close, Qt::LeftButton);
+  QApplication::processEvents();
+
+  action->trigger();
+  QVERIFY(!action->isEnabled());
+  window.showGameInformationError("Injected malformed header.");
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(
+    QStringLiteral("Game Information Failed")));
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("malformed")));
+  QVERIFY(action->isEnabled());
+
+  window.setNoGameLoaded();
+  QVERIFY(!action->isEnabled());
 }
 
 } // namespace

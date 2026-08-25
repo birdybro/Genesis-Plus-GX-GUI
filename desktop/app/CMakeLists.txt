@@ -22,6 +22,7 @@ target_link_libraries(
     GenesisPlusGX::Audio
     GenesisPlusGX::AppSupport
     GenesisPlusGX::Input
+    GenesisPlusGX::Library
     GenesisPlusGX::Persistence
     GenesisPlusGX::Platform
     GenesisPlusGX::Settings

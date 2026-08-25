@@ -8,6 +8,7 @@
 #include "genplusgx/input/input_aggregator.h"
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
+#include "genplusgx/library/game_metadata_service.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/recent_games.h"
@@ -235,6 +236,11 @@ int main(int argc, char* argv[])
   if (!stateStorageStarted) {
     qWarning().noquote() << QString::fromStdString(stateStorageStarted.message);
   }
+  genplusgx::library::GameMetadataService metadataService;
+  const auto metadataServiceStarted = metadataService.start();
+  if (!metadataServiceStarted) {
+    qWarning().noquote() << QString::fromStdString(metadataServiceStarted.message);
+  }
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -245,6 +251,7 @@ int main(int argc, char* argv[])
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
+    static_cast<void>(metadataService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(audioOutput.shutdown());
     return 1;
@@ -503,6 +510,12 @@ int main(int argc, char* argv[])
   };
   std::optional<PendingState> pendingState;
   std::optional<std::uint64_t> stateActivationOperation;
+  struct PendingMetadata final {
+    std::uint64_t operationId{0};
+    std::filesystem::path path;
+  };
+  std::uint64_t metadataOperationId = 4'000'000U;
+  std::optional<PendingMetadata> pendingMetadata;
   window.setGameLoadSink(
     [&lifecycleOperationId, &pendingLoad, &window, &worker](
       const std::filesystem::path& path) {
@@ -595,6 +608,20 @@ int main(int argc, char* argv[])
       }
       pendingState = std::move(pending);
     });
+  window.setGameInformationRequestSink(
+    [&metadataOperationId, &metadataService, &pendingMetadata, &window](
+      const std::filesystem::path& path) {
+      const auto operationId = ++metadataOperationId;
+      pendingMetadata = PendingMetadata{
+        .operationId = operationId,
+        .path = path,
+      };
+      const auto submitted = metadataService.request(operationId, path);
+      if (!submitted) {
+        pendingMetadata.reset();
+        window.showGameInformationError(submitted.message);
+      }
+    });
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
@@ -602,8 +629,9 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&audioOutput, &controllerInput, &gameGeneration, &inputAggregator,
-     &inputOperationId, &lifecycleOperationId, &pendingDisc, &pendingLoad,
-     &pendingState, &pendingUnload, &closingGamePath, &recentGames, &recentGamesStore,
+     &inputOperationId, &lifecycleOperationId, &metadataService, &pendingDisc,
+     &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
+     &closingGamePath, &recentGames, &recentGamesStore,
      &refreshRecentGamesMenu, &stateActivationOperation, &stateOperationId,
      &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
@@ -866,6 +894,35 @@ int main(int argc, char* argv[])
         window.showStateOperationSuccess(operation, slot);
       }
     }
+    while (auto event = metadataService.pollEvent()) {
+      if (event->type ==
+          genplusgx::library::GameMetadataEventType::serviceStarted) {
+        qInfo() << "Game metadata service started.";
+        continue;
+      }
+      if (event->type ==
+          genplusgx::library::GameMetadataEventType::serviceStopped) {
+        continue;
+      }
+      if (!pendingMetadata ||
+          event->operationId != pendingMetadata->operationId ||
+          event->path != pendingMetadata->path) {
+        continue;
+      }
+      const bool belongsToVisibleGame =
+        !window.isGameLoading() && window.isGameLoaded() &&
+        window.loadedGamePath() == event->path;
+      pendingMetadata.reset();
+      if (!belongsToVisibleGame) {
+        window.setGameInformationBusy(false);
+        continue;
+      }
+      if (event->succeeded()) {
+        window.showGameInformation(event->metadata);
+      } else {
+        window.showGameInformationError(event->status.message);
+      }
+    }
   });
   eventPump.start();
   window.show();
@@ -892,6 +949,7 @@ int main(int argc, char* argv[])
   window.setGameCloseSink({});
   window.setClearRecentGamesSink({});
   window.setStateOperationSink({});
+  window.setGameInformationRequestSink({});
   window.setVideoSettingsSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();
@@ -901,6 +959,11 @@ int main(int argc, char* argv[])
   const auto stateStorageStopped = stateStorage.stop();
   if (!stateStorageStopped) {
     qWarning().noquote() << QString::fromStdString(stateStorageStopped.message);
+  }
+  const auto metadataServiceStopped = metadataService.stop();
+  if (!metadataServiceStopped) {
+    qWarning().noquote() << QString::fromStdString(
+      metadataServiceStopped.message);
   }
   static_cast<void>(audioOutput.shutdown());
   return result;

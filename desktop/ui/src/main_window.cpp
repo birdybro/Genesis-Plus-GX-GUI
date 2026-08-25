@@ -5,6 +5,7 @@
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
+#include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -406,7 +407,10 @@ void MainWindow::buildMenus()
 
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
   addAction(*tools, tr("&Cheats…"), "cheatsAction");
-  addAction(*tools, tr("Game &Information…"), "gameInformationAction");
+  auto* gameInformation = addAction(
+    *tools, tr("Game &Information…"), "gameInformationAction");
+  connect(gameInformation, &QAction::triggered,
+    this, &MainWindow::requestGameInformation);
   auto* settings = addAction(
     *tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
   connect(settings, &QAction::triggered, this, &MainWindow::showVideoSettings);
@@ -451,8 +455,67 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   for (const auto* name : gameActionNames) {
     findChild<QAction*>(QString::fromLatin1(name))->setEnabled(enabled);
   }
+  updateGameInformationAction();
   updateDiscActions();
   updateStateActions();
+}
+
+void MainWindow::setGameInformationRequestSink(GameInformationRequestSink sink)
+{
+  gameInformationRequestSink_ = std::move(sink);
+}
+
+void MainWindow::setGameInformationBusy(bool busy)
+{
+  gameInformationBusy_ = busy;
+  updateGameInformationAction();
+  if (busy) {
+    statusBar()->showMessage(tr("Reading game information…"));
+  }
+}
+
+void MainWindow::requestGameInformation()
+{
+  if (loadedGamePath_.empty() || gameInformationBusy_) {
+    return;
+  }
+  if (!gameInformationRequestSink_) {
+    showGameInformationError("The game metadata service is not available.");
+    return;
+  }
+  setGameInformationBusy(true);
+  gameInformationRequestSink_(loadedGamePath_);
+}
+
+void MainWindow::updateGameInformationAction()
+{
+  auto* action = findChild<QAction*>(QStringLiteral("gameInformationAction"));
+  action->setEnabled(
+    !loadedGamePath_.empty() && !gameLoading_ && !gameInformationBusy_);
+}
+
+void MainWindow::showGameInformation(const library::GameMetadata& metadata)
+{
+  setGameInformationBusy(false);
+  statusBar()->showMessage(tr("Game information ready"), 3000);
+  if (auto* existing = findChild<GameInformationDialog*>(
+        QStringLiteral("gameInformationDialog"))) {
+    existing->setMetadata(metadata);
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new GameInformationDialog(metadata, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->open();
+}
+
+void MainWindow::showGameInformationError(const std::string& detail)
+{
+  setGameInformationBusy(false);
+  statusBar()->showMessage(tr("Game information failed"), 5000);
+  dialogService_->showError(
+    this, tr("Game Information Failed"), QString::fromStdString(detail));
 }
 
 void MainWindow::showAboutDialog()
@@ -1005,7 +1068,12 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
 
 void MainWindow::setGameLoading(const std::filesystem::path& path)
 {
+  if (auto* information = findChild<GameInformationDialog*>(
+        QStringLiteral("gameInformationDialog"))) {
+    information->close();
+  }
   gameLoading_ = true;
+  gameInformationBusy_ = false;
   pendingGamePath_ = path;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
@@ -1028,6 +1096,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   loadedGamePath_ = path;
   pendingGamePath_.clear();
   gameLoading_ = false;
+  gameInformationBusy_ = false;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(true);
@@ -1038,9 +1107,14 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
 
 void MainWindow::setNoGameLoaded()
 {
+  if (auto* information = findChild<GameInformationDialog*>(
+        QStringLiteral("gameInformationDialog"))) {
+    information->close();
+  }
   loadedGamePath_.clear();
   pendingGamePath_.clear();
   gameLoading_ = false;
+  gameInformationBusy_ = false;
   stateSessionReady_ = false;
   stateOperationBusy_ = false;
   segaCdSession_ = false;

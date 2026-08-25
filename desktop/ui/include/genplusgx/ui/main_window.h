@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/input/input_profile.h"
+#include "genplusgx/library/game_metadata.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/audio_settings.h"
@@ -77,6 +78,8 @@ public:
     const platform::BiosConfiguration&)>;
   using DiscOperationSink = std::function<void(
     DiscUiOperation, const std::filesystem::path&, bool)>;
+  using GameInformationRequestSink =
+    std::function<void(const std::filesystem::path&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -121,6 +124,10 @@ public:
   void showDiscOperationError(
     DiscUiOperation operation,
     const std::string& detail);
+  void setGameInformationRequestSink(GameInformationRequestSink sink);
+  void setGameInformationBusy(bool busy);
+  void showGameInformation(const library::GameMetadata& metadata);
+  void showGameInformationError(const std::string& detail);
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -164,6 +171,8 @@ private:
   void chooseDisc();
   void requestDiscEjected(bool ejected);
   void updateDiscActions();
+  void requestGameInformation();
+  void updateGameInformationAction();
   void requestStateOperation(StateUiOperation operation);
   void updateStateActions();
   void updateStateSlotPresentation();
@@ -204,6 +213,7 @@ private:
   platform::BiosSnapshot biosSnapshot_;
   BiosConfigurationSink biosConfigurationSink_;
   DiscOperationSink discOperationSink_;
+  GameInformationRequestSink gameInformationRequestSink_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;
@@ -215,6 +225,7 @@ private:
   bool discEjected_{false};
   bool discPresent_{false};
   bool discOperationBusy_{false};
+  bool gameInformationBusy_{false};
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;
   std::uint32_t selectedStateSlot_{0};

@@ -4,6 +4,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/bios_settings_dialog.h
   include/genplusgx/ui/binding_capture_button.h
   include/genplusgx/ui/dialog_service.h
+  include/genplusgx/ui/game_information_dialog.h
   include/genplusgx/ui/input_configuration_dialog.h
   include/genplusgx/ui/main_window.h
   include/genplusgx/ui/system_settings_dialog.h
@@ -13,6 +14,7 @@ add_library(genplusgx_ui STATIC
   src/bios_settings_dialog.cpp
   src/binding_capture_button.cpp
   src/dialog_service.cpp
+  src/game_information_dialog.cpp
   src/input_configuration_dialog.cpp
   src/main_window.cpp
   src/system_settings_dialog.cpp
@@ -34,6 +36,7 @@ target_link_libraries(
     Qt6::Widgets
     GenesisPlusGX::GameFiles
     GenesisPlusGX::Input
+    GenesisPlusGX::Library
     GenesisPlusGX::Platform
     GenesisPlusGX::Settings
     GenesisPlusGX::VideoWidget

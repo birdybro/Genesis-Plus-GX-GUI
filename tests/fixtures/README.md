@@ -86,3 +86,13 @@ test titles, and one generated region marker. The rest is zero-filled. Tests gen
 USA and Europe variants and a CUE sheet that references a generated local BIN file.
 There is no game program, Sega security program, sampled audio, artwork, or third-party
 data. Real-BIOS testing is excluded by default and never creates or fetches firmware.
+
+## Generated metadata/property fixtures
+
+`unit.game_metadata` derives cartridge, SMD, Master System, Game Gear, SG-1000, Sega CD,
+and CUE/BIN metadata inputs entirely at runtime. Cartridge and disc bytes reuse the
+original CC0 generators above; the test creates 8-bit `TMR SEGA` headers, SMD
+interleaving, and CUE text itself in a temporary directory. A fixed-seed corpus creates
+2,000 bounded arbitrary byte arrays up to 70,000 bytes to exercise truncated header
+offsets. No corpus binary or result is stored, downloaded, or automatically promoted
+to a golden reference.

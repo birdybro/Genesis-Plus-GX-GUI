@@ -93,6 +93,7 @@ add_subdirectory(desktop/persistence)
 add_subdirectory(desktop/input)
 add_subdirectory(desktop/settings)
 add_subdirectory(desktop/platform)
+add_subdirectory(desktop/library)
 
 if(GENPLUSGX_BUILD_DESKTOP)
   add_subdirectory(desktop/ui)

@@ -91,6 +91,19 @@ wrong-sized save is rejected before emulation begins rather than partially copie
 the core. The application never reads or writes `game.srm`, `scd.brm`, or other save
 files relative to its current working directory.
 
+## Game information
+
+With a game loaded, choose **Tools → Game Information…** to inspect its titles, system,
+region, format, product code, declared and actual sizes, header/computed checksums,
+mapper or disc details, path, and SHA-256 identifier. CUE sheets also show their track
+count and local data-track path where safely available. The read happens on a bounded
+background worker and does not pause or reinitialize emulation.
+
+Metadata is informational: Genesis Plus GX remains authoritative for actual hardware,
+region, mapper, and disc detection when loading. A missing or malformed header is shown
+as a note rather than guessed into core settings. See
+[GAME_INFORMATION.md](GAME_INFORMATION.md) for format and safety details.
+
 ## Save states
 
 Use **Emulation → Save State** (`F5`) and **Load State** (`F8`) with the selected slot.

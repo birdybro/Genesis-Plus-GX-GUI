@@ -38,8 +38,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | `56eeff4` |
 | 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | `97db779` |
 | 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | `77a562d` |
-| 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | recorded by milestone 28 |
-| 28 Game information | PLANNED | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | pending |
+| 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | `1baef5d` |
+| 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | recorded by milestone 29 |
 | 29 Library database | PLANNED | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | pending |
 | 30 Library UI | PLANNED | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | pending |
 | 31 Screenshots | PLANNED | Native/display PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | pending |
@@ -1628,4 +1628,72 @@ Internal BRAM and RAM-cartridge memory persist under the loaded disc's content i
 No proprietary BIOS, security program, game data, or fetched fixture enters source,
 build output, or CI. Authoritative `core/` files are unchanged.
 
-**Commit SHA:** recorded by milestone 28
+**Commit SHA:** `1baef5d`
+
+## Milestone 28 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide read-only, format-aware game metadata and SHA-256 identification on
+a bounded background service, then expose it in an accessible native dialog without
+initializing, changing, or racing the Genesis Plus GX core.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/library/CMakeLists.txt`
+- `desktop/library/include/genplusgx/library/game_metadata.h`
+- `desktop/library/include/genplusgx/library/game_metadata_service.h`
+- `desktop/library/src/game_metadata.cpp`
+- `desktop/library/src/game_metadata_service.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/game_information_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/game_information_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/game_metadata_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/GAME_INFORMATION.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.game_metadata` decodes the generated Genesis header and live
+checksum, SRAM declaration, interleaved SMD header, Master System/Game Gear `TMR SEGA`
+headers, SG-1000 extension, Sega CD security-area title/region, and safe CUE/BIN track
+metadata. It verifies a known streaming SHA-256, traversal rejection, unsupported
+input, worker start/request/result/stop/restart semantics, and 2,000 fixed-seed arbitrary
+byte arrays up to 70,000 bytes. `gui.main_window` now verifies loaded/no-game/busy action
+states, typed asynchronous handoff, all significant populated fields, accessible
+read-only controls, close behavior, and injected recoverable errors.
+
+**Gate evidence:**
+
+- Focused metadata model/service and GUI tests passed five consecutive Debug runs.
+- Debug build and complete CTest: passed (44/44).
+- Release build and complete CTest: passed (44/44).
+- ASan/UBSan build and complete CTest: passed (44/44) with no findings.
+- A CHD-disabled build compiled and passed metadata/file-format tests, confirming that
+  the parser accepts exactly the formats advertised by that build.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New metadata, service, UI, composition, and test code compiled under the frontend
+  warning policy without warnings; authoritative `core/` files are unchanged.
+
+**Acceptance criteria:** The parser bounds-checks every header offset and normalizes
+only printable text. Whole selected files are streamed in 64 KiB chunks for SHA-256
+and Genesis checksum while memory remains bounded to the 64 KiB header window; files
+over 16 GiB or changing during inspection fail safely. CUE references may not be
+absolute, traverse parents, or resolve through symlinks outside their directory. The
+service uses fixed-capacity command/event queues and has deterministic restart and
+shutdown. The application matches both operation ID and loaded path before displaying
+a result, discarding stale work after game changes. The dialog shows titles, system,
+region, product, sizes, checksum, mapper/media, disc tracks, path, and SHA-256 with
+stable object names and keyboard accessibility. Metadata remains descriptive and
+never calls or overrides the core.
+
+**Commit SHA:** recorded by milestone 29
