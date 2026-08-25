@@ -72,6 +72,28 @@ ctest --preset asan -R '^core\.long_running_stability$'
 The normal test has a 90-second timeout; current Debug and sanitizer runs are expected to
 finish substantially faster on ordinary CI hardware.
 
+## Linux continuous integration
+
+`.github/workflows/ci.yml` runs on pushes to `master` and `desktop-gui`, and on every
+pull request. The Ubuntu 24.04 jobs build and test the complete desktop application in
+Debug and Release, repeat the full suite under ASan/UBSan, and compile the inherited
+libretro target as a compatibility regression. Qt 6.8.3 and SDL 3.4.14 are explicit;
+third-party actions are pinned to immutable commit IDs. Failed CTest jobs upload
+`LastTest.log` and CMake configure diagnostics.
+
+The hosted jobs use the same essential commands as a local run:
+
+```bash
+cmake -S . -B build/ci-Debug -G Ninja \
+  -DCMAKE_BUILD_TYPE=Debug -DBUILD_TESTING=ON -DGENPLUSGX_BUILD_DESKTOP=ON
+cmake --build build/ci-Debug --parallel 2
+QT_QPA_PLATFORM=offscreen SDL_AUDIODRIVER=dummy \
+  ctest --test-dir build/ci-Debug --output-on-failure --no-tests=error --timeout 120
+```
+
+CI has least-privilege read-only repository contents permission, cancels obsolete runs
+on the same ref, and never enables external proprietary-BIOS fixtures.
+
 ## Optional external BIOS test
 
 The Sega CD external-fixture test is opt-in and excluded from required CI. Configure

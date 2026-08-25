@@ -48,8 +48,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | `824adf5` |
 | 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | `88313f1` |
 | 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | `3aa0f41` |
-| 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | recorded by milestone 38 |
-| 38 Linux CI | PLANNED | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation | Clean Linux matrix definition | pending |
+| 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | `34e709f` |
+| 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | recorded by milestone 39 |
 | 39 Windows CI | PLANNED | MSVC x64 build and tests | GitHub workflow/platform fixes | matrix definition and cross-platform review | Clean Windows matrix definition | pending |
 | 40 macOS CI | PLANNED | Apple Silicon and practical Intel build/tests | GitHub workflow/platform fixes | matrix definition and deployment review | Clean macOS matrix definition | pending |
 | 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
@@ -2248,4 +2248,40 @@ growing, video remains a fixed triple buffer, fast-forward emits no unplayable h
 and repeated shutdown releases the process-wide core lease. The combined sanitizer
 preset retains leak detection and has no project suppression file.
 
-**Commit SHA:** recorded by milestone 38
+**Commit SHA:** `34e709f`
+
+## Milestone 38 detail
+
+**Status:** COMPLETE
+
+**Goal:** Run the complete Linux desktop regression suite in clean, reproducible hosted
+Debug, Release, and sanitizer environments while retaining a legacy build compatibility
+gate.
+
+**Files changed:**
+
+- `.github/workflows/ci.yml`
+- `docs/TESTING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** No product test is duplicated in YAML. The workflow executes all CTest
+tests, including unit, core, integration, GUI, fuzz/property, lifecycle, timing, and
+stress labels, in each CMake configuration.
+
+**Gate evidence:**
+
+- `actionlint` 1.7.12: passed with no findings.
+- Clean CI-preset configure and 314-step build: passed without frontend warnings.
+- Complete local CI CTest: passed (61/61), including all 15 headless GUI tests and
+  the 20,000-frame stability workload.
+- Action references and selected Qt/SDL releases were resolved against their upstream
+  repositories; every action is pinned to an immutable full commit ID.
+- The first hosted run is verified after this workflow-bearing commit is pushed and its
+  result is recorded by milestone 39.
+
+**Acceptance criteria:** Ubuntu 24.04 checks out with read-only permissions, installs
+pinned Qt 6.8.3 and SDL 3.4.14 toolchains, builds and tests Debug and Release, repeats
+the suite with ASan/UBSan leak detection, builds the inherited Unix libretro target,
+uploads useful failure logs, and does not enable proprietary external fixtures.
+
+**Commit SHA:** recorded by milestone 39

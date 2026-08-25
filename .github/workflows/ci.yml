@@ -1,0 +1,152 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - master
+      - desktop-gui
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  QT_VERSION: 6.8.3
+  SDL_VERSION: 3.4.14
+  QT_QPA_PLATFORM: offscreen
+  SDL_AUDIODRIVER: dummy
+
+jobs:
+  linux-build-test:
+    name: Linux ${{ matrix.build_type }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: qt-linux-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          install-linux-dependencies: true
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-${{ matrix.build_type }} -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: cmake --build build/ci-${{ matrix.build_type }} --parallel 2
+
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-${{ matrix.build_type }}
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-${{ matrix.build_type }}-test-diagnostics
+          path: |
+            build/ci-${{ matrix.build_type }}/Testing/Temporary/LastTest.log
+            build/ci-${{ matrix.build_type }}/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+
+  linux-sanitizers:
+    name: Linux ASan and UBSan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: qt-linux-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          install-linux-dependencies: true
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure sanitizers
+        run: >-
+          cmake -S . -B build/ci-asan -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+          -DGENPLUSGX_ENABLE_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build/ci-asan --parallel 2
+
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-asan
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: linux-sanitizer-test-diagnostics
+          path: |
+            build/ci-asan/Testing/Temporary/LastTest.log
+            build/ci-asan/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore
+
+  linux-libretro-regression:
+    name: Linux legacy libretro build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build inherited libretro target
+        run: make -f Makefile.libretro platform=unix -j2
+
+      - name: Clean inherited libretro target
+        if: always()
+        run: make -f Makefile.libretro platform=unix clean
