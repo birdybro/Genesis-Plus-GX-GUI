@@ -1,4 +1,5 @@
 #include "genplusgx/timing/frame_pacer.h"
+#include "genplusgx/timing/host_timer_resolution.h"
 
 #include <chrono>
 #include <cmath>
@@ -125,6 +126,14 @@ int main()
           pacer.metrics().targetFramesPerSecond == 60.0,
         "Metric reset changed configuration or retained counters")) {
     return 10;
+  }
+
+  const auto sleepStart = std::chrono::steady_clock::now();
+  genplusgx::sleepUntilHostDeadline(sleepStart + 5ms);
+  const auto sleepElapsed = std::chrono::steady_clock::now() - sleepStart;
+  if (!check(sleepElapsed >= 4ms && sleepElapsed < 250ms,
+        "Host deadline wait returned early or overslept wildly")) {
+    return 11;
   }
   return 0;
 }

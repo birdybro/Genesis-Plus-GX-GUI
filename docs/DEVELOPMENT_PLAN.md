@@ -2381,6 +2381,10 @@ filesystem, timing, generated-fixture, and stability suites.
   monotonic `sleep_until`, and checks commands before each frame. It remains non-busy
   with command latency bounded to one native frame; paused and idle waits stay directly
   interruptible.
+- Run `32911961059` confirmed that the standard sleep itself is heavily coalesced on the
+  hosted Apple Silicon worker. The platform timing service now converts the remaining
+  steady-clock duration into an absolute Mach deadline and repeats interrupted waits;
+  a portable unit check guards against early return and unbounded oversleep.
 - Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
   timing portability fix. Static workflow validation and hosted verification are
   pending this workflow-bearing commit.

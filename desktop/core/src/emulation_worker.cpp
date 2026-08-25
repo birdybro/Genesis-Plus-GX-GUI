@@ -495,7 +495,7 @@ private:
           }
           if (Clock::now() < *deadline) {
             lock.unlock();
-            std::this_thread::sleep_until(*deadline);
+            sleepUntilHostDeadline(*deadline);
             lock.lock();
           }
           if (stopRequested_) {

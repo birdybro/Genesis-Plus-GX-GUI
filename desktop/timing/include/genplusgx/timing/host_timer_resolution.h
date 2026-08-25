@@ -5,6 +5,9 @@
 
 namespace genplusgx {
 
+void sleepUntilHostDeadline(
+  std::chrono::steady_clock::time_point deadline) noexcept;
+
 // Requests a process timer resolution suitable for short emulation deadlines.
 // Windows requires an explicit request for condition-variable waits below the
 // default scheduler tick; other supported platforms need no adjustment.
