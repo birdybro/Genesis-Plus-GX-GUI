@@ -209,3 +209,66 @@ jobs:
             build/ci-windows/Testing/Temporary/LastTest.log
             build/ci-windows/CMakeFiles/CMakeConfigureLog.yaml
           if-no-files-found: ignore
+
+  macos-build-test:
+    name: macOS ${{ matrix.host.architecture }} ${{ matrix.build_type }}
+    runs-on: ${{ matrix.host.runner }}
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: >-
+            qt-macos-${{ matrix.host.architecture }}-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          add-to-environment: true
+          build-type: ${{ matrix.build_type }}
+          discriminator: >-
+            macos-${{ matrix.host.architecture }}-${{ matrix.build_type }}
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-${{ matrix.build_type }} -G Ninja
+          -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: cmake --build build/ci-${{ matrix.build_type }} --parallel 2
+
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-${{ matrix.build_type }}
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: >-
+            macos-${{ matrix.host.architecture }}-${{ matrix.build_type }}-test-diagnostics
+          path: |
+            build/ci-${{ matrix.build_type }}/Testing/Temporary/LastTest.log
+            build/ci-${{ matrix.build_type }}/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore

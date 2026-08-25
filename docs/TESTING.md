@@ -78,9 +78,11 @@ finish substantially faster on ordinary CI hardware.
 pull request. Ubuntu 24.04 jobs build and test the complete desktop application in Debug
 and Release, repeat the full suite under ASan/UBSan, and compile the inherited libretro
 target as a compatibility regression. Windows Server 2022 jobs build and test Debug and
-Release with the Visual Studio 2022 x64 toolchain. Qt 6.8.3 and SDL 3.4.14 are explicit;
-third-party actions are pinned to immutable commit IDs. Failed CTest jobs upload
-`LastTest.log` and CMake configure diagnostics with platform/configuration-specific names.
+Release with the Visual Studio 2022 x64 toolchain. macOS 15 jobs run the same Debug and
+Release suites natively on Apple Silicon and Intel runners. Qt 6.8.3 and SDL 3.4.14 are
+explicit; third-party actions are pinned to immutable commit IDs. Failed CTest jobs
+upload `LastTest.log` and CMake configure diagnostics with platform, architecture, and
+configuration-specific names.
 
 The hosted jobs use the same essential commands as a local run:
 
@@ -97,7 +99,8 @@ on the same ref, and never enables external proprietary-BIOS fixtures. Windows u
 Qt's MSVC 2022 x64 binaries and a matching source-built SDL library; SDL's DLL directory
 is exported for test and application startup. Its emulation worker requests 1 ms timer
 resolution only while the thread is alive so sub-default-tick fast-forward deadlines
-retain the same bounded pacing semantics as Linux.
+retain the same bounded pacing semantics as Linux. macOS uses Clang, Ninja, the host's
+native Qt package, and a host-native SDL build; neither architecture is cross-compiled.
 
 ## Optional external BIOS test
 

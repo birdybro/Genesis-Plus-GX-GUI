@@ -51,7 +51,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | `34e709f` |
 | 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
-| 40 macOS CI | PLANNED | Apple Silicon and practical Intel build/tests | GitHub workflow/platform fixes | matrix definition and deployment review | Clean macOS matrix definition | pending |
+| 40 macOS CI | IN PROGRESS | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | pending |
 | 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
@@ -2345,3 +2345,37 @@ complete Debug and Release suite headlessly. SDL runtime libraries are on `PATH`
 runs retain only bounded build/test diagnostics, and no proprietary fixtures are used.
 
 **Commit SHA:** `043a2ee`
+
+## Milestone 40 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Build and test the complete desktop application natively with Clang on current
+macOS 15 Apple Silicon and Intel hosts in both Debug and Release configurations.
+
+**Files changed:**
+
+- `.github/workflows/ci.yml`
+- `docs/TESTING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** No product test is duplicated. Four native macOS jobs each execute all
+61 CTest registrations, including the complete headless GUI, core, integration,
+filesystem, timing, generated-fixture, and stability suites.
+
+**Gate evidence:**
+
+- GitHub's current runner-image inventory was checked before selecting explicit
+  `macos-15` arm64 and `macos-15-intel` x86-64 labels; the deprecated macOS 14 image and
+  moving `macos-latest` alias are not used.
+- Qt 6.8.3 is installed as the host-native package, SDL 3.4.14 is built natively for each
+  runner, and all third-party actions retain immutable commit pins.
+- Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
+  timing portability fix. Static workflow validation and hosted verification are
+  pending this workflow-bearing commit.
+
+**Acceptance criteria:** Apple Silicon and Intel runners configure with Clang/Ninja,
+build the full `.app` target and every test, execute Debug and Release headlessly, and
+retain bounded failure diagnostics without proprietary fixtures or signing credentials.
+
+**Commit SHA:** recorded by milestone 41
