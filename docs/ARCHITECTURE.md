@@ -86,21 +86,26 @@ settings snapshots, frame views, and byte spans. A small desktop `osd.h`/C bridg
 provides the configuration object, archive and BIOS callbacks, logging hook, and any
 other symbols required by the core.
 
-The adapter lifecycle is a state machine:
+The low-level adapter lifecycle is a state machine:
 
 ```text
-Uninitialized -> Idle -> Loaded -> Running
-                    ^       |         |
-                    |       v         v
-                    +---- Unloading <-Paused
-                              |
-                              v
-                             Idle -> ShuttingDown -> Uninitialized
+Uninitialized -> Ready -> Loaded
+       ^           ^         |
+       |           +---------+
+       +---------------------+
 ```
 
 Invalid transitions return typed errors. Load is transactional: a failed file, BIOS,
-or core initialization leaves the adapter in `Idle`, with no half-loaded game exposed
+or core initialization leaves the adapter in `Ready`, with no half-loaded game exposed
 to the GUI. Repeated load/unload and shutdown operations are safe.
+
+`CoreAdapter::initialize()` records its owner thread and acquires a process-wide single
+core lease. Every production operation checks that lease and thread before reaching a
+Genesis Plus GX function. A process-wide execution mutex prevents simultaneous core
+entry and permits the destructor to perform emergency RAII cleanup without racing a
+finishing call; normal shutdown is still required on the owner thread. The higher-level
+emulation worker adds running, paused, frame-advance, and shutting-down states without
+duplicating the adapter's resource lifecycle.
 
 ## Threading and command flow
 

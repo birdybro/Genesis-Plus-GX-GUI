@@ -14,8 +14,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 00 Repository audit | COMPLETE | Establish baseline, boundaries, licenses, architecture, and ledger | `docs/REPOSITORY_AUDIT.md`, `docs/ARCHITECTURE.md`, this ledger | libretro baseline build; SDL2 baseline build attempt; clean-tree inspection | Existing behavior documented; no functional change | `10a9e35` |
 | 01 Root CMake | COMPLETE | Modern target-based build, presets, dependency discovery, trivial test | root CMake, `cmake/`, presets, test bootstrap | Debug/Release/ASan configure, build, CTest; libretro regression | Host configure succeeds; legacy builds retained | `99f4608` |
 | 02 Core library | COMPLETE | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | Debug/Release/ASan core link smoke; libretro regression | Static core compiles without Qt dependency | `df2985a` |
-| 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | pending |
-| 04 Core lifecycle | PLANNED | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | pending |
+| 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | `16b56c9` |
+| 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | pending |
 | 05 Core video | PLANNED | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | pending |
 | 06 Core audio | PLANNED | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
 | 07 Core input | PLANNED | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
@@ -225,4 +225,46 @@ self-regenerated golden file. Temporary files are uniquely named and removed aft
 each test. Authoritative core headers are treated as external system headers for new
 C++ warning policy without weakening warnings on project code.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 04.
+**Commit SHA:** `16b56c9`
+
+## Milestone 04 detail
+
+**Status:** COMPLETE
+
+**Goal:** Put core initialization, ownership, game load/unload, reset, frame execution,
+and shutdown behind a reusable C++ lifecycle boundary that cannot be called from an
+arbitrary GUI thread.
+
+**Files changed:**
+
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_lifecycle_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.lifecycle` verifies uninitialized/ready/loaded transitions,
+invalid operations, rejected missing and empty files, one active adapter, repeated
+initialization, hard reset semantics, frame counts, hardware/path exposure, owner-thread
+enforcement, 25 complete load/frame/unload cycles, ownership transfer after explicit
+shutdown, automatic RAII teardown, and audio-rate validation.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (4/4).
+- The lifecycle test passed three consecutive Debug executions.
+- Release build and complete CTest: passed (4/4).
+- ASan/UBSan preset build and complete CTest: passed (4/4).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New adapter code compiled with the project warning policy without warnings.
+
+**Acceptance criteria:** Exactly one adapter owns the process-global core context. Core
+entry is serialized and rejected from non-owner threads. All failed lifecycle calls
+return typed errors, failed loads leave a clean ready state, unload/shutdown are
+idempotent, core audio/CD/cheat resources are released, and framebuffer/core metadata
+cannot outlive ownership.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 05.

@@ -21,3 +21,18 @@ add_test(NAME core.synthetic_genesis_rom COMMAND genplusgx_core_synthetic_rom_te
 set_tests_properties(
   core.synthetic_genesis_rom PROPERTIES LABELS "core;integration;fixture"
 )
+
+add_executable(genplusgx_core_lifecycle_test core_lifecycle_test.cpp)
+target_link_libraries(
+  genplusgx_core_lifecycle_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_options
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+
+add_test(NAME core.lifecycle COMMAND genplusgx_core_lifecycle_test)
+set_tests_properties(
+  core.lifecycle PROPERTIES LABELS "core;integration;lifecycle" TIMEOUT 30
+)
