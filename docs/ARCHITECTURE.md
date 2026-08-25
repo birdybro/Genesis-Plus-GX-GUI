@@ -334,6 +334,25 @@ sequence and enter the worker's coalescing command path. Destruction disconnects
 snapshot sink before clearing internal state, preventing teardown callbacks into
 already-destroyed coordinator captures.
 
+`ControllerInput` initializes only SDL3's gamepad subsystem and runs on the GUI thread,
+where SDL requires the event pump. Initialization enumerates already connected standard
+gamepads; a bounded pump retrieves only SDL's gamepad event range, leaving unrelated SDL
+events available to other platform services. Add/remove/remap, button, and left-stick
+events update a fixed eight-player snapshot. Controllers occupy the lowest free player
+slot by default, retain that slot across events, and may be reassigned; assigning an
+occupied slot swaps the two devices instead of silently disconnecting one. Device
+handles close before the SDL subsystem is released, and cross-thread shutdown is
+rejected.
+
+The standard SDL layout maps west/south/east to Genesis A/B/C, north/left shoulder/right
+shoulder to X/Y/Z, Back to Mode, Start to Start, and the D-pad directly. The left stick
+provides both signed analog coordinates and digital directions outside an 8,000-unit
+deadzone. Held opposite D-pad directions use last-input priority. `InputAggregator`
+combines keyboard and controller sources without inheriting either source's sequence;
+its own monotonic sequence is the only one submitted to the worker. Buttons from both
+sources remain usable for Player 1, cross-device opposite directions become neutral,
+and no unchanged or stale source snapshot is published.
+
 ## Persistence and settings
 
 Platform services resolve data locations using Qt standard paths. Tests inject a

@@ -54,6 +54,8 @@ struct InputDeviceState final {
   InputButtonSet buttons{0};
   std::int16_t analogX{0};
   std::int16_t analogY{0};
+
+  friend bool operator==(const InputDeviceState&, const InputDeviceState&) = default;
 };
 
 struct InputSnapshot final {
@@ -61,6 +63,8 @@ struct InputSnapshot final {
 
   std::array<InputDeviceState, maximumPlayers> players{};
   std::uint64_t sequence{0};
+
+  friend bool operator==(const InputSnapshot&, const InputSnapshot&) = default;
 };
 
 } // namespace genplusgx

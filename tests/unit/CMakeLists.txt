@@ -40,6 +40,25 @@ target_link_libraries(
 add_test(NAME unit.input_snapshot COMMAND genplusgx_input_snapshot_test)
 set_tests_properties(unit.input_snapshot PROPERTIES LABELS "unit;input")
 
+add_executable(genplusgx_input_aggregator_test input_aggregator_test.cpp)
+target_link_libraries(
+  genplusgx_input_aggregator_test
+  PRIVATE GenesisPlusGX::Input genplusgx_project_warnings
+)
+add_test(NAME unit.input_aggregator COMMAND genplusgx_input_aggregator_test)
+set_tests_properties(unit.input_aggregator PROPERTIES LABELS "unit;input")
+
+add_executable(genplusgx_controller_input_test controller_input_test.cpp)
+target_link_libraries(
+  genplusgx_controller_input_test
+  PRIVATE GenesisPlusGX::Input genplusgx_project_warnings Threads::Threads
+)
+add_test(NAME unit.controller_input COMMAND genplusgx_controller_input_test)
+set_tests_properties(
+  unit.controller_input
+  PROPERTIES LABELS "unit;input;controller;device" TIMEOUT 30
+)
+
 add_executable(genplusgx_persistence_test persistence_test.cpp)
 target_link_libraries(
   genplusgx_persistence_test

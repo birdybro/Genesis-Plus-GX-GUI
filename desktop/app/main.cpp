@@ -2,6 +2,8 @@
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
 #include "genplusgx/emulation_worker.h"
+#include "genplusgx/input/controller_input.h"
+#include "genplusgx/input/input_aggregator.h"
 #include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -54,10 +56,12 @@ int main(int argc, char* argv[])
 
   genplusgx::ui::MainWindow window;
   window.displayWidget()->setFrameExchange(videoFrames);
+  genplusgx::input::InputAggregator inputAggregator;
   genplusgx::input::KeyboardInput keyboardInput{&window};
+  genplusgx::input::ControllerInput controllerInput;
   keyboardInput.attach(*window.displayWidget());
   std::uint64_t inputOperationId = 1'000'000U;
-  keyboardInput.setSnapshotSink(
+  inputAggregator.setSnapshotSink(
     [&inputOperationId, &worker](const genplusgx::InputSnapshot& snapshot) {
       const auto state = worker.state();
       if (state != genplusgx::EmulationWorkerState::paused &&
@@ -70,13 +74,34 @@ int main(int argc, char* argv[])
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
     });
+  keyboardInput.setSnapshotSink(
+    [&inputAggregator](const genplusgx::InputSnapshot& snapshot) {
+      static_cast<void>(inputAggregator.updateKeyboard(snapshot));
+    });
+  controllerInput.setSnapshotSink(
+    [&inputAggregator](const genplusgx::InputSnapshot& snapshot) {
+      static_cast<void>(inputAggregator.updateControllers(snapshot));
+    });
+  controllerInput.setConnectionSink(
+    [](const genplusgx::input::ControllerInfo& controller, bool connected) {
+      qInfo().noquote()
+        << (connected ? "Controller connected:" : "Controller disconnected:")
+        << QString::fromStdString(controller.name)
+        << "(player" << static_cast<qulonglong>(controller.player + 1U) << ')';
+    });
+  static_cast<void>(inputAggregator.updateKeyboard(keyboardInput.snapshot()));
+  const auto controllerInitialized = controllerInput.initialize();
+  if (!controllerInitialized) {
+    qWarning().noquote() << QString::fromStdString(controllerInitialized.message);
+  }
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
     &eventPump,
     &QTimer::timeout,
     &window,
-    [&audioOutput, &worker, &window] {
+    [&audioOutput, &controllerInput, &worker, &window] {
+    static_cast<void>(controllerInput.pollEvents());
     while (const auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.displayWidget()->presentLatestFrame());
@@ -108,6 +133,10 @@ int main(int argc, char* argv[])
   eventPump.stop();
   keyboardInput.setSnapshotSink({});
   keyboardInput.detach();
+  controllerInput.setSnapshotSink({});
+  controllerInput.setConnectionSink({});
+  static_cast<void>(controllerInput.shutdown());
+  inputAggregator.setSnapshotSink({});
   static_cast<void>(worker.stop());
   static_cast<void>(audioOutput.shutdown());
   return result;

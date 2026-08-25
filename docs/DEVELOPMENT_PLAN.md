@@ -27,8 +27,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | `71692a3` |
 | 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | `1fbc570` |
 | 15 Timing/pacing | COMPLETE | NTSC/PAL/CD pacing, FF, pause, frame advance | `desktop/timing`, core timing metadata, worker scheduler | rational/property and live rate/state tests | Monotonic non-busy pacing | `3235274` |
-| 16 Keyboard controls | COMPLETE | Excellent default Genesis keyboard mappings | `desktop/input`, display/app integration | mapping, event-filter, focus, worker/core pipeline tests | 3/6-button controls work | recorded by milestone 17 |
-| 17 Controllers | PLANNED | SDL3 discovery, hot-plug, assignments, mappings | controller service | injected SDL event tests | Multi-controller lifecycle is safe | pending |
+| 16 Keyboard controls | COMPLETE | Excellent default Genesis keyboard mappings | `desktop/input`, display/app integration | mapping, event-filter, focus, worker/core pipeline tests | 3/6-button controls work | `48d2844` |
+| 17 Controllers | COMPLETE | SDL3 discovery, hot-plug, assignments, mappings | controller service and source aggregator | virtual devices and injected SDL event tests | Multi-controller lifecycle is safe | recorded by milestone 18 |
 | 18 Input UI | PLANNED | Capture, profiles, deadzones, conflicts, advanced devices | settings/input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | pending |
 | 19 Game loading UI | PLANNED | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | pending |
 | 20 Recent games | PLANNED | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | pending |
@@ -907,4 +907,61 @@ shortcuts bypass gameplay presses. The GUI
 submits snapshots only while a game is paused or running, and the worker coalesces and
 applies them on its core-owning thread at the next frame boundary.
 
-**Commit SHA:** recorded by milestone 17
+**Commit SHA:** `48d2844`
+
+## Milestone 17 detail
+
+**Status:** COMPLETE
+
+**Goal:** Discover SDL3-compatible gamepads, handle hot-plug lifecycle, provide a
+complete standard Genesis six-button mapping, assign multiple players, and safely merge
+controller and keyboard input before the worker boundary.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/input_snapshot.h`
+- `desktop/input/CMakeLists.txt`
+- `desktop/input/include/genplusgx/input/controller_input.h`
+- `desktop/input/include/genplusgx/input/input_aggregator.h`
+- `desktop/input/src/controller_input.cpp`
+- `desktop/input/src/input_aggregator.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/controller_input_test.cpp`
+- `tests/unit/input_aggregator_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/INPUT_CONFIGURATION.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.controller_input` uses SDL's official virtual joystick facility
+and injected SDL gamepad events to verify startup, bounded event polling, preservation
+of unrelated events, discovery, add/remove notification, standardized three-/six-button
+mapping, button release, last-input directional priority, analog deadzone and digital
+projection, two-player allocation, occupied-slot swapping, unknown-device handling,
+thread ownership, teardown, and snapshot publication. `unit.input_aggregator` verifies
+source sequence rejection, independent aggregate sequencing, multi-player state,
+keyboard/controller merging, analog preservation, cross-device SOCD neutralization, and
+complete clearing.
+
+**Gate evidence:**
+
+- Focused controller and aggregator tests passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (26/26).
+- Release build and complete CTest: passed (26/26).
+- ASan/UBSan preset build and complete CTest: passed (26/26).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New SDL service, aggregation, application composition, and tests compiled under the
+  frontend warning policy without warnings.
+
+**Acceptance criteria:** SDL owns controller discovery and standard platform mapping but
+never reaches the core. The GUI thread pumps at most 256 gamepad events per tick and
+does not consume unrelated SDL events. Eight controller records and their state are
+bounded; devices receive the lowest available logical player, may be explicitly swapped,
+and close before SDL teardown. The default positional mapping covers all twelve Genesis
+six-button controls. Axis values within the configured deadzone are neutral, while
+values outside it retain analog precision and drive directions. A frontend-neutral
+aggregator prevents keyboard and Player 1 controller snapshots from overwriting each
+other and emits one monotonic, change-only stream to the worker.
+
+**Commit SHA:** recorded by milestone 18
