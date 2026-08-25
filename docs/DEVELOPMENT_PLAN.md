@@ -11,8 +11,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 
 | Milestone | Status | Goal | Files changed | Tests / gate | Acceptance criteria | Commit SHA |
 | --- | --- | --- | --- | --- | --- | --- |
-| 00 Repository audit | COMPLETE | Establish baseline, boundaries, licenses, architecture, and ledger | `docs/REPOSITORY_AUDIT.md`, `docs/ARCHITECTURE.md`, this ledger | libretro baseline build; SDL2 baseline build attempt; clean-tree inspection | Existing behavior documented; no functional change | pending |
-| 01 Root CMake | PLANNED | Modern target-based build, presets, dependency discovery, trivial test | root CMake, `cmake/`, presets, test bootstrap | Debug configure/build/CTest | Host configure succeeds; legacy builds retained | pending |
+| 00 Repository audit | COMPLETE | Establish baseline, boundaries, licenses, architecture, and ledger | `docs/REPOSITORY_AUDIT.md`, `docs/ARCHITECTURE.md`, this ledger | libretro baseline build; SDL2 baseline build attempt; clean-tree inspection | Existing behavior documented; no functional change | `10a9e35` |
+| 01 Root CMake | COMPLETE | Modern target-based build, presets, dependency discovery, trivial test | root CMake, `cmake/`, presets, test bootstrap | Debug/Release/ASan configure, build, CTest; libretro regression | Host configure succeeds; legacy builds retained | pending |
 | 02 Core library | PLANNED | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | core link smoke test; libretro regression build | Static core compiles without Qt dependency | pending |
 | 03 Synthetic ROM | PLANNED | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | pending |
 | 04 Core lifecycle | PLANNED | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | pending |
@@ -102,3 +102,42 @@ architecture.
 constraints, architecture, risks, and subsequent gates are documented.
 
 **Commit SHA:** pending milestone commit; to be recorded during Milestone 01.
+
+## Milestone 01 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add a modern root CMake project without replacing legacy platform builds,
+discover the selected desktop dependencies, provide reproducible presets, establish
+target-scoped frontend warnings/sanitizers, and register the first CTest target.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `CMakePresets.json`
+- `.gitignore`
+- `cmake/CompilerWarnings.cmake`
+- `cmake/Sanitizers.cmake`
+- `cmake/version.h.in`
+- `tests/CMakeLists.txt`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/infrastructure_test.cpp`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `infrastructure.version` verifies configured version/application/Git
+metadata and that new C++ targets compile as C++20.
+
+**Gate evidence:**
+
+- `cmake --preset debug`, build, and CTest: passed (1/1).
+- `cmake --preset release`, build, and CTest: passed (1/1).
+- `cmake --preset asan`, build, and CTest: passed under ASan/UBSan (1/1).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- Qt 6.11.1 and SDL 3.4.14 were found through CMake config packages.
+
+**Acceptance criteria:** The documented configure/build/test workflow succeeds; Debug,
+Release, ASan, and CI presets exist; warnings apply to new code; legacy makefiles and
+core sources are unchanged.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 02.

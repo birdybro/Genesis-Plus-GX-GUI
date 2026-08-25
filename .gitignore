@@ -1,6 +1,8 @@
 .vs/
 Debug/
 Release/
+/build/
+/out/
 
 psp2/*.o
 psp2/*.elf

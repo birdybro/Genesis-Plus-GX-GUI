@@ -1,0 +1,8 @@
+add_executable(genplusgx_infrastructure_test infrastructure_test.cpp)
+target_link_libraries(
+  genplusgx_infrastructure_test
+  PRIVATE genplusgx_project_options genplusgx_project_warnings
+)
+
+add_test(NAME infrastructure.version COMMAND genplusgx_infrastructure_test)
+set_tests_properties(infrastructure.version PROPERTIES LABELS "unit;infrastructure")
