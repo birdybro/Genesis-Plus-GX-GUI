@@ -82,6 +82,14 @@ struct PersistenceLoadResult final {
   std::vector<std::uint8_t> data;
 };
 
+[[nodiscard]] PersistenceStatus writeFileAtomically(
+  const std::filesystem::path& destination,
+  std::span<const std::uint8_t> data,
+  std::size_t maximumBytes);
+[[nodiscard]] PersistenceLoadResult readFileBounded(
+  const std::filesystem::path& source,
+  std::size_t maximumBytes);
+
 class PersistenceStore final {
 public:
   static constexpr std::size_t maximumRamBytes = 8U * 1024U * 1024U;

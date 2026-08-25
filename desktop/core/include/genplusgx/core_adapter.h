@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <span>
 #include <string>
+#include <vector>
 
 namespace genplusgx {
 
@@ -32,6 +33,9 @@ enum class CoreError {
   audioBufferTooSmall,
   invalidAudioBatch,
   staleInputSnapshot,
+  invalidStatePayload,
+  stateSaveFailed,
+  stateLoadFailed,
 };
 
 struct CoreResult final {
@@ -107,6 +111,8 @@ public:
     std::span<StereoAudioFrame> destination,
     CoreAudioBatchInfo& output);
   [[nodiscard]] CoreResult setInputSnapshot(const InputSnapshot& snapshot);
+  [[nodiscard]] CoreResult saveRawState(std::vector<std::uint8_t>& output);
+  [[nodiscard]] CoreResult loadRawState(std::span<const std::uint8_t> state);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

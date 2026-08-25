@@ -1,4 +1,8 @@
-add_library(genplusgx_persistence STATIC src/persistence.cpp)
+add_library(
+  genplusgx_persistence STATIC
+  src/persistence.cpp
+  src/state_manager.cpp
+)
 add_library(GenesisPlusGX::Persistence ALIAS genplusgx_persistence)
 target_include_directories(
   genplusgx_persistence PUBLIC $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>

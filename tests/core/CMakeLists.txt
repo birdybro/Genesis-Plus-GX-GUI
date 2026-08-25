@@ -81,3 +81,20 @@ add_test(NAME core.input_snapshot COMMAND genplusgx_core_input_test)
 set_tests_properties(
   core.input_snapshot PROPERTIES LABELS "core;integration;input;fixture" TIMEOUT 30
 )
+
+add_executable(genplusgx_core_state_test core_state_test.cpp)
+target_link_libraries(
+  genplusgx_core_state_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Persistence
+    genplusgx_project_options
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+
+add_test(NAME core.state_round_trip COMMAND genplusgx_core_state_test)
+set_tests_properties(
+  core.state_round_trip
+  PROPERTIES LABELS "core;integration;state;persistence;fixture" TIMEOUT 30
+)

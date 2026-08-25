@@ -9,6 +9,7 @@ extern "C" {
 #include "sms_ntsc.h"
 }
 
+#include <algorithm>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -54,6 +55,8 @@ public:
   std::uint64_t appliedInputSequence{0};
   std::uint64_t newestInputSequence{0};
   bool hasPendingInput{false};
+  std::vector<std::uint8_t> stateScratch;
+  std::vector<std::uint8_t> stateLoadScratch;
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -88,6 +91,8 @@ CoreResult CoreAdapter::initialize()
   privateState->framebuffer.resize(
     framebufferWidth * framebufferHeight * bytesPerPixel, 0U);
   privateState->audioScratch.resize(maximumAudioFramesPerBatch * 2U, 0);
+  privateState->stateScratch.resize(STATE_SIZE, 0U);
+  privateState->stateLoadScratch.resize(STATE_SIZE, 0U);
 
   private_ = privateState.release();
   activeAdapter = this;
@@ -312,6 +317,58 @@ CoreResult CoreAdapter::setInputSnapshot(const InputSnapshot& snapshot)
   private_->pendingInput = snapshot;
   private_->newestInputSequence = snapshot.sequence;
   private_->hasPendingInput = true;
+  return success();
+}
+
+CoreResult CoreAdapter::saveRawState(std::vector<std::uint8_t>& output)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+
+  const int stateBytes = state_save(private_->stateScratch.data());
+  if (stateBytes <= 0 || stateBytes > STATE_SIZE) {
+    output.clear();
+    return failure(CoreError::stateSaveFailed, "Genesis Plus GX generated an invalid raw state size.");
+  }
+  output.assign(
+    private_->stateScratch.begin(),
+    private_->stateScratch.begin() + stateBytes);
+  return success();
+}
+
+CoreResult CoreAdapter::loadRawState(std::span<const std::uint8_t> state)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (state.size() < 16U || state.size() > private_->stateScratch.size()) {
+    return failure(CoreError::invalidStatePayload, "The raw state size is outside the core's safe bounds.");
+  }
+
+  const int expectedBytes = state_save(private_->stateScratch.data());
+  if (expectedBytes <= 0 || expectedBytes > STATE_SIZE ||
+      state.size() != static_cast<std::size_t>(expectedBytes)) {
+    return failure(CoreError::invalidStatePayload, "The raw state size does not match the loaded hardware.");
+  }
+
+  std::ranges::fill(private_->stateLoadScratch, 0U);
+  std::ranges::copy(state, private_->stateLoadScratch.begin());
+  const int loadedBytes = state_load(private_->stateLoadScratch.data());
+  if (loadedBytes != expectedBytes) {
+    if (state_load(private_->stateScratch.data()) != expectedBytes) {
+      return failure(CoreError::stateLoadFailed,
+        "Genesis Plus GX rejected the state payload and could not restore its prior state.");
+    }
+    return failure(CoreError::stateLoadFailed, "Genesis Plus GX rejected the raw state payload.");
+  }
+
+  private_->pendingAudioFrames = 0;
+  private_->pendingAudioFrameNumber = 0;
+  bitmap.viewport.changed = 3;
+  frameCount_ = 0;
   return success();
 }
 

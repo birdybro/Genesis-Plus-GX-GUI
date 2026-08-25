@@ -257,6 +257,84 @@ PersistenceStore::PersistenceStore(ApplicationPaths paths)
 {
 }
 
+PersistenceStatus writeFileAtomically(
+  const std::filesystem::path& destination,
+  std::span<const std::uint8_t> data,
+  std::size_t maximumBytes)
+{
+  if (data.size() > maximumBytes ||
+      data.size() > static_cast<std::size_t>(std::numeric_limits<qint64>::max())) {
+    return failure(PersistenceError::dataTooLarge, "The payload exceeds the bounded maximum.");
+  }
+
+  std::error_code directoryError;
+  if (!createDirectory(destination.parent_path(), directoryError)) {
+    return failure(PersistenceError::directoryCreationFailed, "Unable to create the destination directory.");
+  }
+
+  QSaveFile output{pathString(destination)};
+  output.setDirectWriteFallback(false);
+  if (!output.open(QIODevice::WriteOnly)) {
+    return failure(PersistenceError::fileOpenFailed, "Unable to create the atomic file transaction.");
+  }
+  const auto requested = static_cast<qint64>(data.size());
+  const auto written = output.write(
+    reinterpret_cast<const char*>(data.data()), requested);
+  if (written != requested) {
+    output.cancelWriting();
+    return failure(PersistenceError::fileWriteFailed, "Unable to write the complete payload.");
+  }
+  if (!output.commit()) {
+    return failure(PersistenceError::fileCommitFailed, "Unable to atomically replace the destination file.");
+  }
+  return success();
+}
+
+PersistenceLoadResult readFileBounded(
+  const std::filesystem::path& source,
+  std::size_t maximumBytes)
+{
+  const QFileInfo information{pathString(source)};
+  if (!information.exists()) {
+    return {.status = success(), .exists = false, .data = {}};
+  }
+  if (!information.isFile()) {
+    return {
+      .status = failure(PersistenceError::fileReadFailed, "The source path is not a regular file."),
+      .exists = true,
+      .data = {},
+    };
+  }
+  if (information.size() < 0 ||
+      static_cast<quint64>(information.size()) > static_cast<quint64>(maximumBytes)) {
+    return {
+      .status = failure(PersistenceError::dataTooLarge, "The file exceeds its bounded maximum."),
+      .exists = true,
+      .data = {},
+    };
+  }
+
+  QFile input{pathString(source)};
+  if (!input.open(QIODevice::ReadOnly)) {
+    return {
+      .status = failure(PersistenceError::fileOpenFailed, "Unable to open the file."),
+      .exists = true,
+      .data = {},
+    };
+  }
+  std::vector<std::uint8_t> data(static_cast<std::size_t>(information.size()));
+  const auto read = input.read(
+    reinterpret_cast<char*>(data.data()), static_cast<qint64>(data.size()));
+  if (read != static_cast<qint64>(data.size())) {
+    return {
+      .status = failure(PersistenceError::fileReadFailed, "Unable to read the complete file."),
+      .exists = true,
+      .data = {},
+    };
+  }
+  return {.status = success(), .exists = true, .data = std::move(data)};
+}
+
 PersistenceStatus PersistenceStore::initialize() const
 {
   return paths_.initialize();
@@ -288,33 +366,7 @@ PersistenceStatus PersistenceStore::saveRam(
   if (!identity.valid()) {
     return failure(PersistenceError::invalidGameIdentity, "The game identity is invalid.");
   }
-  if (data.size() > maximumRamBytes ||
-      data.size() > static_cast<std::size_t>(std::numeric_limits<qint64>::max())) {
-    return failure(PersistenceError::dataTooLarge, "The save-RAM payload exceeds the bounded maximum.");
-  }
-
-  const auto destination = ramPath(identity, kind);
-  std::error_code directoryError;
-  if (!createDirectory(destination.parent_path(), directoryError)) {
-    return failure(PersistenceError::directoryCreationFailed, "Unable to create the per-game save directory.");
-  }
-
-  QSaveFile output{pathString(destination)};
-  output.setDirectWriteFallback(false);
-  if (!output.open(QIODevice::WriteOnly)) {
-    return failure(PersistenceError::fileOpenFailed, "Unable to create the atomic save-RAM transaction.");
-  }
-  const auto requested = static_cast<qint64>(data.size());
-  const auto written = output.write(
-    reinterpret_cast<const char*>(data.data()), requested);
-  if (written != requested) {
-    output.cancelWriting();
-    return failure(PersistenceError::fileWriteFailed, "Unable to write the complete save-RAM payload.");
-  }
-  if (!output.commit()) {
-    return failure(PersistenceError::fileCommitFailed, "Unable to atomically replace the save-RAM file.");
-  }
-  return success();
+  return writeFileAtomically(ramPath(identity, kind), data, maximumRamBytes);
 }
 
 PersistenceLoadResult PersistenceStore::loadRam(
@@ -330,46 +382,7 @@ PersistenceLoadResult PersistenceStore::loadRam(
     };
   }
 
-  const auto source = ramPath(identity, kind);
-  const QFileInfo information{pathString(source)};
-  if (!information.exists()) {
-    return {.status = success(), .exists = false, .data = {}};
-  }
-  if (!information.isFile()) {
-    return {
-      .status = failure(PersistenceError::fileReadFailed, "The save-RAM path is not a regular file."),
-      .exists = true,
-      .data = {},
-    };
-  }
-  if (information.size() < 0 ||
-      static_cast<quint64>(information.size()) > static_cast<quint64>(maximumBytes)) {
-    return {
-      .status = failure(PersistenceError::dataTooLarge, "The save-RAM file exceeds its bounded maximum."),
-      .exists = true,
-      .data = {},
-    };
-  }
-
-  QFile input{pathString(source)};
-  if (!input.open(QIODevice::ReadOnly)) {
-    return {
-      .status = failure(PersistenceError::fileOpenFailed, "Unable to open the save-RAM file."),
-      .exists = true,
-      .data = {},
-    };
-  }
-  std::vector<std::uint8_t> data(static_cast<std::size_t>(information.size()));
-  const auto read = input.read(
-    reinterpret_cast<char*>(data.data()), static_cast<qint64>(data.size()));
-  if (read != static_cast<qint64>(data.size())) {
-    return {
-      .status = failure(PersistenceError::fileReadFailed, "Unable to read the complete save-RAM file."),
-      .exists = true,
-      .data = {},
-    };
-  }
-  return {.status = success(), .exists = true, .data = std::move(data)};
+  return readFileBounded(ramPath(identity, kind), maximumBytes);
 }
 
 } // namespace genplusgx

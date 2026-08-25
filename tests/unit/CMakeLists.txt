@@ -39,3 +39,16 @@ add_test(NAME unit.persistence COMMAND genplusgx_persistence_test)
 set_tests_properties(
   unit.persistence PROPERTIES LABELS "unit;persistence;filesystem" TIMEOUT 30
 )
+
+add_executable(genplusgx_state_manager_test state_manager_test.cpp)
+target_link_libraries(
+  genplusgx_state_manager_test
+  PRIVATE
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+)
+
+add_test(NAME unit.state_manager COMMAND genplusgx_state_manager_test)
+set_tests_properties(
+  unit.state_manager PROPERTIES LABELS "unit;persistence;state" TIMEOUT 30
+)

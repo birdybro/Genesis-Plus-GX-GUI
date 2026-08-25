@@ -252,6 +252,16 @@ cartridge files retain distinct stable names. Writes use `QSaveFile` with direct
 fallback disabled, so a failed transaction cannot truncate an existing save; reads are
 regular-file checked and size bounded before allocation.
 
+Save-state files use a fixed 128-byte little-endian `GPGXST01` envelope followed by the
+unchanged raw Genesis Plus GX payload. The envelope records its schema/header lengths,
+millisecond timestamp, hardware, slot, emulated frame number, full game SHA-256, payload
+length and SHA-256, plus the raw core version signature. The manager accepts only slots
+0-9 and payloads up to 2 MiB, validates the entire envelope before exposing bytes, and
+uses the same atomic transaction primitive as RAM persistence. The adapter independently
+asks the running core for its exact hardware-specific state size before calling the
+core's lengthless `state_load()` API. It keeps the current raw snapshot in reusable
+storage and reloads it if the core rejects a candidate, making failed loads transactional.
+
 ## Game loading and library
 
 The file loader normalizes a path, checks that it is a bounded regular file (or a valid

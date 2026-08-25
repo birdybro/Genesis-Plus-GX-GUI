@@ -19,8 +19,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | `8c99cd6` |
 | 06 Core audio | COMPLETE | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | `ac02374` |
 | 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | `4b5e5b5` |
-| 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
-| 09 Save states | PLANNED | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | pending |
+| 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | `1e4dc1e` |
+| 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | recorded by milestone 10 |
 | 10 Qt shell | PLANNED | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | pending |
 | 11 Emulation worker | PLANNED | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | pending |
 | 12 Display widget | PLANNED | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable texture path | pending |
@@ -460,4 +460,55 @@ traverse. Per-game directories include the full SHA-256. All three RAM forms use
 distinct names, at most 8 MiB is accepted, reads validate before allocating, and Qt
 atomic transactions never fall back to truncating direct writes.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 09.
+**Commit SHA:** `1e4dc1e`
+
+## Milestone 09 detail
+
+**Status:** COMPLETE
+
+**Goal:** Preserve Genesis Plus GX's raw snapshot payload while adding atomic slots,
+portable frontend metadata, content identity, bounded parsing, and safe core-load gates.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/persistence.h`
+- `desktop/persistence/include/genplusgx/state_manager.h`
+- `desktop/persistence/src/persistence.cpp`
+- `desktop/persistence/src/state_manager.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_state_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/state_manager_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.state_manager` verifies slots 0-9, fixed metadata, raw-payload
+preservation, atomic replacement, missing/delete behavior, invalid slot and signature,
+bounded payloads, wrong-game and wrong-system rejection, payload checksums, unsupported
+schemas, and truncated envelopes. `core.state_round_trip` saves a real generated-ROM
+machine state, proves RAM/register/program-counter restoration, rejects a truncated raw
+state before the lengthless core loader, transactionally rolls back a core-rejected
+snapshot, and proves deterministic execution after two restores of the same payload.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (12/12).
+- State manager and core state tests each passed three consecutive Debug executions.
+- Release build and complete CTest: passed (12/12).
+- ASan/UBSan preset build and complete CTest: passed (12/12).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New adapter, serialization, persistence, and test code compiled under the frontend
+  warning policy without warnings.
+
+**Acceptance criteria:** Every wrapper is a bounded 128-byte little-endian header plus
+the byte-for-byte raw core payload. Its schema, slot, hardware, timestamp, frame number,
+full game SHA-256, payload SHA-256, payload length, and core signature are validated
+before core entry. Slots replace atomically and a failed core load restores the prior
+machine state. Raw loads must exactly match the active hardware's core-generated state
+size, preventing truncated buffers from reaching `state_load()`.
+
+**Commit SHA:** recorded by milestone 10
