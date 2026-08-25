@@ -13,8 +13,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | --- | --- | --- | --- | --- | --- | --- |
 | 00 Repository audit | COMPLETE | Establish baseline, boundaries, licenses, architecture, and ledger | `docs/REPOSITORY_AUDIT.md`, `docs/ARCHITECTURE.md`, this ledger | libretro baseline build; SDL2 baseline build attempt; clean-tree inspection | Existing behavior documented; no functional change | `10a9e35` |
 | 01 Root CMake | COMPLETE | Modern target-based build, presets, dependency discovery, trivial test | root CMake, `cmake/`, presets, test bootstrap | Debug/Release/ASan configure, build, CTest; libretro regression | Host configure succeeds; legacy builds retained | `99f4608` |
-| 02 Core library | COMPLETE | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | Debug/Release/ASan core link smoke; libretro regression | Static core compiles without Qt dependency | pending |
-| 03 Synthetic ROM | PLANNED | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | pending |
+| 02 Core library | COMPLETE | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | Debug/Release/ASan core link smoke; libretro regression | Static core compiles without Qt dependency | `df2985a` |
+| 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | pending |
 | 04 Core lifecycle | PLANNED | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | pending |
 | 05 Core video | PLANNED | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | pending |
 | 06 Core audio | PLANNED | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
@@ -181,4 +181,48 @@ dependency. Desktop compile definitions are target-scoped. The CHD target delibe
 uses the decoder-only bundled source manifest because the fork does not vendor zstd's
 compression source subset; it never invokes dependency CMake that mutates source files.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 03.
+**Commit SHA:** `df2985a`
+
+## Milestone 03 detail
+
+**Status:** COMPLETE
+
+**Goal:** Generate an original, redistributable Genesis ROM at test runtime and prove
+that the isolated core performs a real reset, executes deterministic 68000 code, parses
+its header, completes a frame, and exposes semantic machine state.
+
+**Files changed:**
+
+- `desktop/core/CMakeLists.txt`
+- `tests/CMakeLists.txt`
+- `tests/core/CMakeLists.txt`
+- `tests/core/synthetic_rom_test.cpp`
+- `tests/utilities/CMakeLists.txt`
+- `tests/utilities/synthetic_rom.h`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.synthetic_genesis_rom` generates a 64 KiB Genesis image in a
+temporary directory, loads it through the real core loader, initializes audio and the
+machine, runs a frame, and verifies its system type, normalized domestic title, known
+RAM long/word/byte markers, and bounded 68000 program counter.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (3/3).
+- The synthetic-ROM test passed three consecutive Debug executions.
+- Release build and complete CTest: passed (3/3).
+- ASan/UBSan preset build and complete CTest: passed (3/3).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- `tests/fixtures/README.md` records generation, behavior, and CC0 provenance; no ROM
+  binary is stored in the repository.
+
+**Acceptance criteria:** The runtime-generated image executes deterministic original
+68000 instructions and proves behavior through semantic RAM state rather than a
+self-regenerated golden file. Temporary files are uniquely named and removed after
+each test. Authoritative core headers are treated as external system headers for new
+C++ warning policy without weakening warnings on project code.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 04.

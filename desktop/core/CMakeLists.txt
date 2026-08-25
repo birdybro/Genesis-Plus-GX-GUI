@@ -103,6 +103,10 @@ target_include_directories(
   genplusgx_core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/c_api>
+)
+target_include_directories(
+  genplusgx_core
+  SYSTEM PUBLIC
     $<BUILD_INTERFACE:${GENPLUSGX_CORE_ROOT}>
     $<BUILD_INTERFACE:${GENPLUSGX_CORE_ROOT}/z80>
     $<BUILD_INTERFACE:${GENPLUSGX_CORE_ROOT}/m68k>
@@ -182,7 +186,9 @@ if(GENPLUSGX_ENABLE_CHD)
     genplusgx_chd PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES C_EXTENSIONS NO
   )
   target_compile_definitions(genplusgx_core PUBLIC USE_LIBCHDR)
-  target_include_directories(genplusgx_core PUBLIC ${GENPLUSGX_LIBCHDR_ROOT}/include)
+  target_include_directories(
+    genplusgx_core SYSTEM PUBLIC ${GENPLUSGX_LIBCHDR_ROOT}/include
+  )
   target_link_libraries(genplusgx_core PRIVATE genplusgx_chd)
 endif()
 
