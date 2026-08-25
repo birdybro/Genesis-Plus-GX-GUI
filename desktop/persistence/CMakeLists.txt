@@ -1,5 +1,6 @@
 add_library(
   genplusgx_persistence STATIC
+  src/backup_store.cpp
   src/persistence.cpp
   src/recent_games.cpp
   src/state_manager.cpp

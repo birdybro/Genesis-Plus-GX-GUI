@@ -31,8 +31,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 17 Controllers | COMPLETE | SDL3 discovery, hot-plug, assignments, mappings | controller service and source aggregator | virtual devices and injected SDL event tests | Multi-controller lifecycle is safe | `58b908d` |
 | 18 Input UI | COMPLETE | Capture, profiles, deadzones, conflicts, advanced devices | profile store, runtime mappings, input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | `87c13b8` |
 | 19 Game loading UI | COMPLETE | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | `568c811` |
-| 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | recorded by milestone 21 |
-| 21 Live SRAM/BRAM | PLANNED | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD unload/reload tests | Dirty saves flush before teardown | pending |
+| 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | `8615cac` |
+| 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | recorded by milestone 22 |
 | 22 Save-state GUI | PLANNED | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | pending |
 | 23 Video settings | PLANNED | Expose overscan, GG, NTSC, mode/region geometry | video settings UI/adapter | propagation and GUI persistence | Supported settings affect core/display | pending |
 | 24 Audio settings | PLANNED | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | pending |
@@ -1150,4 +1150,69 @@ schemas expose no entries. The menu shows basename labels and full-path tooltips
 missing files disabled, cannot dispatch while another lifecycle operation is active,
 and clears history without unloading the current game.
 
-**Commit SHA:** recorded by milestone 21
+**Commit SHA:** `8615cac`
+
+## Milestone 21 detail
+
+**Status:** COMPLETE
+
+**Goal:** Connect cartridge SRAM, Sega CD internal BRAM, and Sega CD RAM-cartridge
+memory to content-identified platform storage, loading before the first frame and
+atomically flushing before unload, replacement, or shutdown without crossing the
+emulation-thread boundary.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/backup_memory.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/backup_store.h`
+- `desktop/persistence/src/backup_store.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/backup_store_test.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_backup_memory_test.cpp`
+- `tests/core/backup_persistence_test.cpp`
+- `tests/utilities/synthetic_rom.h`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.backup_memory` uses an original generated SRAM-enabled Genesis
+ROM to verify erased initialization, an actual 68000 write through the core memory map,
+bounded copying, exact replacement, hard-reset retention, and wrong-size rejection.
+`unit.backup_store` verifies distinct cartridge/internal-CD/RAM-cartridge mapping,
+round trips, strict expected sizes, and active-identity lifetime. The full
+`core.backup_persistence` workflow loads, executes, atomically unloads, restores before
+the first frame, rejects corrupt data, flushes on shutdown, and injects write failures
+to verify that unload preserves the active game and shutdown reports data-loss risk.
+
+**Gate evidence:**
+
+- Focused core/store/GUI persistence checks passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (35/35).
+- Release build and complete CTest: passed (35/35).
+- ASan/UBSan build and complete CTest: passed (35/35) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New adapter, worker, persistence, GUI, fixture, and test code compiled under the
+  frontend warning policy without warnings.
+
+**Acceptance criteria:** Core backup globals are visible only through owner-thread
+adapter copies. Available memory is discovered after system initialization; missing
+files receive core-appropriate initialization, including a formatted Sega CD BRAM
+header. Existing files must exactly match the core-reported size, so corruption never
+reaches a lengthless core API. One content identity owns three stable file types, and
+all I/O remains on the emulation thread. Replacement and unload flush before releasing
+the old core; a failed atomic write leaves that game loaded and surfaces a GUI error.
+Shutdown always releases core and persistence resources but returns the save failure.
+
+**Commit SHA:** recorded by milestone 22

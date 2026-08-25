@@ -57,6 +57,7 @@ public:
     const std::filesystem::path& path,
     const std::string& detail,
     bool gameWasUnloaded = true);
+  void showGameCloseError(const std::string& detail);
   void setFullscreen(bool enabled);
   [[nodiscard]] bool isGameLoaded() const noexcept;
   [[nodiscard]] bool isGameLoading() const noexcept;

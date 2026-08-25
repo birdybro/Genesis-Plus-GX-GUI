@@ -102,6 +102,13 @@ void GameLoadingTest::openDialogAndCloseActionUseInjectedServices()
   QCOMPARE(closeCount, 1);
   QVERIFY(window.isGameLoading());
 
+  window.setGameLoaded(fixture.path());
+  window.showGameCloseError("Injected atomic save failure.");
+  QVERIFY(window.isGameLoaded());
+  QCOMPARE(window.loadedGamePath(), fixture.path());
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("remains loaded")));
+
   window.setNoGameLoaded();
   QVERIFY(!window.isGameLoaded());
   QVERIFY(window.loadedGamePath().empty());

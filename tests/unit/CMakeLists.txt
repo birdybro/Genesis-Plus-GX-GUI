@@ -104,6 +104,20 @@ set_tests_properties(
   unit.persistence PROPERTIES LABELS "unit;persistence;filesystem" TIMEOUT 30
 )
 
+add_executable(genplusgx_backup_store_test backup_store_test.cpp)
+target_link_libraries(
+  genplusgx_backup_store_test
+  PRIVATE
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(NAME unit.backup_store COMMAND genplusgx_backup_store_test)
+set_tests_properties(
+  unit.backup_store PROPERTIES LABELS "unit;persistence;filesystem" TIMEOUT 30
+)
+
 add_executable(genplusgx_recent_games_test recent_games_test.cpp)
 target_link_libraries(
   genplusgx_recent_games_test

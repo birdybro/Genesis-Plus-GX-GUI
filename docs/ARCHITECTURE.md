@@ -410,6 +410,32 @@ cartridge files retain distinct stable names. Writes use `QSaveFile` with direct
 fallback disabled, so a failed transaction cannot truncate an existing save; reads are
 regular-file checked and size bounded before allocation.
 
+Live backup-memory ownership remains inside the core worker:
+
+```text
+load command
+    -> load and initialize core image
+    -> compute content identity
+    -> read exact-size SRAM/BRAM files
+    -> apply bytes (or core-appropriate erased/formatted defaults)
+    -> expose Paused state and permit the first frame
+
+unload / replacement / shutdown
+    -> copy available backup regions into one reusable bounded scratch buffer
+    -> atomically commit each distinct per-game file
+    -> release core image and active persistence identity
+```
+
+`CoreAdapter` maps the authoritative core regions without exporting their addresses:
+64 KiB cartridge SRAM when enabled, the 8 KiB Sega CD internal BRAM, and the configured
+Sega CD RAM-cartridge area. Sega CD BRAM defaults use the same format structure expected
+by the core. Persisted files must equal the currently reported region size; truncated,
+oversized, or invalidly formatted data fails the load before any emulated frame. The
+worker performs hashing and file I/O on its owner thread, so GUI timing cannot race a
+save. An atomic-write failure blocks unload or replacement and preserves the active
+paused/running core. Final shutdown still tears resources down, releases the identity,
+and returns a failed status so the loss cannot be silent.
+
 Save-state files use a fixed 128-byte little-endian `GPGXST01` envelope followed by the
 unchanged raw Genesis Plus GX payload. The envelope records its schema/header lengths,
 millisecond timestamp, hardware, slot, emulated frame number, full game SHA-256, payload
@@ -469,13 +495,15 @@ message boxes. Important widgets and actions have stable `objectName` values.
 
 Shutdown is an explicit, idempotent workflow:
 
-1. disable new UI commands and enqueue worker shutdown;
-2. stop frame execution and flush dirty SRAM/BRAM on the emulation thread;
-3. stop and close the SDL3 audio stream/device;
-4. publish final operation results and terminate the emulation thread;
-5. stop controller/library workers and join them;
+1. stop the GUI event pump, detach input callbacks, and disable new commands;
+2. stop controller input and close its SDL handles;
+3. wake the emulation worker, stop frame execution, and atomically flush available
+   SRAM/BRAM on the core-owning thread;
+4. shut down the core, release the active persistence identity, publish final status,
+   and join the emulation thread even when a save failed;
+5. stop and close the SDL3 audio stream/device;
 6. release OpenGL resources while their context is current;
-7. persist frontend settings/library state and destroy the GUI.
+7. persist remaining frontend settings/library state and destroy the GUI.
 
 Each stage has tests for no-game, running, paused, audio-disabled, dirty-save, and
 fullscreen variants. No detached thread is permitted.

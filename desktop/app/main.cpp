@@ -2,6 +2,7 @@
 #include "genplusgx/app/command_line.h"
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
+#include "genplusgx/backup_store.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/input_aggregator.h"
@@ -90,12 +91,15 @@ int main(int argc, char* argv[])
   }
 
   auto videoFrames = std::make_shared<genplusgx::VideoFrameExchange>();
+  auto backupStore = std::make_shared<genplusgx::PerGameBackupStore>(
+    genplusgx::PersistenceStore{applicationPaths});
   genplusgx::EmulationWorker worker{
     64U,
     64U,
     audioOutput.config().sampleRate,
     videoFrames,
-    audioOutput.ringBuffer()};
+    audioOutput.ringBuffer(),
+    backupStore};
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
@@ -234,6 +238,7 @@ int main(int argc, char* argv[])
       if (!submitted) {
         pendingUnload.reset();
         window.setGameLoaded(closingGamePath);
+        window.showGameCloseError(submitted.message);
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
     });
@@ -279,7 +284,12 @@ int main(int argc, char* argv[])
             qWarning().noquote() << QString::fromStdString(started.message);
           }
         } else {
-          window.showGameLoadError(loadedPath, event->message);
+          const bool previousGameRemainsLoaded =
+            event->coreError == genplusgx::CoreError::persistenceFailed &&
+            (event->workerState == genplusgx::EmulationWorkerState::paused ||
+             event->workerState == genplusgx::EmulationWorkerState::running);
+          window.showGameLoadError(
+            loadedPath, event->message, !previousGameRemainsLoaded);
         }
       } else if (pendingUnload && event->operationId == *pendingUnload &&
                  event->command == genplusgx::EmulationCommandType::unloadGame) {
@@ -289,6 +299,7 @@ int main(int argc, char* argv[])
           closingGamePath.clear();
         } else {
           window.setGameLoaded(closingGamePath);
+          window.showGameCloseError(event->message);
           qWarning().noquote() << QString::fromStdString(event->message);
         }
       }
@@ -337,7 +348,10 @@ int main(int argc, char* argv[])
   window.setGameCloseSink({});
   window.setClearRecentGamesSink({});
   inputAggregator.setSnapshotSink({});
-  static_cast<void>(worker.stop());
+  const auto workerStopped = worker.stop();
+  if (!workerStopped) {
+    qWarning().noquote() << QString::fromStdString(workerStopped.message);
+  }
   static_cast<void>(audioOutput.shutdown());
   return result;
 }

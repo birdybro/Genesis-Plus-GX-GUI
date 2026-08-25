@@ -8,6 +8,7 @@
 namespace genplusgx::test {
 
 [[nodiscard]] std::vector<std::uint8_t> makeGenesisRamMarkerRom();
+[[nodiscard]] std::vector<std::uint8_t> makeGenesisSramWriterRom();
 
 class TemporaryFixture final {
 public:

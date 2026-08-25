@@ -14,6 +14,19 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 constexpr std::size_t defaultAudioRingFrames = 12'000U;
+constexpr std::array backupMemoryKinds{
+  BackupMemoryKind::cartridgeSram,
+  BackupMemoryKind::scdInternalBram,
+  BackupMemoryKind::scdRamCartridge,
+};
+
+CoreResult persistenceFailure(std::string message)
+{
+  return {
+    .error = CoreError::persistenceFailed,
+    .message = std::move(message),
+  };
+}
 
 EmulationWorkerStatus success()
 {
@@ -92,7 +105,8 @@ public:
     std::size_t eventCapacity,
     int audioSampleRate,
     std::shared_ptr<VideoFrameExchange> videoFrames,
-    std::shared_ptr<StereoAudioRingBuffer> audioFrames)
+    std::shared_ptr<StereoAudioRingBuffer> audioFrames,
+    std::shared_ptr<BackupMemoryPersistence> backupPersistence)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
@@ -101,7 +115,8 @@ public:
                                : std::make_shared<VideoFrameExchange>()),
       audioFrames_(audioFrames ? std::move(audioFrames)
                                : std::make_shared<StereoAudioRingBuffer>(
-                                   defaultAudioRingFrames))
+                                   defaultAudioRingFrames)),
+      backupPersistence_(std::move(backupPersistence))
   {
   }
 
@@ -117,6 +132,7 @@ public:
     events_.clear();
     latestFrame_.reset();
     stopRequested_ = false;
+    shutdownStatus_ = success();
     acceptingCommands_ = true;
     fastForward_ = false;
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
@@ -172,7 +188,7 @@ public:
       if (!thread_.joinable()) {
         acceptingCommands_ = false;
         owner_.state_.store(EmulationWorkerState::stopped, std::memory_order_release);
-        return success();
+        return shutdownStatus_;
       }
       acceptingCommands_ = false;
       stopRequested_ = true;
@@ -181,7 +197,8 @@ public:
       eventReady_.notify_all();
     }
     thread_.join();
-    return success();
+    std::scoped_lock lock{mutex_};
+    return shutdownStatus_;
   }
 
   std::optional<EmulationEvent> pollEvent()
@@ -230,6 +247,85 @@ public:
   }
 
 private:
+  CoreResult loadBackupMemory(
+    CoreAdapter& adapter,
+    const std::filesystem::path& path)
+  {
+    if (!backupPersistence_) {
+      return {};
+    }
+    const auto begun = backupPersistence_->beginGame(path);
+    if (!begun) {
+      return persistenceFailure(
+        "Unable to establish per-game save storage: " + begun.message);
+    }
+    backupGameActive_ = true;
+    for (const auto kind : backupMemoryKinds) {
+      BackupMemoryInfo information;
+      if (const auto described = adapter.backupMemoryInfo(kind, information);
+          !described) {
+        return described;
+      }
+      if (!information.available) {
+        continue;
+      }
+      auto loaded = backupPersistence_->load(kind, information.size);
+      if (!loaded.status) {
+        return persistenceFailure(
+          "Unable to load per-game backup memory: " + loaded.status.message);
+      }
+      if (loaded.exists) {
+        if (const auto applied = adapter.loadBackupMemory(kind, loaded.data);
+            !applied) {
+          return applied;
+        }
+      } else if (const auto initialized = adapter.initializeBackupMemory(kind);
+                 !initialized) {
+        return initialized;
+      }
+    }
+    return {};
+  }
+
+  void endBackupGame() noexcept
+  {
+    if (backupPersistence_ && backupGameActive_) {
+      backupPersistence_->endGame();
+      backupGameActive_ = false;
+    }
+  }
+
+  CoreResult saveBackupMemory(CoreAdapter& adapter)
+  {
+    if (!backupPersistence_ || adapter.state() != CoreLifecycleState::loaded) {
+      return {};
+    }
+    for (const auto kind : backupMemoryKinds) {
+      BackupMemoryInfo information;
+      if (const auto described = adapter.backupMemoryInfo(kind, information);
+          !described) {
+        return described;
+      }
+      if (!information.available) {
+        continue;
+      }
+      backupScratch_.resize(information.size);
+      if (const auto copied = adapter.copyBackupMemory(
+            kind, backupScratch_, information);
+          !copied) {
+        return copied;
+      }
+      const auto saved = backupPersistence_->save(
+        kind,
+        std::span<const std::uint8_t>{backupScratch_}.first(information.size));
+      if (!saved) {
+        return persistenceFailure(
+          "Unable to save per-game backup memory: " + saved.message);
+      }
+    }
+    return {};
+  }
+
   void threadMain()
   {
     CoreAdapter adapter{audioSampleRate_};
@@ -311,7 +407,9 @@ private:
   {
     pacer_.pause();
     updatePacingMetrics();
+    const auto persisted = saveBackupMemory(adapter);
     const auto shutdown = adapter.shutdown();
+    endBackupGame();
     owner_.state_.store(EmulationWorkerState::stopped, std::memory_order_release);
     {
       std::scoped_lock lock{mutex_};
@@ -319,10 +417,17 @@ private:
     }
     auto event = eventFor(
       EmulationEventType::workerStopped, EmulationWorkerState::stopped);
-    event.error = shutdown ? EmulationWorkerError::none
-                           : EmulationWorkerError::coreFailure;
-    event.coreError = shutdown.error;
-    event.message = shutdown.message;
+    const auto finalStatus = persisted ? shutdown : persisted;
+    event.error = finalStatus ? EmulationWorkerError::none
+                              : EmulationWorkerError::coreFailure;
+    event.coreError = finalStatus.error;
+    event.message = finalStatus.message;
+    {
+      std::scoped_lock lock{mutex_};
+      shutdownStatus_ = finalStatus
+        ? success()
+        : failure(EmulationWorkerError::coreFailure, finalStatus.message);
+    }
     publishOperation(std::move(event));
   }
 
@@ -335,29 +440,45 @@ private:
     const auto current = owner_.state_.load(std::memory_order_acquire);
 
     switch (command.type) {
-      case EmulationCommandType::loadGame:
+      case EmulationCommandType::loadGame: {
+        coreResult = saveBackupMemory(adapter);
+        if (!coreResult) {
+          break;
+        }
         discardLatestFrame();
+        endBackupGame();
         coreResult = adapter.loadGame(command.path);
-        if (coreResult) {
-          fastForward_ = false;
-          coreResult = configurePacing(adapter, false);
-          if (coreResult) {
-            owner_.state_.store(
-              EmulationWorkerState::paused, std::memory_order_release);
-          } else {
-            static_cast<void>(adapter.unloadGame());
-            owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
-          }
-        } else if (adapter.state() != CoreLifecycleState::loaded) {
+        if (!coreResult) {
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
           pacer_.pause();
+          break;
         }
-        break;
-      case EmulationCommandType::unloadGame:
-        discardLatestFrame();
-        coreResult = adapter.unloadGame();
+        coreResult = loadBackupMemory(adapter, command.path);
         if (coreResult) {
+          coreResult = configurePacing(adapter, false);
+        }
+        if (!coreResult) {
+          static_cast<void>(adapter.unloadGame());
+          endBackupGame();
+          owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
+          fastForward_ = false;
+          pacer_.pause();
+          break;
+        }
+        fastForward_ = false;
+        owner_.state_.store(
+          EmulationWorkerState::paused, std::memory_order_release);
+        break;
+      }
+      case EmulationCommandType::unloadGame:
+        coreResult = saveBackupMemory(adapter);
+        if (coreResult) {
+          discardLatestFrame();
+          coreResult = adapter.unloadGame();
+        }
+        if (coreResult) {
+          endBackupGame();
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
           pacer_.pause();
@@ -627,9 +748,13 @@ private:
   bool acceptingCommands_{false};
   bool stopRequested_{false};
   bool fastForward_{false};
+  EmulationWorkerStatus shutdownStatus_;
   std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
+  std::shared_ptr<BackupMemoryPersistence> backupPersistence_;
+  bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
+  std::vector<std::uint8_t> backupScratch_;
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
@@ -642,14 +767,16 @@ EmulationWorker::EmulationWorker(
   std::size_t eventCapacity,
   int audioSampleRate,
   std::shared_ptr<VideoFrameExchange> videoFrames,
-  std::shared_ptr<StereoAudioRingBuffer> audioFrames)
+  std::shared_ptr<StereoAudioRingBuffer> audioFrames,
+  std::shared_ptr<BackupMemoryPersistence> backupPersistence)
   : private_(std::make_unique<Private>(
       *this,
       commandCapacity,
       eventCapacity,
       audioSampleRate,
       std::move(videoFrames),
-      std::move(audioFrames)))
+      std::move(audioFrames),
+      std::move(backupPersistence)))
 {
 }
 

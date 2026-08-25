@@ -37,6 +37,35 @@ set_tests_properties(
   core.lifecycle PROPERTIES LABELS "core;integration;lifecycle" TIMEOUT 30
 )
 
+add_executable(genplusgx_core_backup_memory_test core_backup_memory_test.cpp)
+target_link_libraries(
+  genplusgx_core_backup_memory_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME core.backup_memory COMMAND genplusgx_core_backup_memory_test)
+set_tests_properties(
+  core.backup_memory PROPERTIES LABELS "core;integration;persistence;fixture"
+)
+
+add_executable(genplusgx_backup_persistence_test backup_persistence_test.cpp)
+target_link_libraries(
+  genplusgx_backup_persistence_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(NAME core.backup_persistence COMMAND genplusgx_backup_persistence_test)
+set_tests_properties(
+  core.backup_persistence
+  PROPERTIES LABELS "core;integration;persistence;fixture;lifecycle" TIMEOUT 30
+)
+
 add_executable(genplusgx_core_video_test core_video_test.cpp)
 target_link_libraries(
   genplusgx_core_video_test

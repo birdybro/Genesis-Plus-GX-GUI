@@ -140,7 +140,8 @@ public:
     std::size_t eventCapacity = 64U,
     int audioSampleRate = 48'000,
     std::shared_ptr<VideoFrameExchange> videoFrames = {},
-    std::shared_ptr<StereoAudioRingBuffer> audioFrames = {});
+    std::shared_ptr<StereoAudioRingBuffer> audioFrames = {},
+    std::shared_ptr<BackupMemoryPersistence> backupPersistence = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;

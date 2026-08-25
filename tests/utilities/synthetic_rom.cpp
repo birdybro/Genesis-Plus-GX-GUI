@@ -46,6 +46,15 @@ std::string uniqueStem()
          std::to_string(random());
 }
 
+void updateChecksum(std::vector<std::uint8_t>& rom)
+{
+  std::uint32_t checksum = 0U;
+  for (std::size_t offset = 0x200U; offset < rom.size(); offset += 2U) {
+    checksum += static_cast<std::uint32_t>(rom[offset] << 8U) | rom[offset + 1U];
+  }
+  write16(rom, 0x18EU, static_cast<std::uint16_t>(checksum & 0xFFFFU));
+}
+
 } // namespace
 
 std::vector<std::uint8_t> makeGenesisRamMarkerRom()
@@ -145,12 +154,35 @@ std::vector<std::uint8_t> makeGenesisRamMarkerRom()
   // bra.s back twelve bytes to the controller read
   emit16(0x60F4U);
 
-  std::uint32_t checksum = 0U;
-  for (std::size_t offset = 0x200U; offset < rom.size(); offset += 2U) {
-    checksum += static_cast<std::uint32_t>(rom[offset] << 8U) | rom[offset + 1U];
-  }
-  write16(rom, 0x18EU, static_cast<std::uint16_t>(checksum & 0xFFFFU));
+  updateChecksum(rom);
 
+  return rom;
+}
+
+std::vector<std::uint8_t> makeGenesisSramWriterRom()
+{
+  auto rom = makeGenesisRamMarkerRom();
+  std::fill(rom.begin() + static_cast<std::ptrdiff_t>(programAddress), rom.end(), 0U);
+  rom[0x1B0U] = static_cast<std::uint8_t>('R');
+  rom[0x1B1U] = static_cast<std::uint8_t>('A');
+  rom[0x1B2U] = 0xF8U;
+  rom[0x1B3U] = 0x20U;
+  write32(rom, 0x1B4U, 0x00200000U);
+  write32(rom, 0x1B8U, 0x0020FFFFU);
+
+  std::size_t cursor = programAddress;
+  const auto emit16 = [&rom, &cursor](std::uint16_t word) {
+    write16(rom, cursor, word);
+    cursor += 2U;
+  };
+  // move.l #$00200000,a0; move.b #$5a,(a0); bra.s forever
+  emit16(0x207CU);
+  emit16(0x0020U);
+  emit16(0x0000U);
+  emit16(0x10BCU);
+  emit16(0x005AU);
+  emit16(0x60FEU);
+  updateChecksum(rom);
   return rom;
 }
 

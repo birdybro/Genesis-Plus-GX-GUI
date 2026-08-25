@@ -50,6 +50,30 @@ and core-rejected images produce a concise error dialog instead of crashing. Sel
 an invalid file while a game is running leaves that game alone. Proprietary ROMs and
 Sega CD BIOS files are never included with the application.
 
+## Save memory
+
+Cartridge SRAM is loaded automatically before the first emulated frame and saved
+automatically when a game is closed, replaced, or the application exits. Sega CD
+internal backup RAM and RAM-cartridge memory use the same lifecycle when those regions
+are active. Each game is identified by a SHA-256 hash of its content, so games with the
+same filename cannot overwrite one another.
+
+The platform application-data directory contains separate files under
+`saves/<title>-<sha256>/`:
+
+```text
+cartridge.srm
+scd-internal.brm
+scd-cartridge.brm
+```
+
+Writes use an atomic replacement transaction. If a save cannot be committed while
+closing or replacing a game, the application reports the error and leaves that game
+loaded so the user can correct the storage problem and retry. A truncated or
+wrong-sized save is rejected before emulation begins rather than partially copied into
+the core. The application never reads or writes `game.srm`, `scd.brm`, or other save
+files relative to its current working directory.
+
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu

@@ -458,6 +458,16 @@ void MainWindow::showGameLoadError(
   presentGameLoadError(path, detail);
 }
 
+void MainWindow::showGameCloseError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Game close failed"), 5000);
+  dialogService_->showError(
+    this,
+    tr("Unable to Close Game"),
+    tr("The game remains loaded because its save data could not be flushed.\n\n%1")
+      .arg(QString::fromStdString(detail)));
+}
+
 void MainWindow::presentGameLoadError(
   const std::filesystem::path& path,
   const std::string& detail)

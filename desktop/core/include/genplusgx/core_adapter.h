@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/audio_frame.h"
+#include "genplusgx/backup_memory.h"
 #include "genplusgx/input_snapshot.h"
 
 #include <cstddef>
@@ -35,6 +36,8 @@ enum class CoreError {
   invalidTiming,
   staleInputSnapshot,
   invalidStatePayload,
+  invalidBackupMemory,
+  persistenceFailed,
   stateSaveFailed,
   stateLoadFailed,
 };
@@ -137,6 +140,17 @@ public:
   [[nodiscard]] CoreResult setInputSnapshot(const InputSnapshot& snapshot);
   [[nodiscard]] CoreResult saveRawState(std::vector<std::uint8_t>& output);
   [[nodiscard]] CoreResult loadRawState(std::span<const std::uint8_t> state);
+  [[nodiscard]] CoreResult backupMemoryInfo(
+    BackupMemoryKind kind,
+    BackupMemoryInfo& output) const;
+  [[nodiscard]] CoreResult copyBackupMemory(
+    BackupMemoryKind kind,
+    std::span<std::uint8_t> destination,
+    BackupMemoryInfo& output) const;
+  [[nodiscard]] CoreResult loadBackupMemory(
+    BackupMemoryKind kind,
+    std::span<const std::uint8_t> data);
+  [[nodiscard]] CoreResult initializeBackupMemory(BackupMemoryKind kind);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

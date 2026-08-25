@@ -35,3 +35,21 @@ frame and verify stereo sample values and their hash. The header checksum is cal
 by the generator. Input tests inject neutral frontend snapshots and verify both mapped
 core state and the active-low byte observed by the 68000 program. There is no third-party
 program code, game content, artwork, sampled audio, or trademark graphic in the fixture.
+
+## Generated Genesis SRAM writer ROM
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; runtime extension is `.md` |
+| Generator | `makeGenesisSramWriterRom()` in `tests/utilities/synthetic_rom.cpp` |
+| Purpose | Exercise the core's real cartridge-SRAM map and live frontend persistence |
+| Size | 64 KiB ROM with a declared 64 KiB SRAM region at `0x200000`–`0x20ffff` |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+| Expected system | Genesis / Mega Drive (`SYSTEM_MD`) |
+
+The conventional header declares `RA` save memory. Its minimal original 68000 program
+loads address `0x200000`, writes byte `0x5a`, and enters a bounded loop. Core tests first
+observe erased `0xff` SRAM, execute one frame, then observe that actual mapped write.
+Persistence tests generate the image in a temporary directory and verify unload/reload,
+corruption rejection, atomic-save failure behavior, and shutdown flushing. No binary is
+committed and no third-party program or game content is incorporated.

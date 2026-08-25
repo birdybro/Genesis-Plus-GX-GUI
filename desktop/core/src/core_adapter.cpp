@@ -11,6 +11,7 @@ extern "C" {
 }
 
 #include <algorithm>
+#include <array>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -26,6 +27,14 @@ constexpr std::size_t framebufferWidth = 720U;
 constexpr std::size_t framebufferHeight = 576U;
 constexpr std::size_t bytesPerPixel = 2U;
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
+constexpr std::size_t cartridgeSramSize = 0x1'0000U;
+constexpr std::size_t scdInternalBramSize = 0x2'000U;
+constexpr std::array<std::uint8_t, 64> bramFormat{
+  0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x5f,0x00,0x00,0x00,0x00,0x40,
+  0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,0x00,
+  0x53,0x45,0x47,0x41,0x5f,0x43,0x44,0x5f,0x52,0x4f,0x4d,0x00,0x01,0x00,0x00,0x00,
+  0x52,0x41,0x4d,0x5f,0x43,0x41,0x52,0x54,0x52,0x49,0x44,0x47,0x45,0x5f,0x5f,0x5f,
+};
 
 std::mutex coreMutex;
 CoreAdapter* activeAdapter = nullptr;
@@ -38,6 +47,55 @@ CoreResult success()
 CoreResult failure(CoreError errorCode, std::string message)
 {
   return {errorCode, std::move(message)};
+}
+
+std::span<std::uint8_t> backupMemory(BackupMemoryKind kind)
+{
+  switch (kind) {
+    case BackupMemoryKind::cartridgeSram:
+      if (sram.on != 0U) {
+        return {sram.sram, cartridgeSramSize};
+      }
+      break;
+    case BackupMemoryKind::scdInternalBram:
+      if (system_hw == SYSTEM_MCD) {
+        return {scd.bram, scdInternalBramSize};
+      }
+      break;
+    case BackupMemoryKind::scdRamCartridge:
+      if (system_hw == SYSTEM_MCD && scd.cartridge.id != 0U &&
+          scd.cartridge.mask < sizeof(scd.cartridge.area)) {
+        return {scd.cartridge.area,
+          static_cast<std::size_t>(scd.cartridge.mask) + 1U};
+      }
+      break;
+  }
+  return {};
+}
+
+bool hasValidBramFormat(std::span<const std::uint8_t> data)
+{
+  constexpr std::size_t signatureSize = 32U;
+  return data.size() >= bramFormat.size() &&
+    std::equal(
+      bramFormat.end() - static_cast<std::ptrdiff_t>(signatureSize),
+      bramFormat.end(),
+      data.end() - static_cast<std::ptrdiff_t>(signatureSize));
+}
+
+void formatBram(std::span<std::uint8_t> data)
+{
+  std::fill(data.begin(), data.end(), 0U);
+  auto format = bramFormat;
+  const auto blocks = (data.size() / 64U) - 3U;
+  const auto upper = static_cast<std::uint8_t>((blocks >> 8U) & 0xFFU);
+  const auto lower = static_cast<std::uint8_t>(blocks & 0xFFU);
+  for (const auto index : {0x10U, 0x12U, 0x14U, 0x16U}) {
+    format[index] = upper;
+    format[index + 1U] = lower;
+  }
+  std::copy(format.begin(), format.end(),
+    data.end() - static_cast<std::ptrdiff_t>(format.size()));
 }
 
 } // namespace
@@ -160,6 +218,13 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
 
   system_init();
   system_reset();
+  if (system_hw == SYSTEM_MCD) {
+    formatBram(backupMemory(BackupMemoryKind::scdInternalBram));
+    const auto cartridgeBram = backupMemory(BackupMemoryKind::scdRamCartridge);
+    if (!cartridgeBram.empty()) {
+      formatBram(cartridgeBram);
+    }
+  }
   loadedPath_ = path;
   frameCount_ = 0;
   hardware_ = system_hw;
@@ -403,6 +468,96 @@ CoreResult CoreAdapter::loadRawState(std::span<const std::uint8_t> state)
   private_->pendingAudioFrameNumber = 0;
   bitmap.viewport.changed = 3;
   frameCount_ = 0;
+  return success();
+}
+
+CoreResult CoreAdapter::backupMemoryInfo(
+  BackupMemoryKind kind,
+  BackupMemoryInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    output = {.kind = kind};
+    return owner;
+  }
+  const auto memory = backupMemory(kind);
+  output = {
+    .kind = kind,
+    .size = memory.size(),
+    .available = !memory.empty(),
+  };
+  return success();
+}
+
+CoreResult CoreAdapter::copyBackupMemory(
+  BackupMemoryKind kind,
+  std::span<std::uint8_t> destination,
+  BackupMemoryInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    output = {.kind = kind};
+    return owner;
+  }
+  const auto memory = backupMemory(kind);
+  output = {
+    .kind = kind,
+    .size = memory.size(),
+    .available = !memory.empty(),
+  };
+  if (memory.empty()) {
+    return success();
+  }
+  if (destination.size() < memory.size()) {
+    return failure(
+      CoreError::invalidBackupMemory,
+      "The destination cannot hold the complete backup memory image.");
+  }
+  std::ranges::copy(memory, destination.begin());
+  return success();
+}
+
+CoreResult CoreAdapter::loadBackupMemory(
+  BackupMemoryKind kind,
+  std::span<const std::uint8_t> data)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  const auto memory = backupMemory(kind);
+  if (memory.empty()) {
+    return failure(
+      CoreError::invalidBackupMemory,
+      "The selected backup memory type is unavailable for the loaded hardware.");
+  }
+  if (data.size() != memory.size()) {
+    return failure(
+      CoreError::invalidBackupMemory,
+      "The backup memory image size does not match the loaded hardware.");
+  }
+  if (kind != BackupMemoryKind::cartridgeSram && !hasValidBramFormat(data)) {
+    return failure(
+      CoreError::invalidBackupMemory,
+      "The Sega CD backup memory image has an invalid format signature.");
+  }
+  std::ranges::copy(data, memory.begin());
+  return success();
+}
+
+CoreResult CoreAdapter::initializeBackupMemory(BackupMemoryKind kind)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  const auto memory = backupMemory(kind);
+  if (memory.empty()) {
+    return success();
+  }
+  if (kind != BackupMemoryKind::cartridgeSram) {
+    formatBram(memory);
+  }
   return success();
 }
 
