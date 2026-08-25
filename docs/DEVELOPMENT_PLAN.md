@@ -2312,6 +2312,10 @@ all 61 CTest registrations in both Debug and Release using Visual Studio 2022 x6
   GNU-style `__inline__` token. A target-local MSVC definition maps it to `__inline`
   without editing authoritative core sources; the same change also scopes CRT warning
   compatibility to the desktop host bridge.
+- Corrective run `32909305432` compiled the full core, then exposed a C/C++ ABI boundary
+  hidden by ELF symbol behavior: the frontend `config` global was declared before an
+  outer C-linkage block. Its frontend-owned header now gives the variable and reset
+  function explicit C linkage on every compiler.
 - `actionlint` and the first hosted Windows run are verified before milestone 40 begins;
   its run identifier and final result are recorded by milestone 40.
 

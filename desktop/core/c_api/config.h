@@ -53,8 +53,16 @@ typedef struct
   t_input_config input[MAX_INPUTS];
 } t_config;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 extern t_config config;
 
 void set_config_defaults(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
