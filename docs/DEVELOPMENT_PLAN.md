@@ -2308,6 +2308,10 @@ all 61 CTest registrations in both Debug and Release using Visual Studio 2022 x6
   ASan/UBSan, and inherited libretro coverage are green.
 - Windows path conversions, temporary-directory use, core compile definitions, dynamic
   library search paths, and multi-configuration CTest invocation were reviewed.
+- Hosted run `32908722488` reached the native MSVC build and exposed the upstream
+  GNU-style `__inline__` token. A target-local MSVC definition maps it to `__inline`
+  without editing authoritative core sources; the same change also scopes CRT warning
+  compatibility to the desktop host bridge.
 - `actionlint` and the first hosted Windows run are verified before milestone 40 begins;
   its run identifier and final result are recorded by milestone 40.
 

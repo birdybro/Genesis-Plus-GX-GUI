@@ -203,7 +203,14 @@ if(GENPLUSGX_ENABLE_CHD)
 endif()
 
 if(MSVC)
-  target_compile_definitions(genplusgx_core PRIVATE _CRT_SECURE_NO_WARNINGS)
+  # Upstream uses GCC's __inline__ spelling through its INLINE macro. Keep the
+  # compatibility adaptation target-local so core sources remain mergeable.
+  target_compile_definitions(
+    genplusgx_core PRIVATE _CRT_SECURE_NO_WARNINGS __inline__=__inline
+  )
+  target_compile_definitions(
+    genplusgx_core_host PRIVATE _CRT_SECURE_NO_WARNINGS
+  )
 endif()
 
 if(UNIX)
