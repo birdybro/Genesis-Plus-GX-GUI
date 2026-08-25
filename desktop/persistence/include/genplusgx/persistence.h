@@ -20,6 +20,7 @@ enum class PersistenceError {
   fileWriteFailed,
   fileCommitFailed,
   dataTooLarge,
+  invalidData,
   hashFailed,
 };
 

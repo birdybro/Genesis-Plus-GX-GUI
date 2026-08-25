@@ -8,6 +8,7 @@
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/persistence.h"
+#include "genplusgx/recent_games.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -17,6 +18,7 @@
 #include <QTextStream>
 #include <QTimer>
 
+#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -64,6 +66,19 @@ int main(int argc, char* argv[])
       qWarning().noquote() << QString::fromStdString(migrated.message);
     }
   }
+  genplusgx::RecentGamesStore recentGamesStore{
+    applicationPaths.configDirectory() / "recent-games.json"};
+  auto loadedRecentGames = recentGamesStore.load();
+  if (!loadedRecentGames.status) {
+    qWarning().noquote() << QString::fromStdString(loadedRecentGames.status.message);
+  }
+  auto recentGames = std::move(loadedRecentGames.model);
+  if (loadedRecentGames.migrated) {
+    const auto migrated = recentGamesStore.save(recentGames);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
 
   genplusgx::AudioOutput audioOutput;
   const auto audioInitialized = audioOutput.initialize();
@@ -90,6 +105,24 @@ int main(int argc, char* argv[])
 
   genplusgx::ui::MainWindow window;
   window.displayWidget()->setFrameExchange(videoFrames);
+  const auto refreshRecentGamesMenu = [&recentGames, &window] {
+    std::vector<std::filesystem::path> paths;
+    paths.reserve(recentGames.size());
+    for (const auto& entry : recentGames.entries()) {
+      paths.push_back(entry.path);
+    }
+    window.setRecentGames(std::move(paths));
+  };
+  refreshRecentGamesMenu();
+  window.setClearRecentGamesSink(
+    [&recentGames, &recentGamesStore, &refreshRecentGamesMenu] {
+      recentGames.clear();
+      refreshRecentGamesMenu();
+      const auto saved = recentGamesStore.save(recentGames);
+      if (!saved) {
+        qWarning().noquote() << QString::fromStdString(saved.message);
+      }
+    });
   genplusgx::input::InputAggregator inputAggregator;
   genplusgx::input::KeyboardInput keyboardInput{&window};
   genplusgx::input::ControllerInput controllerInput;
@@ -212,7 +245,7 @@ int main(int argc, char* argv[])
     &window,
     [&audioOutput, &controllerInput, &inputAggregator, &inputOperationId,
      &lifecycleOperationId, &pendingLoad, &pendingUnload, &closingGamePath,
-     &worker, &window] {
+     &recentGames, &recentGamesStore, &refreshRecentGamesMenu, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
     while (const auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
@@ -225,6 +258,15 @@ int main(int argc, char* argv[])
         pendingLoad.reset();
         if (event->succeeded()) {
           window.setGameLoaded(loadedPath);
+          const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::system_clock::now().time_since_epoch()).count();
+          if (recentGames.add(loadedPath, now)) {
+            refreshRecentGamesMenu();
+            const auto saved = recentGamesStore.save(recentGames);
+            if (!saved) {
+              qWarning().noquote() << QString::fromStdString(saved.message);
+            }
+          }
           const auto inputSubmitted = worker.submit(
             genplusgx::EmulationCommand::updateInput(
               ++inputOperationId, inputAggregator.snapshot()));
@@ -293,6 +335,7 @@ int main(int argc, char* argv[])
   window.setControllerAssignmentSink({});
   window.setGameLoadSink({});
   window.setGameCloseSink({});
+  window.setClearRecentGamesSink({});
   inputAggregator.setSnapshotSink({});
   static_cast<void>(worker.stop());
   static_cast<void>(audioOutput.shutdown());

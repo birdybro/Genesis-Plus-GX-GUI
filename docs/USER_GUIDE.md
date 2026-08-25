@@ -28,6 +28,12 @@ running after initialization; the window remains responsive throughout. Choose
 **File → Close Game** to stop and unload it. Opening another file replaces the current
 game without restarting the application.
 
+Every successfully loaded game moves to the top of **File → Open Recent**. The history
+stores at most 12 absolute paths in the platform application-data directory. A missing
+file remains listed with a **(Missing)** marker but cannot be launched. Choose **Clear
+Recent Games** at the bottom of the submenu to erase the list; doing so does not close
+the game currently running.
+
 The desktop host currently opens these files directly:
 
 ```text

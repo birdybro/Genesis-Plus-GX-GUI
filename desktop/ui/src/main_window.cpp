@@ -18,6 +18,7 @@
 #include <QMenuBar>
 #include <QMimeData>
 #include <QStatusBar>
+#include <QTimer>
 #include <QUrl>
 
 namespace genplusgx::ui {
@@ -338,6 +339,52 @@ void MainWindow::setGameCloseSink(GameCloseSink sink)
   gameCloseSink_ = std::move(sink);
 }
 
+void MainWindow::setClearRecentGamesSink(ClearRecentGamesSink sink)
+{
+  clearRecentGamesSink_ = std::move(sink);
+}
+
+void MainWindow::setRecentGames(std::vector<std::filesystem::path> paths)
+{
+  constexpr std::size_t maximumRecentGames = 12U;
+  if (paths.size() > maximumRecentGames) {
+    paths.resize(maximumRecentGames);
+  }
+  auto* menu = findChild<QMenu*>(QStringLiteral("openRecentMenu"));
+  menu->clear();
+  for (std::size_t index = 0; index < paths.size(); ++index) {
+    auto path = std::move(paths[index]);
+    auto title = pathToQString(path.filename());
+    title.replace(QStringLiteral("&"), QStringLiteral("&&"));
+    auto* action = menu->addAction(QStringLiteral("%1. %2")
+      .arg(static_cast<qulonglong>(index + 1U)).arg(title));
+    action->setObjectName(
+      QStringLiteral("recentGameAction%1").arg(index));
+    action->setToolTip(pathToQString(path));
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(path, error) || error) {
+      action->setText(action->text() + tr(" (Missing)"));
+      action->setEnabled(false);
+    }
+    connect(action, &QAction::triggered, this, [this, path = std::move(path)] {
+      static_cast<void>(requestGameLoad(path));
+    });
+  }
+  if (!paths.empty()) {
+    menu->addSeparator();
+    auto* clear = menu->addAction(tr("&Clear Recent Games"));
+    clear->setObjectName(QStringLiteral("clearRecentGamesAction"));
+    connect(clear, &QAction::triggered, this, [this] {
+      if (clearRecentGamesSink_) {
+        const auto sink = clearRecentGamesSink_;
+        QTimer::singleShot(0, this, [sink] { sink(); });
+      }
+    });
+  }
+  hasRecentGames_ = !paths.empty();
+  menu->setEnabled(hasRecentGames_ && !gameLoading_);
+}
+
 bool MainWindow::requestGameLoad(const std::filesystem::path& path)
 {
   if (gameLoading_) {
@@ -363,6 +410,7 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   gameLoading_ = true;
   pendingGamePath_ = path;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+  findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
   setGameActionsEnabled(false);
   gameStatus_->setText(
     tr("Loading %1…").arg(pathToQString(path.filename())));
@@ -375,6 +423,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   pendingGamePath_.clear();
   gameLoading_ = false;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(true);
   gameStatus_->setText(pathToQString(path.filename()));
   statusBar()->showMessage(tr("Game loaded"), 3000);
@@ -386,6 +435,7 @@ void MainWindow::setNoGameLoaded()
   pendingGamePath_.clear();
   gameLoading_ = false;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(false);
   gameStatus_->setText(tr("No game loaded"));
   systemStatus_->setText(tr("System: —"));
@@ -476,6 +526,7 @@ void MainWindow::closeGame()
   if (gameCloseSink_ && isGameLoaded()) {
     gameLoading_ = true;
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+    findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
     setGameActionsEnabled(false);
     gameStatus_->setText(tr("Closing game…"));
     gameCloseSink_();

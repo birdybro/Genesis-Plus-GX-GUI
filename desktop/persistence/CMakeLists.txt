@@ -1,6 +1,7 @@
 add_library(
   genplusgx_persistence STATIC
   src/persistence.cpp
+  src/recent_games.cpp
   src/state_manager.cpp
 )
 add_library(GenesisPlusGX::Persistence ALIAS genplusgx_persistence)

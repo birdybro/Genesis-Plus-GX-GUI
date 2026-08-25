@@ -30,8 +30,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 16 Keyboard controls | COMPLETE | Excellent default Genesis keyboard mappings | `desktop/input`, display/app integration | mapping, event-filter, focus, worker/core pipeline tests | 3/6-button controls work | `48d2844` |
 | 17 Controllers | COMPLETE | SDL3 discovery, hot-plug, assignments, mappings | controller service and source aggregator | virtual devices and injected SDL event tests | Multi-controller lifecycle is safe | `58b908d` |
 | 18 Input UI | COMPLETE | Capture, profiles, deadzones, conflicts, advanced devices | profile store, runtime mappings, input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | `87c13b8` |
-| 19 Game loading UI | COMPLETE | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | recorded by milestone 20 |
-| 20 Recent games | PLANNED | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | pending |
+| 19 Game loading UI | COMPLETE | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | `568c811` |
+| 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | recorded by milestone 21 |
 | 21 Live SRAM/BRAM | PLANNED | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD unload/reload tests | Dirty saves flush before teardown | pending |
 | 22 Save-state GUI | PLANNED | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | pending |
 | 23 Video settings | PLANNED | Expose overscan, GG, NTSC, mode/region geometry | video settings UI/adapter | propagation and GUI persistence | Supported settings affect core/display | pending |
@@ -1097,4 +1097,57 @@ list matches the raw desktop host instead of claiming ZIP or playlist support; C
 shown only in CHD-enabled builds. CLI diagnostics return status 2 for invalid syntax and
 support one positional game plus `--fullscreen`, `--help`, and `--version`.
 
-**Commit SHA:** recorded by milestone 20
+**Commit SHA:** `568c811`
+
+## Milestone 20 detail
+
+**Status:** COMPLETE
+
+**Goal:** Maintain a bounded, versioned recent-game history under the platform
+application-data root; expose it through a conventional Open Recent menu; handle stale
+paths safely; and allow the user to clear history without affecting active emulation.
+
+**Files changed:**
+
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/persistence.h`
+- `desktop/persistence/include/genplusgx/recent_games.h`
+- `desktop/persistence/src/recent_games.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/recent_games_test.cpp`
+- `tests/gui/game_loading_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.recent_games` verifies insertion ordering, duplicate promotion,
+timestamp replacement, a strict 12-entry cap, removal/clear behavior, invalid inputs,
+atomic JSON round-trip, missing-file defaults, schema 0 migration, future-schema
+rejection, and corruption isolation in a temporary root. `gui.game_loading` now verifies
+numbered stable actions, full-path tooltips, missing-entry disabling, launch through the
+normal validated load route, operation-time menu disabling, and Clear Recent behavior.
+
+**Gate evidence:**
+
+- Focused recent model/menu tests passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (32/32).
+- Release build and complete CTest: passed (32/32).
+- ASan/UBSan build and complete CTest: passed (32/32).
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New model, serialization, menu, application composition, and tests compile under the
+  frontend warning policy without warnings.
+
+**Acceptance criteria:** Only a successful core load enters history. Paths are made
+absolute once, compared using platform-appropriate case rules, stored newest-first, and
+bounded to 12. Duplicate launches update the timestamp and move the existing entry
+instead of growing the file. `config/recent-games.json` uses schema 1 and atomic bounded
+writes; schema 0 path arrays migrate without silent data loss, while corrupt or future
+schemas expose no entries. The menu shows basename labels and full-path tooltips, marks
+missing files disabled, cannot dispatch while another lifecycle operation is active,
+and clears history without unloading the current game.
+
+**Commit SHA:** recorded by milestone 21

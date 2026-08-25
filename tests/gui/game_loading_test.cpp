@@ -10,6 +10,7 @@
 #include <QDragEnterEvent>
 #include <QDropEvent>
 #include <QLabel>
+#include <QMenu>
 #include <QMimeData>
 #include <QTest>
 #include <QUrl>
@@ -68,6 +69,7 @@ private slots:
   void openDialogAndCloseActionUseInjectedServices();
   void invalidSelectionReportsWithoutDispatching();
   void dragAndDropAcceptsOneSupportedLocalFile();
+  void recentMenuLaunchesValidEntriesAndClears();
   void workerBackedLoadRunReplaceAndCloseWorkflow();
 };
 
@@ -168,6 +170,45 @@ void GameLoadingTest::dragAndDropAcceptsOneSupportedLocalFile()
   QApplication::sendEvent(&window, &multiple);
   QVERIFY(!multiple.isAccepted());
   QVERIFY(requested.empty());
+}
+
+void GameLoadingTest::recentMenuLaunchesValidEntriesAndClears()
+{
+  genplusgx::test::TemporaryFixture fixture{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  const auto missing = std::filesystem::temp_directory_path() /
+    "genplusgx-missing-recent.gg";
+  genplusgx::ui::MainWindow window;
+  std::filesystem::path requested;
+  window.setGameLoadSink([&requested](const auto& path) { requested = path; });
+  int clearCount = 0;
+  window.setClearRecentGamesSink([&window, &clearCount] {
+    ++clearCount;
+    window.setRecentGames({});
+  });
+  window.setRecentGames({fixture.path(), missing});
+
+  auto* menu = window.findChild<QMenu*>(QStringLiteral("openRecentMenu"));
+  QVERIFY(menu->isEnabled());
+  auto* first = window.findChild<QAction*>(QStringLiteral("recentGameAction0"));
+  auto* second = window.findChild<QAction*>(QStringLiteral("recentGameAction1"));
+  auto* clear = window.findChild<QAction*>(QStringLiteral("clearRecentGamesAction"));
+  QVERIFY(first != nullptr && first->isEnabled());
+  QVERIFY(second != nullptr && !second->isEnabled());
+  QVERIFY(second->text().contains(QStringLiteral("Missing")));
+  QVERIFY(clear != nullptr && clear->isEnabled());
+
+  first->trigger();
+  QCOMPARE(requested, fixture.path());
+  QVERIFY(window.isGameLoading());
+  QVERIFY(!menu->isEnabled());
+  window.setGameLoaded(fixture.path());
+  QVERIFY(menu->isEnabled());
+  clear->trigger();
+  QApplication::processEvents();
+  QCOMPARE(clearCount, 1);
+  QVERIFY(!menu->isEnabled());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("recentGameAction0")) == nullptr);
 }
 
 void GameLoadingTest::workerBackedLoadRunReplaceAndCloseWorkflow()

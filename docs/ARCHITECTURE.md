@@ -441,6 +441,15 @@ the active one without process restart. Invalid preflight choices preserve the r
 game, while a core rejection returns the window to the no-game state because the
 transaction has already released the previous core image.
 
+Successful load completion also updates a separate `RecentGamesModel`; validation
+failures never enter history. The model normalizes paths to absolute form, coalesces
+duplicates using platform case rules, retains timestamps, and caps storage at 12
+entries. `RecentGamesStore` persists schema 1 JSON through the common bounded atomic
+writer at `config/recent-games.json` and explicitly migrates the legacy schema 0 path
+array. Invalid/future data falls back to an empty in-memory list without rewriting the
+source. Open Recent entries retain full-path tooltips; stale paths are visible but
+disabled, and a clear operation only changes history.
+
 The library scanner runs outside the GUI thread, parses bounded metadata without
 initializing the emulator, and submits database batches. SQLite operations use
 transactions, schema migrations, integrity checks, and recoverable rebuild behavior.

@@ -33,6 +33,7 @@ public:
     std::function<void(std::uint32_t, std::size_t)>;
   using GameLoadSink = std::function<void(const std::filesystem::path&)>;
   using GameCloseSink = std::function<void()>;
+  using ClearRecentGamesSink = std::function<void()>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -46,6 +47,8 @@ public:
   void setDialogService(std::shared_ptr<DialogService> service);
   void setGameLoadSink(GameLoadSink sink);
   void setGameCloseSink(GameCloseSink sink);
+  void setClearRecentGamesSink(ClearRecentGamesSink sink);
+  void setRecentGames(std::vector<std::filesystem::path> paths);
   [[nodiscard]] bool requestGameLoad(const std::filesystem::path& path);
   void setGameLoading(const std::filesystem::path& path);
   void setGameLoaded(const std::filesystem::path& path);
@@ -94,8 +97,10 @@ private:
   std::shared_ptr<DialogService> dialogService_;
   GameLoadSink gameLoadSink_;
   GameCloseSink gameCloseSink_;
+  ClearRecentGamesSink clearRecentGamesSink_;
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;
+  bool hasRecentGames_{false};
   bool gameLoading_{false};
 };
 

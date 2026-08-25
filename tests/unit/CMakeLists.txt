@@ -104,6 +104,16 @@ set_tests_properties(
   unit.persistence PROPERTIES LABELS "unit;persistence;filesystem" TIMEOUT 30
 )
 
+add_executable(genplusgx_recent_games_test recent_games_test.cpp)
+target_link_libraries(
+  genplusgx_recent_games_test
+  PRIVATE GenesisPlusGX::Persistence genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.recent_games COMMAND genplusgx_recent_games_test)
+set_tests_properties(
+  unit.recent_games PROPERTIES LABELS "unit;persistence;loading" TIMEOUT 30
+)
+
 add_executable(genplusgx_state_manager_test state_manager_test.cpp)
 target_link_libraries(
   genplusgx_state_manager_test
