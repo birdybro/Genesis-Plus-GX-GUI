@@ -1,0 +1,179 @@
+#include "genplusgx/input/input_profile.h"
+
+#include "genplusgx/persistence.h"
+
+#include <QJsonArray>
+#include <QJsonDocument>
+#include <QJsonObject>
+#include <QTemporaryDir>
+
+#include <cstdlib>
+#include <iostream>
+#include <span>
+#include <string>
+#include <vector>
+
+namespace {
+
+bool check(bool condition, const std::string& message)
+{
+  if (!condition) {
+    std::cerr << message << '\n';
+  }
+  return condition;
+}
+
+bool writeBytes(const std::filesystem::path& path, const QByteArray& data)
+{
+  return genplusgx::writeFileAtomically(
+    path,
+    std::span<const std::uint8_t>{
+      reinterpret_cast<const std::uint8_t*>(data.constData()),
+      static_cast<std::size_t>(data.size())},
+    genplusgx::input::InputProfileStore::maximumFileBytes);
+}
+
+} // namespace
+
+int main()
+{
+  using namespace genplusgx;
+  using namespace genplusgx::input;
+
+  auto configuration = defaultInputConfiguration();
+  if (!check(validateInputConfiguration(configuration),
+        "Default input configuration did not validate") ||
+      !check(configuration.active() != nullptr,
+        "Default active profile was not found") ||
+      !check(configuration.active()->keyboardBindings.size() == 12U &&
+        configuration.active()->controllerBindings.size() == 12U &&
+        configuration.active()->controllerAxisBindings.size() == 4U,
+        "Default profile does not contain both complete six-button layouts") ||
+      !check(configuration.active()->devices[0] == LogicalDeviceType::pad6Button &&
+        configuration.active()->devices[1] == LogicalDeviceType::pad6Button,
+        "Default logical devices are incorrect")) {
+    return EXIT_FAILURE;
+  }
+
+  auto* profile = configuration.active();
+  const auto keyboardDuplicate = keyboardBindingConflict(
+    *profile, InputButton::b, Qt::Key_Z);
+  const auto hotkey = keyboardBindingConflict(
+    *profile, InputButton::b, Qt::Key_M, {Qt::Key_M});
+  const auto controllerDuplicate = controllerBindingConflict(
+    *profile, InputButton::c, SDL_GAMEPAD_BUTTON_SOUTH);
+  if (!check(keyboardDuplicate &&
+        keyboardDuplicate->kind == InputConflictKind::duplicateKeyboardKey &&
+        keyboardDuplicate->existingInput == InputButton::a,
+        "Duplicate keyboard binding was not identified") ||
+      !check(hotkey && hotkey->kind == InputConflictKind::applicationHotkey,
+        "Application hotkey conflict was not identified") ||
+      !check(controllerDuplicate &&
+        controllerDuplicate->kind == InputConflictKind::duplicateControllerButton &&
+        controllerDuplicate->existingInput == InputButton::b,
+        "Duplicate controller binding was not identified") ||
+      !check(!setKeyboardBinding(*profile, InputButton::b, Qt::Key_Z),
+        "Duplicate keyboard assignment was accepted") ||
+      !check(!setControllerBinding(
+        *profile, InputButton::c, SDL_GAMEPAD_BUTTON_SOUTH),
+        "Duplicate controller assignment was accepted") ||
+      !check(setKeyboardBinding(*profile, InputButton::a, Qt::Key_Q),
+        "Unique keyboard reassignment failed") ||
+      !check(setControllerBinding(
+        *profile, InputButton::a, SDL_GAMEPAD_BUTTON_MISC1),
+        "Unique controller reassignment failed")) {
+    return EXIT_FAILURE;
+  }
+  profile->deadzone = 12'500;
+  profile->devices[0] = LogicalDeviceType::segaMouse;
+
+  QTemporaryDir directory;
+  if (!check(directory.isValid(), "Could not create temporary profile directory")) {
+    return EXIT_FAILURE;
+  }
+  const auto path = std::filesystem::path{directory.path().toStdString()} /
+    "nested" / "input-profiles.json";
+  InputProfileStore store{path};
+  const auto missing = store.load();
+  if (!check(missing.status && !missing.exists &&
+        missing.configuration == defaultInputConfiguration(),
+        "Missing profile file did not produce safe defaults") ||
+      !check(store.save(configuration), "Valid input profile could not be saved")) {
+    return EXIT_FAILURE;
+  }
+  const auto loaded = store.load();
+  if (!check(loaded.status && loaded.exists && !loaded.migrated,
+        "Saved input profile did not load") ||
+      !check(loaded.configuration == configuration,
+        "Input profile persistence did not round-trip exactly")) {
+    return EXIT_FAILURE;
+  }
+
+  auto invalid = configuration;
+  invalid.profiles.push_back(invalid.profiles.front());
+  if (!check(validateInputConfiguration(invalid).error ==
+        InputProfileError::invalidConfiguration,
+        "Duplicate profile names were not rejected") ||
+      !check(store.save(invalid).error == InputProfileError::invalidConfiguration,
+        "Invalid profile configuration was written")) {
+    return EXIT_FAILURE;
+  }
+  auto invalidHotkey = defaultInputConfiguration();
+  invalidHotkey.active()->keyboardBindings.front().key = Qt::Key_M;
+  if (!check(validateInputConfiguration(invalidHotkey).error ==
+        InputProfileError::invalidConfiguration,
+      "A persisted application-hotkey conflict was accepted")) {
+    return EXIT_FAILURE;
+  }
+
+  const auto persisted = readFileBounded(path, InputProfileStore::maximumFileBytes);
+  auto legacyRoot = QJsonDocument::fromJson(QByteArray{
+    reinterpret_cast<const char*>(persisted.data.data()),
+    static_cast<qsizetype>(persisted.data.size())}).object();
+  legacyRoot.insert(QStringLiteral("schemaVersion"), 0);
+  legacyRoot.insert(QStringLiteral("selectedProfile"),
+    legacyRoot.take(QStringLiteral("activeProfile")));
+  auto legacyProfiles = legacyRoot.value(QStringLiteral("profiles")).toArray();
+  for (qsizetype index = 0; index < legacyProfiles.size(); ++index) {
+    auto object = legacyProfiles[index].toObject();
+    object.remove(QStringLiteral("devices"));
+    object.remove(QStringLiteral("controllerAxes"));
+    legacyProfiles[index] = object;
+  }
+  legacyRoot.insert(QStringLiteral("profiles"), legacyProfiles);
+  if (!check(writeBytes(path, QJsonDocument{legacyRoot}.toJson()),
+        "Could not create the legacy migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto migrated = store.load();
+  if (!check(migrated.status && migrated.migrated,
+        "Schema 0 input profile was not migrated") ||
+      !check(migrated.configuration.schemaVersion ==
+        InputConfiguration::currentSchemaVersion,
+        "Migrated configuration retained its old schema") ||
+      !check(migrated.configuration.active()->devices[0] ==
+        LogicalDeviceType::pad6Button,
+        "Migration did not supply the legacy device default")) {
+    return EXIT_FAILURE;
+  }
+
+  legacyRoot.insert(QStringLiteral("schemaVersion"), 999);
+  if (!check(writeBytes(path, QJsonDocument{legacyRoot}.toJson()),
+        "Could not create future-schema fixture") ||
+      !check(store.load().status.error == InputProfileError::unsupportedSchema,
+        "Future input schema was not rejected")) {
+    return EXIT_FAILURE;
+  }
+  if (!check(writeBytes(path, QByteArray{"{ definitely not JSON"}),
+        "Could not create corrupt profile fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto corrupt = store.load();
+  if (!check(corrupt.status.error == InputProfileError::parseFailed &&
+        corrupt.configuration == defaultInputConfiguration(),
+        "Corrupt input profile did not fail safely with defaults")) {
+    return EXIT_FAILURE;
+  }
+
+  return EXIT_SUCCESS;
+}

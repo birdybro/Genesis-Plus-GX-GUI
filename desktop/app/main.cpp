@@ -4,7 +4,9 @@
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/input_aggregator.h"
+#include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
+#include "genplusgx/persistence.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
@@ -30,6 +32,25 @@ int main(int argc, char* argv[])
   parser.addHelpOption();
   parser.addVersionOption();
   parser.process(application);
+
+  const auto applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
+  const auto pathsInitialized = applicationPaths.initialize();
+  if (!pathsInitialized) {
+    qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
+  }
+  genplusgx::input::InputProfileStore inputProfileStore{
+    applicationPaths.configDirectory() / "input-profiles.json"};
+  auto loadedInputProfiles = inputProfileStore.load();
+  if (!loadedInputProfiles.status) {
+    qWarning().noquote() << QString::fromStdString(loadedInputProfiles.status.message);
+  }
+  auto inputConfiguration = std::move(loadedInputProfiles.configuration);
+  if (loadedInputProfiles.migrated) {
+    const auto migrated = inputProfileStore.save(inputConfiguration);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
 
   genplusgx::AudioOutput audioOutput;
   const auto audioInitialized = audioOutput.initialize();
@@ -59,6 +80,42 @@ int main(int argc, char* argv[])
   genplusgx::input::InputAggregator inputAggregator;
   genplusgx::input::KeyboardInput keyboardInput{&window};
   genplusgx::input::ControllerInput controllerInput;
+  window.setInputConfiguration(inputConfiguration);
+  const auto applyActiveInputProfile =
+    [&inputConfiguration, &keyboardInput, &controllerInput] {
+      const auto* profile = inputConfiguration.active();
+      if (profile == nullptr) {
+        return;
+      }
+      if (!keyboardInput.setBindings(profile->keyboardBindings)) {
+        qWarning() << "The active keyboard profile was rejected by the runtime.";
+      }
+      if (!controllerInput.setBindings(profile->controllerBindings)) {
+        qWarning() << "The active controller profile was rejected by the runtime.";
+      }
+      if (!controllerInput.setAxisBindings(profile->controllerAxisBindings)) {
+        qWarning() << "The active controller axis profile was rejected by the runtime.";
+      }
+      controllerInput.setDeadzone(profile->deadzone);
+    };
+  applyActiveInputProfile();
+  window.setInputConfigurationSink(
+    [&inputConfiguration, &inputProfileStore, &applyActiveInputProfile](
+      const genplusgx::input::InputConfiguration& configuration) {
+      inputConfiguration = configuration;
+      applyActiveInputProfile();
+      const auto saved = inputProfileStore.save(configuration);
+      if (!saved) {
+        qWarning().noquote() << QString::fromStdString(saved.message);
+      }
+    });
+  window.setControllerAssignmentSink(
+    [&controllerInput, &window](std::uint32_t instanceId, std::size_t player) {
+      if (!controllerInput.assignPlayer(instanceId, player)) {
+        qWarning() << "A controller player assignment was rejected.";
+      }
+      window.setConnectedControllers(controllerInput.controllers());
+    });
   keyboardInput.attach(*window.displayWidget());
   std::uint64_t inputOperationId = 1'000'000U;
   inputAggregator.setSnapshotSink(
@@ -83,11 +140,17 @@ int main(int argc, char* argv[])
       static_cast<void>(inputAggregator.updateControllers(snapshot));
     });
   controllerInput.setConnectionSink(
-    [](const genplusgx::input::ControllerInfo& controller, bool connected) {
+    [&controllerInput, &window](
+      const genplusgx::input::ControllerInfo& controller, bool connected) {
       qInfo().noquote()
         << (connected ? "Controller connected:" : "Controller disconnected:")
         << QString::fromStdString(controller.name)
         << "(player" << static_cast<qulonglong>(controller.player + 1U) << ')';
+      window.setConnectedControllers(controllerInput.controllers());
+    });
+  controllerInput.setCaptureSink(
+    [&window](SDL_GamepadButton button) {
+      return window.captureControllerButton(button);
     });
   static_cast<void>(inputAggregator.updateKeyboard(keyboardInput.snapshot()));
   const auto controllerInitialized = controllerInput.initialize();
@@ -135,7 +198,10 @@ int main(int argc, char* argv[])
   keyboardInput.detach();
   controllerInput.setSnapshotSink({});
   controllerInput.setConnectionSink({});
+  controllerInput.setCaptureSink({});
   static_cast<void>(controllerInput.shutdown());
+  window.setInputConfigurationSink({});
+  window.setControllerAssignmentSink({});
   inputAggregator.setSnapshotSink({});
   static_cast<void>(worker.stop());
   static_cast<void>(audioOutput.shutdown());

@@ -28,8 +28,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | `1fbc570` |
 | 15 Timing/pacing | COMPLETE | NTSC/PAL/CD pacing, FF, pause, frame advance | `desktop/timing`, core timing metadata, worker scheduler | rational/property and live rate/state tests | Monotonic non-busy pacing | `3235274` |
 | 16 Keyboard controls | COMPLETE | Excellent default Genesis keyboard mappings | `desktop/input`, display/app integration | mapping, event-filter, focus, worker/core pipeline tests | 3/6-button controls work | `48d2844` |
-| 17 Controllers | COMPLETE | SDL3 discovery, hot-plug, assignments, mappings | controller service and source aggregator | virtual devices and injected SDL event tests | Multi-controller lifecycle is safe | recorded by milestone 18 |
-| 18 Input UI | PLANNED | Capture, profiles, deadzones, conflicts, advanced devices | settings/input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | pending |
+| 17 Controllers | COMPLETE | SDL3 discovery, hot-plug, assignments, mappings | controller service and source aggregator | virtual devices and injected SDL event tests | Multi-controller lifecycle is safe | `58b908d` |
+| 18 Input UI | COMPLETE | Capture, profiles, deadzones, conflicts, advanced devices | profile store, runtime mappings, input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | recorded by milestone 19 |
 | 19 Game loading UI | PLANNED | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | pending |
 | 20 Recent games | PLANNED | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | pending |
 | 21 Live SRAM/BRAM | PLANNED | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD unload/reload tests | Dirty saves flush before teardown | pending |
@@ -964,4 +964,74 @@ values outside it retain analog precision and drive directions. A frontend-neutr
 aggregator prevents keyboard and Player 1 controller snapshots from overwriting each
 other and emits one monotonic, change-only stream to the worker.
 
-**Commit SHA:** recorded by milestone 18
+**Commit SHA:** `58b908d`
+
+## Milestone 18 detail
+
+**Status:** COMPLETE
+
+**Goal:** Deliver an accessible, persistent input configuration workflow with named
+profiles, keyboard/controller capture, conflict prevention, axis/deadzone mapping,
+player assignment, reset-to-default behavior, and advanced logical device selections.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/input/CMakeLists.txt`
+- `desktop/input/include/genplusgx/input/controller_input.h`
+- `desktop/input/include/genplusgx/input/input_profile.h`
+- `desktop/input/include/genplusgx/input/keyboard_input.h`
+- `desktop/input/src/controller_input.cpp`
+- `desktop/input/src/input_profile.cpp`
+- `desktop/input/src/keyboard_input.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/binding_capture_button.h`
+- `desktop/ui/include/genplusgx/ui/input_configuration_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/binding_capture_button.cpp`
+- `desktop/ui/src/input_configuration_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/controller_input_test.cpp`
+- `tests/unit/input_profile_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/input_configuration_dialog_test.cpp`
+- `tests/gui/keyboard_input_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/INPUT_CONFIGURATION.md`
+
+**Tests added:** `unit.input_profile` covers defaults, typed duplicate/hotkey conflicts,
+safe reassignment, exact atomic JSON round-trip, duplicate-name rejection, schema 0
+migration, missing advanced-field defaults, future-schema rejection, corruption fallback,
+and temporary-path isolation. Controller tests now cover live axis remapping, invalid
+axis definitions, and consumption of captured buttons; keyboard tests cover runtime
+custom mappings and transactional rejection. `gui.input_configuration` drives actual
+capture buttons, Escape cancellation, duplicate and hotkey diagnostics, controller
+capture, profile add/delete/reset, deadzone and axis/device settings, Apply semantics,
+assignment collision handling, hot-plug refresh, and both MainWindow entry points.
+
+**Gate evidence:**
+
+- Focused profile and input-dialog tests passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (28/28).
+- Release build and complete CTest: passed (28/28).
+- ASan/UBSan preset build and complete CTest: passed (28/28).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New profile, runtime mapping, GUI, composition, and test code compiled under the
+  frontend warning policy without warnings.
+
+**Acceptance criteria:** Input state remains bounded and core-neutral. A versioned,
+validated model supports up to 32 named profiles with complete default keyboard,
+gamepad, and left-stick mappings, configurable deadzone, and eight logical device types.
+Profiles persist atomically under the platform application-data root and migrate without
+destroying old settings. Capture is keyboard navigable, visibly identifies its waiting
+state, supports Escape cancellation, rejects duplicates and emulator-hotkey collisions,
+and prevents a captured gamepad press from reaching gameplay. Apply updates the live
+keyboard/controller services; Cancel does not. Connected controllers can be assigned to
+unique players, and the assignment UI follows hot-plug changes without unsafe callback
+reentrancy.
+
+**Commit SHA:** recorded by milestone 19

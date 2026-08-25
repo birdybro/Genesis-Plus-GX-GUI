@@ -353,6 +353,24 @@ its own monotonic sequence is the only one submitted to the worker. Buttons from
 sources remain usable for Player 1, cross-device opposite directions become neutral,
 and no unchanged or stale source snapshot is published.
 
+Input configuration is a versioned value model rather than widget state. Each named
+profile owns keyboard bindings, SDL-standard button bindings, explicit signed axis
+mappings, deadzone, and eight logical device selections. The model rejects duplicate
+physical controls, invalid enum values, duplicate profile names, unknown schemas, and
+unmodified application-hotkey collisions. `InputProfileStore` serializes bounded JSON
+through the persistence layer's atomic writer. Legacy schema 0 is parsed into a current
+in-memory value and then rewritten by the composition root; malformed data falls back
+to defaults without overwriting the source automatically.
+
+`InputConfigurationDialog` edits a private copy and invokes its configuration sink only
+after Apply/OK validation, so Cancel has no side effects. Stable named capture buttons
+accept Qt key events or button-down events forwarded by `ControllerInput`; capture
+events are consumed before gameplay state changes. The assignment page updates in place
+when hot-plug changes the device list. Assignment requests are copied before callbacks,
+making a callback-triggered device-list refresh safe. The composition root persists an
+accepted configuration, applies bindings/deadzone to live input services, and logs a
+persistence failure while retaining the requested live behavior.
+
 ## Persistence and settings
 
 Platform services resolve data locations using Qt standard paths. Tests inject a

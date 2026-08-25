@@ -1,6 +1,7 @@
 #include "genplusgx/ui/main_window.h"
 
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -191,8 +192,16 @@ void MainWindow::buildMenus()
   addAction(*audio, tr("Volume &Down"), "volumeDownAction", QKeySequence{tr("-")});
 
   auto* input = createMenu(tr("&Input"), "inputMenu");
-  addAction(*input, tr("&Controller Configuration…"), "controllerConfigurationAction");
-  addAction(*input, tr("&Player Assignments…"), "playerAssignmentsAction");
+  auto* controllerConfiguration = addAction(
+    *input, tr("&Controller Configuration…"), "controllerConfigurationAction");
+  auto* playerAssignments = addAction(
+    *input, tr("&Player Assignments…"), "playerAssignmentsAction");
+  connect(controllerConfiguration, &QAction::triggered, this, [this] {
+    showInputConfiguration(InputConfigurationTab::bindings);
+  });
+  connect(playerAssignments, &QAction::triggered, this, [this] {
+    showInputConfiguration(InputConfigurationTab::assignments);
+  });
 
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
   addAction(*tools, tr("&Cheats…"), "cheatsAction");
@@ -244,6 +253,69 @@ void MainWindow::showAboutDialog()
   auto* dialog = new AboutDialog(this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->open();
+}
+
+void MainWindow::showInputConfiguration(InputConfigurationTab tab)
+{
+  if (auto* existing = findChild<InputConfigurationDialog*>(
+        QStringLiteral("inputConfigurationDialog"))) {
+    existing->openTab(tab);
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new InputConfigurationDialog(
+    inputConfiguration_, controllers_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setConfigurationSink(
+    [this](const input::InputConfiguration& configuration) {
+      inputConfiguration_ = configuration;
+      if (inputConfigurationSink_) {
+        inputConfigurationSink_(configuration);
+      }
+    });
+  dialog->setAssignmentSink(
+    [this](std::uint32_t instanceId, std::size_t player) {
+      if (controllerAssignmentSink_) {
+        controllerAssignmentSink_(instanceId, player);
+      }
+    });
+  dialog->openTab(tab);
+  dialog->open();
+}
+
+void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
+{
+  if (input::validateInputConfiguration(configuration)) {
+    inputConfiguration_ = std::move(configuration);
+  }
+}
+
+void MainWindow::setConnectedControllers(
+  std::vector<input::ControllerInfo> controllers)
+{
+  controllers_ = std::move(controllers);
+  if (auto* dialog = findChild<InputConfigurationDialog*>(
+        QStringLiteral("inputConfigurationDialog"))) {
+    dialog->setControllers(controllers_);
+  }
+}
+
+void MainWindow::setInputConfigurationSink(InputConfigurationSink sink)
+{
+  inputConfigurationSink_ = std::move(sink);
+}
+
+void MainWindow::setControllerAssignmentSink(ControllerAssignmentSink sink)
+{
+  controllerAssignmentSink_ = std::move(sink);
+}
+
+bool MainWindow::captureControllerButton(SDL_GamepadButton button)
+{
+  auto* dialog = findChild<InputConfigurationDialog*>(
+    QStringLiteral("inputConfigurationDialog"));
+  return dialog != nullptr && dialog->captureControllerButton(button);
 }
 
 video::DisplayWidget* MainWindow::displayWidget() const noexcept

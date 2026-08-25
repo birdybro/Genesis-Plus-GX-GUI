@@ -59,6 +59,31 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+qt_add_executable(
+  genplusgx_input_configuration_dialog_test
+  input_configuration_dialog_test.cpp
+)
+set_target_properties(genplusgx_input_configuration_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_input_configuration_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(
+  NAME gui.input_configuration
+  COMMAND genplusgx_input_configuration_dialog_test
+)
+set_tests_properties(
+  gui.input_configuration
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;input;persistence"
+    TIMEOUT 30
+)
+
 add_test(NAME gui.desktop_help COMMAND genplusgx_desktop --help)
 set_tests_properties(
   gui.desktop_help

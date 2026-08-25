@@ -36,7 +36,7 @@ std::string sdlFailureMessage(std::string prefix)
   return prefix;
 }
 
-std::optional<InputButton> mappedButton(SDL_GamepadButton button) noexcept
+std::optional<InputButton> defaultMappedButton(SDL_GamepadButton button) noexcept
 {
   switch (button) {
   case SDL_GAMEPAD_BUTTON_DPAD_UP:
@@ -76,11 +76,21 @@ std::vector<ControllerBinding> defaultGenesisControllerBindings()
   result.reserve(12U);
   for (int value = 0; value < SDL_GAMEPAD_BUTTON_COUNT; ++value) {
     const auto button = static_cast<SDL_GamepadButton>(value);
-    if (const auto mapped = mappedButton(button)) {
+    if (const auto mapped = defaultMappedButton(button)) {
       result.push_back({button, *mapped});
     }
   }
   return result;
+}
+
+std::vector<ControllerAxisBinding> defaultGenesisControllerAxisBindings()
+{
+  return {
+    {SDL_GAMEPAD_AXIS_LEFTX, -1, InputButton::left},
+    {SDL_GAMEPAD_AXIS_LEFTX, 1, InputButton::right},
+    {SDL_GAMEPAD_AXIS_LEFTY, -1, InputButton::up},
+    {SDL_GAMEPAD_AXIS_LEFTY, 1, InputButton::down},
+  };
 }
 
 class ControllerInput::Private final {
@@ -90,8 +100,7 @@ public:
     ControllerInfo info;
     std::array<bool, SDL_GAMEPAD_BUTTON_COUNT> buttons{};
     std::array<std::uint64_t, SDL_GAMEPAD_BUTTON_COUNT> pressOrder{};
-    std::int16_t leftX{0};
-    std::int16_t leftY{0};
+    std::array<std::int16_t, SDL_GAMEPAD_AXIS_COUNT> axes{};
   };
 
   using DeviceIterator = std::vector<Device>::iterator;
@@ -101,6 +110,7 @@ public:
   {
     snapshotSink_ = {};
     connectionSink_ = {};
+    captureSink_ = {};
     static_cast<void>(shutdown());
   }
 
@@ -280,6 +290,41 @@ public:
     return true;
   }
 
+  bool setBindings(std::vector<ControllerBinding> bindings)
+  {
+    for (auto iterator = bindings.begin(); iterator != bindings.end(); ++iterator) {
+      if (iterator->button < 0 || iterator->button >= SDL_GAMEPAD_BUTTON_COUNT ||
+          std::find_if(bindings.begin(), iterator,
+            [iterator](const ControllerBinding& previous) {
+              return previous.button == iterator->button ||
+                previous.input == iterator->input;
+            }) != iterator) {
+        return false;
+      }
+    }
+    bindings_ = std::move(bindings);
+    rebuildSnapshot();
+    return true;
+  }
+
+  bool setAxisBindings(std::vector<ControllerAxisBinding> bindings)
+  {
+    for (auto iterator = bindings.begin(); iterator != bindings.end(); ++iterator) {
+      if (iterator->axis < 0 || iterator->axis >= SDL_GAMEPAD_AXIS_COUNT ||
+          (iterator->direction != -1 && iterator->direction != 1) ||
+          std::find_if(bindings.begin(), iterator,
+            [iterator](const ControllerAxisBinding& previous) {
+              return previous.axis == iterator->axis &&
+                previous.direction == iterator->direction;
+            }) != iterator) {
+        return false;
+      }
+    }
+    axisBindings_ = std::move(bindings);
+    rebuildSnapshot();
+    return true;
+  }
+
   void setDeadzone(std::int16_t deadzone)
   {
     if (deadzone < 0) {
@@ -311,8 +356,10 @@ public:
     for (const auto& device : devices_) {
       auto& output = next.players[device.info.player];
       output.connected = true;
-      output.analogX = applyDeadzone(device.leftX);
-      output.analogY = applyDeadzone(device.leftY);
+      output.analogX = applyDeadzone(
+        device.axes[static_cast<std::size_t>(SDL_GAMEPAD_AXIS_LEFTX)]);
+      output.analogY = applyDeadzone(
+        device.axes[static_cast<std::size_t>(SDL_GAMEPAD_AXIS_LEFTY)]);
 
       for (int value = 0; value < SDL_GAMEPAD_BUTTON_COUNT; ++value) {
         if (!device.buttons[static_cast<std::size_t>(value)]) {
@@ -324,19 +371,16 @@ public:
         }
       }
       normalizeDigitalDirections(device, output.buttons);
-      if (!hasDigitalHorizontal(output.buttons)) {
-        if (output.analogX < 0) {
-          output.buttons = output.buttons | InputButton::left;
-        } else if (output.analogX > 0) {
-          output.buttons = output.buttons | InputButton::right;
+      for (const auto& binding : axisBindings_) {
+        const auto value = applyDeadzone(
+          device.axes[static_cast<std::size_t>(binding.axis)]);
+        if ((binding.direction < 0 && value >= 0) ||
+            (binding.direction > 0 && value <= 0) ||
+            (hasDigitalHorizontal(output.buttons) && isHorizontal(binding.input)) ||
+            (hasDigitalVertical(output.buttons) && isVertical(binding.input))) {
+          continue;
         }
-      }
-      if (!hasDigitalVertical(output.buttons)) {
-        if (output.analogY < 0) {
-          output.buttons = output.buttons | InputButton::up;
-        } else if (output.analogY > 0) {
-          output.buttons = output.buttons | InputButton::down;
-        }
+        output.buttons = output.buttons | binding.input;
       }
     }
     if (next.players == snapshot_.players) {
@@ -355,8 +399,17 @@ public:
       device.buttons[static_cast<std::size_t>(value)] = SDL_GetGamepadButton(
         device.handle, static_cast<SDL_GamepadButton>(value));
     }
-    device.leftX = SDL_GetGamepadAxis(device.handle, SDL_GAMEPAD_AXIS_LEFTX);
-    device.leftY = SDL_GetGamepadAxis(device.handle, SDL_GAMEPAD_AXIS_LEFTY);
+    for (int value = 0; value < SDL_GAMEPAD_AXIS_COUNT; ++value) {
+      device.axes[static_cast<std::size_t>(value)] = SDL_GetGamepadAxis(
+        device.handle, static_cast<SDL_GamepadAxis>(value));
+    }
+  }
+
+  std::optional<InputButton> mappedButton(SDL_GamepadButton button) const noexcept
+  {
+    const auto found = std::find_if(bindings_.begin(), bindings_.end(),
+      [button](const ControllerBinding& binding) { return binding.button == button; });
+    return found == bindings_.end() ? std::nullopt : std::optional{found->input};
   }
 
   bool applyButton(const SDL_GamepadButtonEvent& event)
@@ -367,6 +420,10 @@ public:
     }
     const auto index = static_cast<std::size_t>(event.button);
     const bool down = event.type == SDL_EVENT_GAMEPAD_BUTTON_DOWN || event.down;
+    if (down && !found->buttons[index] && captureSink_ &&
+        captureSink_(static_cast<SDL_GamepadButton>(event.button))) {
+      return true;
+    }
     if (found->buttons[index] == down) {
       return true;
     }
@@ -384,13 +441,10 @@ public:
     if (found == devices_.end()) {
       return true;
     }
-    if (event.axis == SDL_GAMEPAD_AXIS_LEFTX) {
-      found->leftX = event.value;
-    } else if (event.axis == SDL_GAMEPAD_AXIS_LEFTY) {
-      found->leftY = event.value;
-    } else {
+    if (event.axis >= SDL_GAMEPAD_AXIS_COUNT) {
       return true;
     }
+    found->axes[static_cast<std::size_t>(event.axis)] = event.value;
     rebuildSnapshot();
     return true;
   }
@@ -405,6 +459,16 @@ public:
   {
     return hasButton(buttons, InputButton::left) ||
       hasButton(buttons, InputButton::right);
+  }
+
+  static bool isHorizontal(InputButton input) noexcept
+  {
+    return input == InputButton::left || input == InputButton::right;
+  }
+
+  static bool isVertical(InputButton input) noexcept
+  {
+    return input == InputButton::up || input == InputButton::down;
   }
 
   static bool hasDigitalVertical(InputButtonSet buttons) noexcept
@@ -484,8 +548,12 @@ public:
   }
 
   std::vector<Device> devices_;
+  std::vector<ControllerBinding> bindings_{defaultGenesisControllerBindings()};
+  std::vector<ControllerAxisBinding> axisBindings_{
+    defaultGenesisControllerAxisBindings()};
   SnapshotSink snapshotSink_;
   ConnectionSink connectionSink_;
+  CaptureSink captureSink_;
   InputSnapshot snapshot_;
   std::thread::id ownerThread_;
   std::int16_t deadzone_{defaultDeadzone};
@@ -523,6 +591,32 @@ void ControllerInput::setSnapshotSink(SnapshotSink sink)
 void ControllerInput::setConnectionSink(ConnectionSink sink)
 {
   private_->connectionSink_ = std::move(sink);
+}
+
+void ControllerInput::setCaptureSink(CaptureSink sink)
+{
+  private_->captureSink_ = std::move(sink);
+}
+
+bool ControllerInput::setBindings(std::vector<ControllerBinding> bindings)
+{
+  return private_->setBindings(std::move(bindings));
+}
+
+std::vector<ControllerBinding> ControllerInput::bindings() const
+{
+  return private_->bindings_;
+}
+
+bool ControllerInput::setAxisBindings(
+  std::vector<ControllerAxisBinding> bindings)
+{
+  return private_->setAxisBindings(std::move(bindings));
+}
+
+std::vector<ControllerAxisBinding> ControllerInput::axisBindings() const
+{
+  return private_->axisBindings_;
 }
 
 std::size_t ControllerInput::pollEvents()

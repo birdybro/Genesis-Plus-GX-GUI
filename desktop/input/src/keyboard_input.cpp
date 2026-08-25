@@ -80,6 +80,29 @@ void KeyboardInput::setSnapshotSink(SnapshotSink sink)
   sink_ = std::move(sink);
 }
 
+bool KeyboardInput::setBindings(std::vector<KeyboardBinding> bindings)
+{
+  for (auto iterator = bindings.begin(); iterator != bindings.end(); ++iterator) {
+    if (iterator->key == 0 ||
+        std::find_if(bindings.begin(), iterator,
+          [iterator](const KeyboardBinding& previous) {
+            return previous.key == iterator->key ||
+              previous.button == iterator->button;
+          }) != iterator) {
+      return false;
+    }
+  }
+  releaseAll();
+  bindings_ = std::move(bindings);
+  pressedKeys_.reserve(bindings_.size());
+  return true;
+}
+
+const std::vector<KeyboardBinding>& KeyboardInput::bindings() const noexcept
+{
+  return bindings_;
+}
+
 bool KeyboardInput::pressKey(int key, bool autoRepeat)
 {
   const auto* binding = bindingForKey(key);

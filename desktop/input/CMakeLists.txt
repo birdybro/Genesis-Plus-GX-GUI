@@ -2,6 +2,7 @@ add_library(
   genplusgx_input STATIC
   src/controller_input.cpp
   src/input_aggregator.cpp
+  src/input_profile.cpp
   src/keyboard_input.cpp
 )
 add_library(GenesisPlusGX::Input ALIAS genplusgx_input)
@@ -10,7 +11,12 @@ target_include_directories(
 )
 target_link_libraries(
   genplusgx_input
-  PUBLIC GenesisPlusGX::FrontendTypes Qt6::Core Qt6::Gui SDL3::SDL3
+  PUBLIC
+    GenesisPlusGX::FrontendTypes
+    GenesisPlusGX::Persistence
+    Qt6::Core
+    Qt6::Gui
+    SDL3::SDL3
   PRIVATE genplusgx_project_warnings
 )
 set_target_properties(genplusgx_input PROPERTIES OUTPUT_NAME genplusgx_input)

@@ -275,6 +275,48 @@ int main()
     return EXIT_FAILURE;
   }
 
+  auto customAxes = genplusgx::input::defaultGenesisControllerAxisBindings();
+  customAxes[1].input = genplusgx::InputButton::c;
+  if (!check(input.setAxisBindings(customAxes),
+        "Valid controller axis mapping was rejected") ||
+      !check(input.axisBindings() == customAxes,
+        "Controller axis mapping was not retained") ||
+      !check(genplusgx::hasButton(
+        input.snapshot().players[0].buttons, genplusgx::InputButton::c) &&
+        !genplusgx::hasButton(
+          input.snapshot().players[0].buttons, genplusgx::InputButton::right),
+        "Live controller axis remapping was not applied")) {
+    static_cast<void>(input.shutdown());
+    static_cast<void>(SDL_DetachVirtualJoystick(first));
+    return EXIT_FAILURE;
+  }
+  auto invalidAxes = customAxes;
+  invalidAxes.push_back(customAxes.front());
+  if (!check(!input.setAxisBindings(invalidAxes),
+      "Duplicate physical axis direction was accepted")) {
+    static_cast<void>(input.shutdown());
+    static_cast<void>(SDL_DetachVirtualJoystick(first));
+    return EXIT_FAILURE;
+  }
+
+  int capturedButtons = 0;
+  input.setCaptureSink([&capturedButtons](SDL_GamepadButton button) {
+    ++capturedButtons;
+    return button == SDL_GAMEPAD_BUTTON_NORTH;
+  });
+  static_cast<void>(input.processEvent(buttonEvent(
+    SDL_EVENT_GAMEPAD_BUTTON_DOWN, first, SDL_GAMEPAD_BUTTON_NORTH)));
+  if (!check(capturedButtons == 1,
+        "Controller capture seam did not receive the button press") ||
+      !check(!genplusgx::hasButton(
+        input.snapshot().players[0].buttons, genplusgx::InputButton::x),
+        "Captured controller button leaked into gameplay input")) {
+    static_cast<void>(input.shutdown());
+    static_cast<void>(SDL_DetachVirtualJoystick(first));
+    return EXIT_FAILURE;
+  }
+  input.setCaptureSink({});
+
   const SDL_JoystickID second = attachVirtualGamepad("Genesis Test Pad Two");
   if (!check(second != 0U, "Second virtual controller creation failed") ||
       !check(input.processEvent(deviceEvent(SDL_EVENT_GAMEPAD_ADDED, second)),

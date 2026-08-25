@@ -22,6 +22,14 @@ struct ControllerBinding final {
   friend bool operator==(const ControllerBinding&, const ControllerBinding&) = default;
 };
 
+struct ControllerAxisBinding final {
+  SDL_GamepadAxis axis{SDL_GAMEPAD_AXIS_INVALID};
+  int direction{1};
+  InputButton input{InputButton::a};
+
+  friend bool operator==(const ControllerAxisBinding&, const ControllerAxisBinding&) = default;
+};
+
 struct ControllerInfo final {
   std::uint32_t instanceId{0U};
   std::string name;
@@ -49,11 +57,14 @@ struct ControllerInputStatus final {
 };
 
 [[nodiscard]] std::vector<ControllerBinding> defaultGenesisControllerBindings();
+[[nodiscard]] std::vector<ControllerAxisBinding>
+defaultGenesisControllerAxisBindings();
 
 class ControllerInput final {
 public:
   using SnapshotSink = std::function<void(const InputSnapshot&)>;
   using ConnectionSink = std::function<void(const ControllerInfo&, bool connected)>;
+  using CaptureSink = std::function<bool(SDL_GamepadButton)>;
 
   ControllerInput();
   ~ControllerInput();
@@ -69,6 +80,11 @@ public:
 
   void setSnapshotSink(SnapshotSink sink);
   void setConnectionSink(ConnectionSink sink);
+  void setCaptureSink(CaptureSink sink);
+  [[nodiscard]] bool setBindings(std::vector<ControllerBinding> bindings);
+  [[nodiscard]] std::vector<ControllerBinding> bindings() const;
+  [[nodiscard]] bool setAxisBindings(std::vector<ControllerAxisBinding> bindings);
+  [[nodiscard]] std::vector<ControllerAxisBinding> axisBindings() const;
 
   // Pumps only SDL's gamepad event range and leaves unrelated events queued.
   [[nodiscard]] std::size_t pollEvents();

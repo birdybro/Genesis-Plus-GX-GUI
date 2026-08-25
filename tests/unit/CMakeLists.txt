@@ -59,6 +59,16 @@ set_tests_properties(
   PROPERTIES LABELS "unit;input;controller;device" TIMEOUT 30
 )
 
+add_executable(genplusgx_input_profile_test input_profile_test.cpp)
+target_link_libraries(
+  genplusgx_input_profile_test
+  PRIVATE GenesisPlusGX::Input genplusgx_project_warnings
+)
+add_test(NAME unit.input_profile COMMAND genplusgx_input_profile_test)
+set_tests_properties(
+  unit.input_profile PROPERTIES LABELS "unit;input;persistence" TIMEOUT 30
+)
+
 add_executable(genplusgx_persistence_test persistence_test.cpp)
 target_link_libraries(
   genplusgx_persistence_test

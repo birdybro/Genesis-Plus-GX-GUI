@@ -33,6 +33,8 @@ public:
   void attach(QObject& target);
   void detach();
   void setSnapshotSink(SnapshotSink sink);
+  [[nodiscard]] bool setBindings(std::vector<KeyboardBinding> bindings);
+  [[nodiscard]] const std::vector<KeyboardBinding>& bindings() const noexcept;
 
   [[nodiscard]] bool pressKey(int key, bool autoRepeat = false);
   [[nodiscard]] bool releaseKey(int key, bool autoRepeat = false);

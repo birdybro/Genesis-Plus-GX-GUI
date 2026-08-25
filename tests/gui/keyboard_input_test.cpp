@@ -8,6 +8,7 @@
 #include <QtTest/QTest>
 #include <QWidget>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -60,6 +61,7 @@ class KeyboardInputTest final : public QObject {
 private slots:
   void defaultBindings();
   void logicalSnapshots();
+  void customizableBindings();
   void eventFiltering();
   void workerPipeline();
 };
@@ -147,6 +149,28 @@ void KeyboardInputTest::logicalSnapshots()
   QVERIFY(genplusgx::hasButton(buttonsNow, genplusgx::InputButton::z));
   QVERIFY(genplusgx::hasButton(buttonsNow, genplusgx::InputButton::start));
   QVERIFY(genplusgx::hasButton(buttonsNow, genplusgx::InputButton::mode));
+}
+
+void KeyboardInputTest::customizableBindings()
+{
+  genplusgx::input::KeyboardInput input;
+  const auto original = input.bindings();
+  auto duplicate = original;
+  duplicate[1].key = duplicate[0].key;
+  QVERIFY(!input.setBindings(duplicate));
+  QCOMPARE(input.bindings(), original);
+
+  auto customized = original;
+  const auto a = std::find_if(customized.begin(), customized.end(), [](const auto& binding) {
+    return binding.button == genplusgx::InputButton::a;
+  });
+  QVERIFY(a != customized.end());
+  a->key = Qt::Key_Q;
+  QVERIFY(input.setBindings(customized));
+  QVERIFY(input.pressKey(Qt::Key_Q));
+  QVERIFY(genplusgx::hasButton(
+    input.snapshot().players[0].buttons, genplusgx::InputButton::a));
+  QVERIFY(!input.pressKey(Qt::Key_Z));
 }
 
 void KeyboardInputTest::eventFiltering()
