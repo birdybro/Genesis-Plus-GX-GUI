@@ -160,6 +160,27 @@ takes effect on the next game load. Closing and reopening the game is sufficient
 application itself does not need to restart. This boundary also ensures save data is
 flushed before a different emulated hardware model is created.
 
+## BIOS settings
+
+Choose **Tools → BIOS Settings…** to configure firmware for Genesis/Mega Drive,
+Game Gear, regional Master System models, and USA/Europe/Japan Sega CD or Mega CD.
+Each entry shows the configured path, expected region, validation status, detected
+firmware family and size, and a SHA-256 checksum. **Clear** stages removal of one path;
+**Restore Defaults** stages clearing every path. Apply, OK, and Cancel follow the same
+staging behavior as the other settings dialogs.
+
+The application checks that a selection exists, is a normal readable file, has the
+shape accepted by that core loader, fits the core host path boundary, and is not an
+obviously empty repeated-byte image. A **Valid** status means those structural checks
+passed. The checksum is informational and does not certify that a dump is authentic or
+correct for a particular game revision.
+
+Configuration is written atomically to `config/bios.json` beneath the platform
+application-data directory. Firmware files themselves remain wherever you put them;
+the application does not copy, modify, download, or bundle Sega firmware. Sega CD/Mega
+CD software requires a suitable user-supplied regional BIOS when the disc workflow is
+used. See [BIOS.md](BIOS.md) for sizes, privacy, and troubleshooting.
+
 Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).

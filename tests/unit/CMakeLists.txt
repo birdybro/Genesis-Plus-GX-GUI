@@ -217,6 +217,16 @@ set_tests_properties(
   unit.system_settings PROPERTIES LABELS "unit;system;settings;persistence" TIMEOUT 30
 )
 
+add_executable(genplusgx_bios_manager_test bios_manager_test.cpp)
+target_link_libraries(
+  genplusgx_bios_manager_test
+  PRIVATE GenesisPlusGX::Platform genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.bios_manager COMMAND genplusgx_bios_manager_test)
+set_tests_properties(
+  unit.bios_manager PROPERTIES LABELS "unit;bios;platform;persistence" TIMEOUT 30
+)
+
 add_executable(genplusgx_frame_pacer_test frame_pacer_test.cpp)
 target_link_libraries(
   genplusgx_frame_pacer_test

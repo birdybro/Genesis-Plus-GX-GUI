@@ -3,6 +3,7 @@
 #include "genplusgx/game_file.h"
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
+#include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
@@ -407,6 +408,10 @@ void MainWindow::buildMenus()
     *tools, tr("&System Settings…"), "systemSettingsAction");
   connect(systemSettings, &QAction::triggered,
     this, &MainWindow::showSystemSettings);
+  auto* biosSettings = addAction(
+    *tools, tr("&BIOS Settings…"), "biosSettingsAction");
+  connect(biosSettings, &QAction::triggered,
+    this, &MainWindow::showBiosSettings);
   addAction(*tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
@@ -538,6 +543,32 @@ void MainWindow::showSystemSettings()
   dialog->open();
 }
 
+void MainWindow::showBiosSettings()
+{
+  if (auto* existing = findChild<BiosSettingsDialog*>(
+        QStringLiteral("biosSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new BiosSettingsDialog(biosSnapshot_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setConfigurationSink(
+    [this](const platform::BiosConfiguration& configuration) {
+      if (!biosConfigurationSink_) {
+        return;
+      }
+      const auto saved = biosConfigurationSink_(configuration);
+      if (!saved) {
+        dialogService_->showError(this, tr("BIOS configuration error"),
+          QString::fromStdString(saved.message));
+        return;
+      }
+      statusBar()->showMessage(tr("BIOS configuration saved."), 3'000);
+    });
+  dialog->open();
+}
+
 void MainWindow::setVideoSettings(settings::VideoSettings settings)
 {
   applyVideoSettings(settings, false);
@@ -593,6 +624,25 @@ void MainWindow::setSystemSettingsSink(SystemSettingsSink sink)
 const CoreSystemSettings& MainWindow::systemSettings() const noexcept
 {
   return systemSettings_;
+}
+
+void MainWindow::setBiosSnapshot(platform::BiosSnapshot snapshot)
+{
+  biosSnapshot_ = std::move(snapshot);
+  if (auto* dialog = findChild<BiosSettingsDialog*>(
+        QStringLiteral("biosSettingsDialog"))) {
+    dialog->setSnapshot(biosSnapshot_);
+  }
+}
+
+void MainWindow::setBiosConfigurationSink(BiosConfigurationSink sink)
+{
+  biosConfigurationSink_ = std::move(sink);
+}
+
+const platform::BiosSnapshot& MainWindow::biosSnapshot() const noexcept
+{
+  return biosSnapshot_;
 }
 
 void MainWindow::applyVideoSettings(

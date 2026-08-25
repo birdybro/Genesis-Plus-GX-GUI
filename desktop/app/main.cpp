@@ -9,6 +9,7 @@
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/persistence.h"
+#include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/recent_games.h"
 #include "genplusgx/state_storage_service.h"
 #include "genplusgx/settings/video_settings.h"
@@ -159,6 +160,13 @@ int main(int argc, char* argv[])
       qWarning().noquote() << QString::fromStdString(migrated.message);
     }
   }
+  genplusgx::platform::BiosManager biosManager{
+    genplusgx::platform::BiosConfigurationStore{
+      applicationPaths.configDirectory() / "bios.json"}};
+  const auto biosLoaded = biosManager.load();
+  if (!biosLoaded) {
+    qWarning().noquote() << QString::fromStdString(biosLoaded.message);
+  }
 
   const auto audioDevices = genplusgx::availableAudioOutputDevices();
   genplusgx::AudioOutputConfig audioOutputConfig{
@@ -217,6 +225,16 @@ int main(int argc, char* argv[])
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
   window.setSystemSettings(systemSettings);
+  window.setBiosSnapshot(biosManager.snapshot());
+  window.setBiosConfigurationSink(
+    [&biosManager, &window](
+      const genplusgx::platform::BiosConfiguration& configuration) {
+      const auto saved = biosManager.apply(configuration);
+      if (saved) {
+        window.setBiosSnapshot(biosManager.snapshot());
+      }
+      return saved;
+    });
   std::vector<std::string> audioDeviceNames;
   audioDeviceNames.reserve(audioDevices.size());
   for (const auto& device : audioDevices) {

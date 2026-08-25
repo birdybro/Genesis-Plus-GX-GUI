@@ -1,5 +1,6 @@
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
+#include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/system_settings_dialog.h"
@@ -12,11 +13,13 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLabel>
+#include <QLineEdit>
 #include <QMenu>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStatusBar>
 #include <QTest>
+#include <QTemporaryDir>
 
 #include <array>
 #include <chrono>
@@ -56,6 +59,7 @@ private slots:
   void videoSettingsDialogAppliesCancelsAndRestores();
   void audioSettingsWorkflowAppliesCancelsAndRestores();
   void systemSettingsWorkflowIsValidatedAndDeferred();
+  void biosSettingsValidatePersistAndCancel();
   void saveStateActionsExposeSlotSemantics();
 };
 
@@ -96,7 +100,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "openGameAction", "gameLibraryAction", "exitAction", "fullscreenAction",
     "muteAction", "volumeUpAction", "volumeDownAction",
     "controllerConfigurationAction", "playerAssignmentsAction", "settingsAction",
-    "systemSettingsAction",
+    "systemSettingsAction", "biosSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction"};
   for (const auto* name : enabledNames) {
@@ -497,6 +501,106 @@ void MainWindowTest::systemSettingsWorkflowIsValidatedAndDeferred()
   QTest::mouseClick(apply, Qt::LeftButton);
   QCOMPARE(updates.size(), std::size_t{2});
   QCOMPARE(window.systemSettings(), genplusgx::CoreSystemSettings{});
+  dialog->close();
+}
+
+void MainWindowTest::biosSettingsValidatePersistAndCancel()
+{
+  using genplusgx::platform::BiosSlot;
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const auto firmwarePath = std::filesystem::path{
+    directory.filePath(QStringLiteral("segacd-us.bin")).toStdString()};
+  std::vector<std::uint8_t> bytes(128U * 1024U);
+  for (std::size_t index = 0U; index < bytes.size(); ++index) {
+    bytes[index] = static_cast<std::uint8_t>((index * 29U + 7U) & 0xffU);
+  }
+  QVERIFY(genplusgx::writeFileAtomically(
+    firmwarePath, bytes, bytes.size()));
+
+  genplusgx::ui::MainWindow window;
+  genplusgx::platform::BiosSnapshot initial;
+  for (const auto& descriptor : genplusgx::platform::biosDescriptors()) {
+    initial.validation[static_cast<std::size_t>(descriptor.slot)] =
+      genplusgx::platform::validateBios(descriptor.slot, {});
+  }
+  initial.configuration.setPath(
+    BiosSlot::genesis, directory.path().toStdString() + "/missing.bin");
+  initial.validation[static_cast<std::size_t>(BiosSlot::genesis)] =
+    genplusgx::platform::validateBios(
+      BiosSlot::genesis, initial.configuration.path(BiosSlot::genesis));
+  window.setBiosSnapshot(initial);
+  std::vector<genplusgx::platform::BiosConfiguration> updates;
+  window.setBiosConfigurationSink(
+    [&window, &updates](const auto& configuration) {
+      updates.push_back(configuration);
+      genplusgx::platform::BiosSnapshot applied;
+      applied.configuration = configuration;
+      for (const auto& descriptor : genplusgx::platform::biosDescriptors()) {
+        applied.validation[static_cast<std::size_t>(descriptor.slot)] =
+          genplusgx::platform::validateBios(
+            descriptor.slot, configuration.path(descriptor.slot));
+      }
+      window.setBiosSnapshot(std::move(applied));
+      return genplusgx::PersistenceStatus{};
+    });
+
+  window.findChild<QAction*>(QStringLiteral("biosSettingsAction"))->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::BiosSettingsDialog*>(
+    QStringLiteral("biosSettingsDialog"));
+  QVERIFY(dialog != nullptr && dialog->isVisible());
+  QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("biosStatus_genesis"))
+    ->text().contains(QStringLiteral("Missing")));
+  dialog->setFilePicker(
+    [&firmwarePath](BiosSlot slot, const std::filesystem::path&)
+      -> std::optional<std::filesystem::path> {
+      return slot == BiosSlot::segaCdUsa
+        ? std::optional{firmwarePath} : std::nullopt;
+    });
+  auto* browse = dialog->findChild<QPushButton*>(
+    QStringLiteral("biosBrowse_segaCdUsa"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyBiosSettingsButton"));
+  auto* checksum = dialog->findChild<QLineEdit*>(
+    QStringLiteral("biosChecksum_segaCdUsa"));
+  QVERIFY(browse != nullptr && apply != nullptr && checksum != nullptr);
+  browse->click();
+  QCOMPARE(checksum->text().size(), 64);
+  QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("biosStatus_segaCdUsa"))
+    ->text().contains(QStringLiteral("Valid")));
+  apply->click();
+  QCOMPARE(updates.size(), std::size_t{1});
+  QCOMPARE(window.biosSnapshot().configuration.path(BiosSlot::segaCdUsa),
+    firmwarePath);
+  QVERIFY(window.biosSnapshot().validation[
+    static_cast<std::size_t>(BiosSlot::segaCdUsa)].valid());
+  dialog->reject();
+  QApplication::processEvents();
+
+  window.findChild<QAction*>(QStringLiteral("biosSettingsAction"))->trigger();
+  QApplication::processEvents();
+  dialog = window.findChild<genplusgx::ui::BiosSettingsDialog*>(
+    QStringLiteral("biosSettingsDialog"));
+  QVERIFY(dialog != nullptr);
+  dialog->findChild<QPushButton*>(QStringLiteral("biosClear_segaCdUsa"))->click();
+  dialog->reject();
+  QApplication::processEvents();
+  QCOMPARE(updates.size(), std::size_t{1});
+  QCOMPARE(window.biosSnapshot().configuration.path(BiosSlot::segaCdUsa),
+    firmwarePath);
+
+  window.findChild<QAction*>(QStringLiteral("biosSettingsAction"))->trigger();
+  QApplication::processEvents();
+  dialog = window.findChild<genplusgx::ui::BiosSettingsDialog*>(
+    QStringLiteral("biosSettingsDialog"));
+  dialog->findChild<QPushButton*>(
+    QStringLiteral("restoreBiosDefaultsButton"))->click();
+  dialog->findChild<QPushButton*>(
+    QStringLiteral("applyBiosSettingsButton"))->click();
+  QCOMPARE(updates.size(), std::size_t{2});
+  QCOMPARE(window.biosSnapshot().configuration,
+    genplusgx::platform::BiosConfiguration{});
   dialog->close();
 }
 

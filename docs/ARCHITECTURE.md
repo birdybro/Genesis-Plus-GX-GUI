@@ -547,6 +547,33 @@ array. Invalid/future data falls back to an empty in-memory list without rewriti
 source. Open Recent entries retain full-path tooltips; stale paths are visible but
 disabled, and a clear operation only changes history.
 
+## Firmware management
+
+Firmware selection is a platform service rather than an emulator-core or widget
+responsibility. `BiosConfigurationStore` owns the bounded schema and atomic
+`config/bios.json` transaction. `BiosManager` owns the active path snapshot and an
+independently refreshed validation result for Genesis, Game Gear, regional Master
+System, and regional Sega CD/Mega CD slots. The Qt page only stages a copy and delegates
+native file selection through an injectable callback.
+
+```text
+native file picker / test seam
+            |
+            v
+    BIOS settings dialog -- Apply --> BiosManager
+            ^                           |
+            |              bounded read + SHA-256 + atomic JSON
+            +----------- validation snapshot
+```
+
+Validation never executes firmware or initializes the core. It checks path capacity,
+existence, regular-file status, the size shape accepted by the corresponding upstream
+loader, bounded readability, and obviously blank repeated-byte content. SHA-256 and
+detected family are identification aids, not a proprietary hash allowlist. This permits
+legitimate revisions and user dumps without claiming authenticity. The manager never
+downloads, modifies, or copies a firmware file. Milestone 27 consumes only this typed
+configuration when it connects Sega CD startup to the core-owning emulation thread.
+
 The library scanner runs outside the GUI thread, parses bounded metadata without
 initializing the emulator, and submits database batches. SQLite operations use
 transactions, schema migrations, integrity checks, and recoverable rebuild behavior.

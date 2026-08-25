@@ -36,8 +36,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | `c8a3a2a` |
 | 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | `d3f5a69` |
 | 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | `56eeff4` |
-| 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | recorded by milestone 26 |
-| 26 BIOS manager | PLANNED | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | pending |
+| 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | `97db779` |
+| 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | recorded by milestone 27 |
 | 27 Sega CD workflow | PLANNED | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | pending |
 | 28 Game information | PLANNED | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | pending |
 | 29 Library database | PLANNED | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | pending |
@@ -1489,3 +1489,64 @@ the bounded worker queue and are never applied from the GUI thread. The dialog s
 the reload boundary explicitly. Authoritative core source is unchanged.
 
 **Commit SHA:** recorded by milestone 26
+
+## Milestone 26 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide a cross-platform, read-only firmware manager that persists every
+supported BIOS slot, validates files without depending on proprietary reference data,
+and exposes useful status through a native, testable GUI.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/platform/CMakeLists.txt`
+- `desktop/platform/include/genplusgx/platform/bios_manager.h`
+- `desktop/platform/src/bios_manager.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/bios_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/bios_settings_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/bios_manager_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/BIOS.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.bios_manager` generates non-proprietary byte patterns at runtime
+and verifies unconfigured/missing/path-too-long distinctions, slot-specific Genesis,
+Master System, Game Gear, and Sega CD size rules, repeated-byte rejection, SHA-256 and
+type reporting, exact atomic persistence, schema 0 migration, corrupt/future-schema
+isolation, and manager reload. `gui.main_window` opens the full BIOS page, verifies
+missing and valid status, drives an injected file picker, inspects the checksum, and
+proves Apply, Cancel, Clear, and Restore Defaults semantics.
+
+**Gate evidence:**
+
+- Focused BIOS model and GUI checks passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (42/42).
+- Release build and complete CTest: passed (42/42).
+- ASan/UBSan build and complete CTest: passed (42/42) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New platform, GUI, composition, and test code compiled under the frontend warning
+  policy without warnings.
+
+**Acceptance criteria:** `config/bios.json` is a bounded atomic schema 1 file with an
+explicit schema 0 migration. It retains independent paths for Genesis, Game Gear,
+three Master System regions, and three Sega CD/Mega CD regions. Validation performs
+bounded whole-file reads, rejects missing/non-file/unreadable/overlong/wrong-sized and
+obviously blank repeated-byte images, calculates SHA-256, and reports an expected
+region plus detected firmware family. Checksums are informational rather than a brittle
+proprietary hash allowlist. The GUI stages choices until Apply/OK, reports save errors,
+and contains stable accessible controls. No firmware is bundled, fetched, modified, or
+written. Connecting validated Sega CD paths to disc initialization remains milestone
+27 so the manager never crosses the emulation-thread boundary itself.
+
+**Commit SHA:** recorded by milestone 27
