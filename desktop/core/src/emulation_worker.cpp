@@ -334,7 +334,9 @@ public:
     std::scoped_lock lock{mutex_};
     return {
       .commandQueueDepth = commands_.size(),
+      .commandQueueCapacity = commands_.capacity(),
       .eventQueueDepth = events_.size() + (latestFrame_.has_value() ? 1U : 0U),
+      .eventQueueCapacity = events_.capacity() + 1U,
       .coalescedInputCommands = coalescedInputCommands_,
       .coalescedVideoSettingsCommands = coalescedVideoSettingsCommands_,
       .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,

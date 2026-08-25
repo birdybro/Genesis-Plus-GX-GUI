@@ -47,8 +47,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | `cf3e7ac` |
 | 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | `824adf5` |
 | 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | `88313f1` |
-| 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | recorded by milestone 37 |
-| 37 Sanitizer/stress | PLANNED | ASan/UBSan, lifecycle and long-frame hardening | presets/tests | sanitizers and bounded stability test | No new-code sanitizer defects | pending |
+| 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | `3aa0f41` |
+| 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | recorded by milestone 38 |
 | 38 Linux CI | PLANNED | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation | Clean Linux matrix definition | pending |
 | 39 Windows CI | PLANNED | MSVC x64 build and tests | GitHub workflow/platform fixes | matrix definition and cross-platform review | Clean Windows matrix definition | pending |
 | 40 macOS CI | PLANNED | Apple Silicon and practical Intel build/tests | GitHub workflow/platform fixes | matrix definition and deployment review | Clean macOS matrix definition | pending |
@@ -2200,3 +2200,52 @@ topic. The platform-independent GUI suite validates behavior rather than widget
 construction or native-window pixel goldens.
 
 **Commit SHA:** recorded by milestone 37
+
+## Milestone 37 detail
+
+**Status:** COMPLETE
+
+**Goal:** Put sustained emulation, bounded-buffer behavior, command storms, and repeated
+core/worker lifecycle transitions under the same AddressSanitizer and
+UndefinedBehaviorSanitizer gate as the functional suite.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/long_running_stability_test.cpp`
+- `docs/TESTING.md`
+- `docs/TEST_MATRIX.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.long_running_stability` runs 20,000 direct unpaced core frames,
+checks every audio batch and periodic video snapshots, asserts fixed scratch capacities,
+performs 20 direct reload cycles, saturates the threaded worker with 10,000 coalescible
+input updates, runs 90 normal and 600 fast-forward scheduled frames, verifies bounded
+audio/video/command/event storage, performs 12 full worker reload/shutdown cycles, and
+finishes with a core-lease probe.
+
+**Gate evidence:**
+
+- Focused Debug stability workload: passed in 8.28 seconds.
+- Focused ASan/UBSan stability workload: passed in 8.85 seconds with leak detection.
+- Debug build and complete CTest: passed (61/61); stability workload 8.48 seconds.
+- Release build and complete CTest: passed (61/61); stability workload 5.49 seconds.
+- ASan/UBSan build and complete CTest: passed (61/61); stability workload 8.66
+  seconds with leak detection and immediate ASan/UBSan failure enabled.
+- Legacy libretro regression: passed; the two pre-existing `extract_name`
+  const-qualification warnings remain confined to `libretro/libretro.c`.
+
+**Acceptance criteria:** The accelerated test represents more than five minutes of NTSC
+emulation without making CI wait in real time. Core scratch capacities are identical
+before and after steady-state execution. Queue depths never exceed reported capacities,
+newest-input coalescing is exercised, the audio ring reports controlled overruns without
+growing, video remains a fixed triple buffer, fast-forward emits no unplayable host audio,
+and repeated shutdown releases the process-wide core lease. The combined sanitizer
+preset retains leak detection and has no project suppression file.
+
+**Commit SHA:** recorded by milestone 38

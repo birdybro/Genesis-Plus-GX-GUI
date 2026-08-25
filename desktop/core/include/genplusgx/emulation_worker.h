@@ -156,7 +156,9 @@ struct EmulationEvent final {
 
 struct EmulationWorkerMetrics final {
   std::size_t commandQueueDepth{0};
+  std::size_t commandQueueCapacity{0};
   std::size_t eventQueueDepth{0};
+  std::size_t eventQueueCapacity{0};
   std::uint64_t coalescedInputCommands{0};
   std::uint64_t coalescedVideoSettingsCommands{0};
   std::uint64_t coalescedAudioSettingsCommands{0};

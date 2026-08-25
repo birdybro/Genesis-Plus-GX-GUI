@@ -1092,6 +1092,21 @@ std::uint64_t CoreAdapter::appliedInputSequence() const noexcept
   return private_ == nullptr ? 0U : private_->appliedInputSequence;
 }
 
+CoreResourceMetrics CoreAdapter::resourceMetrics() const
+{
+  std::scoped_lock lock{coreMutex};
+  if (private_ == nullptr ||
+      private_->ownerThread != std::this_thread::get_id()) {
+    return {};
+  }
+  return {
+    .framebufferCapacityBytes = private_->framebuffer.capacity(),
+    .audioScratchCapacityFrames = private_->audioScratch.capacity() / 2U,
+    .stateScratchCapacityBytes = private_->stateScratch.capacity(),
+    .stateLoadScratchCapacityBytes = private_->stateLoadScratch.capacity(),
+  };
+}
+
 CoreResult CoreAdapter::requireOwner(bool requireLoaded) const
 {
   if (state_ == CoreLifecycleState::uninitialized || private_ == nullptr) {

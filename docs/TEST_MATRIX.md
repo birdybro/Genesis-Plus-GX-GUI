@@ -46,3 +46,7 @@ CTest labels allow focused gates: `unit`, `core`, `integration`, `gui`, `persist
 gate always runs its focused tests and the complete applicable suite. ASan/UBSan runs use
 the same deterministic corpus; optional user-supplied Sega CD BIOS tests remain outside
 CI and are never counted as required.
+
+The required `core.long_running_stability` test adds accelerated 20,000-frame core
+execution, bounded queue/audio/video saturation, and repeated worker lifecycle coverage.
+Detailed sanitizer and stress commands are in [TESTING.md](TESTING.md).

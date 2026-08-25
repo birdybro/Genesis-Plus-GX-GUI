@@ -139,6 +139,12 @@ search does not move from the command that is subsequently queued. Lifecycle,
 persistence, and disc commands retain ordering. The queue has a fixed capacity and
 reports saturation rather than growing without bound.
 
+The core adapter exposes observation-only capacities for its fixed framebuffer, audio,
+save-state, and state-load scratch buffers. Worker metrics likewise expose command/event
+queue depths together with configured capacities. The long-running regression samples
+these values before and after accelerated execution; instrumentation does not alter core
+algorithms, buffer ownership, or scheduling.
+
 The worker emits immutable events containing operation IDs. The coordinator discards
 stale completion events after a newer load/unload generation, preventing late UI
 updates from a previous game.

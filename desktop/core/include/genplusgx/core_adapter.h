@@ -117,6 +117,15 @@ struct CoreTimingInfo final {
   }
 };
 
+struct CoreResourceMetrics final {
+  std::size_t framebufferCapacityBytes{0};
+  std::size_t audioScratchCapacityFrames{0};
+  std::size_t stateScratchCapacityBytes{0};
+  std::size_t stateLoadScratchCapacityBytes{0};
+
+  [[nodiscard]] bool operator==(const CoreResourceMetrics&) const = default;
+};
+
 enum class CoreDiscRegion {
   unknown,
   usa,
@@ -201,6 +210,7 @@ public:
   [[nodiscard]] std::uint64_t frameCount() const noexcept;
   [[nodiscard]] std::uint8_t hardware() const noexcept;
   [[nodiscard]] std::uint64_t appliedInputSequence() const noexcept;
+  [[nodiscard]] CoreResourceMetrics resourceMetrics() const;
 
 private:
   [[nodiscard]] CoreResult requireOwner(bool requireLoaded) const;

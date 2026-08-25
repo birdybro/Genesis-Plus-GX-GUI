@@ -240,3 +240,24 @@ set_tests_properties(
   core.timing_pacing
   PROPERTIES LABELS "core;integration;fixture;concurrency;timing" TIMEOUT 30
 )
+
+add_executable(
+  genplusgx_long_running_stability_test long_running_stability_test.cpp
+)
+target_link_libraries(
+  genplusgx_long_running_stability_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+)
+add_test(
+  NAME core.long_running_stability
+  COMMAND genplusgx_long_running_stability_test
+)
+set_tests_properties(
+  core.long_running_stability
+  PROPERTIES
+    LABELS "core;integration;fixture;concurrency;lifecycle;timing;audio;video;stress;sanitizer"
+    TIMEOUT 90
+)
