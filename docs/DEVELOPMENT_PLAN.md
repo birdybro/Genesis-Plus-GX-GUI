@@ -34,8 +34,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | `8615cac` |
 | 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | `6e50cac` |
 | 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | `c8a3a2a` |
-| 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | recorded by milestone 24 |
-| 24 Audio settings | PLANNED | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | pending |
+| 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | `d3f5a69` |
+| 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | recorded by milestone 25 |
 | 25 System settings | PLANNED | Region, VDP, clock and safe system options | system settings UI/adapter | validation and reinit tests | Accurate defaults and controlled reinit | pending |
 | 26 BIOS manager | PLANNED | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | pending |
 | 27 Sega CD workflow | PLANNED | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | pending |
@@ -1353,3 +1353,73 @@ authoritative core source. Invalid, corrupt, or future settings fail closed to s
 defaults.
 
 **Commit SHA:** recorded by milestone 24
+
+## Milestone 24 detail
+
+**Status:** COMPLETE
+
+**Goal:** Expose frontend and Genesis Plus GX audio controls through one strict,
+versioned snapshot while keeping real-time host controls callback-safe and every core
+chip/mixer mutation on the sole emulation thread.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_audio_settings.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/audio/include/genplusgx/audio_output.h`
+- `desktop/audio/src/audio_output.cpp`
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/audio_settings.h`
+- `desktop/settings/src/audio_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/audio_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/audio_settings_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/audio_output_test.cpp`
+- `tests/unit/audio_settings_test.cpp`
+- `tests/core/core_audio_test.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.audio_settings` verifies defaults, exact atomic round trip,
+range validation, schema 0 migration, malformed JSON isolation, and future-schema
+rejection. `unit.audio_output` verifies signed gain, mute, live control bounds, and
+dummy-device lifecycle. `core.audio_samples` validates the typed snapshot, rejects
+partial invalid mutation, applies settings to a loaded core, and proves deterministic
+output changes. `core.emulation_worker` proves the command crosses the ownership
+boundary and affects the next audio batch. `gui.main_window` drives mute and volume
+quick actions plus dialog initialization, dynamic filter controls, device selection,
+Apply, Cancel, and Restore Defaults.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (39/39).
+- Focused audio settings/model/output/core/worker/GUI checks passed after correcting
+  the fixture assertion to account for deterministic non-PSG startup energy.
+- Release build and complete CTest: passed (39/39).
+- ASan/UBSan build and complete CTest: passed (39/39) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New audio code compiles under the frontend warning policy without warnings.
+
+**Acceptance criteria:** `config/audio-settings.json` uses bounded atomic schema 1
+writes and explicit schema 0 migration. Master volume and mute are lock-free atomics
+read by the SDL callback. Devices are enumerated through SDL and matched by persisted
+name; unavailable devices fall back to the default with a diagnostic. Device and
+latency changes are marked restart-required because they define stream/ring ownership.
+Mono, filter/low-pass/EQ, PSG/FM/CDDA/PCM levels, MAME/Nuked YM2612 and YM2413 cores,
+YM2413 mode, and HQ resampling form a validated core-neutral snapshot. Commands
+coalesce in the bounded worker queue and apply between frames. Chip implementation
+changes reinitialize only the core sound layer. Authoritative core source is unchanged.
+
+**Commit SHA:** recorded by milestone 25

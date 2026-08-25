@@ -12,6 +12,7 @@
 #include "genplusgx/recent_games.h"
 #include "genplusgx/state_storage_service.h"
 #include "genplusgx/settings/video_settings.h"
+#include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -22,6 +23,7 @@
 #include <QTimer>
 
 #include <chrono>
+#include <algorithm>
 #include <array>
 #include <cstdint>
 #include <memory>
@@ -128,7 +130,42 @@ int main(int argc, char* argv[])
     }
   }
 
-  genplusgx::AudioOutput audioOutput;
+  genplusgx::settings::AudioSettingsStore audioSettingsStore{
+    applicationPaths.configDirectory() / "audio-settings.json"};
+  auto loadedAudioSettings = audioSettingsStore.load();
+  if (!loadedAudioSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedAudioSettings.status.message);
+  }
+  auto audioSettings = loadedAudioSettings.settings;
+  if (loadedAudioSettings.migrated) {
+    const auto migrated = audioSettingsStore.save(audioSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
+
+  const auto audioDevices = genplusgx::availableAudioOutputDevices();
+  genplusgx::AudioOutputConfig audioOutputConfig{
+    .sampleRate = 48'000,
+    .latency = std::chrono::milliseconds{audioSettings.latencyMilliseconds},
+    .volumePercent = audioSettings.masterVolumePercent,
+    .muted = audioSettings.muted,
+  };
+  if (!audioSettings.outputDeviceName.empty()) {
+    const auto found = std::ranges::find_if(audioDevices,
+      [&audioSettings](const auto& device) {
+        return device.name == audioSettings.outputDeviceName;
+      });
+    if (found != audioDevices.end()) {
+      audioOutputConfig.deviceId = found->id;
+    } else {
+      qWarning().noquote() << "Configured audio device is unavailable; using default:"
+        << QString::fromStdString(audioSettings.outputDeviceName);
+    }
+  }
+
+  genplusgx::AudioOutput audioOutput{audioOutputConfig};
   const auto audioInitialized = audioOutput.initialize();
   if (!audioInitialized) {
     qWarning().noquote() << QString::fromStdString(audioInitialized.message);
@@ -163,6 +200,13 @@ int main(int argc, char* argv[])
   genplusgx::ui::MainWindow window;
   window.displayWidget()->setFrameExchange(videoFrames);
   window.setVideoSettings(videoSettings);
+  window.setAudioSettings(audioSettings);
+  std::vector<std::string> audioDeviceNames;
+  audioDeviceNames.reserve(audioDevices.size());
+  for (const auto& device : audioDevices) {
+    audioDeviceNames.push_back(device.name);
+  }
+  window.setAvailableAudioDevices(std::move(audioDeviceNames));
   std::uint64_t videoSettingsOperationId = 500'000U;
   const auto initialVideoSettings = worker.submit(
     genplusgx::EmulationCommand::updateVideoSettings(
@@ -182,6 +226,37 @@ int main(int argc, char* argv[])
       }
       videoSettings = settings;
       const auto saved = videoSettingsStore.save(settings);
+      if (!saved) {
+        qWarning().noquote() << QString::fromStdString(saved.message);
+      }
+    });
+  std::uint64_t audioSettingsOperationId = 600'000U;
+  const auto initialAudioSettings = worker.submit(
+    genplusgx::EmulationCommand::updateAudioSettings(
+      ++audioSettingsOperationId, audioSettings.core));
+  if (!initialAudioSettings) {
+    qWarning().noquote() << QString::fromStdString(initialAudioSettings.message);
+  }
+  window.setAudioSettingsSink(
+    [&audioOutput, &audioSettings, &audioSettingsOperationId,
+     &audioSettingsStore, &worker](
+      const genplusgx::settings::AudioSettings& settings) {
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateAudioSettings(
+          ++audioSettingsOperationId, settings.core));
+      if (!submitted) {
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+        return;
+      }
+      const auto volume = audioOutput.setVolumePercent(
+        settings.masterVolumePercent);
+      if (!volume) {
+        qWarning().noquote() << QString::fromStdString(volume.message);
+        return;
+      }
+      audioOutput.setMuted(settings.muted);
+      audioSettings = settings;
+      const auto saved = audioSettingsStore.save(settings);
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
       }

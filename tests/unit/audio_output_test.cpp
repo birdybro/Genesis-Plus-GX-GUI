@@ -1,6 +1,7 @@
 #include "genplusgx/audio_output.h"
 
 #include <array>
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <iostream>
@@ -30,6 +31,24 @@ int main()
     return 1;
   }
 
+  std::array<genplusgx::StereoAudioFrame, 3> gainFrames{{
+    {.left = 1'000, .right = -1'000},
+    {.left = 32'000, .right = -32'000},
+    {.left = -1, .right = 1},
+  }};
+  genplusgx::applyAudioOutputGain(gainFrames, 50, false);
+  if (!check(gainFrames[0].left == 500 && gainFrames[0].right == -500 &&
+        gainFrames[1].left == 16'000 && gainFrames[1].right == -16'000,
+      "Master gain did not scale signed stereo samples deterministically")) {
+    return 2;
+  }
+  genplusgx::applyAudioOutputGain(gainFrames, 100, true);
+  if (!check(std::ranges::all_of(gainFrames, [](const auto& frame) {
+        return frame.left == 0 && frame.right == 0;
+      }), "Mute did not silence every output sample")) {
+    return 2;
+  }
+
   auto invalidConfig = config;
   invalidConfig.sampleRate = 7'999;
   genplusgx::AudioOutput invalid{invalidConfig};
@@ -54,9 +73,22 @@ int main()
         "New host audio stream did not begin initialized and paused") ||
       !check(!output.deviceName().empty(), "Opened audio device has no display name") ||
       !check(output.ringBuffer()->capacityFrames() == 1'920U,
-        "Host audio ring capacity differs from configured latency")) {
+        "Host audio ring capacity differs from configured latency") ||
+      !check(output.volumePercent() == 100 && !output.isMuted(),
+        "Host audio defaults were not retained") ||
+      !check(output.setVolumePercent(55) && output.volumePercent() == 55,
+        "Live host volume update failed") ||
+      !check(output.setVolumePercent(101).error ==
+          genplusgx::AudioOutputError::invalidConfiguration &&
+          output.volumePercent() == 55,
+        "Invalid live volume changed the host setting")) {
     return 3;
   }
+  output.setMuted(true);
+  if (!check(output.isMuted(), "Live mute update was not retained")) {
+    return 3;
+  }
+  output.setMuted(false);
 
   std::array<genplusgx::StereoAudioFrame, 1'024> source{};
   for (std::size_t index = 0; index < source.size(); ++index) {

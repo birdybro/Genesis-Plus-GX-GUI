@@ -11,6 +11,7 @@
 #include <mutex>
 #include <span>
 #include <utility>
+#include <vector>
 
 namespace genplusgx {
 namespace {
@@ -20,6 +21,8 @@ constexpr int maximumSampleRate = 192'000;
 constexpr auto minimumLatency = std::chrono::milliseconds{10};
 constexpr auto maximumLatency = std::chrono::milliseconds{500};
 constexpr std::size_t callbackScratchFrames = 1'024U;
+constexpr int minimumVolumePercent = 0;
+constexpr int maximumVolumePercent = 100;
 
 AudioOutputStatus success()
 {
@@ -47,7 +50,9 @@ std::size_t audioRingCapacityFrames(const AudioOutputConfig& config) noexcept
 {
   if (config.sampleRate < minimumSampleRate ||
       config.sampleRate > maximumSampleRate ||
-      config.latency < minimumLatency || config.latency > maximumLatency) {
+      config.latency < minimumLatency || config.latency > maximumLatency ||
+      config.volumePercent < minimumVolumePercent ||
+      config.volumePercent > maximumVolumePercent) {
     return 0U;
   }
   const auto frames =
@@ -61,12 +66,63 @@ std::size_t audioRingCapacityFrames(const AudioOutputConfig& config) noexcept
   return static_cast<std::size_t>(frames);
 }
 
+void applyAudioOutputGain(
+  std::span<StereoAudioFrame> frames,
+  int volumePercent,
+  bool muted) noexcept
+{
+  const int gain = std::clamp(
+    volumePercent, minimumVolumePercent, maximumVolumePercent);
+  if (muted || gain == 0) {
+    std::ranges::fill(frames, StereoAudioFrame{});
+    return;
+  }
+  if (gain == maximumVolumePercent) {
+    return;
+  }
+  for (auto& frame : frames) {
+    frame.left = static_cast<std::int16_t>(
+      (static_cast<std::int32_t>(frame.left) * gain) / 100);
+    frame.right = static_cast<std::int16_t>(
+      (static_cast<std::int32_t>(frame.right) * gain) / 100);
+  }
+}
+
+std::vector<AudioOutputDevice> availableAudioOutputDevices()
+{
+  const bool ownedSubsystem = (SDL_WasInit(SDL_INIT_AUDIO) & SDL_INIT_AUDIO) == 0U;
+  if (ownedSubsystem && !SDL_InitSubSystem(SDL_INIT_AUDIO)) {
+    return {};
+  }
+  int count = 0;
+  SDL_AudioDeviceID* devices = SDL_GetAudioPlaybackDevices(&count);
+  std::vector<AudioOutputDevice> result;
+  if (devices != nullptr && count > 0) {
+    result.reserve(static_cast<std::size_t>(count));
+    for (int index = 0; index < count; ++index) {
+      const char* name = SDL_GetAudioDeviceName(devices[index]);
+      if (name != nullptr) {
+        result.push_back({
+          .id = static_cast<std::uint32_t>(devices[index]),
+          .name = name,
+        });
+      }
+    }
+  }
+  SDL_free(devices);
+  if (ownedSubsystem) {
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+  }
+  return result;
+}
+
 class AudioOutput::Private final {
 public:
   explicit Private(AudioOutputConfig config)
     : config_(config),
       ring_(std::make_shared<StereoAudioRingBuffer>(
-        std::max<std::size_t>(audioRingCapacityFrames(config), 1U)))
+        std::max<std::size_t>(audioRingCapacityFrames(config), 1U))),
+      volumePercent_(config.volumePercent), muted_(config.muted)
   {
   }
 
@@ -183,6 +239,17 @@ public:
     return success();
   }
 
+  AudioOutputStatus setVolumePercent(int volumePercent)
+  {
+    if (volumePercent < minimumVolumePercent ||
+        volumePercent > maximumVolumePercent) {
+      return failure(AudioOutputError::invalidConfiguration,
+        "Audio volume must be between 0 and 100 percent.");
+    }
+    volumePercent_.store(volumePercent, std::memory_order_release);
+    return success();
+  }
+
   AudioOutputMetrics metrics() const noexcept
   {
     return {
@@ -228,6 +295,9 @@ public:
       const auto read = ring_->read(chunk);
       std::fill(chunk.begin() + static_cast<std::ptrdiff_t>(read.providedFrames),
         chunk.end(), StereoAudioFrame{});
+      applyAudioOutputGain(chunk,
+        volumePercent_.load(std::memory_order_acquire),
+        muted_.load(std::memory_order_acquire));
       suppliedFrames_.fetch_add(read.providedFrames, std::memory_order_relaxed);
       silenceFrames_.fetch_add(read.missingFrames, std::memory_order_relaxed);
       const auto byteCount = static_cast<int>(chunkFrames * bytesPerFrame);
@@ -256,6 +326,8 @@ public:
   std::array<StereoAudioFrame, callbackScratchFrames> callbackScratch_{};
   std::atomic<bool> initialized_{false};
   std::atomic<bool> paused_{true};
+  std::atomic<int> volumePercent_{100};
+  std::atomic<bool> muted_{false};
   std::atomic<std::uint64_t> callbackCount_{0};
   std::atomic<std::uint64_t> requestedFrames_{0};
   std::atomic<std::uint64_t> suppliedFrames_{0};
@@ -291,6 +363,16 @@ AudioOutputStatus AudioOutput::shutdown()
   return private_->shutdown();
 }
 
+AudioOutputStatus AudioOutput::setVolumePercent(int volumePercent)
+{
+  return private_->setVolumePercent(volumePercent);
+}
+
+void AudioOutput::setMuted(bool muted) noexcept
+{
+  private_->muted_.store(muted, std::memory_order_release);
+}
+
 bool AudioOutput::isInitialized() const noexcept
 {
   return private_->initialized_.load(std::memory_order_acquire);
@@ -309,6 +391,16 @@ AudioOutputConfig AudioOutput::config() const noexcept
 std::string AudioOutput::deviceName() const
 {
   return private_->deviceName();
+}
+
+int AudioOutput::volumePercent() const noexcept
+{
+  return private_->volumePercent_.load(std::memory_order_acquire);
+}
+
+bool AudioOutput::isMuted() const noexcept
+{
+  return private_->muted_.load(std::memory_order_acquire);
 }
 
 AudioOutputMetrics AudioOutput::metrics() const noexcept

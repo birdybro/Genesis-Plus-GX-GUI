@@ -2,6 +2,7 @@
 #include "synthetic_rom.h"
 
 #include <chrono>
+#include <algorithm>
 #include <cstdint>
 #include <iostream>
 #include <optional>
@@ -186,6 +187,35 @@ int main()
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::frameAdvance, 54U), event),
         "Default settings propagation frame failed")) {
+    return 7;
+  }
+
+  genplusgx::CoreAudioSettings silentAudio;
+  silentAudio.filter = genplusgx::CoreAudioFilter::disabled;
+  silentAudio.psgLevelPercent = 0;
+  if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateAudioSettings(55U, silentAudio), event),
+        "Worker audio settings update failed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::hardReset, 56U), event),
+        "Worker audio settings reset failed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 57U), event),
+        "Worker audio settings propagation frame failed")) {
+    return 7;
+  }
+  const auto audioFrameCount = worker.audioFrames()->occupancyFrames();
+  std::vector<genplusgx::StereoAudioFrame> mutedFrames(audioFrameCount);
+  const auto mutedRead = worker.audioFrames()->read(mutedFrames);
+  if (!check(mutedRead.providedFrames == audioFrameCount && audioFrameCount > 0U &&
+        genplusgx::hashAudioFrames(mutedFrames) != 0x3FDB01D7287AE391ULL,
+        "Worker did not propagate core mixer settings at a frame boundary") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateAudioSettings(
+            58U, genplusgx::CoreAudioSettings{}), event),
+        "Worker could not restore default audio settings")) {
     return 7;
   }
 

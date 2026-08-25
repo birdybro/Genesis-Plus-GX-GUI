@@ -1,4 +1,5 @@
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -12,6 +13,7 @@
 #include <QLabel>
 #include <QMenu>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QStatusBar>
 #include <QTest>
 
@@ -51,6 +53,7 @@ private slots:
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
   void videoSettingsDialogAppliesCancelsAndRestores();
+  void audioSettingsWorkflowAppliesCancelsAndRestores();
   void saveStateActionsExposeSlotSemantics();
 };
 
@@ -307,6 +310,99 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   QCOMPARE(updates.size(), std::size_t{2});
   QCOMPARE(window.videoSettings(),
     genplusgx::settings::defaultVideoSettings());
+  dialog->close();
+}
+
+void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
+{
+  genplusgx::ui::MainWindow window;
+  genplusgx::settings::AudioSettings initial;
+  initial.masterVolumePercent = 70;
+  initial.latencyMilliseconds = 45;
+  initial.outputDeviceName = "Configured test output";
+  initial.core.psgLevelPercent = 125;
+  window.setAvailableAudioDevices({"Configured test output", "Other output"});
+  window.setAudioSettings(initial);
+  std::vector<genplusgx::settings::AudioSettings> updates;
+  window.setAudioSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+  });
+
+  auto* muteAction = window.findChild<QAction*>(QStringLiteral("muteAction"));
+  auto* volumeUp = window.findChild<QAction*>(QStringLiteral("volumeUpAction"));
+  auto* volumeDown = window.findChild<QAction*>(QStringLiteral("volumeDownAction"));
+  QVERIFY(muteAction != nullptr && volumeUp != nullptr && volumeDown != nullptr);
+  muteAction->trigger();
+  QVERIFY(window.audioSettings().muted);
+  volumeUp->trigger();
+  QCOMPARE(window.audioSettings().masterVolumePercent, 75);
+  volumeDown->trigger();
+  QCOMPARE(window.audioSettings().masterVolumePercent, 70);
+  QCOMPARE(updates.size(), std::size_t{3});
+
+  window.findChild<QAction*>(QStringLiteral("audioSettingsAction"))->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::AudioSettingsDialog*>(
+    QStringLiteral("audioSettingsDialog"));
+  QVERIFY(dialog != nullptr && dialog->isVisible());
+  auto* device = dialog->findChild<QComboBox*>(
+    QStringLiteral("audioOutputDeviceCombo"));
+  auto* latency = dialog->findChild<QSpinBox*>(
+    QStringLiteral("audioLatencySpinBox"));
+  auto* volume = dialog->findChild<QSpinBox*>(
+    QStringLiteral("masterVolumeSpinBox"));
+  auto* filter = dialog->findChild<QComboBox*>(
+    QStringLiteral("coreAudioFilterCombo"));
+  auto* lowPass = dialog->findChild<QSpinBox*>(
+    QStringLiteral("lowPassRangeSpinBox"));
+  auto* eqLow = dialog->findChild<QSpinBox*>(
+    QStringLiteral("equalizerLowSpinBox"));
+  auto* psg = dialog->findChild<QSpinBox*>(QStringLiteral("psgLevelSpinBox"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyAudioSettingsButton"));
+  auto* restore = dialog->findChild<QPushButton*>(
+    QStringLiteral("restoreAudioDefaultsButton"));
+  QVERIFY(device != nullptr && latency != nullptr && volume != nullptr);
+  QVERIFY(filter != nullptr && lowPass != nullptr && eqLow != nullptr);
+  QVERIFY(psg != nullptr && apply != nullptr && restore != nullptr);
+  QCOMPARE(device->currentData().toString(),
+    QStringLiteral("Configured test output"));
+  QCOMPARE(latency->value(), 45);
+  QCOMPARE(psg->value(), 125);
+
+  volume->setValue(20);
+  dialog->reject();
+  QApplication::processEvents();
+  QCOMPARE(window.audioSettings().masterVolumePercent, 70);
+  QCOMPARE(updates.size(), std::size_t{3});
+
+  window.findChild<QAction*>(QStringLiteral("audioSettingsAction"))->trigger();
+  QApplication::processEvents();
+  dialog = window.findChild<genplusgx::ui::AudioSettingsDialog*>(
+    QStringLiteral("audioSettingsDialog"));
+  volume = dialog->findChild<QSpinBox*>(QStringLiteral("masterVolumeSpinBox"));
+  filter = dialog->findChild<QComboBox*>(QStringLiteral("coreAudioFilterCombo"));
+  lowPass = dialog->findChild<QSpinBox*>(QStringLiteral("lowPassRangeSpinBox"));
+  eqLow = dialog->findChild<QSpinBox*>(QStringLiteral("equalizerLowSpinBox"));
+  apply = dialog->findChild<QPushButton*>(QStringLiteral("applyAudioSettingsButton"));
+  restore = dialog->findChild<QPushButton*>(QStringLiteral("restoreAudioDefaultsButton"));
+  volume->setValue(40);
+  filter->setCurrentIndex(filter->findData(
+    static_cast<int>(genplusgx::CoreAudioFilter::equalizer)));
+  QVERIFY(!lowPass->isEnabled() && eqLow->isEnabled());
+  eqLow->setValue(130);
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{4});
+  QCOMPARE(window.audioSettings().masterVolumePercent, 40);
+  QCOMPARE(window.audioSettings().core.filter,
+    genplusgx::CoreAudioFilter::equalizer);
+  QCOMPARE(window.audioSettings().core.equalizerLowPercent, 130);
+
+  QTest::mouseClick(restore, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{4});
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{5});
+  QCOMPARE(window.audioSettings(), genplusgx::settings::defaultAudioSettings());
   dialog->close();
 }
 

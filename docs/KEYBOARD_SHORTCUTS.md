@@ -46,6 +46,7 @@ shows the currently assigned application shortcuts.
 | Delete selected state | Ctrl+Delete |
 | Screenshot | F12 |
 | Mute | M |
+| Volume up / down | + / - |
 
 Shortcuts whose runtime service is not yet connected remain disabled; their menu text
 still documents the intended binding. Configurable emulator hotkeys are introduced by

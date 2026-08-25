@@ -97,6 +97,15 @@ EmulationCommand EmulationCommand::updateVideoSettings(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateAudioSettings(
+  std::uint64_t operationId,
+  CoreAudioSettings settings)
+{
+  auto command = simple(EmulationCommandType::audioSettings, operationId);
+  command.coreAudioSettings = settings;
+  return command;
+}
+
 EmulationCommand EmulationCommand::restore(
   std::uint64_t operationId,
   std::span<const std::uint8_t> rawState)
@@ -191,6 +200,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::audioSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::audioSettings;
+          },
+          std::move(command))) {
+      ++coalescedAudioSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -243,6 +262,7 @@ public:
       .eventQueueDepth = events_.size() + (latestFrame_.has_value() ? 1U : 0U),
       .coalescedInputCommands = coalescedInputCommands_,
       .coalescedVideoSettingsCommands = coalescedVideoSettingsCommands_,
+      .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -562,6 +582,10 @@ private:
         discardLatestFrame();
         coreResult = adapter.applyVideoSettings(command.coreVideoSettings);
         break;
+      case EmulationCommandType::audioSettings:
+        audioFrames_->clear();
+        coreResult = adapter.applyAudioSettings(command.coreAudioSettings);
+        break;
       case EmulationCommandType::captureState:
         coreResult = adapter.saveRawState(capturedState);
         if (coreResult) {
@@ -788,6 +812,7 @@ private:
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
   std::uint64_t coalescedVideoSettingsCommands_{0};
+  std::uint64_t coalescedAudioSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

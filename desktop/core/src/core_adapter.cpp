@@ -8,6 +8,7 @@ extern "C" {
 #include "cdd.h"
 #include "md_ntsc.h"
 #include "sms_ntsc.h"
+#include "sms_cart.h"
 
 extern md_ntsc_t* md_ntsc;
 extern sms_ntsc_t* sms_ntsc;
@@ -50,6 +51,34 @@ CoreResult success()
 CoreResult failure(CoreError errorCode, std::string message)
 {
   return {errorCode, std::move(message)};
+}
+
+bool usesNukedYm2612(CoreYm2612Core core) noexcept
+{
+  return core == CoreYm2612Core::nukedYm2612 ||
+    core == CoreYm2612Core::nukedYm3438;
+}
+
+uint8 ym2413Mode(CoreYm2413Mode mode) noexcept
+{
+  switch (mode) {
+    case CoreYm2413Mode::disabled: return 0U;
+    case CoreYm2413Mode::enabled: return 1U;
+    case CoreYm2413Mode::autoDetect: return 2U;
+  }
+  return 2U;
+}
+
+uint8 mameYm2612Type(CoreYm2612Core core) noexcept
+{
+  switch (core) {
+    case CoreYm2612Core::mameDiscrete: return YM2612_DISCRETE;
+    case CoreYm2612Core::mameIntegrated: return YM2612_INTEGRATED;
+    case CoreYm2612Core::mameEnhanced: return YM2612_ENHANCED;
+    case CoreYm2612Core::nukedYm2612:
+    case CoreYm2612Core::nukedYm3438: return YM2612_DISCRETE;
+  }
+  return YM2612_DISCRETE;
 }
 
 std::span<std::uint8_t> backupMemory(BackupMemoryKind kind)
@@ -121,6 +150,7 @@ public:
   std::unique_ptr<md_ntsc_t> mdNtsc;
   std::unique_ptr<sms_ntsc_t> smsNtsc;
   CoreVideoSettings videoSettings;
+  CoreAudioSettings audioSettings;
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -631,6 +661,95 @@ CoreResult CoreAdapter::videoSettings(CoreVideoSettings& output) const
     return owner;
   }
   output = private_->videoSettings;
+  return success();
+}
+
+CoreResult CoreAdapter::applyAudioSettings(const CoreAudioSettings& settings)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    return owner;
+  }
+  if (!validateCoreAudioSettings(settings)) {
+    return failure(CoreError::invalidSettings,
+      "The requested core audio settings contain an unsupported value.");
+  }
+
+  const bool loaded = state_ == CoreLifecycleState::loaded;
+  const bool ym2612ImplementationChanged =
+    usesNukedYm2612(private_->audioSettings.ym2612Core) !=
+      usesNukedYm2612(settings.ym2612Core);
+  const bool ym2413ImplementationChanged =
+    private_->audioSettings.ym2413Core != settings.ym2413Core;
+  const bool ym2413ModeChanged =
+    private_->audioSettings.ym2413Mode != settings.ym2413Mode;
+  const uint8 detectedYm2413 = config.ym2413;
+
+  config.mono = settings.output == CoreSoundOutput::mono ? 1U : 0U;
+  config.filter = static_cast<uint8>(settings.filter);
+  config.psg_preamp = static_cast<uint16>(settings.psgLevelPercent);
+  config.fm_preamp = static_cast<uint16>(settings.fmLevelPercent);
+  config.cdda_volume = static_cast<uint16>(settings.cddaLevelPercent);
+  config.pcm_volume = static_cast<uint16>(settings.pcmLevelPercent);
+  config.lp_range = static_cast<uint32>(
+    (static_cast<std::uint64_t>(settings.lowPassPercent) * 65'536U) / 100U);
+  config.lg = static_cast<uint16>(settings.equalizerLowPercent);
+  config.mg = static_cast<uint16>(settings.equalizerMidPercent);
+  config.hg = static_cast<uint16>(settings.equalizerHighPercent);
+  config.hq_fm = settings.highQualityFm ? 1U : 0U;
+  config.hq_psg = settings.highQualityPsg ? 1U : 0U;
+  config.ym2612 = mameYm2612Type(settings.ym2612Core);
+  config.ym3438 = usesNukedYm2612(settings.ym2612Core) ? 1U : 0U;
+  config.ym2413 = settings.ym2413Mode == CoreYm2413Mode::autoDetect &&
+      loaded && !ym2413ModeChanged
+    ? detectedYm2413 : ym2413Mode(settings.ym2413Mode);
+  config.opll = settings.ym2413Core == CoreYm2413Core::nuked ? 1U : 0U;
+  private_->audioSettings = settings;
+
+  if (!loaded) {
+    return success();
+  }
+
+  audio_set_equalizer();
+  psg_config(0, config.psg_preamp,
+    (system_hw & SYSTEM_PBC) == SYSTEM_MD ? 0xff : io_reg[6]);
+
+  const bool genesisAudio = (system_hw & SYSTEM_PBC) == SYSTEM_MD;
+  if (!genesisAudio && ym2413ModeChanged &&
+      settings.ym2413Mode == CoreYm2413Mode::autoDetect) {
+    std::array<uint8, cartridgeSramSize> savedSram{};
+    std::ranges::copy(sram.sram, sram.sram + cartridgeSramSize,
+      savedSram.begin());
+    sms_cart_init();
+    std::ranges::copy(savedSram, sram.sram);
+  }
+  if ((genesisAudio && ym2612ImplementationChanged) ||
+      (!genesisAudio && (ym2413ImplementationChanged || ym2413ModeChanged))) {
+    sound_init();
+    if (genesisAudio && config.ym3438 != 0U) {
+      OPN2_SetChipType(settings.ym2612Core == CoreYm2612Core::nukedYm2612
+        ? ym3438_mode_ym2612 : ym3438_mode_readmode);
+    }
+    sound_reset();
+  } else if (genesisAudio) {
+    if (config.ym3438 != 0U) {
+      OPN2_SetChipType(settings.ym2612Core == CoreYm2612Core::nukedYm2612
+        ? ym3438_mode_ym2612 : ym3438_mode_readmode);
+    } else {
+      YM2612Config(config.ym2612);
+    }
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::audioSettings(CoreAudioSettings& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    output = {};
+    return owner;
+  }
+  output = private_->audioSettings;
   return success();
 }
 

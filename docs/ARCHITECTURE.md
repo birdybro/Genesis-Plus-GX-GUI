@@ -277,6 +277,14 @@ SDL3 audio stream/device callback
 selected host output device
 ```
 
+Audio configuration has two explicit ownership domains. `CoreAudioSettings` contains
+only Genesis Plus GX mixer, channel, filter, equalizer, sound-chip, and resampling
+choices. It travels as a coalescing worker command and is applied between frames by
+`CoreAdapter`; switching chip implementations invokes the core's own sound-layer
+reinitialization without changing synthesis algorithms. The host snapshot owns device
+name, ring latency, master gain, and mute. Device and latency establish resources at
+startup, while gain and mute are lock-free atomics consumed by the SDL callback.
+
 The ring capacity derives from configured latency and is always bounded. The producer
 and consumer track underruns, overruns, peak occupancy, and dropped samples. Normal
 pacing uses audio occupancy plus a monotonic frame deadline without low-resolution GUI
@@ -301,6 +309,13 @@ request. Callback count, requested, supplied, silent, and failed-submission tota
 atomic. Pause first stops callbacks, then clears SDL and ring backlog, so resume cannot
 play stale samples. Device initialization failure is reported but does not prevent the
 emulator UI or core worker from running.
+
+Playback devices are enumerated through SDL and persisted by display name rather than
+their process-local numeric IDs. A missing configured device falls back to the default
+with a diagnostic. The callback applies bounded integer master gain after filling
+shortages; mute writes silence while continuing to drain the ring, preventing muted
+sessions from building a backlog. Neither operation locks or allocates on the audio
+thread.
 
 The composition root creates `AudioOutput` before `EmulationWorker` and passes the
 service's shared ring to the worker. Non-frame worker events synchronize host pause with

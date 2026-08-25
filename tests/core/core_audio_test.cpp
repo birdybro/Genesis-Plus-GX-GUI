@@ -24,7 +24,22 @@ int main()
   const genplusgx::test::TemporaryFixture fixture{
     genplusgx::test::makeGenesisRamMarkerRom(), ".bin"};
   genplusgx::CoreAdapter adapter;
-  if (!check(adapter.initialize(), "Audio test could not initialize the adapter") ||
+  if (!check(adapter.initialize(), "Audio test could not initialize the adapter")) {
+    return 1;
+  }
+  genplusgx::CoreAudioSettings initialSettings;
+  if (!check(adapter.audioSettings(initialSettings) &&
+        initialSettings == genplusgx::CoreAudioSettings{},
+      "Core adapter did not expose deterministic audio defaults")) {
+    return 1;
+  }
+  auto invalidSettings = initialSettings;
+  invalidSettings.fmLevelPercent = 201;
+  if (!check(adapter.applyAudioSettings(invalidSettings).error ==
+        genplusgx::CoreError::invalidSettings &&
+        adapter.audioSettings(initialSettings) &&
+        initialSettings == genplusgx::CoreAudioSettings{},
+      "Invalid audio settings mutated the controlled core snapshot") ||
       !check(adapter.loadGame(fixture.path()), "Audio test could not load the fixture")) {
     return 1;
   }
@@ -118,5 +133,33 @@ int main()
     return 12;
   }
 
-  return adapter.shutdown() ? 0 : 13;
+  auto silentSettings = genplusgx::CoreAudioSettings{};
+  silentSettings.filter = genplusgx::CoreAudioFilter::disabled;
+  silentSettings.psgLevelPercent = 0;
+  if (!check(adapter.applyAudioSettings(silentSettings),
+        "Live core audio settings update failed") ||
+      !check(adapter.reset() && adapter.runFrame(true),
+        "Audio settings propagation frame failed")) {
+    return 13;
+  }
+  genplusgx::CoreAudioBatchInfo silentInfo;
+  if (!check(adapter.audioBatchInfo(silentInfo),
+        "Silent settings audio batch was unavailable")) {
+    return 14;
+  }
+  std::vector<genplusgx::StereoAudioFrame> silentBatch(silentInfo.frameCount);
+  genplusgx::CoreAudioSettings appliedSettings;
+  if (!check(adapter.copyAudioFrames(silentBatch, silentInfo),
+        "Silent settings audio batch copy failed") ||
+      !check(genplusgx::hashAudioFrames(silentBatch) != firstHash,
+        "Core mixer settings did not change deterministic audio output") ||
+      !check(adapter.audioSettings(appliedSettings) &&
+        appliedSettings == silentSettings,
+        "Core adapter did not retain the applied audio snapshot") ||
+      !check(adapter.applyAudioSettings(genplusgx::CoreAudioSettings{}),
+        "Core audio defaults could not be restored")) {
+    return 15;
+  }
+
+  return adapter.shutdown() ? 0 : 16;
 }

@@ -120,6 +120,27 @@ Gear viewport changes likewise come from the core rather than cropping the final
 window image. Region and VDP system selection are intentionally handled by the later
 System settings page instead of being conflated with display scaling.
 
+## Audio settings
+
+Use **Audio → Mute** (`M`) or the volume up/down actions for immediate output control.
+These controls affect host playback only: mute continues consuming samples so audio
+cannot accumulate, and master volume scales the final stereo stream without changing
+the emulated sound chips.
+
+Choose **Audio → Audio Settings…** to select the playback device, buffer latency,
+stereo/mono output, PSG and FM levels, Sega CD CDDA/PCM levels, filtering, low-pass
+strength, three-band equalizer gains, YM2612/YM3438 and YM2413/OPLL implementations,
+Master System FM detection, and high-quality FM/PSG resampling. Relevant low-pass or EQ
+controls are enabled only for the selected filter mode. Apply, OK, Cancel, and Restore
+Defaults follow the same staging behavior as Video Settings.
+
+Mute, volume, and core mixing/chip settings affect a running game immediately at a
+frame boundary. Playback device and latency define the SDL stream and bounded ring, so
+the dialog marks them as taking effect after restarting. If a configured device is no
+longer available, the application logs the condition and safely opens the system
+default. Settings are atomically stored as `config/audio-settings.json`; malformed or
+unsupported files fail closed to defaults.
+
 Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).

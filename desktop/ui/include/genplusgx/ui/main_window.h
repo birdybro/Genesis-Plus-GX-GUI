@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/input/input_profile.h"
+#include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
@@ -62,6 +63,8 @@ public:
     std::function<void(StateUiOperation, std::uint32_t)>;
   using VideoSettingsSink =
     std::function<void(const settings::VideoSettings&)>;
+  using AudioSettingsSink =
+    std::function<void(const settings::AudioSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -81,6 +84,11 @@ public:
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
   void showVideoSettings();
+  void setAudioSettings(settings::AudioSettings settings);
+  void setAvailableAudioDevices(std::vector<std::string> devices);
+  void setAudioSettingsSink(AudioSettingsSink sink);
+  [[nodiscard]] const settings::AudioSettings& audioSettings() const noexcept;
+  void showAudioSettings();
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -131,6 +139,10 @@ private:
     const settings::VideoSettings& settings,
     bool notifySink);
   void updateVideoActionChecks();
+  void applyAudioSettings(
+    const settings::AudioSettings& settings,
+    bool notifySink);
+  void updateAudioActionChecks();
 
   QLabel* gameStatus_{nullptr};
   QLabel* systemStatus_{nullptr};
@@ -149,6 +161,9 @@ private:
   StateOperationSink stateOperationSink_;
   settings::VideoSettings videoSettings_{settings::defaultVideoSettings()};
   VideoSettingsSink videoSettingsSink_;
+  settings::AudioSettings audioSettings_{settings::defaultAudioSettings()};
+  std::vector<std::string> availableAudioDevices_;
+  AudioSettingsSink audioSettingsSink_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;

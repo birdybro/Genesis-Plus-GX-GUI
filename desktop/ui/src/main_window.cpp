@@ -2,6 +2,7 @@
 
 #include "genplusgx/game_file.h"
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -19,10 +20,12 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMimeData>
+#include <QSignalBlocker>
 #include <QStatusBar>
 #include <QTimer>
 #include <QUrl>
 
+#include <algorithm>
 #include <chrono>
 
 namespace genplusgx::ui {
@@ -68,6 +71,7 @@ MainWindow::MainWindow(QWidget* parent)
   updateStateSlotPresentation();
   setGameActionsEnabled(false);
   applyVideoSettings(videoSettings_, false);
+  applyAudioSettings(audioSettings_, false);
 }
 
 QAction* MainWindow::addAction(
@@ -354,8 +358,31 @@ void MainWindow::buildMenus()
   auto* audio = createMenu(tr("&Audio"), "audioMenu");
   auto* mute = addAction(*audio, tr("&Mute"), "muteAction", QKeySequence{tr("M")});
   mute->setCheckable(true);
-  addAction(*audio, tr("Volume &Up"), "volumeUpAction", QKeySequence{tr("+")});
-  addAction(*audio, tr("Volume &Down"), "volumeDownAction", QKeySequence{tr("-")});
+  connect(mute, &QAction::toggled, this, [this](bool muted) {
+    auto settings = audioSettings_;
+    settings.muted = muted;
+    applyAudioSettings(settings, true);
+  });
+  auto* volumeUp = addAction(
+    *audio, tr("Volume &Up"), "volumeUpAction", QKeySequence{tr("+")});
+  auto* volumeDown = addAction(
+    *audio, tr("Volume &Down"), "volumeDownAction", QKeySequence{tr("-")});
+  connect(volumeUp, &QAction::triggered, this, [this] {
+    auto settings = audioSettings_;
+    settings.masterVolumePercent = std::min(
+      settings.masterVolumePercent + 5, 100);
+    applyAudioSettings(settings, true);
+  });
+  connect(volumeDown, &QAction::triggered, this, [this] {
+    auto settings = audioSettings_;
+    settings.masterVolumePercent = std::max(
+      settings.masterVolumePercent - 5, 0);
+    applyAudioSettings(settings, true);
+  });
+  audio->addSeparator();
+  auto* audioSettings = addAction(
+    *audio, tr("Audio &Settings…"), "audioSettingsAction");
+  connect(audioSettings, &QAction::triggered, this, &MainWindow::showAudioSettings);
 
   auto* input = createMenu(tr("&Input"), "inputMenu");
   auto* controllerConfiguration = addAction(
@@ -468,6 +495,23 @@ void MainWindow::showVideoSettings()
   dialog->open();
 }
 
+void MainWindow::showAudioSettings()
+{
+  if (auto* existing = findChild<AudioSettingsDialog*>(
+        QStringLiteral("audioSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new AudioSettingsDialog(
+    audioSettings_, availableAudioDevices_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const settings::AudioSettings& settings) {
+    applyAudioSettings(settings, true);
+  });
+  dialog->open();
+}
+
 void MainWindow::setVideoSettings(settings::VideoSettings settings)
 {
   applyVideoSettings(settings, false);
@@ -481,6 +525,26 @@ void MainWindow::setVideoSettingsSink(VideoSettingsSink sink)
 const settings::VideoSettings& MainWindow::videoSettings() const noexcept
 {
   return videoSettings_;
+}
+
+void MainWindow::setAudioSettings(settings::AudioSettings settings)
+{
+  applyAudioSettings(settings, false);
+}
+
+void MainWindow::setAvailableAudioDevices(std::vector<std::string> devices)
+{
+  availableAudioDevices_ = std::move(devices);
+}
+
+void MainWindow::setAudioSettingsSink(AudioSettingsSink sink)
+{
+  audioSettingsSink_ = std::move(sink);
+}
+
+const settings::AudioSettings& MainWindow::audioSettings() const noexcept
+{
+  return audioSettings_;
 }
 
 void MainWindow::applyVideoSettings(
@@ -552,6 +616,36 @@ void MainWindow::updateVideoActionChecks()
       CoreInterlacedRenderMode::doubleField);
   findChild<QAction*>(QStringLiteral("gameGearExtendedScreenAction"))->setChecked(
     videoSettings_.core.gameGearExtendedScreen);
+}
+
+void MainWindow::applyAudioSettings(
+  const settings::AudioSettings& settings,
+  bool notifySink)
+{
+  if (!settings::validateAudioSettings(settings)) {
+    return;
+  }
+  audioSettings_ = settings;
+  updateAudioActionChecks();
+  if (auto* dialog = findChild<AudioSettingsDialog*>(
+        QStringLiteral("audioSettingsDialog"))) {
+    dialog->setSettings(audioSettings_);
+  }
+  if (notifySink && audioSettingsSink_) {
+    audioSettingsSink_(audioSettings_);
+  }
+  statusBar()->showMessage(
+    tr("Volume: %1%2").arg(audioSettings_.masterVolumePercent)
+      .arg(audioSettings_.muted ? tr(" (muted)") : QString{}),
+    2'000);
+}
+
+void MainWindow::updateAudioActionChecks()
+{
+  const QSignalBlocker blocker{
+    findChild<QAction*>(QStringLiteral("muteAction"))};
+  findChild<QAction*>(QStringLiteral("muteAction"))->setChecked(
+    audioSettings_.muted);
 }
 
 void MainWindow::setInputConfiguration(input::InputConfiguration configuration)

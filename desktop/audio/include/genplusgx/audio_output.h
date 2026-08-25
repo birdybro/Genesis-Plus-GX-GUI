@@ -6,7 +6,9 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
+#include <vector>
 
 namespace genplusgx {
 
@@ -14,6 +16,13 @@ struct AudioOutputConfig final {
   int sampleRate{48'000};
   std::chrono::milliseconds latency{80};
   std::uint32_t deviceId{0};
+  int volumePercent{100};
+  bool muted{false};
+};
+
+struct AudioOutputDevice final {
+  std::uint32_t id{0};
+  std::string name;
 };
 
 enum class AudioOutputError {
@@ -45,6 +54,11 @@ struct AudioOutputMetrics final {
 
 [[nodiscard]] std::size_t audioRingCapacityFrames(
   const AudioOutputConfig& config) noexcept;
+void applyAudioOutputGain(
+  std::span<StereoAudioFrame> frames,
+  int volumePercent,
+  bool muted) noexcept;
+[[nodiscard]] std::vector<AudioOutputDevice> availableAudioOutputDevices();
 
 class AudioOutput final {
 public:
@@ -60,11 +74,15 @@ public:
   [[nodiscard]] AudioOutputStatus pause();
   [[nodiscard]] AudioOutputStatus resume();
   [[nodiscard]] AudioOutputStatus shutdown();
+  [[nodiscard]] AudioOutputStatus setVolumePercent(int volumePercent);
+  void setMuted(bool muted) noexcept;
 
   [[nodiscard]] bool isInitialized() const noexcept;
   [[nodiscard]] bool isPaused() const noexcept;
   [[nodiscard]] AudioOutputConfig config() const noexcept;
   [[nodiscard]] std::string deviceName() const;
+  [[nodiscard]] int volumePercent() const noexcept;
+  [[nodiscard]] bool isMuted() const noexcept;
   [[nodiscard]] AudioOutputMetrics metrics() const noexcept;
   [[nodiscard]] std::shared_ptr<StereoAudioRingBuffer> ringBuffer() const noexcept;
 
