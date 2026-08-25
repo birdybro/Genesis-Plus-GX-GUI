@@ -230,3 +230,14 @@ set_target_properties(
   genplusgx_core_adapter
   PROPERTIES OUTPUT_NAME genplusgx_core_adapter
 )
+
+add_library(genplusgx_game_files STATIC src/game_file.cpp)
+add_library(GenesisPlusGX::GameFiles ALIAS genplusgx_game_files)
+target_link_libraries(
+  genplusgx_game_files
+  PUBLIC GenesisPlusGX::FrontendTypes
+  PRIVATE genplusgx_project_warnings
+)
+if(GENPLUSGX_ENABLE_CHD)
+  target_compile_definitions(genplusgx_game_files PUBLIC GENPLUSGX_HAVE_CHD=1)
+endif()

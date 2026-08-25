@@ -22,6 +22,27 @@ set_tests_properties(
     LABELS "gui;unit"
 )
 
+qt_add_executable(genplusgx_game_loading_test game_loading_test.cpp)
+set_target_properties(genplusgx_game_loading_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_game_loading_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx::ui
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.game_loading COMMAND genplusgx_game_loading_test)
+set_tests_properties(
+  gui.game_loading
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;integration;loading;fixture"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_display_widget_test display_widget_test.cpp)
 set_target_properties(genplusgx_display_widget_test PROPERTIES AUTOMOC ON)
 target_link_libraries(

@@ -422,11 +422,24 @@ storage and reloads it if the core rejects a candidate, making failed loads tran
 
 ## Game loading and library
 
-The file loader normalizes a path, checks that it is a bounded regular file (or a valid
-disc manifest), identifies the format from content plus extension, and delegates the
-actual emulation interpretation to the core. Archive enumeration validates filename
-lengths and uncompressed sizes. Unsupported formats and missing BIOS files produce
-typed errors with concise user messages and detailed logs.
+The implemented preflight service checks that a selected path uses a format enabled in
+the desktop build, is representable by the core's 255-byte host ABI, exists, is a
+regular file, and can be opened for reading. It does not inspect untrusted offsets or
+duplicate the emulator's content interpretation. The direct host currently accepts
+`.68k`, `.bin`, `.bms`, `.cue`, `.gen`, `.gg`, `.iso`, `.md`, `.mdx`, `.sg`, `.sgd`,
+`.smd`, and `.sms`; `.chd` is added only when bundled libchdr support is compiled. ZIP
+and M3U are intentionally not advertised because archive/playlist enumeration is not
+yet present in this desktop host.
+
+Native file selection is abstracted behind `DialogService`, enabling production Qt
+dialogs and deterministic GUI tests. Open actions, one-local-file drops, and the single
+command-line positional argument all converge on `MainWindow::requestGameLoad()`. The
+composition root assigns operation IDs and submits load/unload commands. A successful
+load enters worker `Paused`, updates UI identity, applies current input, then submits
+`Start`; frame execution never happens on the GUI thread. A different game can replace
+the active one without process restart. Invalid preflight choices preserve the running
+game, while a core rejection returns the window to the no-game state because the
+transaction has already released the previous core image.
 
 The library scanner runs outside the GUI thread, parses bounded metadata without
 initializing the emulator, and submits database batches. SQLite operations use

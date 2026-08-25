@@ -1,10 +1,12 @@
 add_library(genplusgx_ui STATIC
   include/genplusgx/ui/about_dialog.h
   include/genplusgx/ui/binding_capture_button.h
+  include/genplusgx/ui/dialog_service.h
   include/genplusgx/ui/input_configuration_dialog.h
   include/genplusgx/ui/main_window.h
   src/about_dialog.cpp
   src/binding_capture_button.cpp
+  src/dialog_service.cpp
   src/input_configuration_dialog.cpp
   src/main_window.cpp
 )
@@ -22,6 +24,7 @@ target_link_libraries(
   genplusgx_ui
   PUBLIC
     Qt6::Widgets
+    GenesisPlusGX::GameFiles
     GenesisPlusGX::Input
     GenesisPlusGX::VideoWidget
   PRIVATE

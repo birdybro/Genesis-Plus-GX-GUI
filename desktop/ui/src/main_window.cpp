@@ -1,6 +1,8 @@
 #include "genplusgx/ui/main_window.h"
 
+#include "genplusgx/game_file.h"
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
@@ -8,11 +10,15 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QDragEnterEvent>
+#include <QDropEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMimeData>
 #include <QStatusBar>
+#include <QUrl>
 
 namespace genplusgx::ui {
 namespace {
@@ -39,7 +45,7 @@ QLabel* statusLabel(
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
-  : QMainWindow(parent)
+  : QMainWindow(parent), dialogService_(std::make_shared<QtDialogService>())
 {
   setObjectName(QStringLiteral("mainWindow"));
   setWindowTitle(QStringLiteral("%1 %2").arg(
@@ -83,11 +89,15 @@ void MainWindow::buildMenus()
   };
 
   auto* file = createMenu(tr("&File"), "fileMenu");
-  addAction(*file, tr("&Open Game…"), "openGameAction", QKeySequence::Open);
+  auto* openGame = addAction(
+    *file, tr("&Open Game…"), "openGameAction", QKeySequence::Open);
+  connect(openGame, &QAction::triggered, this, &MainWindow::chooseGame);
   auto* recent = file->addMenu(tr("Open &Recent"));
   recent->setObjectName(QStringLiteral("openRecentMenu"));
   recent->setEnabled(false);
-  addAction(*file, tr("&Close Game"), "closeGameAction", QKeySequence::Close);
+  auto* closeGameAction = addAction(
+    *file, tr("&Close Game"), "closeGameAction", QKeySequence::Close);
+  connect(closeGameAction, &QAction::triggered, this, &MainWindow::closeGame);
   addAction(*file, tr("Game &Library…"), "gameLibraryAction", QKeySequence{tr("Ctrl+L")});
   file->addSeparator();
   addAction(*file, tr("&Screenshot"), "screenshotAction", QKeySequence{tr("F12")});
@@ -309,6 +319,167 @@ void MainWindow::setInputConfigurationSink(InputConfigurationSink sink)
 void MainWindow::setControllerAssignmentSink(ControllerAssignmentSink sink)
 {
   controllerAssignmentSink_ = std::move(sink);
+}
+
+void MainWindow::setDialogService(std::shared_ptr<DialogService> service)
+{
+  if (service) {
+    dialogService_ = std::move(service);
+  }
+}
+
+void MainWindow::setGameLoadSink(GameLoadSink sink)
+{
+  gameLoadSink_ = std::move(sink);
+}
+
+void MainWindow::setGameCloseSink(GameCloseSink sink)
+{
+  gameCloseSink_ = std::move(sink);
+}
+
+bool MainWindow::requestGameLoad(const std::filesystem::path& path)
+{
+  if (gameLoading_) {
+    presentGameLoadError(path, "Another game operation is still in progress.");
+    return false;
+  }
+  const auto status = validateGameFile(path);
+  if (!status) {
+    presentGameLoadError(path, status.message);
+    return false;
+  }
+  if (!gameLoadSink_) {
+    presentGameLoadError(path, "The emulation service is not available.");
+    return false;
+  }
+  setGameLoading(path);
+  gameLoadSink_(path);
+  return true;
+}
+
+void MainWindow::setGameLoading(const std::filesystem::path& path)
+{
+  gameLoading_ = true;
+  pendingGamePath_ = path;
+  findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+  setGameActionsEnabled(false);
+  gameStatus_->setText(
+    tr("Loading %1…").arg(pathToQString(path.filename())));
+  statusBar()->showMessage(tr("Loading game…"));
+}
+
+void MainWindow::setGameLoaded(const std::filesystem::path& path)
+{
+  loadedGamePath_ = path;
+  pendingGamePath_.clear();
+  gameLoading_ = false;
+  findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  setGameActionsEnabled(true);
+  gameStatus_->setText(pathToQString(path.filename()));
+  statusBar()->showMessage(tr("Game loaded"), 3000);
+}
+
+void MainWindow::setNoGameLoaded()
+{
+  loadedGamePath_.clear();
+  pendingGamePath_.clear();
+  gameLoading_ = false;
+  findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  setGameActionsEnabled(false);
+  gameStatus_->setText(tr("No game loaded"));
+  systemStatus_->setText(tr("System: —"));
+  regionStatus_->setText(tr("Region: —"));
+  fpsStatus_->setText(tr("0.0 FPS"));
+  displayWidget_->clearFrame();
+}
+
+void MainWindow::showGameLoadError(
+  const std::filesystem::path& path,
+  const std::string& detail,
+  bool gameWasUnloaded)
+{
+  const auto previousGame = loadedGamePath_;
+  if (gameWasUnloaded || previousGame.empty()) {
+    setNoGameLoaded();
+  } else {
+    setGameLoaded(previousGame);
+  }
+  presentGameLoadError(path, detail);
+}
+
+void MainWindow::presentGameLoadError(
+  const std::filesystem::path& path,
+  const std::string& detail)
+{
+  const auto fileName = path.empty() ? tr("the selected file")
+                                     : pathToQString(path.filename());
+  const auto message = tr("Could not load %1.\n\n%2")
+    .arg(fileName, QString::fromStdString(detail));
+  statusBar()->showMessage(tr("Game load failed"), 5000);
+  dialogService_->showError(this, tr("Unable to Open Game"), message);
+}
+
+void MainWindow::setFullscreen(bool enabled)
+{
+  findChild<QAction*>(QStringLiteral("fullscreenAction"))->setChecked(enabled);
+}
+
+bool MainWindow::isGameLoaded() const noexcept
+{
+  return !loadedGamePath_.empty() && !gameLoading_;
+}
+
+bool MainWindow::isGameLoading() const noexcept
+{
+  return gameLoading_;
+}
+
+const std::filesystem::path& MainWindow::loadedGamePath() const noexcept
+{
+  return loadedGamePath_;
+}
+
+void MainWindow::dragEnterEvent(QDragEnterEvent* event)
+{
+  const auto urls = event->mimeData()->urls();
+  if (!gameLoading_ && urls.size() == 1 && urls.front().isLocalFile() &&
+      hasSupportedGameExtension(pathFromQString(urls.front().toLocalFile()))) {
+    event->acceptProposedAction();
+  }
+}
+
+void MainWindow::dropEvent(QDropEvent* event)
+{
+  const auto urls = event->mimeData()->urls();
+  if (urls.size() != 1 || !urls.front().isLocalFile()) {
+    return;
+  }
+  if (requestGameLoad(pathFromQString(urls.front().toLocalFile()))) {
+    event->acceptProposedAction();
+  }
+}
+
+void MainWindow::chooseGame()
+{
+  const auto initialDirectory = loadedGamePath_.empty()
+    ? std::filesystem::path{}
+    : loadedGamePath_.parent_path();
+  const auto selected = dialogService_->chooseGame(this, initialDirectory);
+  if (selected) {
+    static_cast<void>(requestGameLoad(*selected));
+  }
+}
+
+void MainWindow::closeGame()
+{
+  if (gameCloseSink_ && isGameLoaded()) {
+    gameLoading_ = true;
+    findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+    setGameActionsEnabled(false);
+    gameStatus_->setText(tr("Closing game…"));
+    gameCloseSink_();
+  }
 }
 
 bool MainWindow::captureControllerButton(SDL_GamepadButton button)

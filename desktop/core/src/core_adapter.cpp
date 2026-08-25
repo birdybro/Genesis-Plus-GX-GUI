@@ -1,4 +1,5 @@
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/game_file.h"
 
 #include "desktop_core_host.h"
 
@@ -24,7 +25,6 @@ namespace {
 constexpr std::size_t framebufferWidth = 720U;
 constexpr std::size_t framebufferHeight = 576U;
 constexpr std::size_t bytesPerPixel = 2U;
-constexpr std::size_t maximumCorePathBytes = 255U;
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 
 std::mutex coreMutex;

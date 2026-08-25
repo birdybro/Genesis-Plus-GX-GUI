@@ -1,5 +1,26 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_game_file_test game_file_test.cpp)
+target_link_libraries(
+  genplusgx_game_file_test
+  PRIVATE
+    GenesisPlusGX::GameFiles
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME unit.game_file COMMAND genplusgx_game_file_test)
+set_tests_properties(unit.game_file PROPERTIES LABELS "unit;filesystem;loading")
+
+if(TARGET genplusgx_app_support)
+  add_executable(genplusgx_command_line_test command_line_test.cpp)
+  target_link_libraries(
+    genplusgx_command_line_test
+    PRIVATE GenesisPlusGX::AppSupport genplusgx_project_warnings Qt6::Core
+  )
+  add_test(NAME unit.command_line COMMAND genplusgx_command_line_test)
+  set_tests_properties(unit.command_line PROPERTIES LABELS "unit;cli;loading")
+endif()
+
 add_executable(genplusgx_audio_ring_buffer_test audio_ring_buffer_test.cpp)
 target_link_libraries(
   genplusgx_audio_ring_buffer_test

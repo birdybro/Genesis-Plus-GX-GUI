@@ -1,4 +1,5 @@
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/app/command_line.h"
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
 #include "genplusgx/emulation_worker.h"
@@ -7,15 +8,18 @@
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/persistence.h"
+#include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
-#include <QCommandLineParser>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QTextStream>
 #include <QTimer>
 
+#include <cstdint>
 #include <memory>
+#include <optional>
 
 int main(int argc, char* argv[])
 {
@@ -26,12 +30,21 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationVersion(QString::fromLatin1(GENPLUSGX_VERSION));
   QApplication::setDesktopFileName(QString::fromLatin1(GENPLUSGX_APP_ID));
 
-  QCommandLineParser parser;
-  parser.setApplicationDescription(
-    QCoreApplication::translate("main", "Native desktop frontend for Genesis Plus GX."));
-  parser.addHelpOption();
-  parser.addVersionOption();
-  parser.process(application);
+  const auto commandLine = genplusgx::app::parseCommandLine(
+    application.arguments().mid(1));
+  if (!commandLine.valid) {
+    QTextStream{stderr} << commandLine.error << '\n'
+                        << "Use --help to list supported arguments.\n";
+    return 2;
+  }
+  if (commandLine.showHelp) {
+    QTextStream{stdout} << genplusgx::app::commandLineHelp() << '\n';
+    return 0;
+  }
+  if (commandLine.showVersion) {
+    QTextStream{stdout} << GENPLUSGX_APP_NAME << ' ' << GENPLUSGX_VERSION << '\n';
+    return 0;
+  }
 
   const auto applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
   const auto pathsInitialized = applicationPaths.initialize();
@@ -157,18 +170,85 @@ int main(int argc, char* argv[])
   if (!controllerInitialized) {
     qWarning().noquote() << QString::fromStdString(controllerInitialized.message);
   }
+
+  struct PendingLoad final {
+    std::uint64_t operationId{0};
+    std::filesystem::path path;
+  };
+  std::uint64_t lifecycleOperationId = 2'000'000U;
+  std::optional<PendingLoad> pendingLoad;
+  std::optional<std::uint64_t> pendingUnload;
+  std::filesystem::path closingGamePath;
+  window.setGameLoadSink(
+    [&lifecycleOperationId, &pendingLoad, &window, &worker](
+      const std::filesystem::path& path) {
+      const auto operationId = ++lifecycleOperationId;
+      pendingLoad = PendingLoad{.operationId = operationId, .path = path};
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::load(operationId, path));
+      if (!submitted) {
+        pendingLoad.reset();
+        window.showGameLoadError(path, submitted.message, false);
+      }
+    });
+  window.setGameCloseSink(
+    [&closingGamePath, &lifecycleOperationId, &pendingUnload, &window, &worker] {
+      closingGamePath = window.loadedGamePath();
+      const auto operationId = ++lifecycleOperationId;
+      pendingUnload = operationId;
+      const auto submitted = worker.submit(genplusgx::EmulationCommand::simple(
+        genplusgx::EmulationCommandType::unloadGame, operationId));
+      if (!submitted) {
+        pendingUnload.reset();
+        window.setGameLoaded(closingGamePath);
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+      }
+    });
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
     &eventPump,
     &QTimer::timeout,
     &window,
-    [&audioOutput, &controllerInput, &worker, &window] {
+    [&audioOutput, &controllerInput, &inputAggregator, &inputOperationId,
+     &lifecycleOperationId, &pendingLoad, &pendingUnload, &closingGamePath,
+     &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
     while (const auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.displayWidget()->presentLatestFrame());
         continue;
+      }
+      if (pendingLoad && event->operationId == pendingLoad->operationId &&
+          event->command == genplusgx::EmulationCommandType::loadGame) {
+        const auto loadedPath = pendingLoad->path;
+        pendingLoad.reset();
+        if (event->succeeded()) {
+          window.setGameLoaded(loadedPath);
+          const auto inputSubmitted = worker.submit(
+            genplusgx::EmulationCommand::updateInput(
+              ++inputOperationId, inputAggregator.snapshot()));
+          if (!inputSubmitted) {
+            qWarning().noquote() << QString::fromStdString(inputSubmitted.message);
+          }
+          const auto started = worker.submit(genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::start, ++lifecycleOperationId));
+          if (!started) {
+            qWarning().noquote() << QString::fromStdString(started.message);
+          }
+        } else {
+          window.showGameLoadError(loadedPath, event->message);
+        }
+      } else if (pendingUnload && event->operationId == *pendingUnload &&
+                 event->command == genplusgx::EmulationCommandType::unloadGame) {
+        pendingUnload.reset();
+        if (event->succeeded()) {
+          window.setNoGameLoaded();
+          closingGamePath.clear();
+        } else {
+          window.setGameLoaded(closingGamePath);
+          qWarning().noquote() << QString::fromStdString(event->message);
+        }
       }
       if (!audioOutput.isInitialized()) {
         continue;
@@ -192,6 +272,15 @@ int main(int argc, char* argv[])
   });
   eventPump.start();
   window.show();
+  if (commandLine.fullscreen) {
+    window.setFullscreen(true);
+  }
+  if (commandLine.gamePath) {
+    const auto startupGame = genplusgx::ui::pathFromQString(*commandLine.gamePath);
+    QTimer::singleShot(0, &window, [&window, startupGame] {
+      static_cast<void>(window.requestGameLoad(startupGame));
+    });
+  }
   const int result = application.exec();
   eventPump.stop();
   keyboardInput.setSnapshotSink({});
@@ -202,6 +291,8 @@ int main(int argc, char* argv[])
   static_cast<void>(controllerInput.shutdown());
   window.setInputConfigurationSink({});
   window.setControllerAssignmentSink({});
+  window.setGameLoadSink({});
+  window.setGameCloseSink({});
   inputAggregator.setSnapshotSink({});
   static_cast<void>(worker.stop());
   static_cast<void>(audioOutput.shutdown());

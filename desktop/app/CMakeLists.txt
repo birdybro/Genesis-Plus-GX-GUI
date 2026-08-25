@@ -1,11 +1,26 @@
-qt_add_executable(genplusgx_desktop
-  main.cpp
+add_library(
+  genplusgx_app_support STATIC
+  include/genplusgx/app/command_line.h
+  command_line.cpp
 )
+add_library(GenesisPlusGX::AppSupport ALIAS genplusgx_app_support)
+target_include_directories(
+  genplusgx_app_support
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>"
+)
+target_link_libraries(
+  genplusgx_app_support
+  PUBLIC Qt6::Core
+  PRIVATE genplusgx_project_options genplusgx_project_warnings
+)
+
+qt_add_executable(genplusgx_desktop main.cpp)
 
 target_link_libraries(
   genplusgx_desktop
   PRIVATE
     GenesisPlusGX::Audio
+    GenesisPlusGX::AppSupport
     GenesisPlusGX::Input
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
