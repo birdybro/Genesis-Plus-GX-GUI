@@ -141,6 +141,31 @@ The worker emits immutable events containing operation IDs. The coordinator disc
 stale completion events after a newer load/unload generation, preventing late UI
 updates from a previous game.
 
+The implemented `EmulationWorker` owns `CoreAdapter` inside a dedicated `std::thread`.
+Its public calls never execute core work: they validate and enqueue operations with
+nonzero IDs. The default command and operation-event capacities are each 64. Queue-full
+submission returns immediately; the newest pending input command replaces an older one.
+Operation events use bounded drop-oldest storage with an observable counter, while frame
+completion occupies a separate single replaceable slot, so an unresponsive GUI cannot
+create frame-sized event growth. Callers may poll or wait on a condition variable.
+
+The worker state machine is:
+
+```text
+Stopped -> Starting -> Idle -> Paused <-> Running
+                         ^        |
+                         +--------+  (unload)
+Any live state -> Stopping -> Stopped
+```
+
+A successful load enters `Paused`, ensuring no frame runs before its coordinator is
+ready. Invalid transitions produce typed asynchronous failures without mutating state.
+Frame waits use interruptible monotonic deadlines; Milestone 15 replaces the temporary
+nominal interval with exact region/audio-aware pacing. `stop()` first closes command
+admission, wakes all waits, performs adapter shutdown on the owner thread, then joins
+synchronously. The destructor invokes the same path, and a stopped worker can be cleanly
+started again.
+
 ## Video data flow
 
 ```text

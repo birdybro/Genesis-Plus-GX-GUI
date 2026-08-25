@@ -218,7 +218,11 @@ target_include_directories(
 )
 target_link_libraries(genplusgx_frontend_types INTERFACE genplusgx_project_options)
 
-add_library(genplusgx_core_adapter STATIC src/core_adapter.cpp)
+add_library(
+  genplusgx_core_adapter STATIC
+  src/core_adapter.cpp
+  src/emulation_worker.cpp
+)
 add_library(GenesisPlusGX::CoreAdapter ALIAS genplusgx_core_adapter)
 target_link_libraries(
   genplusgx_core_adapter

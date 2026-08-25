@@ -98,3 +98,17 @@ set_tests_properties(
   core.state_round_trip
   PROPERTIES LABELS "core;integration;state;persistence;fixture" TIMEOUT 30
 )
+
+add_executable(genplusgx_emulation_worker_test emulation_worker_test.cpp)
+target_link_libraries(
+  genplusgx_emulation_worker_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+)
+add_test(NAME core.emulation_worker COMMAND genplusgx_emulation_worker_test)
+set_tests_properties(
+  core.emulation_worker
+  PROPERTIES LABELS "core;integration;fixture;concurrency;lifecycle;state;input" TIMEOUT 30
+)

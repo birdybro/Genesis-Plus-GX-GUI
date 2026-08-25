@@ -200,6 +200,20 @@ CoreResult CoreAdapter::reset()
   return success();
 }
 
+CoreResult CoreAdapter::softReset()
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+
+  gen_reset(0);
+  frameCount_ = 0;
+  private_->pendingAudioFrames = 0;
+  private_->pendingAudioFrameNumber = 0;
+  return success();
+}
+
 CoreResult CoreAdapter::runFrame(bool skipVideo)
 {
   std::scoped_lock lock{coreMutex};

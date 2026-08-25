@@ -21,8 +21,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 07 Core input | COMPLETE | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | `4b5e5b5` |
 | 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | `1e4dc1e` |
 | 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | `0422e36` |
-| 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | recorded by milestone 11 |
-| 11 Emulation worker | PLANNED | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | pending |
+| 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | `0312e53` |
+| 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | recorded by milestone 12 |
 | 12 Display widget | PLANNED | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable texture path | pending |
 | 13 Video scaling | PLANNED | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | pending |
 | 14 Audio playback | PLANNED | SDL3 output, device lifecycle, pause/resume | `desktop/audio` | null-device init and buffer integrity | Clean bounded low-latency pipeline | pending |
@@ -562,4 +562,58 @@ Every significant shell object has a stable `objectName`; tests require no human
 or real display server. The install target is a GUI executable/app bundle as appropriate
 for the host platform.
 
-**Commit SHA:** recorded by milestone 11
+**Commit SHA:** `0312e53`
+
+## Milestone 11 detail
+
+**Status:** COMPLETE
+
+**Goal:** Move all active core lifecycle and frame execution behind a restartable worker
+with bounded command/event transport, explicit state transitions, and synchronous clean
+shutdown.
+
+**Files changed:**
+
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/bounded_queue.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/bounded_queue_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.bounded_queue` verifies rejected zero capacity, fixed-depth
+backpressure, FIFO order, newest-match coalescing, bounded drop-oldest reporting, pop,
+and clear. `core.emulation_worker` proves the core owner differs from its caller; checks
+stopped/idle/paused/running transitions and typed asynchronous failures; exercises real
+load, run, pause, resume, frame advance, fast-forward, input boundary application, hard
+and soft reset, raw state capture/restore, unload, corrupt replacement-load recovery,
+frame-event coalescing, synchronous stop, ten complete worker restarts, RAII shutdown,
+and final release of the global core lease.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (17/17).
+- The complete worker workflow passed ten consecutive Debug executions.
+- Release build and complete CTest: passed (17/17).
+- ASan/UBSan preset build and complete CTest: passed (17/17).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New protocol, worker, queue, and test code compiled under the frontend warning policy
+  without warnings.
+
+**Acceptance criteria:** Only the worker thread constructs and owns `CoreAdapter`.
+Commands carry nonzero operation IDs through a fixed-capacity FIFO; pending input updates
+coalesce and queue saturation returns synchronously. Operation events remain bounded and
+report drops, while frame completion has exactly one replaceable newest slot. Running
+uses interruptible condition-variable deadlines instead of GUI timers or busy waiting.
+Stop rejects new commands, interrupts waits, shuts down the core on its owner thread,
+joins synchronously, and is idempotent. A failed game replacement cannot leave the
+worker claiming a loaded/running state.
+
+**Commit SHA:** recorded by milestone 12

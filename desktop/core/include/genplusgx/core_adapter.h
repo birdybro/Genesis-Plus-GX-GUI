@@ -101,6 +101,7 @@ public:
   [[nodiscard]] CoreResult loadGame(const std::filesystem::path& path);
   [[nodiscard]] CoreResult unloadGame();
   [[nodiscard]] CoreResult reset();
+  [[nodiscard]] CoreResult softReset();
   [[nodiscard]] CoreResult runFrame(bool skipVideo = false);
   [[nodiscard]] CoreResult videoFrameInfo(CoreVideoFrameInfo& output) const;
   [[nodiscard]] CoreResult copyVideoFrame(

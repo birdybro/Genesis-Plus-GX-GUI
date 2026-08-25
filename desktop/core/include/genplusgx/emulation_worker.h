@@ -1,0 +1,155 @@
+#pragma once
+
+#include "genplusgx/core_adapter.h"
+#include "genplusgx/input_snapshot.h"
+
+#include <atomic>
+#include <chrono>
+#include <cstddef>
+#include <cstdint>
+#include <filesystem>
+#include <memory>
+#include <optional>
+#include <span>
+#include <string>
+#include <thread>
+#include <vector>
+
+namespace genplusgx {
+
+enum class EmulationWorkerState {
+  stopped,
+  starting,
+  idle,
+  paused,
+  running,
+  stopping,
+  failed,
+};
+
+enum class EmulationCommandType {
+  loadGame,
+  unloadGame,
+  start,
+  pause,
+  resume,
+  hardReset,
+  softReset,
+  frameAdvance,
+  setFastForward,
+  inputSnapshot,
+  captureState,
+  restoreState,
+};
+
+struct EmulationCommand final {
+  EmulationCommandType type{EmulationCommandType::pause};
+  std::uint64_t operationId{0};
+  std::filesystem::path path;
+  bool enabled{false};
+  InputSnapshot input;
+  std::vector<std::uint8_t> rawState;
+
+  [[nodiscard]] static EmulationCommand simple(
+    EmulationCommandType type,
+    std::uint64_t operationId);
+  [[nodiscard]] static EmulationCommand load(
+    std::uint64_t operationId,
+    std::filesystem::path path);
+  [[nodiscard]] static EmulationCommand fastForward(
+    std::uint64_t operationId,
+    bool enabled);
+  [[nodiscard]] static EmulationCommand updateInput(
+    std::uint64_t operationId,
+    InputSnapshot input);
+  [[nodiscard]] static EmulationCommand restore(
+    std::uint64_t operationId,
+    std::span<const std::uint8_t> rawState);
+};
+
+enum class EmulationWorkerError {
+  none,
+  notRunning,
+  alreadyRunning,
+  queueFull,
+  invalidCommand,
+  invalidTransition,
+  threadFailure,
+  coreFailure,
+};
+
+struct EmulationWorkerStatus final {
+  EmulationWorkerError error{EmulationWorkerError::none};
+  std::string message;
+
+  [[nodiscard]] bool ok() const noexcept { return error == EmulationWorkerError::none; }
+  [[nodiscard]] operator bool() const noexcept { return ok(); }
+};
+
+enum class EmulationEventType {
+  workerStarted,
+  commandCompleted,
+  commandFailed,
+  frameCompleted,
+  stateCaptured,
+  workerStopped,
+};
+
+struct EmulationEvent final {
+  EmulationEventType type{EmulationEventType::commandFailed};
+  std::optional<EmulationCommandType> command;
+  std::uint64_t operationId{0};
+  EmulationWorkerState workerState{EmulationWorkerState::stopped};
+  EmulationWorkerError error{EmulationWorkerError::none};
+  CoreError coreError{CoreError::none};
+  std::string message;
+  std::uint64_t frameNumber{0};
+  std::uint64_t appliedInputSequence{0};
+  bool fastForward{false};
+  std::thread::id workerThreadId;
+  std::vector<std::uint8_t> rawState;
+
+  [[nodiscard]] bool succeeded() const noexcept
+  {
+    return error == EmulationWorkerError::none && coreError == CoreError::none;
+  }
+};
+
+struct EmulationWorkerMetrics final {
+  std::size_t commandQueueDepth{0};
+  std::size_t eventQueueDepth{0};
+  std::uint64_t coalescedInputCommands{0};
+  std::uint64_t replacedFrameEvents{0};
+  std::uint64_t droppedOperationEvents{0};
+};
+
+class EmulationWorker final {
+public:
+  explicit EmulationWorker(
+    std::size_t commandCapacity = 64U,
+    std::size_t eventCapacity = 64U,
+    int audioSampleRate = 48'000);
+  ~EmulationWorker();
+
+  EmulationWorker(const EmulationWorker&) = delete;
+  EmulationWorker& operator=(const EmulationWorker&) = delete;
+  EmulationWorker(EmulationWorker&&) = delete;
+  EmulationWorker& operator=(EmulationWorker&&) = delete;
+
+  [[nodiscard]] EmulationWorkerStatus start();
+  [[nodiscard]] EmulationWorkerStatus submit(EmulationCommand command);
+  [[nodiscard]] EmulationWorkerStatus stop();
+
+  [[nodiscard]] std::optional<EmulationEvent> pollEvent();
+  [[nodiscard]] std::optional<EmulationEvent> waitForEvent(
+    std::chrono::milliseconds timeout);
+  [[nodiscard]] EmulationWorkerState state() const noexcept;
+  [[nodiscard]] EmulationWorkerMetrics metrics() const;
+
+private:
+  class Private;
+  std::unique_ptr<Private> private_;
+  std::atomic<EmulationWorkerState> state_{EmulationWorkerState::stopped};
+};
+
+} // namespace genplusgx
