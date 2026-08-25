@@ -1,5 +1,6 @@
 #pragma once
 
+#include "genplusgx/core_adapter.h"
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/library/game_metadata.h"
 #include "genplusgx/library/game_library_database.h"
@@ -7,6 +8,7 @@
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/audio_settings.h"
+#include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
@@ -83,6 +85,11 @@ public:
     DiscUiOperation, const std::filesystem::path&, bool)>;
   using GameInformationRequestSink =
     std::function<void(const std::filesystem::path&)>;
+  using ScreenshotSink = std::function<void(
+    CoreVideoFrameInfo,
+    std::vector<std::uint16_t>)>;
+  using ScreenshotSettingsSink = std::function<PersistenceStatus(
+    const settings::ScreenshotSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -150,6 +157,17 @@ public:
     std::int64_t directoryId,
     const std::string& detail);
   void showGameLibraryError(const std::string& detail);
+  void setScreenshotSink(ScreenshotSink sink);
+  void setScreenshotBusy(bool busy);
+  void showScreenshotSaved(const std::filesystem::path& path);
+  void showScreenshotError(const std::string& detail);
+  void setScreenshotSettings(
+    settings::ScreenshotSettings settings,
+    std::filesystem::path defaultDirectory);
+  void setScreenshotSettingsSink(ScreenshotSettingsSink sink);
+  [[nodiscard]] const settings::ScreenshotSettings&
+    screenshotSettings() const noexcept;
+  void showScreenshotSettings();
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -172,6 +190,7 @@ public:
   [[nodiscard]] bool isGameLoading() const noexcept;
   [[nodiscard]] const std::filesystem::path& loadedGamePath() const noexcept;
   [[nodiscard]] bool captureControllerButton(SDL_GamepadButton button);
+  [[nodiscard]] bool presentLatestFrame();
   [[nodiscard]] video::DisplayWidget* displayWidget() const noexcept;
 
 protected:
@@ -198,6 +217,8 @@ private:
   void requestStateOperation(StateUiOperation operation);
   void updateStateActions();
   void updateStateSlotPresentation();
+  void requestScreenshot();
+  void updateScreenshotAction();
   void presentGameLoadError(
     const std::filesystem::path& path,
     const std::string& detail);
@@ -237,6 +258,10 @@ private:
   DiscOperationSink discOperationSink_;
   GameInformationRequestSink gameInformationRequestSink_;
   GameLibraryActions gameLibraryActions_;
+  ScreenshotSink screenshotSink_;
+  ScreenshotSettingsSink screenshotSettingsSink_;
+  settings::ScreenshotSettings screenshotSettings_;
+  std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
@@ -252,6 +277,7 @@ private:
   bool discOperationBusy_{false};
   bool gameInformationBusy_{false};
   bool gameLibraryAvailable_{true};
+  bool screenshotBusy_{false};
   std::string gameLibraryUnavailableDetail_;
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;

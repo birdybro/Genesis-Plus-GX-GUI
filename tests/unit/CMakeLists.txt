@@ -276,6 +276,25 @@ set_tests_properties(
   unit.system_settings PROPERTIES LABELS "unit;system;settings;persistence" TIMEOUT 30
 )
 
+add_executable(genplusgx_screenshot_service_test screenshot_service_test.cpp)
+target_link_libraries(
+  genplusgx_screenshot_service_test
+  PRIVATE
+    GenesisPlusGX::Screenshots
+    GenesisPlusGX::Settings
+    genplusgx_project_warnings
+    Qt6::Core
+    Qt6::Gui
+    Threads::Threads
+)
+add_test(NAME unit.screenshot_service COMMAND genplusgx_screenshot_service_test)
+set_tests_properties(
+  unit.screenshot_service
+  PROPERTIES
+    LABELS "unit;screenshot;filesystem;persistence;settings;concurrency"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_bios_manager_test bios_manager_test.cpp)
 target_link_libraries(
   genplusgx_bios_manager_test

@@ -141,6 +141,25 @@ closing a game is temporarily disabled during an active state operation so its r
 cannot cross into another game session. See [SAVE_STATES.md](SAVE_STATES.md) for the
 format and recovery details.
 
+## Screenshots
+
+Press `F12` or choose **File → Screenshot** while a game has produced a visible frame.
+The command captures the latest complete native emulator image—not the desktop window,
+menus, scaling borders, or native window chrome—and writes a PNG without pausing
+emulation. The status bar confirms the final path; an encoding or directory error is
+shown without closing the running game. The action stays disabled until the first frame
+of a game and while a previous capture is being written.
+
+Choose **File → Screenshot Settings…** to select an absolute output directory. Apply,
+OK, Cancel, and Restore Defaults use the same staged behavior as the other settings
+dialogs. The default is the platform application-data `screenshots` directory, and the
+choice is atomically stored in `config/screenshot-settings.json`.
+
+Names combine a sanitized game filename, millisecond timestamp, and emulated frame
+number. If that exact name already exists, the application adds a numeric suffix and
+never overwrites it. PNG data is first completed in a temporary file in the destination
+directory, so an interrupted encode cannot leave a partially named capture.
+
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu

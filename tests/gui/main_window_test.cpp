@@ -4,6 +4,7 @@
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
@@ -24,6 +25,7 @@
 #include <QTest>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <array>
 #include <chrono>
 #include <memory>
@@ -37,8 +39,11 @@ class FakeDialogService final : public genplusgx::ui::DialogService {
 public:
   std::vector<QString> errors;
   std::optional<std::filesystem::path> discSelection;
+  std::optional<std::filesystem::path> directorySelection;
   std::filesystem::path discInitialDirectory;
+  std::filesystem::path directoryInitialDirectory;
   int chooseDiscCount{0};
+  int chooseDirectoryCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
@@ -52,6 +57,14 @@ public:
     ++chooseDiscCount;
     discInitialDirectory = initialDirectory;
     return discSelection;
+  }
+
+  std::optional<std::filesystem::path> chooseDirectory(
+    QWidget*, const std::filesystem::path& initialDirectory) override
+  {
+    ++chooseDirectoryCount;
+    directoryInitialDirectory = initialDirectory;
+    return directorySelection;
   }
 
   void showError(QWidget*, const QString& title, const QString& message) override
@@ -74,6 +87,7 @@ private slots:
   void audioSettingsWorkflowAppliesCancelsAndRestores();
   void systemSettingsWorkflowIsValidatedAndDeferred();
   void biosSettingsValidatePersistAndCancel();
+  void screenshotCaptureAndSettingsWorkflow();
   void saveStateActionsExposeSlotSemantics();
   void segaCdDiscActionsAreTypedAndRecoverable();
   void gameInformationWorkflowIsAsynchronousAndInspectable();
@@ -116,7 +130,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "openGameAction", "gameLibraryAction", "exitAction", "fullscreenAction",
     "muteAction", "volumeUpAction", "volumeDownAction",
     "controllerConfigurationAction", "playerAssignmentsAction", "settingsAction",
-    "systemSettingsAction", "biosSettingsAction",
+    "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction"};
   for (const auto* name : enabledNames) {
@@ -618,6 +632,146 @@ void MainWindowTest::biosSettingsValidatePersistAndCancel()
   QCOMPARE(window.biosSnapshot().configuration,
     genplusgx::platform::BiosConfiguration{});
   dialog->close();
+}
+
+void MainWindowTest::screenshotCaptureAndSettingsWorkflow()
+{
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+  const auto root = genplusgx::ui::pathFromQString(temporary.path());
+  const auto defaultDirectory = root / "default-screenshots";
+  const auto initialDirectory = root / "initial-screenshots";
+  const auto selectedDirectory = root / "selected-screenshots";
+  auto dialogs = std::make_shared<FakeDialogService>();
+  dialogs->directorySelection = selectedDirectory;
+
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+  window.setScreenshotSettings(
+    {.directory = initialDirectory}, defaultDirectory);
+  auto exchange = std::make_shared<genplusgx::VideoFrameExchange>(4U);
+  window.displayWidget()->setFrameExchange(exchange);
+  window.setGameLoaded(game.path());
+  std::optional<genplusgx::CoreVideoFrameInfo> capturedFrame;
+  std::vector<std::uint16_t> capturedPixels;
+  window.setScreenshotSink(
+    [&capturedFrame, &capturedPixels](const auto& currentFrame, auto pixels) {
+      capturedFrame = currentFrame;
+      capturedPixels = std::move(pixels);
+    });
+  auto* screenshot = window.findChild<QAction*>(
+    QStringLiteral("screenshotAction"));
+  QVERIFY(screenshot != nullptr && !screenshot->isEnabled());
+
+  auto lease = exchange->beginWrite();
+  QVERIFY(lease.has_value());
+  constexpr std::array<std::uint16_t, 4> expectedPixels{
+    0xf800U, 0x07e0U, 0x001fU, 0xffffU};
+  std::ranges::copy(expectedPixels, lease->pixels().begin());
+  const genplusgx::CoreVideoFrameInfo frame{
+    .format = genplusgx::CorePixelFormat::rgb565,
+    .width = 2U,
+    .height = 2U,
+    .frameNumber = 77U,
+  };
+  QVERIFY(lease->publish(frame));
+  QVERIFY(window.presentLatestFrame());
+  QVERIFY(screenshot->isEnabled());
+  screenshot->trigger();
+  QVERIFY(capturedFrame.has_value());
+  QCOMPARE(capturedFrame->frameNumber, 77U);
+  QCOMPARE(capturedPixels, std::vector<std::uint16_t>(
+    expectedPixels.begin(), expectedPixels.end()));
+  QVERIFY(!screenshot->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("Saving")));
+  window.showScreenshotSaved(root / "saved.png");
+  QVERIFY(screenshot->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("saved.png")));
+
+  std::vector<genplusgx::settings::ScreenshotSettings> updates;
+  bool rejectSettings = false;
+  window.setScreenshotSettingsSink(
+    [&updates, &rejectSettings](const auto& settings) {
+      if (rejectSettings) {
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::fileWriteFailed,
+          .message = "Injected settings write failure.",
+        };
+      }
+      updates.push_back(settings);
+      return genplusgx::PersistenceStatus{};
+    });
+  auto* settingsAction = window.findChild<QAction*>(
+    QStringLiteral("screenshotSettingsAction"));
+  QVERIFY(settingsAction != nullptr && settingsAction->isEnabled());
+  settingsAction->trigger();
+  QApplication::processEvents();
+  auto* settingsDialog = window.findChild<
+    genplusgx::ui::ScreenshotSettingsDialog*>(
+      QStringLiteral("screenshotSettingsDialog"));
+  QVERIFY(settingsDialog != nullptr && settingsDialog->isVisible());
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("browseScreenshotDirectoryButton"))->click();
+  QCOMPARE(dialogs->chooseDirectoryCount, 1);
+  QCOMPARE(dialogs->directoryInitialDirectory, initialDirectory);
+  QCOMPARE(settingsDialog->findChild<QLineEdit*>(
+    QStringLiteral("screenshotDirectoryEdit"))->text(),
+    genplusgx::ui::pathToQString(selectedDirectory));
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("applyScreenshotSettingsButton"))->click();
+  QCOMPARE(updates.size(), std::size_t{1});
+  QCOMPARE(window.screenshotSettings().directory, selectedDirectory);
+
+  dialogs->directorySelection = root / "cancelled-screenshots";
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("browseScreenshotDirectoryButton"))->click();
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("cancelScreenshotSettingsButton"))->click();
+  QApplication::processEvents();
+  QCOMPARE(window.screenshotSettings().directory, selectedDirectory);
+  QCOMPARE(updates.size(), std::size_t{1});
+
+  settingsAction->trigger();
+  QApplication::processEvents();
+  settingsDialog = window.findChild<
+    genplusgx::ui::ScreenshotSettingsDialog*>(
+      QStringLiteral("screenshotSettingsDialog"));
+  QVERIFY(settingsDialog != nullptr);
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("restoreScreenshotDefaultsButton"))->click();
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("okScreenshotSettingsButton"))->click();
+  QApplication::processEvents();
+  QCOMPARE(window.screenshotSettings().directory, defaultDirectory);
+  QCOMPARE(updates.size(), std::size_t{2});
+
+  rejectSettings = true;
+  dialogs->directorySelection = root / "rejected-screenshots";
+  settingsAction->trigger();
+  QApplication::processEvents();
+  settingsDialog = window.findChild<
+    genplusgx::ui::ScreenshotSettingsDialog*>(
+      QStringLiteral("screenshotSettingsDialog"));
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("browseScreenshotDirectoryButton"))->click();
+  settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("applyScreenshotSettingsButton"))->click();
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("write failure")));
+  QCOMPARE(window.screenshotSettings().directory, defaultDirectory);
+  QVERIFY(settingsDialog->isVisible());
+  settingsDialog->close();
+
+  bool loadRequested = false;
+  window.setGameLoadSink([&loadRequested](const auto&) { loadRequested = true; });
+  QVERIFY(window.requestGameLoad(game.path()));
+  QVERIFY(loadRequested);
+  QVERIFY(!window.displayWidget()->hasFrame());
+  QVERIFY(!screenshot->isEnabled());
 }
 
 void MainWindowTest::saveStateActionsExposeSlotSemantics()

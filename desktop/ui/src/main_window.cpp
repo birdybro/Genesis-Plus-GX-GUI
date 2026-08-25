@@ -8,6 +8,7 @@
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
@@ -120,7 +121,13 @@ void MainWindow::buildMenus()
     *file, tr("Game &Library…"), "gameLibraryAction", QKeySequence{tr("Ctrl+L")});
   connect(gameLibrary, &QAction::triggered, this, &MainWindow::showGameLibrary);
   file->addSeparator();
-  addAction(*file, tr("&Screenshot"), "screenshotAction", QKeySequence{tr("F12")});
+  auto* screenshot = addAction(
+    *file, tr("&Screenshot"), "screenshotAction", QKeySequence{tr("F12")});
+  connect(screenshot, &QAction::triggered, this, &MainWindow::requestScreenshot);
+  auto* screenshotSettings = addAction(
+    *file, tr("Screenshot &Settings…"), "screenshotSettingsAction");
+  connect(screenshotSettings, &QAction::triggered,
+    this, &MainWindow::showScreenshotSettings);
   file->addSeparator();
   auto* exit = addAction(*file, tr("E&xit"), "exitAction", QKeySequence::Quit);
   connect(exit, &QAction::triggered, this, &QWidget::close);
@@ -461,6 +468,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateGameInformationAction();
   updateDiscActions();
   updateStateActions();
+  updateScreenshotAction();
 }
 
 void MainWindow::setGameInformationRequestSink(GameInformationRequestSink sink)
@@ -623,6 +631,129 @@ void MainWindow::showGameLibraryError(const std::string& detail)
   }
   dialogService_->showError(
     this, tr("Game Library Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::setScreenshotSink(ScreenshotSink sink)
+{
+  screenshotSink_ = std::move(sink);
+  updateScreenshotAction();
+}
+
+void MainWindow::setScreenshotBusy(bool busy)
+{
+  screenshotBusy_ = busy;
+  updateScreenshotAction();
+  if (busy) {
+    statusBar()->showMessage(tr("Saving screenshot…"));
+  }
+}
+
+void MainWindow::showScreenshotSaved(const std::filesystem::path& path)
+{
+  setScreenshotBusy(false);
+  statusBar()->showMessage(
+    tr("Screenshot saved: %1").arg(pathToQString(path)), 5'000);
+}
+
+void MainWindow::showScreenshotError(const std::string& detail)
+{
+  setScreenshotBusy(false);
+  statusBar()->showMessage(tr("Screenshot failed"), 5'000);
+  dialogService_->showError(
+    this, tr("Unable to Save Screenshot"), QString::fromStdString(detail));
+}
+
+void MainWindow::setScreenshotSettings(
+  settings::ScreenshotSettings settings,
+  std::filesystem::path defaultDirectory)
+{
+  if (!settings::validateScreenshotSettings(settings) ||
+      defaultDirectory.empty()) {
+    return;
+  }
+  screenshotSettings_ = std::move(settings);
+  defaultScreenshotDirectory_ = std::move(defaultDirectory);
+  if (auto* dialog = findChild<ScreenshotSettingsDialog*>(
+        QStringLiteral("screenshotSettingsDialog"))) {
+    dialog->setSettings(screenshotSettings_);
+  }
+}
+
+void MainWindow::setScreenshotSettingsSink(ScreenshotSettingsSink sink)
+{
+  screenshotSettingsSink_ = std::move(sink);
+}
+
+const settings::ScreenshotSettings& MainWindow::screenshotSettings() const noexcept
+{
+  return screenshotSettings_;
+}
+
+void MainWindow::showScreenshotSettings()
+{
+  if (auto* existing = findChild<ScreenshotSettingsDialog*>(
+        QStringLiteral("screenshotSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  if (!settings::validateScreenshotSettings(screenshotSettings_) ||
+      defaultScreenshotDirectory_.empty()) {
+    showScreenshotError("The screenshot settings are unavailable.");
+    return;
+  }
+  auto* dialog = new ScreenshotSettingsDialog(
+    screenshotSettings_, defaultScreenshotDirectory_, dialogService_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink(
+    [this](const settings::ScreenshotSettings& settings) {
+      if (screenshotSettingsSink_) {
+        const auto saved = screenshotSettingsSink_(settings);
+        if (!saved) {
+          dialogService_->showError(
+            this, tr("Screenshot Settings Error"),
+            QString::fromStdString(saved.message));
+          return false;
+        }
+      }
+      screenshotSettings_ = settings;
+      statusBar()->showMessage(tr("Screenshot settings saved."), 3'000);
+      return true;
+    });
+  dialog->open();
+}
+
+void MainWindow::requestScreenshot()
+{
+  if (screenshotBusy_) {
+    return;
+  }
+  if (!isGameLoaded() || !displayWidget_->hasFrame()) {
+    showScreenshotError("No native emulator frame is available yet.");
+    return;
+  }
+  if (!screenshotSink_) {
+    showScreenshotError("The screenshot service is not available.");
+    return;
+  }
+  const auto frame = displayWidget_->currentFrameInfo();
+  const auto pixels = displayWidget_->currentPixels();
+  if (pixels.size() < frame.pixelCount()) {
+    showScreenshotError("The native emulator frame is incomplete.");
+    return;
+  }
+  std::vector<std::uint16_t> copy(
+    pixels.begin(), pixels.begin() + static_cast<std::ptrdiff_t>(frame.pixelCount()));
+  setScreenshotBusy(true);
+  screenshotSink_(frame, std::move(copy));
+}
+
+void MainWindow::updateScreenshotAction()
+{
+  if (auto* action = findChild<QAction*>(QStringLiteral("screenshotAction"))) {
+    action->setEnabled(isGameLoaded() && !screenshotBusy_ &&
+      displayWidget_->hasFrame() && static_cast<bool>(screenshotSink_));
+  }
 }
 
 void MainWindow::showAboutDialog()
@@ -1016,6 +1147,10 @@ void MainWindow::setDialogService(std::shared_ptr<DialogService> service)
           QStringLiteral("gameLibraryDialog"))) {
       dialog->setDialogService(dialogService_);
     }
+    if (auto* dialog = findChild<ScreenshotSettingsDialog*>(
+          QStringLiteral("screenshotSettingsDialog"))) {
+      dialog->setDialogService(dialogService_);
+    }
   }
 }
 
@@ -1186,6 +1321,7 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   gameLoading_ = true;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
+  displayWidget_->clearFrame();
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
   setGameActionsEnabled(false);
@@ -1490,6 +1626,15 @@ bool MainWindow::captureControllerButton(SDL_GamepadButton button)
   auto* dialog = findChild<InputConfigurationDialog*>(
     QStringLiteral("inputConfigurationDialog"));
   return dialog != nullptr && dialog->captureControllerButton(button);
+}
+
+bool MainWindow::presentLatestFrame()
+{
+  const bool presented = displayWidget_->presentLatestFrame();
+  if (presented) {
+    updateScreenshotAction();
+  }
+  return presented;
 }
 
 video::DisplayWidget* MainWindow::displayWidget() const noexcept

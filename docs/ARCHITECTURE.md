@@ -212,8 +212,8 @@ Slots are allocated for the core's maximum supported surface and reused. A publi
 frame carries width, height, pitch, crop/overscan viewport, pixel aspect, region,
 interlace state, and monotonically increasing frame number. The GUI may skip obsolete
 presentation frames but never observes a partially written frame. Native screenshots
-copy a published complete frame; displayed screenshots are captured explicitly from
-the presentation path.
+copy the `DisplayWidget`'s latest complete presented frame. Starting a new load clears
+that presentation snapshot so a request cannot be mislabeled with the next game's name.
 
 At the core boundary, `CoreAdapter` retains the mutable 720x576 RGB565 surface and never
 returns its pointer. `videoFrameInfo()` validates the effective viewport, including
@@ -435,6 +435,15 @@ Settings have a versioned schema with migrations. Global settings are loaded fir
 an existing per-game override is applied only for fields explicitly marked overridden.
 Defaults and validation are pure, testable logic. UI Apply sends a complete validated
 snapshot rather than mutating core globals piecemeal.
+
+The screenshot directory is stored independently in
+`config/screenshot-settings.json`. F12 takes one immutable RGB565 copy on the GUI
+thread, then submits it to `ScreenshotService` through a fixed-capacity command queue.
+The dedicated worker performs deterministic RGB565-to-RGB32 expansion and PNG encoding
+in a same-directory temporary file, then renames to a sanitized timestamp/frame name.
+A fixed-capacity event queue reports the final path or concise failure to the GUI. The
+emulation thread, core surface, renderer, and settings store are never touched by the
+encoder thread, and the application joins the worker explicitly during shutdown.
 
 The implemented video store uses bounded schema-1 JSON and atomic replacement. Schema
 0's legacy flat booleans/mask migrate to named enum values; malformed values and future

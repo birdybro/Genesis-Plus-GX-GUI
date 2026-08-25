@@ -41,8 +41,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | `1baef5d` |
 | 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | `c9e0c03` |
 | 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | `58d46df` |
-| 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | recorded by milestone 31 |
-| 31 Screenshots | PLANNED | Native/display PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | pending |
+| 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | `6667162` |
+| 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | recorded by milestone 32 |
 | 32 Cheats | PLANNED | GG/PAR validation, persistence and enable UI | `desktop/cheats`, dialog | parser property, persistence, GUI tests | Invalid codes never applied | pending |
 | 33 Per-game overrides | PLANNED | Sparse overrides and precedence | settings model/UI | precedence, schema, GUI tests | No file until override exists | pending |
 | 34 Theme/accessibility | PLANNED | System/light/dark, high-DPI and keyboard access | theme/accessibility services | persistence and navigation GUI tests | Critical controls keyboard accessible | pending |
@@ -1819,4 +1819,75 @@ files. GUI write controls and coordinator mutations reject work during a scan, a
 SQLite write contention on the event loop. Deferred history uses a fixed 32-entry
 queue. Directory enumeration and hashing remain entirely off the GUI/emulation threads.
 
-**Commit SHA:** recorded by milestone 31
+**Commit SHA:** `6667162`
+
+## Milestone 31 detail
+
+**Status:** COMPLETE
+
+**Goal:** Capture the core's latest complete native frame as a deterministic PNG on a
+bounded background worker, with collision-safe atomic output, a configurable platform
+directory, visible completion/failure feedback, and no dependency on window chrome or
+GPU readback.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/screenshots/CMakeLists.txt`
+- `desktop/screenshots/include/genplusgx/screenshots/screenshot_service.h`
+- `desktop/screenshots/src/screenshot_service.cpp`
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/screenshot_settings.h`
+- `desktop/settings/src/screenshot_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/include/genplusgx/ui/screenshot_settings_dialog.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/screenshot_settings_dialog.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/screenshot_service_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.screenshot_service` verifies exact red, green, blue, and white
+RGB565 conversion, deterministic native 2×2 PNG dimensions, timestamp/frame filenames,
+collision suffixes, temporary-file cleanup, invalid-frame/directory rejection, bounded
+worker startup/request/completion/stop/restart, settings defaults, atomic round trip,
+schema 0 migration, relative-path rejection, corrupt JSON isolation, and future-schema
+rejection. `gui.main_window` publishes a complete frame through the real triple buffer,
+captures its immutable snapshot through F12, verifies busy/completion presentation,
+drives Browse/Apply/Cancel/OK/Restore Defaults and persistence failure behavior, and
+proves that starting another load clears the old frame before capture can recur.
+
+**Gate evidence:**
+
+- Focused screenshot service/application and complete main-window workflows passed five
+  consecutive Debug executions.
+- Debug build and complete CTest: passed (48/48).
+- Release build and complete CTest: passed (48/48).
+- ASan/UBSan build and complete CTest: passed (48/48) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New screenshot service, settings, GUI, composition, and test code compiles under the
+  frontend warning policy without warnings; authoritative `core/` files are unchanged.
+
+**Acceptance criteria:** **File → Screenshot** (`F12`) is enabled only while a loaded
+game has a complete presented native frame and no capture is outstanding. It copies
+that immutable RGB565 frame once, then a dedicated worker expands it to RGB32 and
+encodes PNG without blocking emulation or the event loop. Command/event queues have
+fixed capacities; only one GUI request is outstanding. Names contain a sanitized game
+stem, millisecond timestamp, and emulated frame number, with bounded numeric collision
+suffixing. Encoding occurs in a temporary file in the destination directory and commits
+by same-directory rename, leaving no partial final PNG. `config/screenshot-settings.json`
+is a bounded atomic schema 1 file with explicit schema 0 migration and an absolute-path
+requirement. The modeless settings dialog uses the injectable directory picker, and
+completion or failure is visible and logged. Starting a new load clears the previous
+presentation frame. The application explicitly starts, drains, disconnects, and joins
+the screenshot service during shutdown.
+
+**Commit SHA:** recorded by milestone 32

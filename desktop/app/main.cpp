@@ -15,7 +15,9 @@
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/recent_games.h"
+#include "genplusgx/screenshots/screenshot_service.h"
 #include "genplusgx/state_storage_service.h"
+#include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/system_settings.h"
@@ -219,6 +221,21 @@ int main(int argc, char* argv[])
       qWarning().noquote() << QString::fromStdString(migrated.message);
     }
   }
+  genplusgx::settings::ScreenshotSettingsStore screenshotSettingsStore{
+    applicationPaths.configDirectory() / "screenshot-settings.json",
+    applicationPaths.screenshotsDirectory()};
+  auto loadedScreenshotSettings = screenshotSettingsStore.load();
+  if (!loadedScreenshotSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedScreenshotSettings.status.message);
+  }
+  auto screenshotSettings = loadedScreenshotSettings.settings;
+  if (loadedScreenshotSettings.migrated) {
+    const auto migrated = screenshotSettingsStore.save(screenshotSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
   genplusgx::platform::BiosManager biosManager{
     genplusgx::platform::BiosConfigurationStore{
       applicationPaths.configDirectory() / "bios.json"}};
@@ -269,6 +286,12 @@ int main(int argc, char* argv[])
   if (!metadataServiceStarted) {
     qWarning().noquote() << QString::fromStdString(metadataServiceStarted.message);
   }
+  genplusgx::screenshots::ScreenshotService screenshotService;
+  const auto screenshotServiceStarted = screenshotService.start();
+  if (!screenshotServiceStarted) {
+    qWarning().noquote() << QString::fromStdString(
+      screenshotServiceStarted.message);
+  }
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -281,6 +304,7 @@ int main(int argc, char* argv[])
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
     static_cast<void>(stateStorage.stop());
+    static_cast<void>(screenshotService.stop());
     static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
     return 1;
@@ -487,6 +511,17 @@ int main(int argc, char* argv[])
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
   window.setSystemSettings(systemSettings);
+  window.setScreenshotSettings(
+    screenshotSettings, applicationPaths.screenshotsDirectory());
+  window.setScreenshotSettingsSink(
+    [&screenshotSettings, &screenshotSettingsStore](
+      const genplusgx::settings::ScreenshotSettings& settings) {
+      const auto saved = screenshotSettingsStore.save(settings);
+      if (saved) {
+        screenshotSettings = settings;
+      }
+      return saved;
+    });
   window.setBiosSnapshot(biosManager.snapshot());
   std::uint64_t firmwareSettingsOperationId = 800'000U;
   const auto initialFirmwareSettings = worker.submit(
@@ -741,6 +776,29 @@ int main(int argc, char* argv[])
   };
   std::uint64_t metadataOperationId = 4'000'000U;
   std::optional<PendingMetadata> pendingMetadata;
+  std::uint64_t screenshotOperationId = 4'500'000U;
+  std::optional<std::uint64_t> pendingScreenshot;
+  if (screenshotServiceStarted) {
+    window.setScreenshotSink(
+      [&pendingScreenshot, &screenshotOperationId, &screenshotService,
+       &screenshotSettings, &window](genplusgx::CoreVideoFrameInfo frame,
+                                     std::vector<std::uint16_t> pixels) {
+        const auto operationId = ++screenshotOperationId;
+        pendingScreenshot = operationId;
+        auto title = genplusgx::ui::pathToQString(
+          window.loadedGamePath().stem()).toUtf8().toStdString();
+        if (title.empty()) {
+          title = "screenshot";
+        }
+        const auto submitted = screenshotService.request(
+          operationId, screenshotSettings.directory, std::move(title), frame,
+          std::move(pixels));
+        if (!submitted) {
+          pendingScreenshot.reset();
+          window.showScreenshotError(submitted.message);
+        }
+      });
+  }
   window.setGameLoadSink(
     [&lifecycleOperationId, &pendingLoad, &window, &worker](
       const std::filesystem::path& path) {
@@ -859,6 +917,7 @@ int main(int argc, char* argv[])
      &lifecycleOperationId,
      &metadataService, &pendingDisc,
      &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
+     &pendingScreenshot, &screenshotService,
      &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
      &stateOperationId,
@@ -866,7 +925,7 @@ int main(int argc, char* argv[])
     static_cast<void>(controllerInput.pollEvents());
     while (auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
-        static_cast<void>(window.displayWidget()->presentLatestFrame());
+        static_cast<void>(window.presentLatestFrame());
         continue;
       }
       if (pendingState && event->operationId == pendingState->operationId &&
@@ -1134,6 +1193,38 @@ int main(int argc, char* argv[])
         window.showStateOperationSuccess(operation, slot);
       }
     }
+    while (auto event = screenshotService.pollEvent()) {
+      using EventType = genplusgx::screenshots::ScreenshotEventType;
+      if (event->type == EventType::serviceStarted) {
+        qInfo() << "Screenshot service started.";
+        continue;
+      }
+      if (event->type == EventType::serviceStopped) {
+        if (!event->status) {
+          qWarning().noquote() << QString::fromStdString(event->status.message);
+        }
+        if (pendingScreenshot) {
+          pendingScreenshot.reset();
+          window.showScreenshotError(
+            event->status.message.empty()
+              ? "The screenshot service stopped before saving the image."
+              : event->status.message);
+        }
+        continue;
+      }
+      if (!pendingScreenshot || event->operationId != *pendingScreenshot) {
+        continue;
+      }
+      pendingScreenshot.reset();
+      if (event->succeeded()) {
+        qInfo().noquote() << "Screenshot saved:"
+                          << genplusgx::ui::pathToQString(event->path);
+        window.showScreenshotSaved(event->path);
+      } else {
+        qWarning().noquote() << QString::fromStdString(event->status.message);
+        window.showScreenshotError(event->status.message);
+      }
+    }
     while (auto event = metadataService.pollEvent()) {
       if (event->type ==
           genplusgx::library::GameMetadataEventType::serviceStarted) {
@@ -1231,6 +1322,8 @@ int main(int argc, char* argv[])
   window.setStateOperationSink({});
   window.setGameInformationRequestSink({});
   window.setGameLibraryActions({});
+  window.setScreenshotSink({});
+  window.setScreenshotSettingsSink({});
   window.setVideoSettingsSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();
@@ -1245,6 +1338,11 @@ int main(int argc, char* argv[])
   if (!metadataServiceStopped) {
     qWarning().noquote() << QString::fromStdString(
       metadataServiceStopped.message);
+  }
+  const auto screenshotServiceStopped = screenshotService.stop();
+  if (!screenshotServiceStopped) {
+    qWarning().noquote() << QString::fromStdString(
+      screenshotServiceStopped.message);
   }
   const auto gameLibraryScannerStopped = gameLibraryScanner.stop();
   if (!gameLibraryScannerStopped) {

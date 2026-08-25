@@ -25,6 +25,7 @@ target_link_libraries(
     GenesisPlusGX::Library
     GenesisPlusGX::Persistence
     GenesisPlusGX::Platform
+    GenesisPlusGX::Screenshots
     GenesisPlusGX::Settings
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
