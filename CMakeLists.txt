@@ -72,6 +72,8 @@ message(STATUS "SDL3: ${SDL3_VERSION}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
 
+add_subdirectory(desktop/core)
+
 if(BUILD_TESTING)
   add_subdirectory(tests)
 endif()
