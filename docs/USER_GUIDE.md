@@ -211,8 +211,8 @@ The bundled NTSC filter offers monochrome, composite, S-Video, and RGB presets i
 addition to disabled. Interlaced games may use the core's single-field or double-field
 output, and Game Gear software can opt into the extended 256×192 viewport.
 
-Choose **Video → Video Settings…** or **Tools → Settings…** to edit the same controls
-in one dialog. **Apply** updates a running game without closing the dialog, **OK**
+Choose **Video → Video Settings…** to edit the same controls in one dialog. **Apply**
+updates a running game without closing the dialog, **OK**
 applies and closes, **Cancel** discards changes not already applied, and **Restore
 Defaults** stages the native/fit/nearest presentation with all optional core processing
 disabled. Every quick menu item and dialog control reflects the same active snapshot.
@@ -226,6 +226,24 @@ inside Genesis Plus GX and changes the native framebuffer geometry. Overscan and
 Gear viewport changes likewise come from the core rather than cropping the final
 window image. Region and VDP system selection are intentionally handled by the later
 System settings page instead of being conflated with display scaling.
+
+## Appearance and accessibility
+
+Choose **Tools → Settings…** (the platform Preferences shortcut) to select **System
+default**, **Light**, or **Dark**. System default restores the Qt platform style and
+colors captured at application startup. Light and dark use standard Qt Widgets with
+high-contrast palettes; they do not replace native controls with a custom skin. Changes
+apply to every open application window. The selection is atomically stored in
+`config/appearance-settings.json`; unreadable, malformed, or newer unsupported files
+fall back to the system theme without being overwritten.
+
+Qt 6 sizes the interface in device-independent units. Fractional desktop scaling and
+Retina displays use pass-through scale-factor rounding, while emulated-image integer
+scaling remains an independent Video setting. All menus have keyboard mnemonics,
+Preferences provides an explicit focus order and label buddy, and important controls
+expose stable accessible names through Qt's normal platform accessibility bridge. See
+[APPEARANCE_AND_ACCESSIBILITY.md](APPEARANCE_AND_ACCESSIBILITY.md) for keyboard and
+assistive-technology details.
 
 ## Audio settings
 

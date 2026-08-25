@@ -130,6 +130,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "openGameAction", "gameLibraryAction", "exitAction", "fullscreenAction",
     "muteAction", "volumeUpAction", "volumeDownAction",
     "controllerConfigurationAction", "playerAssignmentsAction", "settingsAction",
+    "videoSettingsAction", "audioSettingsAction",
     "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction"};
@@ -268,7 +269,7 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   });
   window.show();
 
-  window.findChild<QAction*>(QStringLiteral("settingsAction"))->trigger();
+  window.findChild<QAction*>(QStringLiteral("videoSettingsAction"))->trigger();
   QApplication::processEvents();
   auto* dialog = window.findChild<genplusgx::ui::VideoSettingsDialog*>(
     QStringLiteral("videoSettingsDialog"));

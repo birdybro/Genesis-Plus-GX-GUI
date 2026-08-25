@@ -1,5 +1,16 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_appearance_settings_test appearance_settings_test.cpp)
+target_link_libraries(
+  genplusgx_appearance_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.appearance_settings COMMAND genplusgx_appearance_settings_test)
+set_tests_properties(
+  unit.appearance_settings
+  PROPERTIES LABELS "unit;settings;persistence;filesystem;accessibility" TIMEOUT 30
+)
+
 add_executable(genplusgx_cheat_manager_test cheat_manager_test.cpp)
 target_link_libraries(
   genplusgx_cheat_manager_test

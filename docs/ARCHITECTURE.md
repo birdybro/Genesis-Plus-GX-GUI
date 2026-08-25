@@ -757,6 +757,28 @@ and bounded timing/audio anomalies without frame-by-frame noise or secrets.
 Dialogs are routed through an interface so GUI tests can replace native file and
 message boxes. Important widgets and actions have stable `objectName` values.
 
+## Appearance, DPI, and accessibility
+
+`AppearanceSettingsStore` is a bounded, versioned JSON boundary under the application
+config directory. The composition root loads it before constructing any top-level
+window. `ThemeController` owns the one process-wide policy: system mode restores the
+platform style/palette captured at startup, while explicit light and dark modes select
+Qt Fusion and a centralized palette. Widgets do not retain theme state and no theme
+operation crosses into the emulation worker or core.
+
+```text
+appearance-settings.json --> validated snapshot --> ThemeController --> QApplication
+                                     ^                       |
+                                     |                       v
+                         Preferences callback <--- all open Qt widgets
+```
+
+The high-DPI rounding policy is set before `QApplication` construction. Qt therefore
+keeps widget geometry, fonts, keyboard focus, accessibility objects, and platform
+screen-reader integration in device-independent coordinates. `DisplayWidget` continues
+to calculate emulated pixels from its physical render target and the independent
+fit/integer-scale policy. This prevents UI scaling from changing emulator geometry.
+
 ## Shutdown order
 
 Shutdown is an explicit, idempotent workflow:

@@ -44,8 +44,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | `6667162` |
 | 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | `7f04063` |
 | 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | `7756e2b` |
-| 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | recorded by milestone 34 |
-| 34 Theme/accessibility | PLANNED | System/light/dark, high-DPI and keyboard access | theme/accessibility services | persistence and navigation GUI tests | Critical controls keyboard accessible | pending |
+| 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | `cf3e7ac` |
+| 34 Theme/accessibility | COMPLETE | System/light/dark, high-DPI and keyboard access | appearance store/controller/dialog | persistence, palette and navigation GUI tests | Critical controls keyboard accessible | recorded by milestone 35 |
 | 35 Diagnostics/logging | PLANNED | Structured logs and copyable safe diagnostics | logging/diagnostics dialog | redaction/log creation/GUI tests | Useful bounded diagnostics, no secrets | pending |
 | 36 GUI regression | PLANNED | Cover every significant menu/dialog workflow | `tests/gui` and seams | complete headless GUI suite | Behavior, not construction-only, asserted | pending |
 | 37 Sanitizer/stress | PLANNED | ASan/UBSan, lifecycle and long-frame hardening | presets/tests | sanitizers and bounded stability test | No new-code sanitizer defects | pending |
@@ -2018,4 +2018,66 @@ effective core snapshots are ordered ahead of load so machine settings affect th
 frame. Live-safe categories apply immediately. Deleted profiles, corrupt data, queue
 failure, failed replacement, unload, and shutdown return to a deterministic safe state.
 
-**Commit SHA:** recorded by milestone 34
+**Commit SHA:** `cf3e7ac`
+
+## Milestone 34 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide persistent system, light, and dark presentation without custom widget
+skins, retain Qt's platform accessibility behavior, and make the complete preferences
+workflow usable without a pointer at fractional and Retina display scales.
+
+**Files changed:**
+
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/appearance_settings.h`
+- `desktop/settings/src/appearance_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/appearance_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/include/genplusgx/ui/theme_controller.h`
+- `desktop/ui/src/appearance_settings_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/theme_controller.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/appearance_settings_test.cpp`
+- `tests/gui/appearance_accessibility_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `docs/APPEARANCE_AND_ACCESSIBILITY.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.appearance_settings` verifies system defaults, exact atomic
+round trips, invalid enum rejection, schema-zero migration, invalid text, future schema,
+and corrupt JSON. `gui.appearance_accessibility` verifies deterministic light/dark
+palette application, restoration of the captured platform palette, pass-through
+high-DPI rounding, label/buddy and accessible metadata, mnemonic focus, explicit tab
+order, Apply/Restore Defaults, visible persistence failure, and the MainWindow
+Preferences workflow. The existing MainWindow suite now independently drives the
+dedicated Video Settings action.
+
+**Gate evidence:**
+
+- Focused appearance persistence, controller/dialog, keyboard-navigation, and
+  MainWindow tests passed.
+- Debug build and complete CTest: passed (56/56).
+- Release build and complete CTest: passed (56/56).
+- ASan/UBSan build and complete CTest: passed (56/56) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New C++/Qt code compiles under the frontend warning policy without warnings;
+  authoritative `core/` sources remain unchanged.
+
+**Acceptance criteria:** **Tools → Settings…** opens a modeless native Appearance
+dialog with stable automation names, a mnemonic-associated theme selector, explicit
+keyboard focus order, accessible names/descriptions, and transactional Apply/OK/Cancel
+behavior. System mode restores the startup platform style and palette; light/dark use
+Qt Fusion plus centralized high-contrast palettes rather than fragile per-widget skins.
+Qt 6 receives pass-through scale-factor rounding before `QApplication` construction,
+so native widgets remain device-independent while the emulator display retains its
+separate pixel/integer-scaling policy. Schema 1 persistence is bounded and atomic;
+malformed or unsupported settings fail closed to the system theme.
+
+**Commit SHA:** recorded by milestone 35

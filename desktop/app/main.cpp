@@ -18,12 +18,14 @@
 #include "genplusgx/recent_games.h"
 #include "genplusgx/screenshots/screenshot_service.h"
 #include "genplusgx/state_storage_service.h"
+#include "genplusgx/settings/appearance_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
+#include "genplusgx/ui/theme_controller.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
@@ -151,12 +153,14 @@ genplusgx::PersistenceStatus workerPersistenceFailure(std::string message)
 
 int main(int argc, char* argv[])
 {
+  genplusgx::ui::configureHighDpiPolicy();
   QApplication application(argc, argv);
   QCoreApplication::setOrganizationName(QStringLiteral("Genesis Plus GX GUI"));
   QCoreApplication::setOrganizationDomain(QStringLiteral("genesisplusgx.org"));
   QCoreApplication::setApplicationName(QString::fromLatin1(GENPLUSGX_APP_NAME));
   QCoreApplication::setApplicationVersion(QString::fromLatin1(GENPLUSGX_VERSION));
   QApplication::setDesktopFileName(QString::fromLatin1(GENPLUSGX_APP_ID));
+  genplusgx::ui::ThemeController themeController{application};
 
   const auto commandLine = genplusgx::app::parseCommandLine(
     application.arguments().mid(1));
@@ -178,6 +182,24 @@ int main(int argc, char* argv[])
   const auto pathsInitialized = applicationPaths.initialize();
   if (!pathsInitialized) {
     qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
+  }
+  genplusgx::settings::AppearanceSettingsStore appearanceSettingsStore{
+    applicationPaths.configDirectory() / "appearance-settings.json"};
+  auto loadedAppearanceSettings = appearanceSettingsStore.load();
+  if (!loadedAppearanceSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedAppearanceSettings.status.message);
+  }
+  auto appearanceSettings = loadedAppearanceSettings.settings;
+  if (!themeController.apply(appearanceSettings)) {
+    appearanceSettings = genplusgx::settings::defaultAppearanceSettings();
+    static_cast<void>(themeController.apply(appearanceSettings));
+  }
+  if (loadedAppearanceSettings.migrated) {
+    const auto migrated = appearanceSettingsStore.save(appearanceSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
   }
   const auto gameLibraryPath =
     applicationPaths.libraryDirectory() / "game-library.sqlite3";
@@ -561,6 +583,23 @@ int main(int argc, char* argv[])
       }
     };
   window.displayWidget()->setFrameExchange(videoFrames);
+  window.setAppearanceSettings(appearanceSettings);
+  window.setAppearanceSettingsSink(
+    [&appearanceSettings, &appearanceSettingsStore, &themeController](
+      const genplusgx::settings::AppearanceSettings& settings) {
+      const auto saved = appearanceSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      if (!themeController.apply(settings)) {
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = "The selected application theme could not be applied.",
+        };
+      }
+      appearanceSettings = settings;
+      return genplusgx::PersistenceStatus{};
+    });
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
   window.setSystemSettings(systemSettings);
@@ -1913,6 +1952,7 @@ int main(int argc, char* argv[])
   window.setScreenshotSettingsSink({});
   window.setCheatConfigurationSink({});
   window.setPerGameSettingsSink({});
+  window.setAppearanceSettingsSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});

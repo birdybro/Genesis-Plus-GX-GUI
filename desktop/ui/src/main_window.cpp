@@ -2,6 +2,7 @@
 
 #include "genplusgx/game_file.h"
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/cheat_manager_dialog.h"
@@ -430,7 +431,8 @@ void MainWindow::buildMenus()
     this, &MainWindow::requestGameInformation);
   auto* settings = addAction(
     *tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
-  connect(settings, &QAction::triggered, this, &MainWindow::showVideoSettings);
+  connect(settings, &QAction::triggered,
+    this, &MainWindow::showAppearanceSettings);
   auto* systemSettings = addAction(
     *tools, tr("&System Settings…"), "systemSettingsAction");
   connect(systemSettings, &QAction::triggered,
@@ -973,6 +975,31 @@ void MainWindow::showInputConfiguration(InputConfigurationTab tab)
   dialog->open();
 }
 
+void MainWindow::showAppearanceSettings()
+{
+  if (auto* existing = findChild<AppearanceSettingsDialog*>(
+        QStringLiteral("appearanceSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new AppearanceSettingsDialog(appearanceSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink(
+    [this](const settings::AppearanceSettings& settings) {
+      if (appearanceSettingsSink_) {
+        const auto saved = appearanceSettingsSink_(settings);
+        if (!saved) {
+          return saved;
+        }
+      }
+      appearanceSettings_ = settings;
+      statusBar()->showMessage(tr("Appearance settings applied."), 3'000);
+      return PersistenceStatus{};
+    });
+  dialog->open();
+}
+
 void MainWindow::showVideoSettings()
 {
   if (auto* existing = findChild<VideoSettingsDialog*>(
@@ -1071,6 +1098,29 @@ const settings::VideoSettings& MainWindow::videoSettings() const noexcept
 void MainWindow::setAudioSettings(settings::AudioSettings settings)
 {
   applyAudioSettings(settings, false);
+}
+
+void MainWindow::setAppearanceSettings(settings::AppearanceSettings value)
+{
+  if (!settings::validateAppearanceSettings(value)) {
+    return;
+  }
+  appearanceSettings_ = value;
+  if (auto* dialog = findChild<AppearanceSettingsDialog*>(
+        QStringLiteral("appearanceSettingsDialog"))) {
+    dialog->setSettings(appearanceSettings_);
+  }
+}
+
+void MainWindow::setAppearanceSettingsSink(AppearanceSettingsSink sink)
+{
+  appearanceSettingsSink_ = std::move(sink);
+}
+
+const settings::AppearanceSettings&
+MainWindow::appearanceSettings() const noexcept
+{
+  return appearanceSettings_;
 }
 
 void MainWindow::setAvailableAudioDevices(std::vector<std::string> devices)

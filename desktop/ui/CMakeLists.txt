@@ -1,4 +1,5 @@
 add_library(genplusgx_ui STATIC
+  include/genplusgx/ui/appearance_settings_dialog.h
   include/genplusgx/ui/audio_settings_dialog.h
   include/genplusgx/ui/about_dialog.h
   include/genplusgx/ui/bios_settings_dialog.h
@@ -12,7 +13,9 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/per_game_settings_dialog.h
   include/genplusgx/ui/screenshot_settings_dialog.h
   include/genplusgx/ui/system_settings_dialog.h
+  include/genplusgx/ui/theme_controller.h
   include/genplusgx/ui/video_settings_dialog.h
+  src/appearance_settings_dialog.cpp
   src/about_dialog.cpp
   src/audio_settings_dialog.cpp
   src/bios_settings_dialog.cpp
@@ -26,6 +29,7 @@ add_library(genplusgx_ui STATIC
   src/per_game_settings_dialog.cpp
   src/screenshot_settings_dialog.cpp
   src/system_settings_dialog.cpp
+  src/theme_controller.cpp
   src/video_settings_dialog.cpp
 )
 

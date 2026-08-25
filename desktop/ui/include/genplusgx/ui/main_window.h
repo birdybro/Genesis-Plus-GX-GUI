@@ -8,6 +8,7 @@
 #include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
+#include "genplusgx/settings/appearance_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
@@ -96,6 +97,8 @@ public:
     const cheats::CheatConfiguration&)>;
   using PerGameSettingsSink = std::function<PersistenceStatus(
     const settings::PerGameSettings&)>;
+  using AppearanceSettingsSink = std::function<PersistenceStatus(
+    const settings::AppearanceSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -107,6 +110,11 @@ public:
   void setInputConfigurationSink(InputConfigurationSink sink);
   void setControllerAssignmentSink(ControllerAssignmentSink sink);
   void setDialogService(std::shared_ptr<DialogService> service);
+  void setAppearanceSettings(settings::AppearanceSettings settings);
+  void setAppearanceSettingsSink(AppearanceSettingsSink sink);
+  [[nodiscard]] const settings::AppearanceSettings&
+    appearanceSettings() const noexcept;
+  void showAppearanceSettings();
   void setGameLoadSink(GameLoadSink sink);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
@@ -284,9 +292,11 @@ private:
   ScreenshotSettingsSink screenshotSettingsSink_;
   CheatConfigurationSink cheatConfigurationSink_;
   PerGameSettingsSink perGameSettingsSink_;
+  AppearanceSettingsSink appearanceSettingsSink_;
   cheats::CheatConfiguration cheatConfiguration_;
   cheats::CheatSystem cheatSystem_{cheats::CheatSystem::genesis};
   settings::PerGameSettings perGameSettings_;
+  settings::AppearanceSettings appearanceSettings_;
   settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
   std::filesystem::path defaultScreenshotDirectory_;
