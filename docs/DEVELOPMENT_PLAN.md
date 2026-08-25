@@ -49,8 +49,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 35 Diagnostics/logging | COMPLETE | Structured logs and copyable safe diagnostics | bounded logger/snapshot/dialog | rotation, redaction, JSONL and GUI copy tests | Useful bounded diagnostics, no secrets | `88313f1` |
 | 36 GUI regression | COMPLETE | Cover every significant menu/dialog workflow | `tests/gui`, typed emulation controls, embedded help, test matrix | complete headless GUI suite | Behavior, not construction-only, asserted | `3aa0f41` |
 | 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | `34e709f` |
-| 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | recorded by milestone 39 |
-| 39 Windows CI | PLANNED | MSVC x64 build and tests | GitHub workflow/platform fixes | matrix definition and cross-platform review | Clean Windows matrix definition | pending |
+| 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
+| 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | recorded by milestone 40 |
 | 40 macOS CI | PLANNED | Apple Silicon and practical Intel build/tests | GitHub workflow/platform fixes | matrix definition and deployment review | Clean macOS matrix definition | pending |
 | 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
@@ -2284,4 +2284,36 @@ pinned Qt 6.8.3 and SDL 3.4.14 toolchains, builds and tests Debug and Release, r
 the suite with ASan/UBSan leak detection, builds the inherited Unix libretro target,
 uploads useful failure logs, and does not enable proprietary external fixtures.
 
-**Commit SHA:** recorded by milestone 39
+**Commit SHA:** `013af97`
+
+## Milestone 39 detail
+
+**Status:** COMPLETE
+
+**Goal:** Prove the desktop frontend and complete automated suite build and run as
+native 64-bit Windows applications using Microsoft's supported compiler toolchain.
+
+**Files changed:**
+
+- `.github/workflows/ci.yml`
+- `docs/TESTING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** No product test is duplicated. The Windows Server 2022 matrix executes
+all 61 CTest registrations in both Debug and Release using Visual Studio 2022 x64.
+
+**Gate evidence:**
+
+- Milestone 38 hosted run `32908213185`: all four Linux jobs passed; Debug, Release,
+  ASan/UBSan, and inherited libretro coverage are green.
+- Windows path conversions, temporary-directory use, core compile definitions, dynamic
+  library search paths, and multi-configuration CTest invocation were reviewed.
+- `actionlint` and the first hosted Windows run are verified before milestone 40 begins;
+  its run identifier and final result are recorded by milestone 40.
+
+**Acceptance criteria:** Windows Server 2022 obtains Qt 6.8.3 for MSVC 2022 x64, builds
+matching SDL 3.4.14 libraries, compiles the entire application with `/W4`, and runs the
+complete Debug and Release suite headlessly. SDL runtime libraries are on `PATH`, failed
+runs retain only bounded build/test diagnostics, and no proprietary fixtures are used.
+
+**Commit SHA:** recorded by milestone 40

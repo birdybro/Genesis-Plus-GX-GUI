@@ -150,3 +150,62 @@ jobs:
       - name: Clean inherited libretro target
         if: always()
         run: make -f Makefile.libretro platform=unix clean
+
+  windows-build-test:
+    name: Windows MSVC x64 ${{ matrix.build_type }}
+    runs-on: windows-2022
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        build_type:
+          - Debug
+          - Release
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+          cache-key-prefix: qt-windows-msvc2022-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          add-to-environment: true
+          build-type: ${{ matrix.build_type }}
+          discriminator: windows-msvc-x64-${{ matrix.build_type }}
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure
+        run: >-
+          cmake -S . -B build/ci-windows
+          -A x64
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: >-
+          cmake --build build/ci-windows
+          --config ${{ matrix.build_type }} --parallel 2
+
+      - name: Test
+        run: >-
+          ctest --test-dir build/ci-windows
+          -C ${{ matrix.build_type }}
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Upload failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: windows-msvc-x64-${{ matrix.build_type }}-test-diagnostics
+          path: |
+            build/ci-windows/Testing/Temporary/LastTest.log
+            build/ci-windows/CMakeFiles/CMakeConfigureLog.yaml
+          if-no-files-found: ignore

@@ -72,14 +72,15 @@ ctest --preset asan -R '^core\.long_running_stability$'
 The normal test has a 90-second timeout; current Debug and sanitizer runs are expected to
 finish substantially faster on ordinary CI hardware.
 
-## Linux continuous integration
+## Continuous integration
 
 `.github/workflows/ci.yml` runs on pushes to `master` and `desktop-gui`, and on every
-pull request. The Ubuntu 24.04 jobs build and test the complete desktop application in
-Debug and Release, repeat the full suite under ASan/UBSan, and compile the inherited
-libretro target as a compatibility regression. Qt 6.8.3 and SDL 3.4.14 are explicit;
+pull request. Ubuntu 24.04 jobs build and test the complete desktop application in Debug
+and Release, repeat the full suite under ASan/UBSan, and compile the inherited libretro
+target as a compatibility regression. Windows Server 2022 jobs build and test Debug and
+Release with the Visual Studio 2022 x64 toolchain. Qt 6.8.3 and SDL 3.4.14 are explicit;
 third-party actions are pinned to immutable commit IDs. Failed CTest jobs upload
-`LastTest.log` and CMake configure diagnostics.
+`LastTest.log` and CMake configure diagnostics with platform/configuration-specific names.
 
 The hosted jobs use the same essential commands as a local run:
 
@@ -92,7 +93,9 @@ QT_QPA_PLATFORM=offscreen SDL_AUDIODRIVER=dummy \
 ```
 
 CI has least-privilege read-only repository contents permission, cancels obsolete runs
-on the same ref, and never enables external proprietary-BIOS fixtures.
+on the same ref, and never enables external proprietary-BIOS fixtures. Windows uses
+Qt's MSVC 2022 x64 binaries and a matching source-built SDL library; SDL's DLL directory
+is exported for test and application startup.
 
 ## Optional external BIOS test
 
