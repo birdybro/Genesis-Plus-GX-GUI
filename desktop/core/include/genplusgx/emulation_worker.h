@@ -43,6 +43,7 @@ enum class EmulationCommandType {
   inputSnapshot,
   videoSettings,
   audioSettings,
+  systemSettings,
   captureState,
   restoreState,
 };
@@ -55,6 +56,7 @@ struct EmulationCommand final {
   InputSnapshot input;
   CoreVideoSettings coreVideoSettings;
   CoreAudioSettings coreAudioSettings;
+  CoreSystemSettings coreSystemSettings;
   std::vector<std::uint8_t> rawState;
 
   [[nodiscard]] static EmulationCommand simple(
@@ -75,6 +77,9 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand updateAudioSettings(
     std::uint64_t operationId,
     CoreAudioSettings settings);
+  [[nodiscard]] static EmulationCommand updateSystemSettings(
+    std::uint64_t operationId,
+    CoreSystemSettings settings);
   [[nodiscard]] static EmulationCommand restore(
     std::uint64_t operationId,
     std::span<const std::uint8_t> rawState);
@@ -136,6 +141,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedInputCommands{0};
   std::uint64_t coalescedVideoSettingsCommands{0};
   std::uint64_t coalescedAudioSettingsCommands{0};
+  std::uint64_t coalescedSystemSettingsCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
   std::uint64_t pacedFrameCount{0};

@@ -3,6 +3,7 @@
 #include "genplusgx/audio_frame.h"
 #include "genplusgx/backup_memory.h"
 #include "genplusgx/core_audio_settings.h"
+#include "genplusgx/core_system_settings.h"
 #include "genplusgx/core_video_settings.h"
 #include "genplusgx/input_snapshot.h"
 
@@ -160,6 +161,9 @@ public:
   [[nodiscard]] CoreResult applyAudioSettings(
     const CoreAudioSettings& settings);
   [[nodiscard]] CoreResult audioSettings(CoreAudioSettings& output) const;
+  [[nodiscard]] CoreResult applySystemSettings(
+    const CoreSystemSettings& settings);
+  [[nodiscard]] CoreResult systemSettings(CoreSystemSettings& output) const;
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

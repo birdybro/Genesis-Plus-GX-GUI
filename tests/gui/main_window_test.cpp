@@ -2,6 +2,7 @@
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
@@ -54,6 +55,7 @@ private slots:
   void videoActionsDriveDisplayPolicy();
   void videoSettingsDialogAppliesCancelsAndRestores();
   void audioSettingsWorkflowAppliesCancelsAndRestores();
+  void systemSettingsWorkflowIsValidatedAndDeferred();
   void saveStateActionsExposeSlotSemantics();
 };
 
@@ -94,6 +96,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "openGameAction", "gameLibraryAction", "exitAction", "fullscreenAction",
     "muteAction", "volumeUpAction", "volumeDownAction",
     "controllerConfigurationAction", "playerAssignmentsAction", "settingsAction",
+    "systemSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction"};
   for (const auto* name : enabledNames) {
@@ -403,6 +406,97 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
   QTest::mouseClick(apply, Qt::LeftButton);
   QCOMPARE(updates.size(), std::size_t{5});
   QCOMPARE(window.audioSettings(), genplusgx::settings::defaultAudioSettings());
+  dialog->close();
+}
+
+void MainWindowTest::systemSettingsWorkflowIsValidatedAndDeferred()
+{
+  genplusgx::ui::MainWindow window;
+  genplusgx::CoreSystemSettings initial;
+  initial.hardware = genplusgx::CoreSystemHardware::masterSystem;
+  initial.region = genplusgx::CoreSystemRegion::ntscU;
+  window.setSystemSettings(initial);
+  std::vector<genplusgx::CoreSystemSettings> updates;
+  window.setSystemSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+  });
+
+  window.findChild<QAction*>(QStringLiteral("systemSettingsAction"))->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::SystemSettingsDialog*>(
+    QStringLiteral("systemSettingsDialog"));
+  QVERIFY(dialog != nullptr && dialog->isVisible());
+  auto* hardware = dialog->findChild<QComboBox*>(
+    QStringLiteral("systemHardwareCombo"));
+  auto* region = dialog->findChild<QComboBox*>(QStringLiteral("systemRegionCombo"));
+  auto* vdp = dialog->findChild<QComboBox*>(QStringLiteral("vdpModeCombo"));
+  auto* clock = dialog->findChild<QComboBox*>(QStringLiteral("masterClockCombo"));
+  auto* lockups = dialog->findChild<QCheckBox*>(
+    QStringLiteral("illegalAccessLockupsCheckBox"));
+  auto* addressErrors = dialog->findChild<QCheckBox*>(
+    QStringLiteral("addressErrorsCheckBox"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applySystemSettingsButton"));
+  auto* restore = dialog->findChild<QPushButton*>(
+    QStringLiteral("restoreSystemDefaultsButton"));
+  QVERIFY(hardware != nullptr && region != nullptr && vdp != nullptr);
+  QVERIFY(clock != nullptr && lockups != nullptr && addressErrors != nullptr);
+  QVERIFY(apply != nullptr && restore != nullptr);
+  QCOMPARE(hardware->currentData().toInt(),
+    static_cast<int>(genplusgx::CoreSystemHardware::masterSystem));
+  QCOMPARE(region->currentData().toInt(),
+    static_cast<int>(genplusgx::CoreSystemRegion::ntscU));
+
+  hardware->setCurrentIndex(hardware->findData(
+    static_cast<int>(genplusgx::CoreSystemHardware::gameGear)));
+  dialog->reject();
+  QApplication::processEvents();
+  QVERIFY(updates.empty());
+  QCOMPARE(window.systemSettings(), initial);
+
+  window.findChild<QAction*>(QStringLiteral("systemSettingsAction"))->trigger();
+  QApplication::processEvents();
+  dialog = window.findChild<genplusgx::ui::SystemSettingsDialog*>(
+    QStringLiteral("systemSettingsDialog"));
+  hardware = dialog->findChild<QComboBox*>(QStringLiteral("systemHardwareCombo"));
+  region = dialog->findChild<QComboBox*>(QStringLiteral("systemRegionCombo"));
+  vdp = dialog->findChild<QComboBox*>(QStringLiteral("vdpModeCombo"));
+  clock = dialog->findChild<QComboBox*>(QStringLiteral("masterClockCombo"));
+  lockups = dialog->findChild<QCheckBox*>(
+    QStringLiteral("illegalAccessLockupsCheckBox"));
+  addressErrors = dialog->findChild<QCheckBox*>(
+    QStringLiteral("addressErrorsCheckBox"));
+  apply = dialog->findChild<QPushButton*>(QStringLiteral("applySystemSettingsButton"));
+  restore = dialog->findChild<QPushButton*>(QStringLiteral("restoreSystemDefaultsButton"));
+  hardware->setCurrentIndex(hardware->findData(
+    static_cast<int>(genplusgx::CoreSystemHardware::sg1000IIRamExtension)));
+  region->setCurrentIndex(region->findData(
+    static_cast<int>(genplusgx::CoreSystemRegion::palJapan)));
+  vdp->setCurrentIndex(vdp->findData(
+    static_cast<int>(genplusgx::CoreVideoStandard::pal)));
+  clock->setCurrentIndex(clock->findData(
+    static_cast<int>(genplusgx::CoreMasterClock::ntsc)));
+  lockups->setChecked(false);
+  addressErrors->setChecked(false);
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{1});
+  QCOMPARE(window.systemSettings().hardware,
+    genplusgx::CoreSystemHardware::sg1000IIRamExtension);
+  QCOMPARE(window.systemSettings().region,
+    genplusgx::CoreSystemRegion::palJapan);
+  QCOMPARE(window.systemSettings().videoStandard,
+    genplusgx::CoreVideoStandard::pal);
+  QCOMPARE(window.systemSettings().masterClock,
+    genplusgx::CoreMasterClock::ntsc);
+  QVERIFY(!window.systemSettings().emulateIllegalAccessLockups);
+  QVERIFY(!window.systemSettings().enableAddressErrors);
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("next game")));
+
+  QTest::mouseClick(restore, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{1});
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{2});
+  QCOMPARE(window.systemSettings(), genplusgx::CoreSystemSettings{});
   dialog->close();
 }
 

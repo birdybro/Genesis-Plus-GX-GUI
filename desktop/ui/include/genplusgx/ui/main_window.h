@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/input/input_profile.h"
+#include "genplusgx/core_system_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
@@ -65,6 +66,7 @@ public:
     std::function<void(const settings::VideoSettings&)>;
   using AudioSettingsSink =
     std::function<void(const settings::AudioSettings&)>;
+  using SystemSettingsSink = std::function<void(const CoreSystemSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -89,6 +91,10 @@ public:
   void setAudioSettingsSink(AudioSettingsSink sink);
   [[nodiscard]] const settings::AudioSettings& audioSettings() const noexcept;
   void showAudioSettings();
+  void setSystemSettings(CoreSystemSettings settings);
+  void setSystemSettingsSink(SystemSettingsSink sink);
+  [[nodiscard]] const CoreSystemSettings& systemSettings() const noexcept;
+  void showSystemSettings();
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -164,6 +170,8 @@ private:
   settings::AudioSettings audioSettings_{settings::defaultAudioSettings()};
   std::vector<std::string> availableAudioDevices_;
   AudioSettingsSink audioSettingsSink_;
+  CoreSystemSettings systemSettings_;
+  SystemSettingsSink systemSettingsSink_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;

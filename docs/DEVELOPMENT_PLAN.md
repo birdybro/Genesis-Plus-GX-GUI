@@ -35,8 +35,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | `6e50cac` |
 | 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | `c8a3a2a` |
 | 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | `d3f5a69` |
-| 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | recorded by milestone 25 |
-| 25 System settings | PLANNED | Region, VDP, clock and safe system options | system settings UI/adapter | validation and reinit tests | Accurate defaults and controlled reinit | pending |
+| 24 Audio settings | COMPLETE | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | `56eeff4` |
+| 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | recorded by milestone 26 |
 | 26 BIOS manager | PLANNED | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | pending |
 | 27 Sega CD workflow | PLANNED | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | pending |
 | 28 Game information | PLANNED | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | pending |
@@ -1423,3 +1423,69 @@ coalesce in the bounded worker queue and apply between frames. Chip implementati
 changes reinitialize only the core sound layer. Authoritative core source is unchanged.
 
 **Commit SHA:** recorded by milestone 25
+
+## Milestone 25 detail
+
+**Status:** COMPLETE
+
+**Goal:** Expose supported hardware, region, VDP standard, master-clock, DTACK lockup,
+and 68000 address-error choices without mutating an active machine into a hybrid state.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_system_settings.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/system_settings.h`
+- `desktop/settings/src/system_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/include/genplusgx/ui/system_settings_dialog.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/system_settings_dialog.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/system_settings_test.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_system_settings_test.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.system_settings` verifies defaults, exact atomic round trip,
+invalid-enum rejection, schema 0 migration, malformed JSON isolation, and future-schema
+rejection. `core.system_settings` verifies invalid snapshots never partially mutate,
+PAL VDP timing can be combined with the NTSC master clock, loaded-session changes are
+deferred without changing active hardware/timing, forced SG-1000 plus NTSC VDP/PAL
+clock apply on reload, and restored automatic detection selects Genesis again.
+`core.emulation_worker` verifies the typed command crosses the ownership boundary while
+preserving active hardware. `gui.main_window` drives every control and verifies stable
+names plus Apply, Cancel, Restore Defaults, sink, and reload notification behavior.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (41/41).
+- Focused model/core/worker/GUI checks passed five consecutive Debug executions.
+- Release build and complete CTest: passed (41/41).
+- ASan/UBSan build and complete CTest: passed (41/41) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New system code compiles under the frontend warning policy without warnings.
+
+**Acceptance criteria:** `config/system-settings.json` is a bounded atomic schema 1
+file with explicit schema 0 migration. Automatic and forced SG-1000, SG-1000 II,
+SG-1000 II + RAM, Mark III, Master System, Master System II, Game Gear, and Genesis
+hardware are represented without leaking core constants into UI/persistence code.
+Automatic/NTSC-U/PAL Europe/NTSC-J/PAL Japan region, automatic/NTSC/PAL VDP mode, and
+automatic/NTSC/PAL master clock remain independent. Accuracy toggles retain hardware-
+accurate defaults. A loaded game continues with the exact machine it started with;
+the complete desired snapshot is applied before the next load. Commands coalesce in
+the bounded worker queue and are never applied from the GUI thread. The dialog states
+the reload boundary explicitly. Authoritative core source is unchanged.
+
+**Commit SHA:** recorded by milestone 26

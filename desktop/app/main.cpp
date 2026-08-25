@@ -13,6 +13,7 @@
 #include "genplusgx/state_storage_service.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/settings/audio_settings.h"
+#include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -144,6 +145,20 @@ int main(int argc, char* argv[])
       qWarning().noquote() << QString::fromStdString(migrated.message);
     }
   }
+  genplusgx::settings::SystemSettingsStore systemSettingsStore{
+    applicationPaths.configDirectory() / "system-settings.json"};
+  auto loadedSystemSettings = systemSettingsStore.load();
+  if (!loadedSystemSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedSystemSettings.status.message);
+  }
+  auto systemSettings = loadedSystemSettings.settings;
+  if (loadedSystemSettings.migrated) {
+    const auto migrated = systemSettingsStore.save(systemSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
 
   const auto audioDevices = genplusgx::availableAudioOutputDevices();
   genplusgx::AudioOutputConfig audioOutputConfig{
@@ -201,6 +216,7 @@ int main(int argc, char* argv[])
   window.displayWidget()->setFrameExchange(videoFrames);
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
+  window.setSystemSettings(systemSettings);
   std::vector<std::string> audioDeviceNames;
   audioDeviceNames.reserve(audioDevices.size());
   for (const auto& device : audioDevices) {
@@ -257,6 +273,29 @@ int main(int argc, char* argv[])
       audioOutput.setMuted(settings.muted);
       audioSettings = settings;
       const auto saved = audioSettingsStore.save(settings);
+      if (!saved) {
+        qWarning().noquote() << QString::fromStdString(saved.message);
+      }
+    });
+  std::uint64_t systemSettingsOperationId = 700'000U;
+  const auto initialSystemSettings = worker.submit(
+    genplusgx::EmulationCommand::updateSystemSettings(
+      ++systemSettingsOperationId, systemSettings));
+  if (!initialSystemSettings) {
+    qWarning().noquote() << QString::fromStdString(initialSystemSettings.message);
+  }
+  window.setSystemSettingsSink(
+    [&systemSettings, &systemSettingsOperationId, &systemSettingsStore, &worker](
+      const genplusgx::CoreSystemSettings& settings) {
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateSystemSettings(
+          ++systemSettingsOperationId, settings));
+      if (!submitted) {
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+        return;
+      }
+      systemSettings = settings;
+      const auto saved = systemSettingsStore.save(settings);
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
       }

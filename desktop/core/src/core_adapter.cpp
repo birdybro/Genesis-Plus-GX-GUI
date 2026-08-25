@@ -81,6 +81,32 @@ uint8 mameYm2612Type(CoreYm2612Core core) noexcept
   return YM2612_DISCRETE;
 }
 
+uint8 systemHardware(CoreSystemHardware hardware) noexcept
+{
+  switch (hardware) {
+    case CoreSystemHardware::automatic: return 0U;
+    case CoreSystemHardware::sg1000: return SYSTEM_SG;
+    case CoreSystemHardware::sg1000II: return SYSTEM_SGII;
+    case CoreSystemHardware::sg1000IIRamExtension: return SYSTEM_SGII_RAM_EXT;
+    case CoreSystemHardware::markIII: return SYSTEM_MARKIII;
+    case CoreSystemHardware::masterSystem: return SYSTEM_SMS;
+    case CoreSystemHardware::masterSystemII: return SYSTEM_SMS2;
+    case CoreSystemHardware::gameGear: return SYSTEM_GG;
+    case CoreSystemHardware::genesis: return SYSTEM_MD;
+  }
+  return 0U;
+}
+
+void configureSystem(const CoreSystemSettings& settings) noexcept
+{
+  config.system = systemHardware(settings.hardware);
+  config.region_detect = static_cast<uint8>(settings.region);
+  config.vdp_mode = static_cast<uint8>(settings.videoStandard);
+  config.master_clock = static_cast<uint8>(settings.masterClock);
+  config.force_dtack = settings.emulateIllegalAccessLockups ? 0U : 1U;
+  config.addr_error = settings.enableAddressErrors ? 1U : 0U;
+}
+
 std::span<std::uint8_t> backupMemory(BackupMemoryKind kind)
 {
   switch (kind) {
@@ -151,6 +177,7 @@ public:
   std::unique_ptr<sms_ntsc_t> smsNtsc;
   CoreVideoSettings videoSettings;
   CoreAudioSettings audioSettings;
+  CoreSystemSettings systemSettings;
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -241,6 +268,7 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
   if (state_ == CoreLifecycleState::loaded) {
     unloadUnchecked();
   }
+  configureSystem(private_->systemSettings);
 
   std::vector<char> mutablePath(nativePath.begin(), nativePath.end());
   mutablePath.push_back('\0');
@@ -750,6 +778,34 @@ CoreResult CoreAdapter::audioSettings(CoreAudioSettings& output) const
     return owner;
   }
   output = private_->audioSettings;
+  return success();
+}
+
+CoreResult CoreAdapter::applySystemSettings(const CoreSystemSettings& settings)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    return owner;
+  }
+  if (!validateCoreSystemSettings(settings)) {
+    return failure(CoreError::invalidSettings,
+      "The requested core system settings contain an unsupported value.");
+  }
+  private_->systemSettings = settings;
+  if (state_ != CoreLifecycleState::loaded) {
+    configureSystem(settings);
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::systemSettings(CoreSystemSettings& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    output = {};
+    return owner;
+  }
+  output = private_->systemSettings;
   return success();
 }
 

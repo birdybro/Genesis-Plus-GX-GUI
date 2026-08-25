@@ -218,6 +218,21 @@ int main()
         "Worker could not restore default audio settings")) {
     return 7;
   }
+  genplusgx::CoreSystemSettings nextLoadSystem;
+  nextLoadSystem.region = genplusgx::CoreSystemRegion::palEurope;
+  nextLoadSystem.videoStandard = genplusgx::CoreVideoStandard::pal;
+  if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateSystemSettings(
+            59U, nextLoadSystem), event),
+        "Worker system settings update failed") ||
+      !check(event.hardware == 0x80U,
+        "Reload-required system settings changed the active hardware") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateSystemSettings(
+            60U, genplusgx::CoreSystemSettings{}), event),
+        "Worker could not restore automatic system settings")) {
+    return 7;
+  }
 
   genplusgx::InputSnapshot input;
   input.sequence = 22U;

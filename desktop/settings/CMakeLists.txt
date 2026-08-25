@@ -1,7 +1,9 @@
 add_library(genplusgx_settings STATIC
   include/genplusgx/settings/audio_settings.h
+  include/genplusgx/settings/system_settings.h
   include/genplusgx/settings/video_settings.h
   src/audio_settings.cpp
+  src/system_settings.cpp
   src/video_settings.cpp
 )
 add_library(GenesisPlusGX::Settings ALIAS genplusgx_settings)

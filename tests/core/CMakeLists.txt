@@ -96,6 +96,19 @@ set_tests_properties(
   core.audio_samples PROPERTIES LABELS "core;integration;audio;fixture" TIMEOUT 30
 )
 
+add_executable(genplusgx_core_system_settings_test core_system_settings_test.cpp)
+target_link_libraries(
+  genplusgx_core_system_settings_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME core.system_settings COMMAND genplusgx_core_system_settings_test)
+set_tests_properties(
+  core.system_settings PROPERTIES LABELS "core;integration;system;settings;fixture" TIMEOUT 30
+)
+
 add_executable(genplusgx_core_input_test core_input_test.cpp)
 target_link_libraries(
   genplusgx_core_input_test

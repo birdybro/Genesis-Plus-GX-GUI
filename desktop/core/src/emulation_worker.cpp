@@ -106,6 +106,15 @@ EmulationCommand EmulationCommand::updateAudioSettings(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateSystemSettings(
+  std::uint64_t operationId,
+  CoreSystemSettings settings)
+{
+  auto command = simple(EmulationCommandType::systemSettings, operationId);
+  command.coreSystemSettings = settings;
+  return command;
+}
+
 EmulationCommand EmulationCommand::restore(
   std::uint64_t operationId,
   std::span<const std::uint8_t> rawState)
@@ -210,6 +219,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::systemSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::systemSettings;
+          },
+          std::move(command))) {
+      ++coalescedSystemSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -263,6 +282,7 @@ public:
       .coalescedInputCommands = coalescedInputCommands_,
       .coalescedVideoSettingsCommands = coalescedVideoSettingsCommands_,
       .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,
+      .coalescedSystemSettingsCommands = coalescedSystemSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -586,6 +606,9 @@ private:
         audioFrames_->clear();
         coreResult = adapter.applyAudioSettings(command.coreAudioSettings);
         break;
+      case EmulationCommandType::systemSettings:
+        coreResult = adapter.applySystemSettings(command.coreSystemSettings);
+        break;
       case EmulationCommandType::captureState:
         coreResult = adapter.saveRawState(capturedState);
         if (coreResult) {
@@ -813,6 +836,7 @@ private:
   std::uint64_t coalescedInputCommands_{0};
   std::uint64_t coalescedVideoSettingsCommands_{0};
   std::uint64_t coalescedAudioSettingsCommands_{0};
+  std::uint64_t coalescedSystemSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

@@ -409,6 +409,8 @@ layout is:
 
 ```text
 config/video-settings.json
+config/audio-settings.json
+config/system-settings.json
 config/input-profiles.json
 config/recent-games.json
 config/games/<game-id>.json
@@ -438,6 +440,16 @@ The implemented video store uses bounded schema-1 JSON and atomic replacement. S
 schemas return defaults plus a diagnostic without overwriting the source. The
 composition root applies presentation values before showing the window, queues the core
 snapshot after worker startup, and persists only validated user changes.
+
+System configuration is also a typed core-neutral snapshot. It maps supported hardware,
+region, VDP standard, master clock, illegal-access lockup, and address-error policy to
+core values only inside `CoreAdapter`. Unlike video and audio presentation controls,
+these values define machine initialization. An update while loaded changes only the
+adapter's desired snapshot; the active machine, timing, and CPU state are untouched.
+The complete snapshot is applied after unloading and immediately before the next ROM
+load. This prevents a running session from combining a new clock or console identity
+with old VDP/audio/CPU initialization. Its worker command still coalesces and remains
+ordered with lifecycle commands.
 
 `ApplicationPaths::fromPlatform()` resolves the root through Qt's standard application
 data location; every test constructs it with an absolute temporary root. Relative roots

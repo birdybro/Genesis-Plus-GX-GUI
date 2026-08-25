@@ -5,6 +5,7 @@
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
@@ -402,6 +403,10 @@ void MainWindow::buildMenus()
   auto* settings = addAction(
     *tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
   connect(settings, &QAction::triggered, this, &MainWindow::showVideoSettings);
+  auto* systemSettings = addAction(
+    *tools, tr("&System Settings…"), "systemSettingsAction");
+  connect(systemSettings, &QAction::triggered,
+    this, &MainWindow::showSystemSettings);
   addAction(*tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
@@ -512,6 +517,27 @@ void MainWindow::showAudioSettings()
   dialog->open();
 }
 
+void MainWindow::showSystemSettings()
+{
+  if (auto* existing = findChild<SystemSettingsDialog*>(
+        QStringLiteral("systemSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new SystemSettingsDialog(systemSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const CoreSystemSettings& settings) {
+    setSystemSettings(settings);
+    if (systemSettingsSink_) {
+      systemSettingsSink_(systemSettings_);
+    }
+    statusBar()->showMessage(
+      tr("System settings will apply when the next game is loaded."), 3'000);
+  });
+  dialog->open();
+}
+
 void MainWindow::setVideoSettings(settings::VideoSettings settings)
 {
   applyVideoSettings(settings, false);
@@ -545,6 +571,28 @@ void MainWindow::setAudioSettingsSink(AudioSettingsSink sink)
 const settings::AudioSettings& MainWindow::audioSettings() const noexcept
 {
   return audioSettings_;
+}
+
+void MainWindow::setSystemSettings(CoreSystemSettings settings)
+{
+  if (!validateCoreSystemSettings(settings)) {
+    return;
+  }
+  systemSettings_ = settings;
+  if (auto* dialog = findChild<SystemSettingsDialog*>(
+        QStringLiteral("systemSettingsDialog"))) {
+    dialog->setSettings(systemSettings_);
+  }
+}
+
+void MainWindow::setSystemSettingsSink(SystemSettingsSink sink)
+{
+  systemSettingsSink_ = std::move(sink);
+}
+
+const CoreSystemSettings& MainWindow::systemSettings() const noexcept
+{
+  return systemSettings_;
 }
 
 void MainWindow::applyVideoSettings(

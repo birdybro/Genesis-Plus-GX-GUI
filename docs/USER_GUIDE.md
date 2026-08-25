@@ -141,6 +141,25 @@ longer available, the application logs the condition and safely opens the system
 default. Settings are atomically stored as `config/audio-settings.json`; malformed or
 unsupported files fail closed to defaults.
 
+## System settings
+
+Choose **Tools → System Settings…** to override console hardware, region, VDP video
+standard, or master clock. Hardware choices include automatic detection, SG-1000 and
+both SG-1000 II variants, Mark III, Master System and Master System II, Game Gear, and
+Mega Drive/Genesis. Region, VDP, and master clock are independent advanced controls;
+leaving each on **Automatic** preserves the core's normal content detection.
+
+The Accuracy section retains real-hardware lockups for illegal accesses and 68000
+address-error exceptions by default. Disable these only for software known to depend
+on non-hardware behavior. All system choices are saved atomically in
+`config/system-settings.json`.
+
+System choices define machine initialization, so applying them never rewrites a game
+that is already running. The dialog and status bar state that the complete snapshot
+takes effect on the next game load. Closing and reopening the game is sufficient; the
+application itself does not need to restart. This boundary also ensures save data is
+flushed before a different emulated hardware model is created.
+
 Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).
