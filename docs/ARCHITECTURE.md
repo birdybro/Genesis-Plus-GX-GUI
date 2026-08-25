@@ -143,6 +143,42 @@ The worker emits immutable events containing operation IDs. The coordinator disc
 stale completion events after a newer load/unload generation, preventing late UI
 updates from a previous game.
 
+## Per-game settings resolution
+
+```text
+selected game path
+       |
+bounded metadata worker -> SHA-256 GameIdentity -> sparse schema 1 file
+                                                    |
+global video/audio/system/input/BIOS ---------------+
+                                                    |
+                                           deterministic precedence
+                                                    |
+                         system + firmware + video + audio commands
+                                                    |
+                                           ordered before core load
+```
+
+`PerGameSettings` contains optional whole-category snapshots. Absence means inheritance,
+not a copied default. `resolvePerGameSettings()` is the sole precedence function and
+produces a complete immutable effective snapshot. Host audio device and ring latency
+always remain global because the SDL stream and the ring shared with the worker are
+process resources; per-game audio covers gain/mute and core sound settings.
+
+The composition root preflights metadata off the GUI thread before submitting a load,
+so region, hardware, clock, and BIOS overrides participate in the first core
+initialization. The existing coalescing settings commands retain FIFO order with the
+lifecycle command. Active global settings and effective game settings are held
+separately: quick settings update a category's existing override, or the global layer
+when that category inherits. Failed replacement loads reapply the saved previous
+effective snapshot. Successful unload returns presentation, audio, input, and deferred
+core configuration to globals.
+
+The bounded atomic file embeds the complete SHA-256 and sanitized title slug. Invalid
+identity, nested values, paths, sizes, JSON, and future schemas fail closed. Saving an
+empty override removes that one exact file, ensuring a title that uses globals does not
+accumulate configuration artifacts.
+
 ## Cheat data flow
 
 ```text

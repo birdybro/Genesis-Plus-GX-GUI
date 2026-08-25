@@ -5,6 +5,17 @@ target_link_libraries(
   genplusgx_cheat_manager_test
   PRIVATE GenesisPlusGX::Cheats genplusgx_project_warnings Qt6::Core
 )
+
+add_executable(genplusgx_per_game_settings_test per_game_settings_test.cpp)
+target_link_libraries(
+  genplusgx_per_game_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.per_game_settings COMMAND genplusgx_per_game_settings_test)
+set_tests_properties(
+  unit.per_game_settings
+  PROPERTIES LABELS "unit;settings;persistence;filesystem" TIMEOUT 30
+)
 add_test(NAME unit.cheats COMMAND genplusgx_cheat_manager_test)
 set_tests_properties(
   unit.cheats PROPERTIES LABELS "unit;cheats;persistence;parser;fuzz" TIMEOUT 30

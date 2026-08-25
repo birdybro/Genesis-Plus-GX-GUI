@@ -14,6 +14,31 @@ target_link_libraries(
     Qt6::Test
     Qt6::Widgets
 )
+
+qt_add_executable(
+  genplusgx_per_game_settings_dialog_test per_game_settings_dialog_test.cpp
+)
+set_target_properties(
+  genplusgx_per_game_settings_dialog_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_per_game_settings_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(
+  NAME gui.per_game_settings COMMAND genplusgx_per_game_settings_dialog_test
+)
+set_tests_properties(
+  gui.per_game_settings
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;settings;persistence"
+    TIMEOUT 30
+)
 add_test(NAME gui.cheats COMMAND genplusgx_cheat_manager_dialog_test)
 set_tests_properties(
   gui.cheats

@@ -21,6 +21,7 @@
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/settings/audio_settings.h"
+#include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
@@ -82,6 +83,36 @@ genplusgx::CoreFirmwareSettings coreFirmwareSettings(
     .segaCdEurope = validPath(genplusgx::platform::BiosSlot::segaCdEurope),
     .segaCdJapan = validPath(genplusgx::platform::BiosSlot::segaCdJapan),
   };
+}
+
+genplusgx::CoreFirmwareSettings coreFirmwareSettings(
+  const genplusgx::platform::BiosConfiguration& configuration)
+{
+  const auto validPath = [&configuration](genplusgx::platform::BiosSlot slot) {
+    const auto& path = configuration.path(slot);
+    return genplusgx::platform::validateBios(slot, path).valid()
+      ? path
+      : std::filesystem::path{};
+  };
+  return {
+    .segaCdUsa = validPath(genplusgx::platform::BiosSlot::segaCdUsa),
+    .segaCdEurope = validPath(genplusgx::platform::BiosSlot::segaCdEurope),
+    .segaCdJapan = validPath(genplusgx::platform::BiosSlot::segaCdJapan),
+  };
+}
+
+std::optional<genplusgx::GameIdentity> metadataIdentity(
+  const genplusgx::library::GameMetadata& metadata)
+{
+  auto title = genplusgx::sanitizeFilename(metadata.displayTitle());
+  if (title.empty()) {
+    title = "game";
+  }
+  genplusgx::GameIdentity identity{
+    .sha256 = metadata.sha256,
+    .titleSlug = std::move(title),
+  };
+  return identity.valid() ? std::optional{std::move(identity)} : std::nullopt;
 }
 
 std::string discRegionName(genplusgx::CoreDiscRegion region)
@@ -152,6 +183,8 @@ int main(int argc, char* argv[])
     applicationPaths.libraryDirectory() / "game-library.sqlite3";
   genplusgx::cheats::CheatStore cheatStore{
     applicationPaths.configDirectory() / "cheats"};
+  genplusgx::settings::PerGameSettingsStore perGameSettingsStore{
+    applicationPaths.configDirectory() / "per-game-settings"};
   genplusgx::library::GameLibraryDatabase gameLibrary{gameLibraryPath};
   const auto gameLibraryInitialized = gameLibrary.initialize();
   if (!gameLibraryInitialized) {
@@ -542,6 +575,21 @@ int main(int argc, char* argv[])
       }
       return saved;
     });
+  const auto globalGameSettings = [&audioSettings, &biosManager,
+                                    &inputConfiguration, &systemSettings,
+                                    &videoSettings] {
+    return genplusgx::settings::GlobalGameSettings{
+      .video = videoSettings,
+      .audio = audioSettings,
+      .system = systemSettings,
+      .inputProfile = inputConfiguration.activeProfile,
+      .bios = biosManager.snapshot().configuration,
+    };
+  };
+  std::optional<genplusgx::GameIdentity> activePerGameIdentity;
+  genplusgx::settings::PerGameSettings activePerGameSettings;
+  auto activeEffectiveSettings = genplusgx::settings::resolvePerGameSettings(
+    globalGameSettings(), activePerGameSettings);
   window.setBiosSnapshot(biosManager.snapshot());
   std::uint64_t firmwareSettingsOperationId = 800'000U;
   const auto initialFirmwareSettings = worker.submit(
@@ -553,23 +601,34 @@ int main(int argc, char* argv[])
       initialFirmwareSettings.message);
   }
   window.setBiosConfigurationSink(
-    [&biosManager, &firmwareSettingsOperationId, &window, &worker](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &biosManager, &firmwareSettingsOperationId, &globalGameSettings, &window,
+     &worker](
       const genplusgx::platform::BiosConfiguration& configuration) {
       const auto saved = biosManager.apply(configuration);
       if (!saved) {
         return saved;
       }
       window.setBiosSnapshot(biosManager.snapshot());
+      const bool overridesActiveGame =
+        activePerGameIdentity && activePerGameSettings.bios;
+      if (!overridesActiveGame) {
+        activeEffectiveSettings.bios = biosManager.snapshot().configuration;
+      }
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateFirmwareSettings(
           ++firmwareSettingsOperationId,
-          coreFirmwareSettings(biosManager.snapshot())));
+          coreFirmwareSettings(activeEffectiveSettings.bios)));
       if (!submitted) {
         return genplusgx::PersistenceStatus{
           .error = genplusgx::PersistenceError::invalidData,
           .message = "BIOS paths were saved, but the emulation worker could not "
                      "accept the update: " + submitted.message,
         };
+      }
+      if (activePerGameIdentity) {
+        window.setPerGameSettingsSession(
+          activePerGameSettings, globalGameSettings());
       }
       return genplusgx::PersistenceStatus{};
     });
@@ -587,19 +646,47 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(initialVideoSettings.message);
   }
   window.setVideoSettingsSink(
-    [&videoSettings, &videoSettingsOperationId, &videoSettingsStore, &worker](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &globalGameSettings, &perGameSettingsStore, &videoSettings,
+     &videoSettingsOperationId,
+     &videoSettingsStore, &window, &worker](
       const genplusgx::settings::VideoSettings& settings) {
+      const auto previous = activeEffectiveSettings.video;
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateVideoSettings(
           ++videoSettingsOperationId, settings.core));
       if (!submitted) {
         qWarning().noquote() << QString::fromStdString(submitted.message);
+        window.setVideoSettings(previous);
         return;
       }
-      videoSettings = settings;
-      const auto saved = videoSettingsStore.save(settings);
+      const bool overridesActiveGame =
+        activePerGameIdentity && activePerGameSettings.video;
+      auto saved = genplusgx::PersistenceStatus{};
+      if (overridesActiveGame) {
+        auto candidate = activePerGameSettings;
+        candidate.video = settings;
+        saved = perGameSettingsStore.save(*activePerGameIdentity, candidate);
+        if (saved) {
+          activePerGameSettings = std::move(candidate);
+          activeEffectiveSettings.video = settings;
+        }
+      } else {
+        saved = videoSettingsStore.save(settings);
+        if (saved) {
+          videoSettings = settings;
+          activeEffectiveSettings.video = settings;
+        }
+      }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
+        static_cast<void>(worker.submit(
+          genplusgx::EmulationCommand::updateVideoSettings(
+            ++videoSettingsOperationId, previous.core)));
+        window.setVideoSettings(previous);
+      } else if (activePerGameIdentity) {
+        window.setPerGameSettingsSession(
+          activePerGameSettings, globalGameSettings());
       }
     });
   std::uint64_t audioSettingsOperationId = 600'000U;
@@ -610,9 +697,12 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(initialAudioSettings.message);
   }
   window.setAudioSettingsSink(
-    [&audioOutput, &audioSettings, &audioSettingsOperationId,
-     &audioSettingsStore, &worker](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &audioOutput, &audioSettings, &audioSettingsOperationId,
+     &audioSettingsStore, &globalGameSettings, &perGameSettingsStore, &window,
+     &worker](
       const genplusgx::settings::AudioSettings& settings) {
+      const auto previous = activeEffectiveSettings.audio;
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateAudioSettings(
           ++audioSettingsOperationId, settings.core));
@@ -624,13 +714,40 @@ int main(int argc, char* argv[])
         settings.masterVolumePercent);
       if (!volume) {
         qWarning().noquote() << QString::fromStdString(volume.message);
+        window.setAudioSettings(previous);
         return;
       }
       audioOutput.setMuted(settings.muted);
-      audioSettings = settings;
-      const auto saved = audioSettingsStore.save(settings);
+      const bool overridesActiveGame =
+        activePerGameIdentity && activePerGameSettings.audio;
+      auto saved = genplusgx::PersistenceStatus{};
+      if (overridesActiveGame) {
+        auto candidate = activePerGameSettings;
+        candidate.audio = settings;
+        saved = perGameSettingsStore.save(*activePerGameIdentity, candidate);
+        if (saved) {
+          activePerGameSettings = std::move(candidate);
+          activeEffectiveSettings.audio = settings;
+        }
+      } else {
+        saved = audioSettingsStore.save(settings);
+        if (saved) {
+          audioSettings = settings;
+          activeEffectiveSettings.audio = settings;
+        }
+      }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
+        static_cast<void>(worker.submit(
+          genplusgx::EmulationCommand::updateAudioSettings(
+            ++audioSettingsOperationId, previous.core)));
+        static_cast<void>(audioOutput.setVolumePercent(
+          previous.masterVolumePercent));
+        audioOutput.setMuted(previous.muted);
+        window.setAudioSettings(previous);
+      } else if (activePerGameIdentity) {
+        window.setPerGameSettingsSession(
+          activePerGameSettings, globalGameSettings());
       }
     });
   std::uint64_t systemSettingsOperationId = 700'000U;
@@ -641,19 +758,46 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(initialSystemSettings.message);
   }
   window.setSystemSettingsSink(
-    [&systemSettings, &systemSettingsOperationId, &systemSettingsStore, &worker](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &globalGameSettings, &perGameSettingsStore, &systemSettings,
+     &systemSettingsOperationId, &systemSettingsStore, &window, &worker](
       const genplusgx::CoreSystemSettings& settings) {
+      const auto previous = activeEffectiveSettings.system;
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateSystemSettings(
           ++systemSettingsOperationId, settings));
       if (!submitted) {
         qWarning().noquote() << QString::fromStdString(submitted.message);
+        window.setSystemSettings(previous);
         return;
       }
-      systemSettings = settings;
-      const auto saved = systemSettingsStore.save(settings);
+      const bool overridesActiveGame =
+        activePerGameIdentity && activePerGameSettings.system;
+      auto saved = genplusgx::PersistenceStatus{};
+      if (overridesActiveGame) {
+        auto candidate = activePerGameSettings;
+        candidate.system = settings;
+        saved = perGameSettingsStore.save(*activePerGameIdentity, candidate);
+        if (saved) {
+          activePerGameSettings = std::move(candidate);
+          activeEffectiveSettings.system = settings;
+        }
+      } else {
+        saved = systemSettingsStore.save(settings);
+        if (saved) {
+          systemSettings = settings;
+          activeEffectiveSettings.system = settings;
+        }
+      }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
+        static_cast<void>(worker.submit(
+          genplusgx::EmulationCommand::updateSystemSettings(
+            ++systemSettingsOperationId, previous)));
+        window.setSystemSettings(previous);
+      } else if (activePerGameIdentity) {
+        window.setPerGameSettingsSession(
+          activePerGameSettings, globalGameSettings());
       }
     });
   const auto refreshRecentGamesMenu = [&recentGames, &window] {
@@ -678,32 +822,56 @@ int main(int argc, char* argv[])
   genplusgx::input::KeyboardInput keyboardInput{&window};
   genplusgx::input::ControllerInput controllerInput;
   window.setInputConfiguration(inputConfiguration);
-  const auto applyActiveInputProfile =
-    [&inputConfiguration, &keyboardInput, &controllerInput] {
-      const auto* profile = inputConfiguration.active();
-      if (profile == nullptr) {
-        return;
+  const auto applyInputProfile =
+    [&inputConfiguration, &keyboardInput, &controllerInput](
+      const std::string& name) {
+      const auto found = std::ranges::find_if(inputConfiguration.profiles,
+        [&name](const auto& profile) { return profile.name == name; });
+      if (found == inputConfiguration.profiles.end()) {
+        return false;
       }
+      const auto* profile = &*found;
+      bool applied = true;
       if (!keyboardInput.setBindings(profile->keyboardBindings)) {
         qWarning() << "The active keyboard profile was rejected by the runtime.";
+        applied = false;
       }
       if (!controllerInput.setBindings(profile->controllerBindings)) {
         qWarning() << "The active controller profile was rejected by the runtime.";
+        applied = false;
       }
       if (!controllerInput.setAxisBindings(profile->controllerAxisBindings)) {
         qWarning() << "The active controller axis profile was rejected by the runtime.";
+        applied = false;
       }
       controllerInput.setDeadzone(profile->deadzone);
+      return applied;
     };
-  applyActiveInputProfile();
+  const auto applyActiveInputProfile =
+    [&applyInputProfile, &inputConfiguration] {
+      return applyInputProfile(inputConfiguration.activeProfile);
+    };
+  static_cast<void>(applyActiveInputProfile());
   window.setInputConfigurationSink(
-    [&inputConfiguration, &inputProfileStore, &applyActiveInputProfile](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &globalGameSettings, &inputConfiguration, &inputProfileStore,
+     &applyActiveInputProfile, &applyInputProfile, &window](
       const genplusgx::input::InputConfiguration& configuration) {
       inputConfiguration = configuration;
-      applyActiveInputProfile();
+      bool appliedOverride = false;
+      if (activePerGameIdentity && activePerGameSettings.inputProfile) {
+        appliedOverride = applyInputProfile(*activePerGameSettings.inputProfile);
+      }
+      if (!appliedOverride) {
+        static_cast<void>(applyActiveInputProfile());
+        activeEffectiveSettings.inputProfile = inputConfiguration.activeProfile;
+      }
       const auto saved = inputProfileStore.save(configuration);
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
+      } else if (activePerGameIdentity) {
+        window.setPerGameSettingsSession(
+          activePerGameSettings, globalGameSettings());
       }
     });
   window.setControllerAssignmentSink(
@@ -755,11 +923,71 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(controllerInitialized.message);
   }
 
+  const auto applyEffectiveSettings =
+    [&applyInputProfile, &audioOutput, &audioSettingsOperationId,
+     &firmwareSettingsOperationId, &inputConfiguration,
+     &systemSettingsOperationId, &videoSettingsOperationId, &window, &worker](
+      const genplusgx::settings::EffectiveGameSettings& settings) {
+      const auto profile = std::ranges::find_if(inputConfiguration.profiles,
+        [&settings](const auto& candidate) {
+          return candidate.name == settings.inputProfile;
+        });
+      if (profile == inputConfiguration.profiles.end()) {
+        return workerPersistenceFailure(
+          "The selected per-game input profile no longer exists.");
+      }
+      const std::array submitted{
+        worker.submit(genplusgx::EmulationCommand::updateSystemSettings(
+          ++systemSettingsOperationId, settings.system)),
+        worker.submit(genplusgx::EmulationCommand::updateFirmwareSettings(
+          ++firmwareSettingsOperationId, coreFirmwareSettings(settings.bios))),
+        worker.submit(genplusgx::EmulationCommand::updateVideoSettings(
+          ++videoSettingsOperationId, settings.video.core)),
+        worker.submit(genplusgx::EmulationCommand::updateAudioSettings(
+          ++audioSettingsOperationId, settings.audio.core)),
+      };
+      for (const auto& status : submitted) {
+        if (!status) {
+          return workerPersistenceFailure(
+            "The emulation worker could not accept effective settings: " +
+            status.message);
+        }
+      }
+      const auto volume = audioOutput.setVolumePercent(
+        settings.audio.masterVolumePercent);
+      if (!volume) {
+        return workerPersistenceFailure(volume.message);
+      }
+      audioOutput.setMuted(settings.audio.muted);
+      if (!applyInputProfile(settings.inputProfile)) {
+        return workerPersistenceFailure(
+          "The selected input profile could not be applied safely.");
+      }
+      window.setVideoSettings(settings.video);
+      window.setAudioSettings(settings.audio);
+      window.setSystemSettings(settings.system);
+      return genplusgx::PersistenceStatus{};
+    };
+
+  enum class PendingLoadPhase {
+    metadata,
+    coreLoad,
+  };
   struct PendingLoad final {
     std::uint64_t operationId{0};
+    std::uint64_t metadataOperationId{0};
     std::filesystem::path path;
+    std::optional<genplusgx::GameIdentity> identity;
+    genplusgx::settings::PerGameSettings overrides;
+    genplusgx::settings::EffectiveGameSettings effective;
+    std::optional<genplusgx::GameIdentity> previousIdentity;
+    genplusgx::settings::PerGameSettings previousOverrides;
+    genplusgx::settings::EffectiveGameSettings previousEffective;
+    std::string warning;
+    PendingLoadPhase phase{PendingLoadPhase::metadata};
   };
   std::uint64_t lifecycleOperationId = 2'000'000U;
+  std::uint64_t loadMetadataOperationId = 2'250'000U;
   std::uint64_t stateOperationId = 3'000'000U;
   std::uint64_t gameGeneration = 0U;
   bool stateSessionAvailable = false;
@@ -832,15 +1060,82 @@ int main(int argc, char* argv[])
         }
       });
   }
+  window.setPerGameSettingsSink(
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &applyEffectiveSettings, &globalGameSettings, &perGameSettingsStore,
+     &window](const genplusgx::settings::PerGameSettings& overrides) {
+      if (!activePerGameIdentity) {
+        return workerPersistenceFailure(
+          "No active per-game settings identity is available.");
+      }
+      if (!genplusgx::settings::validatePerGameSettings(overrides)) {
+        return workerPersistenceFailure(
+          "The requested per-game settings are invalid.");
+      }
+      const auto previous = activeEffectiveSettings;
+      const auto effective = genplusgx::settings::resolvePerGameSettings(
+        globalGameSettings(), overrides);
+      const auto applied = applyEffectiveSettings(effective);
+      if (!applied) {
+        static_cast<void>(applyEffectiveSettings(previous));
+        return applied;
+      }
+      const auto saved = perGameSettingsStore.save(
+        *activePerGameIdentity, overrides);
+      if (!saved) {
+        static_cast<void>(applyEffectiveSettings(previous));
+        return saved;
+      }
+      activePerGameSettings = overrides;
+      activeEffectiveSettings = effective;
+      window.setPerGameSettingsSession(
+        activePerGameSettings, globalGameSettings());
+      return genplusgx::PersistenceStatus{};
+    });
   window.setGameLoadSink(
-    [&lifecycleOperationId, &pendingLoad, &window, &worker](
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &applyEffectiveSettings, &globalGameSettings, &lifecycleOperationId,
+     &loadMetadataOperationId, &metadataService, &pendingLoad, &window, &worker](
       const std::filesystem::path& path) {
-      const auto operationId = ++lifecycleOperationId;
-      pendingLoad = PendingLoad{.operationId = operationId, .path = path};
-      const auto submitted = worker.submit(
-        genplusgx::EmulationCommand::load(operationId, path));
-      if (!submitted) {
+      const auto metadataId = ++loadMetadataOperationId;
+      pendingLoad = PendingLoad{
+        .operationId = 0U,
+        .metadataOperationId = metadataId,
+        .path = path,
+        .identity = std::nullopt,
+        .overrides = {},
+        .effective = genplusgx::settings::resolvePerGameSettings(
+          globalGameSettings(), {}),
+        .previousIdentity = activePerGameIdentity,
+        .previousOverrides = activePerGameSettings,
+        .previousEffective = activeEffectiveSettings,
+        .warning = {},
+        .phase = PendingLoadPhase::metadata,
+      };
+      const auto requested = metadataService.request(metadataId, path);
+      if (requested) {
+        return;
+      }
+      pendingLoad->warning =
+        "Per-game metadata preflight failed; global settings were used: " +
+        requested.message;
+      qWarning().noquote() << QString::fromStdString(pendingLoad->warning);
+      const auto applied = applyEffectiveSettings(pendingLoad->effective);
+      if (!applied) {
+        const auto previous = pendingLoad->previousEffective;
         pendingLoad.reset();
+        static_cast<void>(applyEffectiveSettings(previous));
+        window.showGameLoadError(path, applied.message, false);
+        return;
+      }
+      pendingLoad->operationId = ++lifecycleOperationId;
+      pendingLoad->phase = PendingLoadPhase::coreLoad;
+      const auto submitted = worker.submit(genplusgx::EmulationCommand::load(
+        pendingLoad->operationId, path));
+      if (!submitted) {
+        const auto previous = pendingLoad->previousEffective;
+        pendingLoad.reset();
+        static_cast<void>(applyEffectiveSettings(previous));
         window.showGameLoadError(path, submitted.message, false);
       }
     });
@@ -983,15 +1278,18 @@ int main(int argc, char* argv[])
     &eventPump,
     &QTimer::timeout,
     &window,
-    [&audioOutput, &controllerInput, &deferredLibraryLaunches,
-     &flushDeferredLibraryLaunches, &gameGeneration, &gameLibraryScanner,
-     &inputAggregator, &inputOperationId, &libraryScansInFlight,
+    [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &applyEffectiveSettings, &audioOutput, &controllerInput,
+     &deferredLibraryLaunches, &flushDeferredLibraryLaunches, &gameGeneration,
+     &gameLibraryScanner, &globalGameSettings,
+     &inputAggregator, &inputConfiguration, &inputOperationId,
+     &libraryScansInFlight,
      &lifecycleOperationId,
      &metadataService, &pendingDisc,
      &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
      &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
-     &pendingCheatMetadata, &pendingCheatOperation,
+     &pendingCheatMetadata, &pendingCheatOperation, &perGameSettingsStore,
      &pendingScreenshot, &screenshotService,
      &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
@@ -1052,18 +1350,31 @@ int main(int argc, char* argv[])
           }
         }
       }
-      if (pendingLoad && event->operationId == pendingLoad->operationId &&
+      if (pendingLoad && pendingLoad->phase == PendingLoadPhase::coreLoad &&
+          event->operationId == pendingLoad->operationId &&
           event->command == genplusgx::EmulationCommandType::loadGame) {
-        const auto loadedPath = pendingLoad->path;
+        const auto completedLoad = std::move(*pendingLoad);
+        const auto loadedPath = completedLoad.path;
         pendingLoad.reset();
         if (event->succeeded()) {
           window.clearCheatSession();
+          window.clearPerGameSettingsSession();
           activeCheatIdentity.reset();
           activeCheatSystem.reset();
           activeCheatConfiguration = {};
           pendingCheatMetadata.reset();
           pendingCheatOperation.reset();
+          activePerGameIdentity = completedLoad.identity;
+          activePerGameSettings = completedLoad.overrides;
+          activeEffectiveSettings = completedLoad.effective;
           window.setGameLoaded(loadedPath);
+          if (activePerGameIdentity) {
+            window.setPerGameSettingsSession(
+              activePerGameSettings, globalGameSettings());
+          }
+          if (!completedLoad.warning.empty()) {
+            window.showPerGameSettingsError(completedLoad.warning);
+          }
           window.setSegaCdSession(
             event->disc.segaCd,
             discRegionName(event->disc.region),
@@ -1137,6 +1448,18 @@ int main(int argc, char* argv[])
           window.showGameLoadError(
             loadedPath, event->message, !previousGameRemainsLoaded);
           if (previousGameRemainsLoaded) {
+            const auto restored = applyEffectiveSettings(
+              completedLoad.previousEffective);
+            if (!restored) {
+              qWarning().noquote() << QString::fromStdString(restored.message);
+            }
+            activePerGameIdentity = completedLoad.previousIdentity;
+            activePerGameSettings = completedLoad.previousOverrides;
+            activeEffectiveSettings = completedLoad.previousEffective;
+            if (activePerGameIdentity) {
+              window.setPerGameSettingsSession(
+                activePerGameSettings, globalGameSettings());
+            }
             window.setStateSessionReady(stateSessionAvailable);
             window.setSegaCdSession(
               event->disc.segaCd,
@@ -1159,6 +1482,17 @@ int main(int argc, char* argv[])
             window.setStateSessionReady(false);
           }
           if (!previousGameRemainsLoaded) {
+            const auto globalEffective =
+              genplusgx::settings::resolvePerGameSettings(
+                globalGameSettings(), {});
+            const auto restored = applyEffectiveSettings(globalEffective);
+            if (!restored) {
+              qWarning().noquote() << QString::fromStdString(restored.message);
+            }
+            activePerGameIdentity.reset();
+            activePerGameSettings = {};
+            activeEffectiveSettings = globalEffective;
+            window.clearPerGameSettingsSession();
             activeCheatIdentity.reset();
             activeCheatSystem.reset();
             activeCheatConfiguration = {};
@@ -1181,6 +1515,16 @@ int main(int argc, char* argv[])
           stateSessionAvailable = false;
           stateActivationOperation.reset();
           pendingState.reset();
+          const auto globalEffective =
+            genplusgx::settings::resolvePerGameSettings(
+              globalGameSettings(), {});
+          const auto restored = applyEffectiveSettings(globalEffective);
+          if (!restored) {
+            qWarning().noquote() << QString::fromStdString(restored.message);
+          }
+          activePerGameIdentity.reset();
+          activePerGameSettings = {};
+          activeEffectiveSettings = globalEffective;
           window.setNoGameLoaded();
           window.clearCheatSession();
           activeCheatIdentity.reset();
@@ -1352,6 +1696,72 @@ int main(int argc, char* argv[])
           genplusgx::library::GameMetadataEventType::serviceStopped) {
         continue;
       }
+      if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata &&
+          event->operationId == pendingLoad->metadataOperationId &&
+          event->path == pendingLoad->path) {
+        if (event->succeeded()) {
+          pendingLoad->identity = metadataIdentity(event->metadata);
+          if (!pendingLoad->identity) {
+            pendingLoad->warning =
+              "The game metadata did not produce a safe settings identity; "
+              "global settings were used.";
+          } else {
+            auto loaded = perGameSettingsStore.load(*pendingLoad->identity);
+            if (!loaded.status) {
+              pendingLoad->warning =
+                "Stored per-game settings could not be loaded; global settings "
+                "were used: " + loaded.status.message;
+              qWarning().noquote()
+                << QString::fromStdString(pendingLoad->warning);
+            } else {
+              pendingLoad->overrides = std::move(loaded.settings);
+            }
+          }
+        } else {
+          pendingLoad->warning =
+            "Game metadata preflight failed; global settings were used: " +
+            event->status.message;
+          qWarning().noquote() << QString::fromStdString(pendingLoad->warning);
+        }
+        pendingLoad->effective = genplusgx::settings::resolvePerGameSettings(
+          globalGameSettings(), pendingLoad->overrides);
+        const auto inputProfileExists = std::ranges::any_of(
+          inputConfiguration.profiles,
+          [&pendingLoad](const auto& profile) {
+            return profile.name == pendingLoad->effective.inputProfile;
+          });
+        if (!inputProfileExists) {
+          if (!pendingLoad->warning.empty()) {
+            pendingLoad->warning += ' ';
+          }
+          pendingLoad->warning +=
+            "The selected input profile no longer exists; the global profile "
+            "was used.";
+          pendingLoad->effective.inputProfile =
+            globalGameSettings().inputProfile;
+        }
+        const auto applied = applyEffectiveSettings(pendingLoad->effective);
+        if (!applied) {
+          const auto path = pendingLoad->path;
+          const auto previous = pendingLoad->previousEffective;
+          pendingLoad.reset();
+          static_cast<void>(applyEffectiveSettings(previous));
+          window.showGameLoadError(path, applied.message, false);
+          continue;
+        }
+        pendingLoad->operationId = ++lifecycleOperationId;
+        pendingLoad->phase = PendingLoadPhase::coreLoad;
+        const auto submitted = worker.submit(genplusgx::EmulationCommand::load(
+          pendingLoad->operationId, pendingLoad->path));
+        if (!submitted) {
+          const auto path = pendingLoad->path;
+          const auto previous = pendingLoad->previousEffective;
+          pendingLoad.reset();
+          static_cast<void>(applyEffectiveSettings(previous));
+          window.showGameLoadError(path, submitted.message, false);
+        }
+        continue;
+      }
       if (pendingCheatMetadata &&
           event->operationId == pendingCheatMetadata->operationId &&
           event->path == pendingCheatMetadata->path) {
@@ -1502,7 +1912,11 @@ int main(int argc, char* argv[])
   window.setScreenshotSink({});
   window.setScreenshotSettingsSink({});
   window.setCheatConfigurationSink({});
+  window.setPerGameSettingsSink({});
   window.setVideoSettingsSink({});
+  window.setAudioSettingsSink({});
+  window.setSystemSettingsSink({});
+  window.setBiosConfigurationSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();
   if (!workerStopped) {

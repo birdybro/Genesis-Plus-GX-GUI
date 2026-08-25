@@ -9,6 +9,7 @@
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -419,6 +420,10 @@ void MainWindow::buildMenus()
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
   auto* cheats = addAction(*tools, tr("&Cheats…"), "cheatsAction");
   connect(cheats, &QAction::triggered, this, &MainWindow::showCheats);
+  auto* perGameSettings = addAction(
+    *tools, tr("Per-&Game Settings…"), "perGameSettingsAction");
+  connect(perGameSettings, &QAction::triggered,
+    this, &MainWindow::showPerGameSettings);
   auto* gameInformation = addAction(
     *tools, tr("Game &Information…"), "gameInformationAction");
   connect(gameInformation, &QAction::triggered,
@@ -472,6 +477,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateStateActions();
   updateScreenshotAction();
   updateCheatAction();
+  updatePerGameSettingsAction();
 }
 
 void MainWindow::setCheatSession(
@@ -548,6 +554,96 @@ void MainWindow::updateCheatAction()
 {
   if (auto* action = findChild<QAction*>(QStringLiteral("cheatsAction"))) {
     action->setEnabled(isGameLoaded() && cheatSessionReady_);
+  }
+}
+
+void MainWindow::setPerGameSettingsSession(
+  settings::PerGameSettings overrides,
+  settings::GlobalGameSettings global)
+{
+  if (!isGameLoaded() || !settings::validatePerGameSettings(overrides) ||
+      !settings::validateVideoSettings(global.video) ||
+      !settings::validateAudioSettings(global.audio) ||
+      !validateCoreSystemSettings(global.system)) {
+    return;
+  }
+  perGameSettings_ = std::move(overrides);
+  globalGameSettings_ = std::move(global);
+  perGameSettingsSessionReady_ = true;
+  if (auto* dialog = findChild<PerGameSettingsDialog*>(
+        QStringLiteral("perGameSettingsDialog"))) {
+    dialog->setSession(perGameSettings_, globalGameSettings_);
+  }
+  updatePerGameSettingsAction();
+}
+
+void MainWindow::clearPerGameSettingsSession()
+{
+  perGameSettingsSessionReady_ = false;
+  perGameSettings_ = {};
+  if (auto* dialog = findChild<PerGameSettingsDialog*>(
+        QStringLiteral("perGameSettingsDialog"))) {
+    dialog->reject();
+  }
+  updatePerGameSettingsAction();
+}
+
+void MainWindow::setPerGameSettingsSink(PerGameSettingsSink sink)
+{
+  perGameSettingsSink_ = std::move(sink);
+}
+
+void MainWindow::showPerGameSettings()
+{
+  if (!perGameSettingsSessionReady_ || !isGameLoaded()) {
+    return;
+  }
+  if (auto* existing = findChild<PerGameSettingsDialog*>(
+        QStringLiteral("perGameSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  std::vector<std::string> profiles;
+  profiles.reserve(inputConfiguration_.profiles.size());
+  for (const auto& profile : inputConfiguration_.profiles) {
+    profiles.push_back(profile.name);
+  }
+  auto* dialog = new PerGameSettingsDialog(
+    perGameSettings_, globalGameSettings_, std::move(profiles),
+    availableAudioDevices_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setConfigurationSink(
+    [this](const settings::PerGameSettings& configuration) {
+      if (perGameSettingsSink_) {
+        const auto saved = perGameSettingsSink_(configuration);
+        if (!saved) {
+          return saved;
+        }
+      }
+      perGameSettings_ = configuration;
+      statusBar()->showMessage(
+        configuration.empty()
+          ? tr("This game now uses all global settings.")
+          : tr("Per-game settings applied."),
+        3'000);
+      return PersistenceStatus{};
+    });
+  dialog->open();
+}
+
+void MainWindow::showPerGameSettingsError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Per-game settings operation failed"), 5'000);
+  dialogService_->showError(
+    this, tr("Per-Game Settings Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::updatePerGameSettingsAction()
+{
+  if (auto* action = findChild<QAction*>(
+        QStringLiteral("perGameSettingsAction"))) {
+    action->setEnabled(isGameLoaded() && perGameSettingsSessionReady_);
   }
 }
 
@@ -1402,6 +1498,10 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
         QStringLiteral("cheatManagerDialog"))) {
     cheats->reject();
   }
+  if (auto* perGame = findChild<PerGameSettingsDialog*>(
+        QStringLiteral("perGameSettingsDialog"))) {
+    perGame->reject();
+  }
   gameLoading_ = true;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
@@ -1439,6 +1539,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
 void MainWindow::setNoGameLoaded()
 {
   clearCheatSession();
+  clearPerGameSettingsSession();
   if (auto* information = findChild<GameInformationDialog*>(
         QStringLiteral("gameInformationDialog"))) {
     information->close();

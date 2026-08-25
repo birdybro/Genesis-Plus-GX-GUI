@@ -20,6 +20,27 @@ set_tests_properties(
   core.cheats PROPERTIES LABELS "core;integration;cheats;fixture" TIMEOUT 30
 )
 
+add_executable(
+  genplusgx_per_game_settings_workflow_test
+  per_game_settings_workflow_test.cpp
+)
+target_link_libraries(
+  genplusgx_per_game_settings_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Settings
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(
+  NAME integration.per_game_settings
+  COMMAND genplusgx_per_game_settings_workflow_test
+)
+set_tests_properties(
+  integration.per_game_settings
+  PROPERTIES LABELS "core;integration;settings;fixture;concurrency" TIMEOUT 30
+)
+
 add_executable(genplusgx_core_synthetic_rom_test synthetic_rom_test.cpp)
 target_link_libraries(
   genplusgx_core_synthetic_rom_test

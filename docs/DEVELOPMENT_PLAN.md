@@ -43,8 +43,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | `58d46df` |
 | 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | `6667162` |
 | 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | `7f04063` |
-| 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | recorded by milestone 33 |
-| 33 Per-game overrides | PLANNED | Sparse overrides and precedence | settings model/UI | precedence, schema, GUI tests | No file until override exists | pending |
+| 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | `7756e2b` |
+| 33 Per-game overrides | COMPLETE | Sparse overrides and precedence | settings model/UI/composition | precedence, schema, ordered-load and GUI tests | No file until override exists | recorded by milestone 34 |
 | 34 Theme/accessibility | PLANNED | System/light/dark, high-DPI and keyboard access | theme/accessibility services | persistence and navigation GUI tests | Critical controls keyboard accessible | pending |
 | 35 Diagnostics/logging | PLANNED | Structured logs and copyable safe diagnostics | logging/diagnostics dialog | redaction/log creation/GUI tests | Useful bounded diagnostics, no secrets | pending |
 | 36 GUI regression | PLANNED | Cover every significant menu/dialog workflow | `tests/gui` and seams | complete headless GUI suite | Behavior, not construction-only, asserted | pending |
@@ -1958,4 +1958,64 @@ hook, and Sega CD RAM classification matches the existing frontend behavior. Sch
 JSON is bounded, atomic, and keyed by complete game identity/system. Invalid UI or disk
 content fails closed without a partial save or core mutation.
 
-**Commit SHA:** recorded by milestone 33
+**Commit SHA:** `7756e2b`
+
+## Milestone 33 detail
+
+**Status:** COMPLETE
+
+**Goal:** Resolve optional game-specific policy over versioned global settings without
+path collisions, unnecessary files, or applying machine settings after initialization.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/per_game_settings.h`
+- `desktop/settings/src/per_game_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/per_game_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/per_game_settings_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/per_game_settings_test.cpp`
+- `tests/core/per_game_settings_workflow_test.cpp`
+- `tests/gui/per_game_settings_dialog_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/PER_GAME_SETTINGS.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.per_game_settings` verifies sparse category precedence, global
+host-audio resource inheritance, invalid nested enums/profile text/relative BIOS paths,
+atomic round trips, embedded identity rejection, corrupt JSON, invalid roots, and exact
+file removal when the last override is cleared. `integration.per_game_settings` queues
+resolved PAL settings immediately before a generated Genesis ROM load, verifies the
+worker adopts the PAL cadence, then clears the override and verifies the global NTSC
+cadence on reload. `gui.per_game_settings` drives category enablement, nested video
+editing, input profile selection, Apply, persistence failure, Use Global Settings,
+action gating, and load-transition dialog closure using stable object names.
+
+**Gate evidence:**
+
+- Focused model, ordered-load integration, dialog, MainWindow, and game-loading tests
+  passed.
+- Debug build and complete CTest: passed (54/54).
+- Release build and complete CTest: passed (54/54).
+- ASan/UBSan build and complete CTest: passed (54/54) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New C++/Qt code compiles under the frontend warning policy without warnings;
+  authoritative `core/` sources remain unchanged.
+
+**Acceptance criteria:** A bounded schema 1 file stores only explicitly enabled video,
+audio, system/region, input-profile, and BIOS categories beneath a full SHA-256 game
+identity. Empty configurations delete the exact per-game file. One pure resolver gives
+overrides precedence and otherwise inherits current globals; SDL device and ring
+latency intentionally remain global. Metadata preflight occurs on its worker, and all
+effective core snapshots are ordered ahead of load so machine settings affect the first
+frame. Live-safe categories apply immediately. Deleted profiles, corrupt data, queue
+failure, failed replacement, unload, and shutdown return to a deterministic safe state.
+
+**Commit SHA:** recorded by milestone 34

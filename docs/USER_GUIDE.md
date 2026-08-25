@@ -178,6 +178,30 @@ identity. Loading another game clears the live patch list before its own stored 
 resolved. Corrupt, future-schema, wrong-game, and wrong-system files fail closed to an
 empty list. See [CHEATS.md](CHEATS.md) for exact formats and lifecycle details.
 
+## Per-game settings
+
+After a game has loaded and its SHA-256 identity is ready, choose **Tools → Per-Game
+Settings…**. Check only the categories that should differ for that title, then edit the
+video, audio, system/region, input-profile, or BIOS override. Unchecked categories use
+the current global value; they are not copied into the game file and continue to follow
+later global changes. **Use Global Settings** clears every category, and Apply removes
+the game's override file entirely.
+
+Video presentation and core output, master volume/mute, core audio mixing, and an
+available input profile can change while the game is running. Machine identity, region,
+VDP/master-clock, and BIOS changes take effect when that game is reopened because they
+participate in core initialization. Host audio device and buffer latency remain global
+process settings; the per-game audio editor disables those two resource controls.
+
+Before every load, the metadata worker hashes the selected content. The coordinator
+loads `config/per-game-settings/<title>-<sha256>.json`, resolves each category over the
+global snapshots, and orders the resulting system, firmware, video, and audio commands
+ahead of the core load. A deleted input profile falls back to the active global profile
+with a warning. If replacing a game fails before the old game unloads, its previous
+effective settings and editor session are restored. Corrupt, oversized, future-schema,
+or wrong-identity files are reported and ignored without modifying them. See
+[PER_GAME_SETTINGS.md](PER_GAME_SETTINGS.md) for the precedence and storage contract.
+
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu

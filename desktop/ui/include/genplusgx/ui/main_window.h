@@ -9,6 +9,7 @@
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/audio_settings.h"
+#include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
@@ -93,6 +94,8 @@ public:
     const settings::ScreenshotSettings&)>;
   using CheatConfigurationSink = std::function<PersistenceStatus(
     const cheats::CheatConfiguration&)>;
+  using PerGameSettingsSink = std::function<PersistenceStatus(
+    const settings::PerGameSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -178,6 +181,13 @@ public:
   void setCheatConfigurationSink(CheatConfigurationSink sink);
   void showCheats();
   void showCheatError(const std::string& detail);
+  void setPerGameSettingsSession(
+    settings::PerGameSettings overrides,
+    settings::GlobalGameSettings global);
+  void clearPerGameSettingsSession();
+  void setPerGameSettingsSink(PerGameSettingsSink sink);
+  void showPerGameSettings();
+  void showPerGameSettingsError(const std::string& detail);
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -230,6 +240,7 @@ private:
   void requestScreenshot();
   void updateScreenshotAction();
   void updateCheatAction();
+  void updatePerGameSettingsAction();
   void presentGameLoadError(
     const std::filesystem::path& path,
     const std::string& detail);
@@ -272,8 +283,11 @@ private:
   ScreenshotSink screenshotSink_;
   ScreenshotSettingsSink screenshotSettingsSink_;
   CheatConfigurationSink cheatConfigurationSink_;
+  PerGameSettingsSink perGameSettingsSink_;
   cheats::CheatConfiguration cheatConfiguration_;
   cheats::CheatSystem cheatSystem_{cheats::CheatSystem::genesis};
+  settings::PerGameSettings perGameSettings_;
+  settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
@@ -293,6 +307,7 @@ private:
   bool gameLibraryAvailable_{true};
   bool screenshotBusy_{false};
   bool cheatSessionReady_{false};
+  bool perGameSettingsSessionReady_{false};
   std::string gameLibraryUnavailableDetail_;
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;
