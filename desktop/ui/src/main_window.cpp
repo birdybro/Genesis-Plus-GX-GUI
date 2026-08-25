@@ -5,6 +5,7 @@
 #include "genplusgx/video/display_widget.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
 #include <QKeySequence>
 #include <QLabel>
@@ -114,12 +115,72 @@ void MainWindow::buildMenus()
   auto* fullscreen = addAction(
     *video, tr("&Fullscreen"), "fullscreenAction", QKeySequence{tr("Alt+Return")});
   fullscreen->setCheckable(true);
+  connect(fullscreen, &QAction::toggled, this, [this](bool enabled) {
+    if (enabled) {
+      showFullScreen();
+    } else {
+      showNormal();
+    }
+  });
   auto* scale = video->addMenu(tr("&Scale"));
   scale->setObjectName(QStringLiteral("videoScaleMenu"));
+  auto* scaleGroup = new QActionGroup(this);
+  scaleGroup->setObjectName(QStringLiteral("videoScaleActionGroup"));
+  auto* fitScale = addAction(*scale, tr("&Fit to Window"), "fitScaleAction");
+  auto* integerScale = addAction(*scale, tr("&Integer Scale"), "integerScaleAction");
+  scaleGroup->addAction(fitScale);
+  scaleGroup->addAction(integerScale);
+  fitScale->setCheckable(true);
+  integerScale->setCheckable(true);
+  fitScale->setChecked(true);
+  connect(fitScale, &QAction::triggered, this, [this] {
+    displayWidget_->setScaleMode(video::ScaleMode::fit);
+  });
+  connect(integerScale, &QAction::triggered, this, [this] {
+    displayWidget_->setScaleMode(video::ScaleMode::integer);
+  });
+
   auto* aspect = video->addMenu(tr("&Aspect Ratio"));
   aspect->setObjectName(QStringLiteral("aspectRatioMenu"));
+  auto* aspectGroup = new QActionGroup(this);
+  aspectGroup->setObjectName(QStringLiteral("aspectRatioActionGroup"));
+  auto* nativeAspect = addAction(*aspect, tr("&Native Pixels"), "nativeAspectAction");
+  auto* fourThreeAspect = addAction(*aspect, tr("Force &4:3"), "fourThreeAspectAction");
+  auto* stretchAspect = addAction(*aspect, tr("&Stretch to Window"), "stretchAspectAction");
+  aspectGroup->addAction(nativeAspect);
+  aspectGroup->addAction(fourThreeAspect);
+  aspectGroup->addAction(stretchAspect);
+  nativeAspect->setCheckable(true);
+  fourThreeAspect->setCheckable(true);
+  stretchAspect->setCheckable(true);
+  nativeAspect->setChecked(true);
+  connect(nativeAspect, &QAction::triggered, this, [this] {
+    displayWidget_->setAspectMode(video::AspectMode::native);
+  });
+  connect(fourThreeAspect, &QAction::triggered, this, [this] {
+    displayWidget_->setAspectMode(video::AspectMode::fourThree);
+  });
+  connect(stretchAspect, &QAction::triggered, this, [this] {
+    displayWidget_->setAspectMode(video::AspectMode::stretch);
+  });
+
   auto* filtering = video->addMenu(tr("&Filtering"));
   filtering->setObjectName(QStringLiteral("filteringMenu"));
+  auto* filterGroup = new QActionGroup(this);
+  filterGroup->setObjectName(QStringLiteral("filterActionGroup"));
+  auto* nearest = addAction(*filtering, tr("&Nearest Neighbor"), "nearestFilterAction");
+  auto* bilinear = addAction(*filtering, tr("&Bilinear"), "bilinearFilterAction");
+  filterGroup->addAction(nearest);
+  filterGroup->addAction(bilinear);
+  nearest->setCheckable(true);
+  bilinear->setCheckable(true);
+  nearest->setChecked(true);
+  connect(nearest, &QAction::triggered, this, [this] {
+    displayWidget_->setVideoFilter(video::VideoFilter::nearest);
+  });
+  connect(bilinear, &QAction::triggered, this, [this] {
+    displayWidget_->setVideoFilter(video::VideoFilter::bilinear);
+  });
   auto* overscan = video->addMenu(tr("&Overscan"));
   overscan->setObjectName(QStringLiteral("overscanMenu"));
 

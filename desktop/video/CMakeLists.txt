@@ -1,5 +1,6 @@
 add_library(genplusgx_video_exchange STATIC
   src/frame_exchange.cpp
+  src/video_geometry.cpp
 )
 add_library(GenesisPlusGX::VideoExchange ALIAS genplusgx_video_exchange)
 target_include_directories(
@@ -27,6 +28,6 @@ target_include_directories(
 )
 target_link_libraries(
   genplusgx_video_widget
-  PUBLIC GenesisPlusGX::VideoExchange Qt6::Widgets
+  PUBLIC GenesisPlusGX::VideoExchange Qt6::Widgets Qt6::OpenGLWidgets
   PRIVATE genplusgx_project_options genplusgx_project_warnings
 )

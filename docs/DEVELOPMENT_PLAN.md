@@ -23,8 +23,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | `0422e36` |
 | 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | `0312e53` |
 | 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | `0a04aa1` |
-| 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | recorded by milestone 13 |
-| 13 Video scaling | PLANNED | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | pending |
+| 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | `3ee78c1` |
+| 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | recorded by milestone 14 |
 | 14 Audio playback | PLANNED | SDL3 output, device lifecycle, pause/resume | `desktop/audio` | null-device init and buffer integrity | Clean bounded low-latency pipeline | pending |
 | 15 Timing/pacing | PLANNED | NTSC/PAL/CD pacing, FF, pause, frame advance | timing service | rate tolerance and state tests | Monotonic non-busy pacing | pending |
 | 16 Keyboard controls | PLANNED | Excellent default Genesis keyboard mappings | input/UI integration | synthetic key-to-core workflow | 3/6-button controls work | pending |
@@ -679,4 +679,57 @@ preallocated GUI receive surface bound memory. The main process starts the worke
 polls only its bounded events from an 8 ms GUI timer, repaints the newest frame, and
 stops/joins the worker after the Qt event loop; the timer never drives emulation.
 
-**Commit SHA:** recorded by milestone 13
+**Commit SHA:** `3ee78c1`
+
+## Milestone 13 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide mathematically bounded scaling policies, selectable filtering, real
+fullscreen behavior, and a persistent GPU texture path with deterministic fallback.
+
+**Files changed:**
+
+- `desktop/video/CMakeLists.txt`
+- `desktop/video/include/genplusgx/video/display_widget.h`
+- `desktop/video/include/genplusgx/video/video_geometry.h`
+- `desktop/video/src/display_widget.cpp`
+- `desktop/video/src/video_geometry.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `tests/gui/display_widget_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/video_geometry_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.video_geometry` checks invalid dimensions, exact native/4:3/
+stretch/whole-integer results, fit fallback below 1x, centering, and 1,280 combinations
+of source geometry, destination geometry, aspect, and scale policy for containment and
+integer invariants. GUI tests exercise every live menu group, exclusive defaults,
+nearest/bilinear propagation, fit/integer/native/4:3/stretch layout updates, semantic
+render boundaries in landscape and portrait, offscreen software selection, and checked
+fullscreen entry/exit.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (20/20).
+- Geometry, display, and main-window policy tests each passed five consecutive Debug
+  executions.
+- Release build and complete CTest: passed (20/20).
+- ASan/UBSan preset build and complete CTest: passed (20/20).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New geometry, OpenGL, menu, and test code compiled under the frontend warning policy
+  without warnings.
+
+**Acceptance criteria:** Pure geometry always returns a contained centered rectangle,
+preserves native or forced 4:3 aspect, fills only in explicit stretch mode, and uses
+whole native pixel multiples whenever at least 1x fits. Production window-system
+platforms use `QOpenGLWidget`, a reusable RGB565 texture, and subimage uploads; nearest
+and bilinear select hardware texture sampling. Shader/context/VAO/texture failure
+asynchronously falls back to the same deterministic software renderer used by offscreen
+tests and by `GENPLUSGX_FORCE_SOFTWARE_VIDEO`. Viewports convert logical coordinates to
+device pixels for high-DPI/Retina surfaces. No GUI timer performs scaling or emulation.
+
+**Commit SHA:** recorded by milestone 14

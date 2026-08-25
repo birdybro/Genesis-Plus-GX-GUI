@@ -207,12 +207,20 @@ the published slot as read while copying into its one preallocated receive surfa
 remaining slots keep the producer nonblocking. If no slot is safe, that presentation
 frame is dropped and instrumented rather than queued or allocated.
 
-`DisplayWidget` currently uses Qt's portable backing-store painter to render the tight
-RGB565 surface with nearest-neighbor sampling, native pixel aspect, centered aspect fit,
-and black letterboxing. It remains stable across logical-size and high-DPI backing-store
-changes and is fully testable on Qt's offscreen platform. Milestone 13 adds selectable
-geometry/filter policy and the accelerated texture-upload backend while retaining this
-deterministic software presentation path for headless tests and renderer fallback.
+`DisplayWidget` selects an accelerated `QOpenGLWidget` canvas on normal window-system
+platforms. A persistent RGB565 texture is allocated only for geometry changes and each
+new generation uses `glTexSubImage2D`; a small shader draws the texture with selectable
+nearest or bilinear sampling. The OpenGL viewport converts the pure logical layout to
+device pixels for high-DPI/Retina surfaces. Context, shader, VAO, or texture failure
+switches asynchronously to Qt's portable backing-store painter. The same deterministic
+software path is selected for offscreen/minimal platforms and by the explicit
+`GENPLUSGX_FORCE_SOFTWARE_VIDEO` diagnostic override.
+
+`calculateVideoLayout()` is Qt-independent policy for native pixels, forced 4:3, or
+stretch plus fit or integer scale. It validates all dimensions, centers contained output,
+uses exact native pixel multiples whenever at least 1x fits, and falls back to aspect-fit
+instead of cropping on undersized windows. Both rendering backends consume that one
+result, keeping resize and fullscreen behavior consistent.
 
 The application composition root shares the exchange between worker and widget. An
 8 ms GUI timer drains the bounded event channel and asks the widget to consume only a

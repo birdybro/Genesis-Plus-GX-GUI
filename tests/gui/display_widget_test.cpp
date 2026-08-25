@@ -27,6 +27,7 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   widget.show();
   QApplication::processEvents();
 
+  QVERIFY(!widget.usesAcceleratedRenderer());
   QVERIFY(!widget.hasFrame());
   QVERIFY(!widget.presentLatestFrame());
   auto* prompt = widget.findChild<QLabel*>(QStringLiteral("emptyCanvasLabel"));
@@ -64,6 +65,29 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   QCOMPARE(rendered.pixelColor(200, 10), QColor(Qt::black));
   QCOMPARE(rendered.pixelColor(100, 150), QColor(Qt::red));
   QCOMPARE(rendered.pixelColor(300, 150), QColor(Qt::green));
+
+  widget.setAspectMode(genplusgx::video::AspectMode::fourThree);
+  QCOMPARE(widget.aspectMode(), genplusgx::video::AspectMode::fourThree);
+  QCOMPARE(widget.currentLayout().width, 400);
+  QCOMPARE(widget.currentLayout().height, 300);
+  widget.setAspectMode(genplusgx::video::AspectMode::stretch);
+  QCOMPARE(widget.currentLayout().width, 400);
+  QCOMPARE(widget.currentLayout().height, 300);
+  widget.setAspectMode(genplusgx::video::AspectMode::native);
+
+  widget.resize(410, 310);
+  widget.setScaleMode(genplusgx::video::ScaleMode::fit);
+  QCOMPARE(widget.currentLayout().width, 410);
+  QCOMPARE(widget.currentLayout().height, 205);
+  widget.setScaleMode(genplusgx::video::ScaleMode::integer);
+  QCOMPARE(widget.currentLayout().width, 408);
+  QCOMPARE(widget.currentLayout().height, 204);
+  QCOMPARE(widget.currentLayout().integerScale, 102U);
+  widget.setVideoFilter(genplusgx::video::VideoFilter::bilinear);
+  QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::bilinear);
+  widget.setVideoFilter(genplusgx::video::VideoFilter::nearest);
+  QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::nearest);
+  widget.setScaleMode(genplusgx::video::ScaleMode::fit);
 
   widget.resize(320, 640);
   QApplication::processEvents();

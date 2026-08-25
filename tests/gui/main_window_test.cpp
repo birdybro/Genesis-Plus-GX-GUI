@@ -1,6 +1,7 @@
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/version.h"
+#include "genplusgx/video/display_widget.h"
 
 #include <QAction>
 #include <QApplication>
@@ -20,6 +21,7 @@ private slots:
   void emptyStatusIsDescriptive();
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
+  void videoActionsDriveDisplayPolicy();
 };
 
 void MainWindowTest::shellIsVisibleAndIdentified()
@@ -127,6 +129,40 @@ void MainWindowTest::exitActionClosesWindow()
   window.findChild<QAction*>(QStringLiteral("exitAction"))->trigger();
   QApplication::processEvents();
   QVERIFY(!window.isVisible());
+}
+
+void MainWindowTest::videoActionsDriveDisplayPolicy()
+{
+  genplusgx::ui::MainWindow window;
+  window.show();
+  QApplication::processEvents();
+  auto* display = window.displayWidget();
+
+  window.findChild<QAction*>(QStringLiteral("integerScaleAction"))->trigger();
+  QCOMPARE(display->scaleMode(), genplusgx::video::ScaleMode::integer);
+  window.findChild<QAction*>(QStringLiteral("fourThreeAspectAction"))->trigger();
+  QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::fourThree);
+  window.findChild<QAction*>(QStringLiteral("stretchAspectAction"))->trigger();
+  QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::stretch);
+  window.findChild<QAction*>(QStringLiteral("bilinearFilterAction"))->trigger();
+  QCOMPARE(display->videoFilter(), genplusgx::video::VideoFilter::bilinear);
+
+  window.findChild<QAction*>(QStringLiteral("fitScaleAction"))->trigger();
+  window.findChild<QAction*>(QStringLiteral("nativeAspectAction"))->trigger();
+  window.findChild<QAction*>(QStringLiteral("nearestFilterAction"))->trigger();
+  QCOMPARE(display->scaleMode(), genplusgx::video::ScaleMode::fit);
+  QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::native);
+  QCOMPARE(display->videoFilter(), genplusgx::video::VideoFilter::nearest);
+
+  auto* fullscreen = window.findChild<QAction*>(QStringLiteral("fullscreenAction"));
+  fullscreen->trigger();
+  QApplication::processEvents();
+  QVERIFY(window.isFullScreen());
+  QVERIFY(fullscreen->isChecked());
+  fullscreen->trigger();
+  QApplication::processEvents();
+  QVERIFY(!window.isFullScreen());
+  QVERIFY(!fullscreen->isChecked());
 }
 
 } // namespace
