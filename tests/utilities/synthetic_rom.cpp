@@ -96,6 +96,31 @@ std::vector<std::uint8_t> makeGenesisRamMarkerRom()
   emit16(0x117CU);
   emit16(0x0042U);
   emit16(0x0006U);
+
+  // Configure the VDP for a visible 320x224 Mode 5 display with a light backdrop.
+  // move.l #$00c00004,a1 (VDP control port)
+  emit16(0x227CU);
+  emit16(0x00C0U);
+  emit16(0x0004U);
+  // move.l #$00c00000,a2 (VDP data port)
+  emit16(0x247CU);
+  emit16(0x00C0U);
+  emit16(0x0000U);
+  // Register 0/1: Mode 5 with display enabled; register 12: 320-pixel mode.
+  emit16(0x32BCU);
+  emit16(0x8004U);
+  emit16(0x32BCU);
+  emit16(0x8174U);
+  emit16(0x32BCU);
+  emit16(0x8C81U);
+  // Use CRAM entry zero for the backdrop, select it, and make it light gray.
+  emit16(0x32BCU);
+  emit16(0x8700U);
+  emit16(0x22BCU);
+  emit16(0xC000U);
+  emit16(0x0000U);
+  emit16(0x34BCU);
+  emit16(0x0EEEU);
   // bra.s to this instruction
   emit16(0x60FEU);
 

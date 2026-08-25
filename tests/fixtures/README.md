@@ -23,10 +23,12 @@ move.l #$00ff0000,a0
 move.l #$13579bdf,(a0)
 move.w #$cafe,4(a0)
 move.b #$42,6(a0)
+configure VDP Mode 5, 320x224, with an original solid-color test image
 bra.s  <same instruction>
 ```
 
 The test runs a real emulated frame and checks the resulting work-RAM values and bounded
-program counter. The header checksum is calculated by the generator. There is no
-third-party program code, game content, artwork, audio, or trademark graphic in the
-fixture.
+program counter. Video tests run the viewport change through a second frame and verify
+the tightly packed RGB565 frame hash. The header checksum is calculated by the
+generator. There is no third-party program code, game content, artwork, audio, or
+trademark graphic in the fixture.

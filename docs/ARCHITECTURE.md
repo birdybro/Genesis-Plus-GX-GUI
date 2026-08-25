@@ -150,6 +150,14 @@ presentation frames but never observes a partially written frame. Native screens
 copy a published complete frame; displayed screenshots are captured explicitly from
 the presentation path.
 
+At the core boundary, `CoreAdapter` retains the mutable 720x576 RGB565 surface and never
+returns its pointer. `videoFrameInfo()` validates the effective viewport, including
+negative Game Gear crop offsets, positive overscan, NTSC-filter expansion, and optional
+interlaced line doubling. `copyVideoFrame()` copies complete rows into caller-owned
+preallocated storage and rejects undersized spans. A core viewport notification is
+acknowledged only after that copy succeeds. The later triple-buffer exchange owns those
+caller-side slots, so this boundary requires no framebuffer allocation per frame.
+
 ## Audio data flow
 
 ```text

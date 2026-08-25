@@ -15,8 +15,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 01 Root CMake | COMPLETE | Modern target-based build, presets, dependency discovery, trivial test | root CMake, `cmake/`, presets, test bootstrap | Debug/Release/ASan configure, build, CTest; libretro regression | Host configure succeeds; legacy builds retained | `99f4608` |
 | 02 Core library | COMPLETE | Build core independently of SDL main and GUI | core target manifests, desktop OSD bridge | Debug/Release/ASan core link smoke; libretro regression | Static core compiles without Qt dependency | `df2985a` |
 | 03 Synthetic ROM | COMPLETE | Generate legal deterministic test ROM and first headless core test | `tests/fixtures`, core test utilities | generated ROM execution and semantic assertion | Fixture provenance documented; repeatable result | `16b56c9` |
-| 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | pending |
-| 05 Core video | PLANNED | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | pending |
+| 04 Core lifecycle | COMPLETE | Adapter init/shutdown/load/unload/reset/frame API | `desktop/core` | lifecycle, invalid transition, repeated load/unload | Deterministic and leak-safe lifecycle | `447bc21` |
+| 05 Core video | COMPLETE | Safe framebuffer and dynamic viewport exposure | core/video adapter | viewport, frame content/hash tests | Complete immutable frame snapshots | pending |
 | 06 Core audio | PLANNED | Sample exposure and bounded audio storage | core/audio adapter | deterministic sample and ring-buffer tests | No overflow or unbounded allocation | pending |
 | 07 Core input | PLANNED | Neutral input snapshot translated at frame boundary | input model/adapter | controller ROM and mapping tests | Snapshot consumed deterministically | pending |
 | 08 Persistence | PLANNED | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | pending |
@@ -267,4 +267,47 @@ return typed errors, failed loads leave a clean ready state, unload/shutdown are
 idempotent, core audio/CD/cheat resources are released, and framebuffer/core metadata
 cannot outlive ownership.
 
-**Commit SHA:** pending milestone commit; to be recorded during Milestone 05.
+**Commit SHA:** `447bc21`
+
+## Milestone 05 detail
+
+**Status:** COMPLETE
+
+**Goal:** Expose the core's dynamic RGB565 output without leaking its mutable framebuffer
+or allocating a framebuffer-sized object during normal frame publication.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_video_test.cpp`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.video_frame` verifies the reset viewport, maximum reusable surface,
+undersized-copy rejection, a real VDP-driven 256x192 to 320x224 viewport transition,
+frame numbering, progressive metadata, successful notification acknowledgement,
+caller-owned tight RGB565 copies, reset pixel determinism, semantic backdrop color, and
+the investigated FNV-1a frame regression hash `0x0cfd2d0b9af92325`.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (5/5).
+- The video-frame test passed three consecutive Debug executions.
+- Release build and complete CTest: passed (5/5).
+- ASan/UBSan preset build and complete CTest: passed (5/5).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- The locked hash represents 320x224 pixels of RGB565 `0xEF7D`, the core's expansion of
+  the Genesis VDP's maximum native 3-bit channel intensity; it is not a blank frame.
+
+**Acceptance criteria:** Mutable core video memory never crosses the public boundary.
+Metadata validates native crop/overscan, NTSC expansion, and interlaced-height cases.
+Copying requires bounded caller-owned storage, produces a complete immutable snapshot,
+and consumes the viewport-change notification only after success. The generated legal
+ROM drives a real VDP geometry and pixel-output regression.
+
+**Commit SHA:** pending milestone commit; to be recorded during Milestone 06.

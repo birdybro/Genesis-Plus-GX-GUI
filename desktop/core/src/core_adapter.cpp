@@ -5,6 +5,8 @@
 extern "C" {
 #include "shared.h"
 #include "cdd.h"
+#include "md_ntsc.h"
+#include "sms_ntsc.h"
 }
 
 #include <cstring>
@@ -190,6 +192,42 @@ CoreResult CoreAdapter::runFrame(bool skipVideo)
   return success();
 }
 
+CoreResult CoreAdapter::videoFrameInfo(CoreVideoFrameInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  return describeVideoFrame(output);
+}
+
+CoreResult CoreAdapter::copyVideoFrame(
+  std::span<std::uint16_t> destination,
+  CoreVideoFrameInfo& output)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (const auto described = describeVideoFrame(output); !described) {
+    return described;
+  }
+  if (destination.size() < output.pixelCount()) {
+    return failure(CoreError::videoBufferTooSmall, "The destination cannot hold the complete video frame.");
+  }
+
+  const auto sourcePitchBytes = static_cast<std::size_t>(bitmap.pitch);
+  const auto copiedRowBytes = static_cast<std::size_t>(output.width) * bytesPerPixel;
+  for (std::size_t row = 0; row < output.height; ++row) {
+    std::memcpy(
+      destination.data() + (row * output.width),
+      bitmap.data + (row * sourcePitchBytes),
+      copiedRowBytes);
+  }
+  bitmap.viewport.changed &= ~1;
+  return success();
+}
+
 CoreLifecycleState CoreAdapter::state() const noexcept
 {
   std::scoped_lock lock{coreMutex};
@@ -228,6 +266,48 @@ CoreResult CoreAdapter::requireOwner(bool requireLoaded) const
   return success();
 }
 
+CoreResult CoreAdapter::describeVideoFrame(CoreVideoFrameInfo& output) const
+{
+  const int nativeWidth = bitmap.viewport.w + (2 * bitmap.viewport.x);
+  int width = nativeWidth;
+  if (config.ntsc != 0) {
+    width = (reg[12] & 0x01) != 0 ? MD_NTSC_OUT_WIDTH(nativeWidth)
+                                  : SMS_NTSC_OUT_WIDTH(nativeWidth);
+  }
+  int height = bitmap.viewport.h + (2 * bitmap.viewport.y);
+  const bool doublesInterlacedLines = interlaced != 0 && config.render != 0;
+  if (doublesInterlacedLines) {
+    height *= 2;
+  }
+
+  const bool dimensionsAreValid = bitmap.data != nullptr && bitmap.width > 0 &&
+                                  bitmap.height > 0 && bitmap.pitch > 0 &&
+                                  width > 0 && height > 0 &&
+                                  width <= (bitmap.pitch / static_cast<int>(bytesPerPixel)) &&
+                                  height <= bitmap.height;
+  if (!dimensionsAreValid) {
+    output = {};
+    return failure(CoreError::invalidVideoFrame, "The core reported an invalid video viewport.");
+  }
+
+  output = {
+    .format = CorePixelFormat::rgb565,
+    .width = static_cast<std::uint32_t>(width),
+    .height = static_cast<std::uint32_t>(height),
+    .sourceSurfaceWidth = static_cast<std::uint32_t>(bitmap.width),
+    .sourceSurfaceHeight = static_cast<std::uint32_t>(bitmap.height),
+    .sourcePitchPixels = static_cast<std::uint32_t>(
+      bitmap.pitch / static_cast<int>(bytesPerPixel)),
+    .coreViewportX = bitmap.viewport.x,
+    .coreViewportY = bitmap.viewport.y,
+    .frameNumber = frameCount_,
+    .viewportChanged = (bitmap.viewport.changed & 1) != 0,
+    .interlaced = interlaced != 0,
+    .oddField = odd_frame != 0,
+  };
+  return success();
+}
+
 void CoreAdapter::unloadUnchecked() noexcept
 {
   audio_shutdown();
@@ -254,6 +334,20 @@ void CoreAdapter::releaseOwnership() noexcept
   if (activeAdapter == this) {
     activeAdapter = nullptr;
   }
+}
+
+std::uint64_t hashVideoFrame(std::span<const std::uint16_t> pixels) noexcept
+{
+  constexpr std::uint64_t fnvOffsetBasis = 14'695'981'039'346'656'037ULL;
+  constexpr std::uint64_t fnvPrime = 1'099'511'628'211ULL;
+  std::uint64_t hash = fnvOffsetBasis;
+  for (const auto pixel : pixels) {
+    hash ^= static_cast<std::uint8_t>(pixel & 0xFFU);
+    hash *= fnvPrime;
+    hash ^= static_cast<std::uint8_t>(pixel >> 8U);
+    hash *= fnvPrime;
+  }
+  return hash;
 }
 
 } // namespace genplusgx
