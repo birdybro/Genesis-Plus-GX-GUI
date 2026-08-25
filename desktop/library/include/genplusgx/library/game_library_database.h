@@ -117,6 +117,9 @@ public:
   [[nodiscard]] LibraryDirectoriesResult directories() const;
   [[nodiscard]] LibraryGamesResult games() const;
   [[nodiscard]] GameLibraryStatus setFavorite(std::int64_t gameId, bool favorite);
+  [[nodiscard]] GameLibraryStatus setArtworkPath(
+    std::int64_t gameId,
+    const std::filesystem::path& artworkPath);
   [[nodiscard]] GameLibraryStatus recordLaunch(
     std::int64_t gameId,
     std::int64_t epochMilliseconds);

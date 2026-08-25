@@ -5,9 +5,33 @@ The local game library is an offline SQLite index stored at
 paths and metadata only. It does not copy ROMs, contact a metadata service, download
 artwork, or initialize Genesis Plus GX while scanning.
 
-The library window and directory controls are connected in the following UI milestone.
-This document describes the database and scanner contract already implemented for that
-interface.
+Open **File → Game Library…** (`Ctrl+L`) to manage and launch the offline collection.
+The window is modeless, so it may remain open while a game runs. Its controls have
+stable accessibility names and support normal keyboard focus and table navigation.
+
+## Using the library
+
+Choose **Add…** and select a directory. New roots default to recursive scanning and
+begin scanning immediately; select a root to change **Scan subdirectories** or request
+**Scan Now** later. **Remove** deletes only the root and its index rows. It never deletes,
+moves, or edits a game file. Mutating controls are briefly disabled while a scan owns
+the write transaction, while searching, sorting, viewing information, and launching
+remain responsive.
+
+The table can be sorted by favorite, title, system, region, last-played time, play
+count, or path. The search field matches titles, region, and path without case
+sensitivity. System and region selectors compose with **Favorites only**. Double-click
+a row or choose **Launch** to use the normal validated game-loading workflow. A launch
+is recorded only after the emulation core accepts the game; successful loads from the
+regular Open and Recent commands also update an indexed game's play count and
+last-played time.
+
+**Add to Favorites** and **Remove from Favorites** persist across rescans. **Game
+Information…** opens the already-indexed read-only metadata without rerunning the core.
+**Choose Artwork…** associates a local PNG, JPEG, WebP, or BMP path and displays a
+bounded preview; **Clear Artwork** removes the association. Artwork is never copied,
+uploaded, fetched, or scraped. A moved/deleted image is shown as unavailable without
+affecting the game row.
 
 ## Directory model
 

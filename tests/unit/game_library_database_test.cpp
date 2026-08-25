@@ -93,8 +93,13 @@ int main(int argc, char* argv[])
     return 2;
   }
   const auto romPath = gamesPath / "fixture.md";
+  const auto artworkPath = gamesPath / "fixture.png";
   const auto romBytes = genplusgx::test::makeGenesisSramWriterRom();
-  if (!check(writeBytes(romPath, romBytes), "Test ROM could not be written")) {
+  constexpr std::array<std::uint8_t, 8> artworkBytes{
+    0x89U, 0x50U, 0x4eU, 0x47U, 0x0dU, 0x0aU, 0x1aU, 0x0aU};
+  if (!check(writeBytes(romPath, romBytes) &&
+      writeBytes(artworkPath, artworkBytes),
+      "Test ROM/artwork files could not be written")) {
     return 3;
   }
   const auto metadata = readGameMetadata(romPath);
@@ -180,8 +185,9 @@ int main(int argc, char* argv[])
     }
     const auto gameId = games.games.front().id;
     if (!check(database.setFavorite(gameId, true) &&
+        database.setArtworkPath(gameId, artworkPath) &&
         database.recordLaunch(gameId, 9'876'543),
-        "Library favorite/launch state could not be updated")) {
+        "Library favorite/artwork/launch state could not be updated")) {
       return 14;
     }
 
@@ -195,9 +201,24 @@ int main(int argc, char* argv[])
     games = database.games();
     if (!check(games.status && games.games.front().favorite &&
         games.games.front().playCount == 1U &&
-        games.games.front().lastPlayedEpochMilliseconds == 9'876'543,
+        games.games.front().lastPlayedEpochMilliseconds == 9'876'543 &&
+        games.games.front().artworkPath ==
+          std::filesystem::canonical(artworkPath),
         "A rescan discarded user-owned library state")) {
       return 16;
+    }
+    const auto clearedArtwork = database.setArtworkPath(gameId, {});
+    const auto afterArtworkClear = database.games();
+    const auto invalidArtwork = database.setArtworkPath(
+      gameId, gamesPath / "missing.png");
+    if (!check(clearedArtwork,
+        "Local artwork path could not be cleared") ||
+        !check(afterArtworkClear.status &&
+          afterArtworkClear.games.front().artworkPath.empty(),
+          "Cleared local artwork path remained in the database") ||
+        !check(invalidArtwork.error == GameLibraryError::invalidPath,
+          "Missing local artwork path was accepted")) {
+      return 17;
     }
 
     const auto cancelled = database.beginDirectoryScan(added.directory.id);
@@ -205,7 +226,7 @@ int main(int argc, char* argv[])
           added.directory.id, cancelled.generation, records) &&
         database.cancelDirectoryScan() && database.games().games.size() == 1U,
         "Cancelled library scan did not roll back")) {
-      return 17;
+      return 18;
     }
     const auto emptyScan = database.beginDirectoryScan(added.directory.id);
     const auto emptied = database.finishDirectoryScan(
@@ -213,19 +234,19 @@ int main(int argc, char* argv[])
     if (!check(emptyScan.status && emptied.status && emptied.removedGames == 1U &&
         database.games().games.empty(),
         "Stale library entries were not removed transactionally")) {
-      return 18;
+      return 19;
     }
     if (!check(database.removeDirectory(added.directory.id) &&
         database.directories().directories.empty(),
         "Library directory removal did not cascade cleanly")) {
-      return 19;
+      return 20;
     }
   }
 
   constexpr std::string_view corruptText{"this is not a sqlite database"};
   if (!check(writeText(databasePath, corruptText),
       "Corrupt database fixture could not be staged")) {
-    return 20;
+    return 21;
   }
   std::filesystem::path recoveryPath;
   {
@@ -235,7 +256,7 @@ int main(int argc, char* argv[])
         std::filesystem::is_regular_file(recovered.recoveryBackupPath()) &&
         recovered.directories().directories.empty(),
         "Corrupt game-library database was not preserved and rebuilt")) {
-      return 21;
+      return 22;
     }
     recoveryPath = recovered.recoveryBackupPath();
   }
@@ -244,7 +265,7 @@ int main(int argc, char* argv[])
       !check(executeSql(databasePath,
         QStringLiteral("DROP TABLE library_games")),
         "Logical schema corruption could not be staged")) {
-    return 22;
+    return 23;
   }
   {
     GameLibraryDatabase logicalCorruption{databasePath};
@@ -254,19 +275,19 @@ int main(int argc, char* argv[])
           logicalCorruption.recoveryBackupPath()) &&
         logicalCorruption.games().status,
         "A structurally incomplete database was not preserved and rebuilt")) {
-      return 23;
+      return 24;
     }
   }
   if (!check(setSchemaVersion(databasePath, 999U),
       "Future schema fixture could not be staged")) {
-    return 24;
+    return 25;
   }
   {
     GameLibraryDatabase future{databasePath};
     if (!check(future.initialize().error == GameLibraryError::unsupportedSchema &&
         !future.recoveredCorruption(),
         "A future database schema was accepted or destroyed")) {
-      return 25;
+      return 26;
     }
   }
 

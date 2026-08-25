@@ -40,8 +40,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | `77a562d` |
 | 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | `1baef5d` |
 | 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | `c9e0c03` |
-| 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | recorded by milestone 30 |
-| 30 Library UI | PLANNED | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | pending |
+| 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | `58d46df` |
+| 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | recorded by milestone 31 |
 | 31 Screenshots | PLANNED | Native/display PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | pending |
 | 32 Cheats | PLANNED | GG/PAR validation, persistence and enable UI | `desktop/cheats`, dialog | parser property, persistence, GUI tests | Invalid codes never applied | pending |
 | 33 Per-game overrides | PLANNED | Sparse overrides and precedence | settings model/UI | precedence, schema, GUI tests | No file until override exists | pending |
@@ -1754,4 +1754,69 @@ failures, and missing roots cannot publish a partial replacement index. The appl
 owns and shuts down the service explicitly; milestone 30 will connect the model to the
 native library window.
 
-**Commit SHA:** recorded by milestone 30
+**Commit SHA:** `58d46df`
+
+## Milestone 30 detail
+
+**Status:** COMPLETE
+
+**Goal:** Expose the offline index as a useful native library window with directory
+management, live scan status, composable search/filtering, sorting, favorites, play
+history, local artwork, information, and validated launch handoff.
+
+**Files changed:**
+
+- `desktop/library/include/genplusgx/library/game_library_database.h`
+- `desktop/library/src/game_library_database.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/dialog_service.h`
+- `desktop/ui/include/genplusgx/ui/game_library_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/dialog_service.cpp`
+- `desktop/ui/src/game_library_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/game_library_database_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/game_library_dialog_test.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/GAME_LIBRARY.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `gui.game_library` verifies the modeless window and stable controls;
+case-insensitive search; system, region, and favorite filters; numeric play-count sort;
+favorite, launch, information, artwork, recursive, scan, remove, and add callbacks; a
+bounded artwork preview; progress/busy states; and recoverable errors. Its integration
+workflow adds a temporary directory through the real GUI seam, scans an original
+generated Genesis ROM on `GameLibraryScanner`, refreshes the real SQLite model, filters
+and favorites the indexed result, records launch history, and removes the root/index
+without deleting the ROM. The database test additionally verifies canonical local
+artwork assignment, clear, invalid-path rejection, and rescan preservation.
+
+**Gate evidence:**
+
+- Focused database, scanner, and complete GUI library workflows passed five consecutive
+  Debug executions.
+- Debug build and complete CTest: passed (47/47).
+- Release build and complete CTest: passed (47/47).
+- ASan/UBSan build and complete CTest: passed (47/47) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New Qt model/dialog, coordinator, database extension, and test code compiled under
+  the frontend warning policy without warnings; authoritative `core/` files are unchanged.
+
+**Acceptance criteria:** **File → Game Library…** opens a keyboard-accessible modeless
+window. Canonical roots can be added, removed from the index, toggled between flat and
+recursive traversal, and rescanned with visible progress. Search, system, detected
+region, and favorite filters compose without database work; every column sorts through
+a proxy model. Favorite, last-played, play-count, and canonical local-artwork paths are
+durable and rescan-safe. Artwork is decoded at preview size and is never copied,
+downloaded, or scraped. Launches use the normal file-validation/core path and update
+history only after a successful core load, including Open/Recent launches for indexed
+files. GUI write controls and coordinator mutations reject work during a scan, avoiding
+SQLite write contention on the event loop. Deferred history uses a fixed 32-entry
+queue. Directory enumeration and hashing remain entirely off the GUI/emulation threads.
+
+**Commit SHA:** recorded by milestone 31

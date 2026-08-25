@@ -448,6 +448,36 @@ public:
       "The game favorite could not be updated");
   }
 
+  GameLibraryStatus setArtworkPath(
+    std::int64_t gameId,
+    const std::filesystem::path& artworkPath)
+  {
+    if (artworkPath.empty()) {
+      return updateGameField(
+        gameId,
+        QStringLiteral("UPDATE library_games SET artwork_path = ? WHERE id = ?"),
+        QStringLiteral(""),
+        "The local artwork path could not be cleared");
+    }
+    std::error_code error;
+    if (!std::filesystem::is_regular_file(artworkPath, error) || error) {
+      return failure(
+        GameLibraryError::invalidPath,
+        "The selected local artwork file does not exist.");
+    }
+    const auto canonical = std::filesystem::canonical(artworkPath, error);
+    if (error || canonical.native().size() > 4'096U) {
+      return failure(
+        GameLibraryError::invalidPath,
+        "The selected local artwork path could not be resolved safely.");
+    }
+    return updateGameField(
+      gameId,
+      QStringLiteral("UPDATE library_games SET artwork_path = ? WHERE id = ?"),
+      pathToQString(canonical),
+      "The local artwork path could not be updated");
+  }
+
   GameLibraryStatus recordLaunch(
     std::int64_t gameId,
     std::int64_t epochMilliseconds)
@@ -976,6 +1006,13 @@ GameLibraryStatus GameLibraryDatabase::setFavorite(
   bool favorite)
 {
   return private_->setFavorite(gameId, favorite);
+}
+
+GameLibraryStatus GameLibraryDatabase::setArtworkPath(
+  std::int64_t gameId,
+  const std::filesystem::path& artworkPath)
+{
+  return private_->setArtworkPath(gameId, artworkPath);
 }
 
 GameLibraryStatus GameLibraryDatabase::recordLaunch(

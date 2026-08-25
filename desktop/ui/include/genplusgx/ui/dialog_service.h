@@ -18,6 +18,12 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDisc(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDirectory(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> chooseArtwork(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
   virtual void showError(QWidget* parent, const QString& title, const QString& message) = 0;
 };
 
@@ -27,6 +33,12 @@ public:
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::filesystem::path> chooseDisc(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::filesystem::path> chooseDirectory(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::filesystem::path> chooseArtwork(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
   void showError(QWidget* parent, const QString& title, const QString& message) override;

@@ -663,6 +663,16 @@ structurally incomplete current databases are preserved under a collision-safe
 without modification. Configured roots are canonical, non-overlapping, and bounded.
 No network access is part of scanning or artwork handling.
 
+The modeless Qt library dialog consumes immutable directory/game snapshots from the GUI
+thread's read connection and filters/sorts them through a proxy model. UI mutations are
+typed callbacks into the application coordinator. They are disabled (and independently
+rejected by the coordinator) while the scanner has an outstanding write transaction,
+so SQLite's busy timeout cannot stall the event loop. Scanner events refresh the model
+only after commit. A successful core load records play history; loads that coincide with
+a scan are retained in a small bounded-by-user-actions deferred list and committed once
+the scan finishes. Local artwork is decoded to preview dimensions and its path is the
+only artwork data stored in SQLite.
+
 ## Error handling and diagnostics
 
 Frontend APIs return structured errors with a stable category, operation, safe user

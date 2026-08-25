@@ -3,6 +3,7 @@
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
 #include "genplusgx/backup_store.h"
+#include "genplusgx/bounded_queue.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/input_aggregator.h"
@@ -33,6 +34,9 @@
 #include <cstdint>
 #include <memory>
 #include <optional>
+#include <set>
+#include <utility>
+#include <vector>
 
 namespace {
 
@@ -283,6 +287,202 @@ int main(int argc, char* argv[])
   }
 
   genplusgx::ui::MainWindow window;
+  std::set<std::int64_t> libraryScansInFlight;
+  std::uint64_t libraryScanOperationId = 5'000'000U;
+  genplusgx::BoundedQueue<
+    std::pair<std::filesystem::path, std::int64_t>> deferredLibraryLaunches{32U};
+  const auto refreshGameLibrary = [&gameLibrary, &window] {
+    const auto directories = gameLibrary.directories();
+    if (!directories.status) {
+      return directories.status;
+    }
+    const auto games = gameLibrary.games();
+    if (!games.status) {
+      return games.status;
+    }
+    window.setGameLibrarySnapshot(directories.directories, games.games);
+    return genplusgx::library::GameLibraryStatus{};
+  };
+  const auto showLibraryStatus = [&window](
+    const genplusgx::library::GameLibraryStatus& status) {
+    if (!status) {
+      window.showGameLibraryError(status.message);
+    }
+  };
+  const auto requestLibraryScan =
+    [&gameLibraryScanner, &libraryScanOperationId, &libraryScansInFlight,
+     &window](std::int64_t directoryId, const std::filesystem::path& path) {
+      if (libraryScansInFlight.contains(directoryId)) {
+        window.showGameLibraryError(
+          "That game-library directory is already queued for scanning.");
+        return;
+      }
+      const auto submitted = gameLibraryScanner.requestScan(
+        ++libraryScanOperationId, directoryId);
+      if (!submitted) {
+        window.showGameLibraryError(submitted.message);
+        return;
+      }
+      libraryScansInFlight.insert(directoryId);
+      window.showGameLibraryScanStarted(directoryId, path);
+    };
+  if (gameLibraryInitialized) {
+    const auto refreshed = refreshGameLibrary();
+    if (!refreshed) {
+      qWarning().noquote() << QString::fromStdString(refreshed.message);
+      window.setGameLibraryAvailable(false, refreshed.message);
+    } else {
+      window.setGameLibraryAvailable(true);
+    }
+  } else {
+    window.setGameLibraryAvailable(false, gameLibraryInitialized.message);
+  }
+  window.setGameLibraryActions({
+    .addDirectory =
+      [&gameLibrary, &libraryScansInFlight, &refreshGameLibrary,
+       &requestLibraryScan, &window](const std::filesystem::path& path,
+                                     bool recursive) {
+        if (!libraryScansInFlight.empty()) {
+          window.showGameLibraryError(
+            "Wait for the active library scan before changing directories.");
+          return;
+        }
+        const auto added = gameLibrary.addDirectory(path, recursive);
+        if (!added.status) {
+          window.showGameLibraryError(added.status.message);
+          return;
+        }
+        const auto refreshed = refreshGameLibrary();
+        if (!refreshed) {
+          window.showGameLibraryError(refreshed.message);
+          return;
+        }
+        requestLibraryScan(added.directory.id, added.directory.path);
+      },
+    .removeDirectory =
+      [&gameLibrary, &libraryScansInFlight, &refreshGameLibrary,
+       &showLibraryStatus, &window](std::int64_t directoryId) {
+        if (!libraryScansInFlight.empty()) {
+          window.showGameLibraryError(
+            "Wait for the active library scan before removing a directory.");
+          return;
+        }
+        const auto removed = gameLibrary.removeDirectory(directoryId);
+        if (!removed) {
+          window.showGameLibraryError(removed.message);
+          return;
+        }
+        showLibraryStatus(refreshGameLibrary());
+      },
+    .updateDirectory =
+      [&gameLibrary, &libraryScansInFlight, &refreshGameLibrary,
+       &showLibraryStatus, &window](std::int64_t directoryId, bool recursive) {
+        if (!libraryScansInFlight.empty()) {
+          window.showGameLibraryError(
+            "Wait for the active library scan before changing a directory.");
+          return;
+        }
+        const auto updated = gameLibrary.updateDirectory(directoryId, recursive);
+        if (!updated) {
+          window.showGameLibraryError(updated.message);
+          return;
+        }
+        showLibraryStatus(refreshGameLibrary());
+      },
+    .scanDirectory =
+      [&gameLibrary, &requestLibraryScan, &window](std::int64_t directoryId) {
+        const auto directories = gameLibrary.directories();
+        if (!directories.status) {
+          window.showGameLibraryError(directories.status.message);
+          return;
+        }
+        const auto found = std::ranges::find_if(
+          directories.directories, [directoryId](const auto& directory) {
+            return directory.id == directoryId;
+          });
+        if (found == directories.directories.end()) {
+          window.showGameLibraryError(
+            "The selected game-library directory no longer exists.");
+          return;
+        }
+        requestLibraryScan(directoryId, found->path);
+      },
+    .setFavorite =
+      [&gameLibrary, &libraryScansInFlight, &refreshGameLibrary,
+       &showLibraryStatus, &window](std::int64_t gameId, bool favorite) {
+        if (!libraryScansInFlight.empty()) {
+          window.showGameLibraryError(
+            "Wait for the active library scan before changing favorites.");
+          return;
+        }
+        const auto updated = gameLibrary.setFavorite(gameId, favorite);
+        if (!updated) {
+          window.showGameLibraryError(updated.message);
+          return;
+        }
+        showLibraryStatus(refreshGameLibrary());
+      },
+    .setArtwork =
+      [&gameLibrary, &libraryScansInFlight, &refreshGameLibrary,
+       &showLibraryStatus, &window](std::int64_t gameId,
+                                    const std::filesystem::path& path) {
+        if (!libraryScansInFlight.empty()) {
+          window.showGameLibraryError(
+            "Wait for the active library scan before changing artwork.");
+          return;
+        }
+        const auto updated = gameLibrary.setArtworkPath(gameId, path);
+        if (!updated) {
+          window.showGameLibraryError(updated.message);
+          return;
+        }
+        showLibraryStatus(refreshGameLibrary());
+      },
+    .launchGame = [&window](std::int64_t, const std::filesystem::path& path) {
+      static_cast<void>(window.requestGameLoad(path));
+    },
+  });
+  const auto recordLibraryLaunch =
+    [&gameLibrary, &refreshGameLibrary](const std::filesystem::path& path,
+                                        std::int64_t timestamp) {
+      const auto games = gameLibrary.games();
+      if (!games.status) {
+        return games.status;
+      }
+      std::error_code error;
+      const auto canonical = std::filesystem::weakly_canonical(path, error);
+      const auto found = std::ranges::find_if(
+        games.games, [&path, &canonical, &error](const auto& game) {
+          if (game.metadata.path == path) {
+            return true;
+          }
+          if (error) {
+            return false;
+          }
+          std::error_code gameError;
+          const auto gameCanonical = std::filesystem::weakly_canonical(
+            game.metadata.path, gameError);
+          return !gameError && gameCanonical == canonical;
+        });
+      if (found == games.games.end()) {
+        return genplusgx::library::GameLibraryStatus{};
+      }
+      const auto recorded = gameLibrary.recordLaunch(found->id, timestamp);
+      if (!recorded) {
+        return recorded;
+      }
+      return refreshGameLibrary();
+    };
+  const auto flushDeferredLibraryLaunches =
+    [&deferredLibraryLaunches, &recordLibraryLaunch] {
+      while (auto launch = deferredLibraryLaunches.pop()) {
+        const auto recorded = recordLibraryLaunch(
+          launch->first, launch->second);
+        if (!recorded) {
+          qWarning().noquote() << QString::fromStdString(recorded.message);
+        }
+      }
+    };
   window.displayWidget()->setFrameExchange(videoFrames);
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
@@ -653,12 +853,15 @@ int main(int argc, char* argv[])
     &eventPump,
     &QTimer::timeout,
     &window,
-    [&audioOutput, &controllerInput, &gameGeneration, &inputAggregator,
-     &gameLibraryScanner, &inputOperationId, &lifecycleOperationId,
+    [&audioOutput, &controllerInput, &deferredLibraryLaunches,
+     &flushDeferredLibraryLaunches, &gameGeneration, &gameLibraryScanner,
+     &inputAggregator, &inputOperationId, &libraryScansInFlight,
+     &lifecycleOperationId,
      &metadataService, &pendingDisc,
      &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
-     &closingGamePath, &recentGames, &recentGamesStore,
-     &refreshRecentGamesMenu, &stateActivationOperation, &stateOperationId,
+     &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
+     &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
+     &stateOperationId,
      &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
     while (auto event = worker.pollEvent()) {
@@ -739,6 +942,17 @@ int main(int argc, char* argv[])
             const auto saved = recentGamesStore.save(recentGames);
             if (!saved) {
               qWarning().noquote() << QString::fromStdString(saved.message);
+            }
+          }
+          if (libraryScansInFlight.empty()) {
+            const auto recorded = recordLibraryLaunch(loadedPath, now);
+            if (!recorded) {
+              qWarning().noquote() << QString::fromStdString(recorded.message);
+            }
+          } else {
+            if (!deferredLibraryLaunches.tryPush({loadedPath, now})) {
+              qWarning() << "The bounded deferred library-history queue is full; "
+                            "one launch will not be counted.";
             }
           }
           const auto inputSubmitted = worker.submit(
@@ -950,12 +1164,43 @@ int main(int argc, char* argv[])
       }
     }
     while (auto event = gameLibraryScanner.pollEvent()) {
-      if (event->type ==
-          genplusgx::library::GameLibraryScanEventType::serviceStarted) {
-        qInfo() << "Game-library scanner started.";
-      } else if (event->type ==
-                 genplusgx::library::GameLibraryScanEventType::scanFailed) {
-        qWarning().noquote() << QString::fromStdString(event->status.message);
+      using EventType = genplusgx::library::GameLibraryScanEventType;
+      switch (event->type) {
+        case EventType::serviceStarted:
+          qInfo() << "Game-library scanner started.";
+          break;
+        case EventType::scanStarted:
+          window.showGameLibraryScanStarted(
+            event->directoryId, event->directoryPath);
+          break;
+        case EventType::scanProgress:
+          window.showGameLibraryScanProgress(
+            event->directoryId, event->summary);
+          break;
+        case EventType::scanCompleted: {
+          libraryScansInFlight.erase(event->directoryId);
+          const auto refreshed = refreshGameLibrary();
+          if (!refreshed) {
+            window.showGameLibraryError(refreshed.message);
+          }
+          window.showGameLibraryScanCompleted(
+            event->directoryId, event->summary);
+          if (libraryScansInFlight.empty()) {
+            flushDeferredLibraryLaunches();
+          }
+          break;
+        }
+        case EventType::scanFailed:
+          libraryScansInFlight.erase(event->directoryId);
+          qWarning().noquote() << QString::fromStdString(event->status.message);
+          window.showGameLibraryScanFailed(
+            event->directoryId, event->status.message);
+          if (libraryScansInFlight.empty()) {
+            flushDeferredLibraryLaunches();
+          }
+          break;
+        case EventType::serviceStopped:
+          break;
       }
     }
   });
@@ -985,6 +1230,7 @@ int main(int argc, char* argv[])
   window.setClearRecentGamesSink({});
   window.setStateOperationSink({});
   window.setGameInformationRequestSink({});
+  window.setGameLibraryActions({});
   window.setVideoSettingsSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();

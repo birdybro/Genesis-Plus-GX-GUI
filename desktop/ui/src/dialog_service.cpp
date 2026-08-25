@@ -52,6 +52,20 @@ std::optional<std::filesystem::path> DialogService::chooseDisc(
   return chooseGame(parent, initialDirectory);
 }
 
+std::optional<std::filesystem::path> DialogService::chooseDirectory(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseArtwork(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
 std::optional<std::filesystem::path> QtDialogService::chooseGame(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -80,6 +94,34 @@ std::optional<std::filesystem::path> QtDialogService::chooseDisc(
     return std::nullopt;
   }
   return pathFromQString(selected);
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseDirectory(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getExistingDirectory(
+    parent,
+    QObject::tr("Add Game Directory"),
+    pathToQString(initialDirectory),
+    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseArtwork(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Choose Local Box Art"),
+    pathToQString(initialDirectory),
+    QObject::tr("Images (*.png *.jpg *.jpeg *.webp *.bmp);;All files (*)"));
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
 }
 
 void QtDialogService::showError(

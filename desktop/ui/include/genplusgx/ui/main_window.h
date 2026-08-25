@@ -2,12 +2,15 @@
 
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/library/game_metadata.h"
+#include "genplusgx/library/game_library_database.h"
+#include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/game_library_dialog.h"
 
 #include <QMainWindow>
 
@@ -128,6 +131,25 @@ public:
   void setGameInformationBusy(bool busy);
   void showGameInformation(const library::GameMetadata& metadata);
   void showGameInformationError(const std::string& detail);
+  void setGameLibraryActions(GameLibraryActions actions);
+  void setGameLibrarySnapshot(
+    std::vector<library::LibraryDirectory> directories,
+    std::vector<library::LibraryGame> games);
+  void setGameLibraryAvailable(bool available, const std::string& detail = {});
+  void showGameLibrary();
+  void showGameLibraryScanStarted(
+    std::int64_t directoryId,
+    const std::filesystem::path& path);
+  void showGameLibraryScanProgress(
+    std::int64_t directoryId,
+    const library::GameLibraryScanSummary& summary);
+  void showGameLibraryScanCompleted(
+    std::int64_t directoryId,
+    const library::GameLibraryScanSummary& summary);
+  void showGameLibraryScanFailed(
+    std::int64_t directoryId,
+    const std::string& detail);
+  void showGameLibraryError(const std::string& detail);
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -214,6 +236,9 @@ private:
   BiosConfigurationSink biosConfigurationSink_;
   DiscOperationSink discOperationSink_;
   GameInformationRequestSink gameInformationRequestSink_;
+  GameLibraryActions gameLibraryActions_;
+  std::vector<library::LibraryDirectory> gameLibraryDirectories_;
+  std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;
@@ -226,6 +251,8 @@ private:
   bool discPresent_{false};
   bool discOperationBusy_{false};
   bool gameInformationBusy_{false};
+  bool gameLibraryAvailable_{true};
+  std::string gameLibraryUnavailableDetail_;
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;
   std::uint32_t selectedStateSlot_{0};

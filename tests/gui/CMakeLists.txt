@@ -23,6 +23,28 @@ set_tests_properties(
     LABELS "gui;unit"
 )
 
+qt_add_executable(
+  genplusgx_game_library_dialog_test game_library_dialog_test.cpp
+)
+set_target_properties(genplusgx_game_library_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_game_library_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.game_library COMMAND genplusgx_game_library_dialog_test)
+set_tests_properties(
+  gui.game_library
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;library;database;filesystem"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_game_loading_test game_loading_test.cpp)
 set_target_properties(genplusgx_game_loading_test PROPERTIES AUTOMOC ON)
 target_link_libraries(

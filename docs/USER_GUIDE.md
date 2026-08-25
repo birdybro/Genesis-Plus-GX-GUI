@@ -104,6 +104,22 @@ region, mapper, and disc detection when loading. A missing or malformed header i
 as a note rather than guessed into core settings. See
 [GAME_INFORMATION.md](GAME_INFORMATION.md) for format and safety details.
 
+## Game library
+
+Choose **File → Game Library…** (`Ctrl+L`) to build an entirely local collection. Use
+**Add…** to select a root; it is indexed on a worker thread, so hashing and recursive
+directory walking do not freeze the main window or emulation. Select a root to toggle
+subdirectory scanning, rescan it, or remove it from the index. Removing a root never
+deletes the files it contains.
+
+Search title/path text, filter by system or detected region, show favorites only, and
+sort any table column. The table includes last-played and play-count state. Launch by
+double-clicking a row or pressing **Launch**; the count changes only after a successful
+core load. Favorites and local artwork paths survive rescans. **Game Information…**
+shows the indexed header and hash, while **Choose Artwork…** displays a bounded local
+preview. The application never contacts an artwork or metadata service. See
+[GAME_LIBRARY.md](GAME_LIBRARY.md) for storage, recovery, and scan safety details.
+
 ## Save states
 
 Use **Emulation → Save State** (`F5`) and **Load State** (`F8`) with the selected slot.

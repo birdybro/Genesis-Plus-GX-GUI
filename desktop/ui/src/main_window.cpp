@@ -6,6 +6,7 @@
 #include "genplusgx/ui/bios_settings_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/game_information_dialog.h"
+#include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -115,7 +116,9 @@ void MainWindow::buildMenus()
   auto* closeGameAction = addAction(
     *file, tr("&Close Game"), "closeGameAction", QKeySequence::Close);
   connect(closeGameAction, &QAction::triggered, this, &MainWindow::closeGame);
-  addAction(*file, tr("Game &Library…"), "gameLibraryAction", QKeySequence{tr("Ctrl+L")});
+  auto* gameLibrary = addAction(
+    *file, tr("Game &Library…"), "gameLibraryAction", QKeySequence{tr("Ctrl+L")});
+  connect(gameLibrary, &QAction::triggered, this, &MainWindow::showGameLibrary);
   file->addSeparator();
   addAction(*file, tr("&Screenshot"), "screenshotAction", QKeySequence{tr("F12")});
   file->addSeparator();
@@ -518,6 +521,110 @@ void MainWindow::showGameInformationError(const std::string& detail)
     this, tr("Game Information Failed"), QString::fromStdString(detail));
 }
 
+void MainWindow::setGameLibraryActions(GameLibraryActions actions)
+{
+  gameLibraryActions_ = std::move(actions);
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->setActions(gameLibraryActions_);
+  }
+}
+
+void MainWindow::setGameLibrarySnapshot(
+  std::vector<library::LibraryDirectory> directories,
+  std::vector<library::LibraryGame> games)
+{
+  gameLibraryDirectories_ = std::move(directories);
+  gameLibraryGames_ = std::move(games);
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->setSnapshot(gameLibraryDirectories_, gameLibraryGames_);
+  }
+}
+
+void MainWindow::setGameLibraryAvailable(
+  bool available,
+  const std::string& detail)
+{
+  gameLibraryAvailable_ = available;
+  gameLibraryUnavailableDetail_ = detail;
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->setServiceAvailable(available, detail);
+  }
+}
+
+void MainWindow::showGameLibrary()
+{
+  if (auto* existing = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new GameLibraryDialog(dialogService_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setActions(gameLibraryActions_);
+  dialog->setSnapshot(gameLibraryDirectories_, gameLibraryGames_);
+  dialog->setServiceAvailable(
+    gameLibraryAvailable_, gameLibraryUnavailableDetail_);
+  dialog->open();
+}
+
+void MainWindow::showGameLibraryScanStarted(
+  std::int64_t directoryId,
+  const std::filesystem::path& path)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showScanStarted(directoryId, path);
+  }
+}
+
+void MainWindow::showGameLibraryScanProgress(
+  std::int64_t directoryId,
+  const library::GameLibraryScanSummary& summary)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showScanProgress(directoryId, summary);
+  }
+}
+
+void MainWindow::showGameLibraryScanCompleted(
+  std::int64_t directoryId,
+  const library::GameLibraryScanSummary& summary)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showScanCompleted(directoryId, summary);
+  }
+}
+
+void MainWindow::showGameLibraryScanFailed(
+  std::int64_t directoryId,
+  const std::string& detail)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showScanFailed(directoryId, detail);
+    return;
+  }
+  dialogService_->showError(
+    this, tr("Game Library Scan Failed"), QString::fromStdString(detail));
+}
+
+void MainWindow::showGameLibraryError(const std::string& detail)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showOperationError(detail);
+    return;
+  }
+  dialogService_->showError(
+    this, tr("Game Library Error"), QString::fromStdString(detail));
+}
+
 void MainWindow::showAboutDialog()
 {
   if (auto* existing = findChild<AboutDialog*>(QStringLiteral("aboutDialog"))) {
@@ -905,6 +1012,10 @@ void MainWindow::setDialogService(std::shared_ptr<DialogService> service)
 {
   if (service) {
     dialogService_ = std::move(service);
+    if (auto* dialog = findChild<GameLibraryDialog*>(
+          QStringLiteral("gameLibraryDialog"))) {
+      dialog->setDialogService(dialogService_);
+    }
   }
 }
 
