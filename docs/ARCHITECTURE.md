@@ -248,11 +248,13 @@ its sub-CPU cycles per line from that master clock.
 
 `FramePacer` converts the ratio to whole nanoseconds plus a rational remainder and
 distributes that remainder across absolute `steady_clock` deadlines. This prevents
-long-run drift from truncating each individual frame duration. The worker condition
-variable waits until the deadline but remains interruptible by every command and by
-shutdown; no busy loop or Qt timer executes frames. A frame more than one full interval
-behind resynchronizes to one interval after the current monotonic time instead of
-running an unbounded catch-up burst.
+long-run drift from truncating each individual frame duration. The worker releases its
+queue mutex, sleeps against the monotonic deadline, then checks commands before running
+the frame; no busy loop or Qt timer executes frames. Active-emulation command latency is
+therefore bounded by one native frame (about 16.7 ms), while paused/idle command waits
+remain immediately interruptible. A frame more than one full interval behind
+resynchronizes to one interval after the current monotonic time instead of running an
+unbounded catch-up burst.
 
 Windows begins the worker thread with a scoped 1 ms Multimedia Timer resolution request
 and balances it during thread teardown. This is required because the platform's default

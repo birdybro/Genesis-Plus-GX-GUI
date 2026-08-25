@@ -2375,6 +2375,12 @@ filesystem, timing, generated-fixture, and stability suites.
   required by Apple's `sysctl` headers. That Linux-only definition is now excluded on
   Apple without changing vendored sources. The same Clang build identified and corrected
   a safe-size-to-iterator-difference conversion in the frontend video exchange.
+- Corrective run `32911618611` built both Apple Silicon configurations and passed 59/61
+  tests before showing libc++ condition-variable deadline oversleep in the two real-time
+  pacing workloads. Active pacing now releases the queue lock, uses the standard
+  monotonic `sleep_until`, and checks commands before each frame. It remains non-busy
+  with command latency bounded to one native frame; paused and idle waits stay directly
+  interruptible.
 - Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
   timing portability fix. Static workflow validation and hosted verification are
   pending this workflow-bearing commit.

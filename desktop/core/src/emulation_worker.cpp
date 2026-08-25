@@ -493,13 +493,15 @@ private:
             publishOperation(std::move(event));
             break;
           }
-          const bool interrupted = wake_.wait_until(lock, *deadline, [this] {
-            return stopRequested_ || !commands_.empty();
-          });
+          if (Clock::now() < *deadline) {
+            lock.unlock();
+            std::this_thread::sleep_until(*deadline);
+            lock.lock();
+          }
           if (stopRequested_) {
             break;
           }
-          if (interrupted) {
+          if (!commands_.empty()) {
             command = commands_.pop();
           } else {
             executeFrame = true;
