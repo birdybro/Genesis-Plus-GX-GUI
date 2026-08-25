@@ -90,3 +90,11 @@ target_link_libraries(
 )
 add_test(NAME unit.video_geometry COMMAND genplusgx_video_geometry_test)
 set_tests_properties(unit.video_geometry PROPERTIES LABELS "unit;video")
+
+add_executable(genplusgx_frame_pacer_test frame_pacer_test.cpp)
+target_link_libraries(
+  genplusgx_frame_pacer_test
+  PRIVATE GenesisPlusGX::Timing genplusgx_project_warnings
+)
+add_test(NAME unit.frame_pacer COMMAND genplusgx_frame_pacer_test)
+set_tests_properties(unit.frame_pacer PROPERTIES LABELS "unit;timing")

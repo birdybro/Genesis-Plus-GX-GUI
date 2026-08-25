@@ -68,14 +68,16 @@ int main(int argc, char* argv[])
       if (!audioOutput.isInitialized()) {
         continue;
       }
-      if (event->workerState == genplusgx::EmulationWorkerState::running &&
+      const bool audioShouldRun =
+        event->workerState == genplusgx::EmulationWorkerState::running &&
+        !event->fastForward;
+      if (audioShouldRun &&
           audioOutput.isPaused()) {
         const auto resumed = audioOutput.resume();
         if (!resumed) {
           qWarning().noquote() << QString::fromStdString(resumed.message);
         }
-      } else if (event->workerState != genplusgx::EmulationWorkerState::running &&
-                 !audioOutput.isPaused()) {
+      } else if (!audioShouldRun && !audioOutput.isPaused()) {
         const auto paused = audioOutput.pause();
         if (!paused) {
           qWarning().noquote() << QString::fromStdString(paused.message);

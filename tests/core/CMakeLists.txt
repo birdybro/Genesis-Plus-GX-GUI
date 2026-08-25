@@ -112,3 +112,17 @@ set_tests_properties(
   core.emulation_worker
   PROPERTIES LABELS "core;integration;fixture;concurrency;lifecycle;state;input" TIMEOUT 30
 )
+
+add_executable(genplusgx_timing_pacing_test timing_pacing_test.cpp)
+target_link_libraries(
+  genplusgx_timing_pacing_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+)
+add_test(NAME core.timing_pacing COMMAND genplusgx_timing_pacing_test)
+set_tests_properties(
+  core.timing_pacing
+  PROPERTIES LABELS "core;integration;fixture;concurrency;timing" TIMEOUT 30
+)

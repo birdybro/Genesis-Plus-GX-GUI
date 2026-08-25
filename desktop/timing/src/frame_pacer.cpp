@@ -1,0 +1,188 @@
+#include "genplusgx/timing/frame_pacer.h"
+
+#include <algorithm>
+#include <limits>
+
+namespace genplusgx {
+namespace {
+
+constexpr std::uint64_t nanosecondsPerSecond = 1'000'000'000U;
+constexpr std::uint64_t fastForwardMultiplier = 4U;
+
+} // namespace
+
+bool FrameRateRatio::valid() const noexcept
+{
+  if (framesNumerator == 0U || framesDenominator == 0U ||
+      framesNumerator >
+        std::numeric_limits<std::uint64_t>::max() / fastForwardMultiplier ||
+      framesDenominator >
+        std::numeric_limits<std::uint64_t>::max() / nanosecondsPerSecond) {
+    return false;
+  }
+  return framesNumerator * fastForwardMultiplier <=
+         framesDenominator * nanosecondsPerSecond;
+}
+
+double FrameRateRatio::hertz() const noexcept
+{
+  if (!valid()) {
+    return 0.0;
+  }
+  return static_cast<double>(framesNumerator) /
+         static_cast<double>(framesDenominator);
+}
+
+bool FramePacer::configure(FrameRateRatio frameRate) noexcept
+{
+  if (!frameRate.valid()) {
+    return false;
+  }
+  frameRate_ = frameRate;
+  active_ = false;
+  fastForward_ = false;
+  accumulatedRemainder_ = 0U;
+  metrics_ = {};
+  return rebuildInterval();
+}
+
+bool FramePacer::setFastForward(bool enabled, TimePoint now) noexcept
+{
+  if (!frameRate_.valid()) {
+    return false;
+  }
+  if (fastForward_ == enabled) {
+    return true;
+  }
+  fastForward_ = enabled;
+  if (!rebuildInterval()) {
+    fastForward_ = !enabled;
+    static_cast<void>(rebuildInterval());
+    return false;
+  }
+  if (active_) {
+    deadline_ = now;
+    accumulatedRemainder_ = 0U;
+  }
+  return true;
+}
+
+void FramePacer::resume(TimePoint now) noexcept
+{
+  if (!frameRate_.valid()) {
+    return;
+  }
+  deadline_ = now;
+  accumulatedRemainder_ = 0U;
+  active_ = true;
+}
+
+void FramePacer::pause() noexcept
+{
+  active_ = false;
+}
+
+void FramePacer::frameExecuted(TimePoint now) noexcept
+{
+  if (!active_) {
+    return;
+  }
+  ++metrics_.scheduledFrames;
+  if (now > deadline_) {
+    ++metrics_.lateFrames;
+    metrics_.maximumLateness =
+      std::max(metrics_.maximumLateness,
+        std::chrono::duration_cast<std::chrono::nanoseconds>(now - deadline_));
+  }
+
+  advanceDeadline();
+  const auto intervalCeiling = std::chrono::nanoseconds{
+    static_cast<std::chrono::nanoseconds::rep>(
+      intervalWholeNanoseconds_ + (intervalRemainder_ == 0U ? 0U : 1U))};
+  if (deadline_ < now && now - deadline_ > intervalCeiling) {
+    ++metrics_.resynchronizations;
+    deadline_ = now;
+    accumulatedRemainder_ = 0U;
+    advanceDeadline();
+  }
+}
+
+void FramePacer::resetMetrics() noexcept
+{
+  metrics_.scheduledFrames = 0U;
+  metrics_.lateFrames = 0U;
+  metrics_.resynchronizations = 0U;
+  metrics_.maximumLateness = std::chrono::nanoseconds{0};
+}
+
+bool FramePacer::isActive() const noexcept
+{
+  return active_;
+}
+
+bool FramePacer::isFastForward() const noexcept
+{
+  return fastForward_;
+}
+
+FrameRateRatio FramePacer::frameRate() const noexcept
+{
+  return frameRate_;
+}
+
+std::optional<FramePacer::TimePoint> FramePacer::nextDeadline() const noexcept
+{
+  if (!active_) {
+    return std::nullopt;
+  }
+  return deadline_;
+}
+
+std::chrono::nanoseconds FramePacer::nominalFrameDuration() const noexcept
+{
+  if (!frameRate_.valid()) {
+    return std::chrono::nanoseconds{0};
+  }
+  return std::chrono::nanoseconds{
+    static_cast<std::chrono::nanoseconds::rep>(intervalWholeNanoseconds_)};
+}
+
+FramePacerMetrics FramePacer::metrics() const noexcept
+{
+  return metrics_;
+}
+
+bool FramePacer::rebuildInterval() noexcept
+{
+  if (!frameRate_.valid()) {
+    return false;
+  }
+  const auto multiplier = fastForward_ ? fastForwardMultiplier : 1U;
+  const auto intervalNumerator = frameRate_.framesDenominator * nanosecondsPerSecond;
+  intervalDenominator_ = frameRate_.framesNumerator * multiplier;
+  intervalWholeNanoseconds_ = intervalNumerator / intervalDenominator_;
+  intervalRemainder_ = intervalNumerator % intervalDenominator_;
+  if (intervalWholeNanoseconds_ == 0U) {
+    return false;
+  }
+  metrics_.targetFramesPerSecond =
+    frameRate_.hertz() * static_cast<double>(multiplier);
+  metrics_.fastForward = fastForward_;
+  return true;
+}
+
+void FramePacer::advanceDeadline() noexcept
+{
+  auto delta = intervalWholeNanoseconds_;
+  if (intervalRemainder_ > 0U &&
+      accumulatedRemainder_ >= intervalDenominator_ - intervalRemainder_) {
+    ++delta;
+    accumulatedRemainder_ -= intervalDenominator_ - intervalRemainder_;
+  } else {
+    accumulatedRemainder_ += intervalRemainder_;
+  }
+  deadline_ += std::chrono::nanoseconds{
+    static_cast<std::chrono::nanoseconds::rep>(delta)};
+}
+
+} // namespace genplusgx

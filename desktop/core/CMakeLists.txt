@@ -222,6 +222,7 @@ target_link_libraries(
     GenesisPlusGX::Audio
     GenesisPlusGX::Core
     GenesisPlusGX::FrontendTypes
+    GenesisPlusGX::Timing
     GenesisPlusGX::VideoExchange
   PRIVATE genplusgx_project_warnings
 )

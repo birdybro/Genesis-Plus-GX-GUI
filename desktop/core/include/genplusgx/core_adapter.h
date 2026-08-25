@@ -32,6 +32,7 @@ enum class CoreError {
   noAudioAvailable,
   audioBufferTooSmall,
   invalidAudioBatch,
+  invalidTiming,
   staleInputSnapshot,
   invalidStatePayload,
   stateSaveFailed,
@@ -82,6 +83,27 @@ struct CoreAudioBatchInfo final {
   std::uint64_t droppedBatchCount{0};
 };
 
+struct CoreTimingInfo final {
+  std::uint64_t masterClockHz{0};
+  std::uint32_t linesPerFrame{0};
+  std::uint32_t masterCyclesPerLine{0};
+  bool pal{false};
+  bool segaCd{false};
+
+  [[nodiscard]] std::uint64_t masterCyclesPerFrame() const noexcept
+  {
+    return static_cast<std::uint64_t>(linesPerFrame) * masterCyclesPerLine;
+  }
+
+  [[nodiscard]] double framesPerSecond() const noexcept
+  {
+    const auto cycles = masterCyclesPerFrame();
+    return cycles == 0U ? 0.0
+                        : static_cast<double>(masterClockHz) /
+                            static_cast<double>(cycles);
+  }
+};
+
 [[nodiscard]] std::uint64_t hashAudioFrames(
   std::span<const StereoAudioFrame> frames) noexcept;
 
@@ -111,6 +133,7 @@ public:
   [[nodiscard]] CoreResult copyAudioFrames(
     std::span<StereoAudioFrame> destination,
     CoreAudioBatchInfo& output);
+  [[nodiscard]] CoreResult timingInfo(CoreTimingInfo& output) const;
   [[nodiscard]] CoreResult setInputSnapshot(const InputSnapshot& snapshot);
   [[nodiscard]] CoreResult saveRawState(std::vector<std::uint8_t>& output);
   [[nodiscard]] CoreResult loadRawState(std::span<const std::uint8_t> state);

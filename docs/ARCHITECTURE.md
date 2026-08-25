@@ -160,11 +160,34 @@ Any live state -> Stopping -> Stopped
 
 A successful load enters `Paused`, ensuring no frame runs before its coordinator is
 ready. Invalid transitions produce typed asynchronous failures without mutating state.
-Frame waits use interruptible monotonic deadlines; Milestone 15 replaces the temporary
-nominal interval with exact region/audio-aware pacing. `stop()` first closes command
-admission, wakes all waits, performs adapter shutdown on the owner thread, then joins
-synchronously. The destructor invokes the same path, and a stopped worker can be cleanly
-started again.
+Frame waits use interruptible monotonic deadlines derived from the core's current timing
+ratio. `stop()` first closes command admission, wakes all waits, performs adapter
+shutdown on the owner thread, then joins synchronously. The destructor invokes the same
+path, and a stopped worker can be cleanly started again.
+
+## Timing and synchronization
+
+`CoreAdapter::timingInfo()` reads the authoritative values after load: `system_clock`,
+`lines_per_frame`, and the upstream constant of 3,420 master cycles per line. The target
+ratio is retained as `system_clock / (lines_per_frame * 3420)`—approximately 59.923 Hz
+for NTSC and 49.701 Hz for PAL—rather than rounded to 60/50 Hz or to one fixed integer
+duration. Sega CD follows the same region-specific VDP frame cadence; the core derives
+its sub-CPU cycles per line from that master clock.
+
+`FramePacer` converts the ratio to whole nanoseconds plus a rational remainder and
+distributes that remainder across absolute `steady_clock` deadlines. This prevents
+long-run drift from truncating each individual frame duration. The worker condition
+variable waits until the deadline but remains interruptible by every command and by
+shutdown; no busy loop or Qt timer executes frames. A frame more than one full interval
+behind resynchronizes to one interval after the current monotonic time instead of
+running an unbounded catch-up burst.
+
+Pause removes the active deadline. Resume starts immediately from a fresh origin, and
+frame advance runs exactly one frame without activating the pacer. Fast-forward rebuilds
+the same rational interval at a bounded 4x rate. Its core audio batch is drained but not
+queued because a real-time device cannot consume it at 4x; the composition root pauses
+and clears SDL until normal speed resumes. Metrics expose scheduled/late frames,
+resynchronizations, maximum lateness, effective target rate, and fast-forward state.
 
 ## Video data flow
 

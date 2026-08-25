@@ -10,6 +10,7 @@ extern "C" {
 #include <filesystem>
 #include <iostream>
 #include <thread>
+#include <utility>
 
 namespace {
 
@@ -44,9 +45,13 @@ int main()
 {
   const genplusgx::test::TemporaryFixture fixture{
     genplusgx::test::makeGenesisRamMarkerRom(), ".bin"};
+  auto palRom = genplusgx::test::makeGenesisRamMarkerRom();
+  palRom.at(0x1F0U) = static_cast<std::uint8_t>('E');
+  const genplusgx::test::TemporaryFixture palFixture{std::move(palRom), ".bin"};
   const genplusgx::test::TemporaryFixture emptyFixture{{}, ".bin"};
 
   CoreAdapter adapter;
+  genplusgx::CoreTimingInfo unloadedTiming;
   if (!check(adapter.state() == CoreLifecycleState::uninitialized,
         "A new adapter did not start uninitialized") ||
       !check(adapter.runFrame().error == CoreError::notInitialized,
@@ -58,7 +63,9 @@ int main()
       !check(adapter.state() == CoreLifecycleState::ready,
         "Initialized adapter did not enter ready state") ||
       !check(adapter.reset().error == CoreError::noGameLoaded,
-        "Reset without a loaded game was not rejected")) {
+        "Reset without a loaded game was not rejected") ||
+      !check(adapter.timingInfo(unloadedTiming).error == CoreError::noGameLoaded,
+        "Timing metadata was exposed without a loaded game")) {
     return 1;
   }
 
@@ -75,12 +82,21 @@ int main()
     return 2;
   }
 
+  genplusgx::CoreTimingInfo ntscTiming;
   if (!check(adapter.loadGame(fixture.path()), "Generated ROM failed to load through the adapter") ||
       !check(adapter.state() == CoreLifecycleState::loaded,
         "Successful load did not enter loaded state") ||
       !check(adapter.hardware() == SYSTEM_MD, "Loaded hardware metadata was incorrect") ||
       !check(adapter.loadedPath() == fixture.path(), "Loaded path was not retained") ||
       !check(adapter.frameCount() == 0U, "Fresh load had a nonzero frame count") ||
+      !check(adapter.timingInfo(ntscTiming), "NTSC timing metadata was unavailable") ||
+      !check(ntscTiming.masterClockHz == MCLOCK_NTSC &&
+          ntscTiming.linesPerFrame == 262U &&
+          ntscTiming.masterCyclesPerLine == MCYCLES_PER_LINE &&
+          !ntscTiming.pal && !ntscTiming.segaCd &&
+          ntscTiming.framesPerSecond() > 59.92 &&
+          ntscTiming.framesPerSecond() < 59.93,
+        "NTSC timing metadata differs from the authoritative core cadence") ||
       !check(adapter.runFrame(true), "Headless frame execution failed") ||
       !check(adapter.frameCount() == 1U, "Frame count did not advance") ||
       !check(markerWasWritten(), "Synthetic program did not run through the adapter")) {
@@ -124,26 +140,39 @@ int main()
     }
   }
 
+  genplusgx::CoreTimingInfo palTiming;
+  if (!check(adapter.loadGame(palFixture.path()), "PAL fixture failed to load") ||
+      !check(adapter.timingInfo(palTiming), "PAL timing metadata was unavailable") ||
+      !check(palTiming.masterClockHz == MCLOCK_PAL &&
+          palTiming.linesPerFrame == 313U &&
+          palTiming.masterCyclesPerLine == MCYCLES_PER_LINE && palTiming.pal &&
+          !palTiming.segaCd && palTiming.framesPerSecond() > 49.70 &&
+          palTiming.framesPerSecond() < 49.71,
+        "PAL timing metadata differs from the authoritative core cadence") ||
+      !check(adapter.unloadGame(), "PAL fixture unload failed")) {
+    return 7;
+  }
+
   if (!check(adapter.shutdown(), "Core shutdown failed") ||
       !check(adapter.state() == CoreLifecycleState::uninitialized,
         "Shutdown did not release adapter state") ||
       !check(competingAdapter.initialize(), "Released core ownership could not be reacquired") ||
       !check(competingAdapter.shutdown(), "Second adapter shutdown failed")) {
-    return 7;
+    return 8;
   }
 
   {
     CoreAdapter scopedAdapter;
     if (!check(scopedAdapter.initialize(), "Scoped adapter initialization failed") ||
         !check(scopedAdapter.loadGame(fixture.path()), "Scoped adapter load failed")) {
-      return 8;
+      return 9;
     }
   }
 
   CoreAdapter afterDestructor;
   if (!check(afterDestructor.initialize(), "RAII destruction did not release core ownership") ||
       !check(afterDestructor.shutdown(), "Final adapter shutdown failed")) {
-    return 9;
+    return 10;
   }
 
   CoreAdapter invalidAudioRate{7'999};
@@ -151,7 +180,7 @@ int main()
         "An unsupported audio rate was accepted") ||
       !check(invalidAudioRate.state() == CoreLifecycleState::uninitialized,
         "Rejected audio configuration acquired core ownership")) {
-    return 10;
+    return 11;
   }
 
   return 0;

@@ -12,8 +12,6 @@ namespace genplusgx {
 namespace {
 
 using Clock = std::chrono::steady_clock;
-constexpr auto normalFrameInterval = std::chrono::microseconds{16'667};
-constexpr auto fastFrameInterval = std::chrono::milliseconds{1};
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 constexpr std::size_t defaultAudioRingFrames = 12'000U;
 
@@ -210,6 +208,14 @@ public:
       .coalescedInputCommands = coalescedInputCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
+      .pacedFrameCount = pacingMetrics_.scheduledFrames,
+      .lateFrameCount = pacingMetrics_.lateFrames,
+      .pacingResynchronizations = pacingMetrics_.resynchronizations,
+      .maximumLatenessMicroseconds =
+        std::chrono::duration_cast<std::chrono::microseconds>(
+          pacingMetrics_.maximumLateness).count(),
+      .targetFramesPerSecond = pacingMetrics_.targetFramesPerSecond,
+      .fastForward = pacingMetrics_.fastForward,
     };
   }
 
@@ -240,11 +246,12 @@ private:
       return;
     }
 
+    pacer_ = FramePacer{};
+    updatePacingMetrics();
     owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
     publishOperation(eventFor(
       EmulationEventType::workerStarted, EmulationWorkerState::idle));
 
-    auto nextFrame = Clock::now();
     while (true) {
       std::optional<EmulationCommand> command;
       bool executeFrame = false;
@@ -257,7 +264,18 @@ private:
           command = commands_.pop();
         } else if (owner_.state_.load(std::memory_order_acquire) ==
                    EmulationWorkerState::running) {
-          const bool interrupted = wake_.wait_until(lock, nextFrame, [this] {
+          const auto deadline = pacer_.nextDeadline();
+          if (!deadline) {
+            owner_.state_.store(EmulationWorkerState::failed, std::memory_order_release);
+            auto event = eventFor(
+              EmulationEventType::commandFailed, EmulationWorkerState::failed);
+            event.error = EmulationWorkerError::threadFailure;
+            event.message = "Running emulation has no valid frame deadline.";
+            lock.unlock();
+            publishOperation(std::move(event));
+            break;
+          }
+          const bool interrupted = wake_.wait_until(lock, *deadline, [this] {
             return stopRequested_ || !commands_.empty();
           });
           if (stopRequested_) {
@@ -279,16 +297,10 @@ private:
 
       if (command) {
         processCommand(adapter, std::move(*command));
-        nextFrame = Clock::now();
         continue;
       }
       if (executeFrame) {
         runOneFrame(adapter);
-        const auto interval = fastForward_ ? fastFrameInterval : normalFrameInterval;
-        nextFrame += interval;
-        if (nextFrame < Clock::now()) {
-          nextFrame = Clock::now() + interval;
-        }
       }
     }
 
@@ -297,6 +309,8 @@ private:
 
   void finishThread(CoreAdapter& adapter)
   {
+    pacer_.pause();
+    updatePacingMetrics();
     const auto shutdown = adapter.shutdown();
     owner_.state_.store(EmulationWorkerState::stopped, std::memory_order_release);
     {
@@ -325,10 +339,19 @@ private:
         discardLatestFrame();
         coreResult = adapter.loadGame(command.path);
         if (coreResult) {
-          owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
+          fastForward_ = false;
+          coreResult = configurePacing(adapter, false);
+          if (coreResult) {
+            owner_.state_.store(
+              EmulationWorkerState::paused, std::memory_order_release);
+          } else {
+            static_cast<void>(adapter.unloadGame());
+            owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
+          }
         } else if (adapter.state() != CoreLifecycleState::loaded) {
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
+          pacer_.pause();
         }
         break;
       case EmulationCommandType::unloadGame:
@@ -337,28 +360,39 @@ private:
         if (coreResult) {
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
+          pacer_.pause();
         }
         break;
       case EmulationCommandType::start:
       case EmulationCommandType::resume:
         validTransition = current == EmulationWorkerState::paused;
         if (validTransition) {
+          pacer_.resume(Clock::now());
           owner_.state_.store(EmulationWorkerState::running, std::memory_order_release);
         }
         break;
       case EmulationCommandType::pause:
         validTransition = current == EmulationWorkerState::running;
         if (validTransition) {
+          pacer_.pause();
           owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
         }
         break;
       case EmulationCommandType::hardReset:
         discardLatestFrame();
         coreResult = adapter.reset();
+        if (coreResult) {
+          coreResult = configurePacing(
+            adapter, current == EmulationWorkerState::running);
+        }
         break;
       case EmulationCommandType::softReset:
         discardLatestFrame();
         coreResult = adapter.softReset();
+        if (coreResult) {
+          coreResult = configurePacing(
+            adapter, current == EmulationWorkerState::running);
+        }
         break;
       case EmulationCommandType::frameAdvance:
         validTransition = current == EmulationWorkerState::paused;
@@ -370,7 +404,14 @@ private:
         validTransition = current == EmulationWorkerState::paused ||
                           current == EmulationWorkerState::running;
         if (validTransition) {
-          fastForward_ = command.enabled;
+          if (pacer_.setFastForward(command.enabled, Clock::now())) {
+            fastForward_ = command.enabled;
+          } else {
+            coreResult = {
+              CoreError::invalidTiming,
+              "Fast-forward could not be applied to the current frame rate.",
+            };
+          }
         }
         break;
       case EmulationCommandType::inputSnapshot:
@@ -385,8 +426,14 @@ private:
       case EmulationCommandType::restoreState:
         discardLatestFrame();
         coreResult = adapter.loadRawState(command.rawState);
+        if (coreResult) {
+          coreResult = configurePacing(
+            adapter, current == EmulationWorkerState::running);
+        }
         break;
     }
+
+    updatePacingMetrics();
 
     if (!validTransition) {
       auto event = eventFor(EmulationEventType::commandFailed, current);
@@ -432,6 +479,8 @@ private:
     const auto result = executeOneFrame(adapter);
     if (!result) {
       owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
+      pacer_.pause();
+      updatePacingMetrics();
       auto event = eventFor(
         EmulationEventType::commandFailed, EmulationWorkerState::paused);
       event.error = EmulationWorkerError::coreFailure;
@@ -441,6 +490,9 @@ private:
       publishOperation(std::move(event));
       return;
     }
+
+    pacer_.frameExecuted(Clock::now());
+    updatePacingMetrics();
 
     std::scoped_lock lock{mutex_};
     if (latestFrame_) {
@@ -481,8 +533,10 @@ private:
       if (!copiedAudio) {
         return copiedAudio;
       }
-      static_cast<void>(audioFrames_->write(
-        std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
+      if (!fastForward_) {
+        static_cast<void>(audioFrames_->write(
+          std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
+      }
     }
 
     auto write = videoFrames_->beginWrite();
@@ -501,6 +555,35 @@ private:
       };
     }
     return {};
+  }
+
+  CoreResult configurePacing(CoreAdapter& adapter, bool resume)
+  {
+    CoreTimingInfo timing;
+    if (const auto result = adapter.timingInfo(timing); !result) {
+      return result;
+    }
+    const FrameRateRatio rate{
+      .framesNumerator = timing.masterClockHz,
+      .framesDenominator = timing.masterCyclesPerFrame(),
+    };
+    if (!pacer_.configure(rate) ||
+        !pacer_.setFastForward(fastForward_, Clock::now())) {
+      return {
+        CoreError::invalidTiming,
+        "The core frame rate cannot be represented by the frontend scheduler.",
+      };
+    }
+    if (resume) {
+      pacer_.resume(Clock::now());
+    }
+    return {};
+  }
+
+  void updatePacingMetrics()
+  {
+    std::scoped_lock lock{mutex_};
+    pacingMetrics_ = pacer_.metrics();
   }
 
   void publishOperation(EmulationEvent event)
@@ -547,6 +630,8 @@ private:
   std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
+  FramePacer pacer_;
+  FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};

@@ -318,6 +318,26 @@ CoreResult CoreAdapter::copyAudioFrames(
   return success();
 }
 
+CoreResult CoreAdapter::timingInfo(CoreTimingInfo& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (system_clock == 0U || lines_per_frame == 0U) {
+    output = {};
+    return failure(CoreError::invalidTiming, "The core reported invalid timing values.");
+  }
+  output = {
+    .masterClockHz = system_clock,
+    .linesPerFrame = lines_per_frame,
+    .masterCyclesPerLine = MCYCLES_PER_LINE,
+    .pal = vdp_pal != 0U,
+    .segaCd = system_hw == SYSTEM_MCD,
+  };
+  return success();
+}
+
 CoreResult CoreAdapter::setInputSnapshot(const InputSnapshot& snapshot)
 {
   std::scoped_lock lock{coreMutex};

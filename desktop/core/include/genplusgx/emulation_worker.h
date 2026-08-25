@@ -3,6 +3,7 @@
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/input_snapshot.h"
 #include "genplusgx/audio_ring_buffer.h"
+#include "genplusgx/timing/frame_pacer.h"
 #include "genplusgx/video/frame_exchange.h"
 
 #include <atomic>
@@ -124,6 +125,12 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedInputCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
+  std::uint64_t pacedFrameCount{0};
+  std::uint64_t lateFrameCount{0};
+  std::uint64_t pacingResynchronizations{0};
+  std::int64_t maximumLatenessMicroseconds{0};
+  double targetFramesPerSecond{0.0};
+  bool fastForward{false};
 };
 
 class EmulationWorker final {

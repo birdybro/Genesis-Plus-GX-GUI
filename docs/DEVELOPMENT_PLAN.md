@@ -25,8 +25,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | `0a04aa1` |
 | 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | `3ee78c1` |
 | 13 Video scaling | COMPLETE | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | `71692a3` |
-| 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | recorded by milestone 15 |
-| 15 Timing/pacing | PLANNED | NTSC/PAL/CD pacing, FF, pause, frame advance | timing service | rate tolerance and state tests | Monotonic non-busy pacing | pending |
+| 14 Audio playback | COMPLETE | SDL3 output, device lifecycle, pause/resume | `desktop/audio`, worker/app composition | dummy-device init, callback accounting, worker transfer | Clean bounded low-latency pipeline | `1fbc570` |
+| 15 Timing/pacing | COMPLETE | NTSC/PAL/CD pacing, FF, pause, frame advance | `desktop/timing`, core timing metadata, worker scheduler | rational/property and live rate/state tests | Monotonic non-busy pacing | recorded by milestone 16 |
 | 16 Keyboard controls | PLANNED | Excellent default Genesis keyboard mappings | input/UI integration | synthetic key-to-core workflow | 3/6-button controls work | pending |
 | 17 Controllers | PLANNED | SDL3 discovery, hot-plug, assignments, mappings | controller service | injected SDL event tests | Multi-controller lifecycle is safe | pending |
 | 18 Input UI | PLANNED | Capture, profiles, deadzones, conflicts, advanced devices | settings/input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | pending |
@@ -788,4 +788,65 @@ paused, track callback/ring underruns and overruns, clear stale data on pause, a
 before the audio subsystem. Application shutdown stops and joins emulation before
 closing audio.
 
-**Commit SHA:** recorded by milestone 15
+**Commit SHA:** `1fbc570`
+
+## Milestone 15 detail
+
+**Status:** COMPLETE
+
+**Goal:** Schedule frames from the core's authoritative rational NTSC/PAL cadence with
+interruptible monotonic waits, bounded late-frame recovery, pause/frame-advance
+semantics, and a controlled fast-forward rate.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/timing/CMakeLists.txt`
+- `desktop/timing/include/genplusgx/timing/frame_pacer.h`
+- `desktop/timing/src/frame_pacer.cpp`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/core/core_lifecycle_test.cpp`
+- `tests/core/timing_pacing_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/frame_pacer_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.frame_pacer` validates input/overflow bounds, exact NTSC and PAL
+rates, 600-frame nanosecond remainder accumulation, pause, resume, a rational 4x mode,
+late-frame instrumentation, single-interval catch-up limits, and metric reset. Core
+lifecycle tests verify generated NTSC and PAL headers expose the expected master clocks,
+line counts, and cadence. `core.timing_pacing` measures live worker behavior: 30 normal
+frames remain within rate tolerance, pause schedules none, frame advance does not restart
+continuous pacing, and 40 fast frames materially accelerate without an unbounded loop.
+
+**Gate evidence:**
+
+- Initial focused tests and five consecutive unit/live timing runs: passed.
+- Debug build and complete CTest: passed (23/23).
+- Release build and complete CTest: passed (23/23).
+- ASan/UBSan preset build and complete CTest: passed (23/23).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New scheduler, integration, and test code compiled under the frontend warning policy
+  without warnings.
+
+**Acceptance criteria:** `CoreAdapter` reports the same master clock, lines-per-frame,
+and 3,420 master cycles per line used by the upstream libretro timing calculation. The
+frontend retains the ratio rather than rounding it to a millisecond/microsecond timer.
+`FramePacer` distributes fractional nanoseconds across deadlines, waits through the
+worker's interruptible condition variable, permits at most a bounded catch-up before
+resynchronizing, and exposes target rate, late frames, maximum lateness, and resyncs.
+Pause removes the deadline, resume begins immediately from a fresh monotonic origin,
+frame advance executes without enabling the scheduler, and fast-forward is exactly 4x.
+Fast-forward still drains the core batch but does not enqueue impossible real-time host
+audio; the application pauses and clears the SDL stream until normal speed resumes.
+Sega CD automatically uses its loaded region's VDP cadence while its core sub-clock
+remains synchronized by Genesis Plus GX.
+
+**Commit SHA:** recorded by milestone 16
