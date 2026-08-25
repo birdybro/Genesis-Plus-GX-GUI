@@ -162,6 +162,33 @@ int main()
     return 6;
   }
 
+  genplusgx::CoreVideoSettings overscanSettings;
+  overscanSettings.overscan = genplusgx::CoreOverscanMode::full;
+  overscanSettings.ntscFilter = genplusgx::CoreNtscFilter::composite;
+  if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateVideoSettings(
+            51U, overscanSettings), event),
+        "Worker video settings update failed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 52U), event),
+        "Worker settings propagation frame failed") ||
+      !check(worker.videoFrames()->copyLatest(
+          videoPixels, videoInfo, videoGeneration),
+        "Worker settings frame was not published") ||
+      !check(videoInfo.width > 320U && videoInfo.height > 224U,
+        "Worker did not propagate overscan settings to the core") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateVideoSettings(
+            53U, genplusgx::CoreVideoSettings{}), event),
+        "Worker could not restore default video settings") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 54U), event),
+        "Default settings propagation frame failed")) {
+    return 7;
+  }
+
   genplusgx::InputSnapshot input;
   input.sequence = 22U;
   input.players[0].connected = true;
@@ -176,7 +203,7 @@ int main()
       !check(event.workerState == genplusgx::EmulationWorkerState::paused &&
           event.appliedInputSequence == 22U,
         "Frame advance did not consume input at its frame boundary")) {
-    return 7;
+    return 8;
   }
 
   if (!check(submitAndSucceed(worker,
@@ -186,7 +213,7 @@ int main()
       !check(event.type == genplusgx::EmulationEventType::stateCaptured &&
           event.rawState.size() > 16U,
         "Worker did not return a raw state payload")) {
-    return 8;
+    return 9;
   }
   const auto capturedState = event.rawState;
 
@@ -213,7 +240,7 @@ int main()
             genplusgx::EmulationCommandType::softReset, 13U), event),
         "Worker soft reset failed") ||
       !check(event.frameNumber == 0U, "Soft reset retained a frame count")) {
-    return 9;
+    return 10;
   }
 
   if (!check(submitAndSucceed(worker,
@@ -224,7 +251,7 @@ int main()
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::resume, 15U), event),
         "Fast-forward resume failed")) {
-    return 10;
+    return 11;
   }
   const auto fastFrame = waitForType(worker, genplusgx::EmulationEventType::frameCompleted);
   std::this_thread::sleep_for(20ms);
@@ -240,7 +267,7 @@ int main()
       !check(worker.submit(genplusgx::EmulationCommand::load(
           17U, invalidFixture.path())),
         "Invalid replacement load could not be queued")) {
-    return 11;
+    return 12;
   }
   const auto invalidLoad = waitForOperation(worker, 17U);
   if (!check(invalidLoad && invalidLoad->type ==
@@ -258,7 +285,7 @@ int main()
         "Worker unload failed") ||
       !check(event.workerState == genplusgx::EmulationWorkerState::idle,
         "Worker unload did not return to idle")) {
-    return 12;
+    return 13;
   }
 
   if (!check(worker.stop(), "Worker stop failed") ||
@@ -268,11 +295,11 @@ int main()
           genplusgx::EmulationCommandType::pause, 20U)).error ==
           genplusgx::EmulationWorkerError::notRunning,
         "Stopped worker retained command acceptance")) {
-    return 13;
+    return 14;
   }
   const auto stopped = waitForType(worker, genplusgx::EmulationEventType::workerStopped);
   if (!check(stopped && stopped->succeeded(), "Worker did not publish clean shutdown")) {
-    return 14;
+    return 15;
   }
 
   for (int cycle = 0; cycle < 10; ++cycle) {
@@ -282,7 +309,7 @@ int main()
         !check(worker.stop(), "Repeated worker stop failed") ||
         !check(worker.state() == genplusgx::EmulationWorkerState::stopped,
           "Repeated worker stop left a live state")) {
-      return 15;
+      return 16;
     }
   }
 
@@ -297,7 +324,7 @@ int main()
           "RAII worker load could not be queued") ||
         !check(waitForOperation(automaticShutdown, 21U).has_value(),
           "RAII worker load did not complete")) {
-      return 16;
+      return 17;
     }
   }
 
@@ -305,5 +332,5 @@ int main()
   return check(leaseProbe.initialize(), "Worker destruction retained the global core lease") &&
       check(leaseProbe.shutdown(), "Core lease probe shutdown failed")
     ? 0
-    : 17;
+    : 18;
 }

@@ -4,6 +4,7 @@
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -66,6 +67,7 @@ MainWindow::MainWindow(QWidget* parent)
   }
   updateStateSlotPresentation();
   setGameActionsEnabled(false);
+  applyVideoSettings(videoSettings_, false);
 }
 
 QAction* MainWindow::addAction(
@@ -200,10 +202,14 @@ void MainWindow::buildMenus()
   integerScale->setCheckable(true);
   fitScale->setChecked(true);
   connect(fitScale, &QAction::triggered, this, [this] {
-    displayWidget_->setScaleMode(video::ScaleMode::fit);
+    auto settings = videoSettings_;
+    settings.scaling = video::ScaleMode::fit;
+    applyVideoSettings(settings, true);
   });
   connect(integerScale, &QAction::triggered, this, [this] {
-    displayWidget_->setScaleMode(video::ScaleMode::integer);
+    auto settings = videoSettings_;
+    settings.scaling = video::ScaleMode::integer;
+    applyVideoSettings(settings, true);
   });
 
   auto* aspect = video->addMenu(tr("&Aspect Ratio"));
@@ -221,13 +227,19 @@ void MainWindow::buildMenus()
   stretchAspect->setCheckable(true);
   nativeAspect->setChecked(true);
   connect(nativeAspect, &QAction::triggered, this, [this] {
-    displayWidget_->setAspectMode(video::AspectMode::native);
+    auto settings = videoSettings_;
+    settings.aspect = video::AspectMode::native;
+    applyVideoSettings(settings, true);
   });
   connect(fourThreeAspect, &QAction::triggered, this, [this] {
-    displayWidget_->setAspectMode(video::AspectMode::fourThree);
+    auto settings = videoSettings_;
+    settings.aspect = video::AspectMode::fourThree;
+    applyVideoSettings(settings, true);
   });
   connect(stretchAspect, &QAction::triggered, this, [this] {
-    displayWidget_->setAspectMode(video::AspectMode::stretch);
+    auto settings = videoSettings_;
+    settings.aspect = video::AspectMode::stretch;
+    applyVideoSettings(settings, true);
   });
 
   auto* filtering = video->addMenu(tr("&Filtering"));
@@ -242,13 +254,102 @@ void MainWindow::buildMenus()
   bilinear->setCheckable(true);
   nearest->setChecked(true);
   connect(nearest, &QAction::triggered, this, [this] {
-    displayWidget_->setVideoFilter(video::VideoFilter::nearest);
+    auto settings = videoSettings_;
+    settings.presentationFilter = video::VideoFilter::nearest;
+    applyVideoSettings(settings, true);
   });
   connect(bilinear, &QAction::triggered, this, [this] {
-    displayWidget_->setVideoFilter(video::VideoFilter::bilinear);
+    auto settings = videoSettings_;
+    settings.presentationFilter = video::VideoFilter::bilinear;
+    applyVideoSettings(settings, true);
   });
   auto* overscan = video->addMenu(tr("&Overscan"));
   overscan->setObjectName(QStringLiteral("overscanMenu"));
+  auto* overscanGroup = new QActionGroup(this);
+  overscanGroup->setObjectName(QStringLiteral("overscanActionGroup"));
+  const std::array overscanChoices{
+    std::pair{tr("&Disabled"), CoreOverscanMode::disabled},
+    std::pair{tr("&Top and Bottom"), CoreOverscanMode::vertical},
+    std::pair{tr("&Left and Right"), CoreOverscanMode::horizontal},
+    std::pair{tr("&All Borders"), CoreOverscanMode::full},
+  };
+  const std::array overscanNames{
+    "overscanDisabledAction", "overscanVerticalAction",
+    "overscanHorizontalAction", "overscanFullAction"};
+  for (std::size_t index = 0U; index < overscanChoices.size(); ++index) {
+    const auto [label, mode] = overscanChoices[index];
+    auto* action = addAction(*overscan, label, overscanNames[index]);
+    action->setCheckable(true);
+    action->setData(static_cast<int>(mode));
+    overscanGroup->addAction(action);
+    connect(action, &QAction::triggered, this, [this, mode] {
+      auto settings = videoSettings_;
+      settings.core.overscan = mode;
+      applyVideoSettings(settings, true);
+    });
+  }
+
+  auto* ntsc = video->addMenu(tr("&NTSC Filter"));
+  ntsc->setObjectName(QStringLiteral("ntscFilterMenu"));
+  auto* ntscGroup = new QActionGroup(this);
+  ntscGroup->setObjectName(QStringLiteral("ntscFilterActionGroup"));
+  const std::array ntscChoices{
+    std::pair{tr("&Disabled"), CoreNtscFilter::disabled},
+    std::pair{tr("&Monochrome"), CoreNtscFilter::monochrome},
+    std::pair{tr("&Composite"), CoreNtscFilter::composite},
+    std::pair{tr("&S-Video"), CoreNtscFilter::sVideo},
+    std::pair{tr("&RGB"), CoreNtscFilter::rgb},
+  };
+  const std::array ntscNames{
+    "ntscDisabledAction", "ntscMonochromeAction", "ntscCompositeAction",
+    "ntscSVideoAction", "ntscRgbAction"};
+  for (std::size_t index = 0U; index < ntscChoices.size(); ++index) {
+    const auto [label, mode] = ntscChoices[index];
+    auto* action = addAction(*ntsc, label, ntscNames[index]);
+    action->setCheckable(true);
+    action->setData(static_cast<int>(mode));
+    ntscGroup->addAction(action);
+    connect(action, &QAction::triggered, this, [this, mode] {
+      auto settings = videoSettings_;
+      settings.core.ntscFilter = mode;
+      applyVideoSettings(settings, true);
+    });
+  }
+
+  auto* interlaced = video->addMenu(tr("&Interlaced Output"));
+  interlaced->setObjectName(QStringLiteral("interlacedRenderMenu"));
+  auto* interlacedGroup = new QActionGroup(this);
+  interlacedGroup->setObjectName(QStringLiteral("interlacedRenderActionGroup"));
+  auto* singleField = addAction(
+    *interlaced, tr("&Single Field"), "singleFieldRenderAction");
+  auto* doubleField = addAction(
+    *interlaced, tr("&Double Field"), "doubleFieldRenderAction");
+  for (auto* action : {singleField, doubleField}) {
+    action->setCheckable(true);
+    interlacedGroup->addAction(action);
+  }
+  connect(singleField, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.core.interlacedRender = CoreInterlacedRenderMode::singleField;
+    applyVideoSettings(settings, true);
+  });
+  connect(doubleField, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.core.interlacedRender = CoreInterlacedRenderMode::doubleField;
+    applyVideoSettings(settings, true);
+  });
+  auto* gameGearExtended = addAction(
+    *video, tr("Extended &Game Gear Screen"), "gameGearExtendedScreenAction");
+  gameGearExtended->setCheckable(true);
+  connect(gameGearExtended, &QAction::triggered, this, [this](bool checked) {
+    auto settings = videoSettings_;
+    settings.core.gameGearExtendedScreen = checked;
+    applyVideoSettings(settings, true);
+  });
+  video->addSeparator();
+  auto* videoSettings = addAction(
+    *video, tr("Video &Settings…"), "videoSettingsAction");
+  connect(videoSettings, &QAction::triggered, this, &MainWindow::showVideoSettings);
 
   auto* audio = createMenu(tr("&Audio"), "audioMenu");
   auto* mute = addAction(*audio, tr("&Mute"), "muteAction", QKeySequence{tr("M")});
@@ -271,7 +372,9 @@ void MainWindow::buildMenus()
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
   addAction(*tools, tr("&Cheats…"), "cheatsAction");
   addAction(*tools, tr("Game &Information…"), "gameInformationAction");
-  addAction(*tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
+  auto* settings = addAction(
+    *tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
+  connect(settings, &QAction::triggered, this, &MainWindow::showVideoSettings);
   addAction(*tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
@@ -347,6 +450,108 @@ void MainWindow::showInputConfiguration(InputConfigurationTab tab)
     });
   dialog->openTab(tab);
   dialog->open();
+}
+
+void MainWindow::showVideoSettings()
+{
+  if (auto* existing = findChild<VideoSettingsDialog*>(
+        QStringLiteral("videoSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new VideoSettingsDialog(videoSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const settings::VideoSettings& settings) {
+    applyVideoSettings(settings, true);
+  });
+  dialog->open();
+}
+
+void MainWindow::setVideoSettings(settings::VideoSettings settings)
+{
+  applyVideoSettings(settings, false);
+}
+
+void MainWindow::setVideoSettingsSink(VideoSettingsSink sink)
+{
+  videoSettingsSink_ = std::move(sink);
+}
+
+const settings::VideoSettings& MainWindow::videoSettings() const noexcept
+{
+  return videoSettings_;
+}
+
+void MainWindow::applyVideoSettings(
+  const settings::VideoSettings& settings,
+  bool notifySink)
+{
+  if (!settings::validateVideoSettings(settings)) {
+    return;
+  }
+  videoSettings_ = settings;
+  displayWidget_->setAspectMode(settings.aspect);
+  displayWidget_->setScaleMode(settings.scaling);
+  displayWidget_->setVideoFilter(settings.presentationFilter);
+  updateVideoActionChecks();
+  if (auto* dialog = findChild<VideoSettingsDialog*>(
+        QStringLiteral("videoSettingsDialog"))) {
+    dialog->setSettings(videoSettings_);
+  }
+  if (notifySink && videoSettingsSink_) {
+    videoSettingsSink_(videoSettings_);
+  }
+}
+
+void MainWindow::updateVideoActionChecks()
+{
+  findChild<QAction*>(QStringLiteral("nativeAspectAction"))->setChecked(
+    videoSettings_.aspect == video::AspectMode::native);
+  findChild<QAction*>(QStringLiteral("fourThreeAspectAction"))->setChecked(
+    videoSettings_.aspect == video::AspectMode::fourThree);
+  findChild<QAction*>(QStringLiteral("stretchAspectAction"))->setChecked(
+    videoSettings_.aspect == video::AspectMode::stretch);
+  findChild<QAction*>(QStringLiteral("fitScaleAction"))->setChecked(
+    videoSettings_.scaling == video::ScaleMode::fit);
+  findChild<QAction*>(QStringLiteral("integerScaleAction"))->setChecked(
+    videoSettings_.scaling == video::ScaleMode::integer);
+  findChild<QAction*>(QStringLiteral("nearestFilterAction"))->setChecked(
+    videoSettings_.presentationFilter == video::VideoFilter::nearest);
+  findChild<QAction*>(QStringLiteral("bilinearFilterAction"))->setChecked(
+    videoSettings_.presentationFilter == video::VideoFilter::bilinear);
+
+  const auto setDataChecked = [this](const char* actionName, int value, int current) {
+    auto* action = findChild<QAction*>(QString::fromLatin1(actionName));
+    action->setChecked(value == current);
+  };
+  const auto overscan = static_cast<int>(videoSettings_.core.overscan);
+  setDataChecked("overscanDisabledAction",
+    static_cast<int>(CoreOverscanMode::disabled), overscan);
+  setDataChecked("overscanVerticalAction",
+    static_cast<int>(CoreOverscanMode::vertical), overscan);
+  setDataChecked("overscanHorizontalAction",
+    static_cast<int>(CoreOverscanMode::horizontal), overscan);
+  setDataChecked("overscanFullAction",
+    static_cast<int>(CoreOverscanMode::full), overscan);
+  const auto ntsc = static_cast<int>(videoSettings_.core.ntscFilter);
+  setDataChecked("ntscDisabledAction",
+    static_cast<int>(CoreNtscFilter::disabled), ntsc);
+  setDataChecked("ntscMonochromeAction",
+    static_cast<int>(CoreNtscFilter::monochrome), ntsc);
+  setDataChecked("ntscCompositeAction",
+    static_cast<int>(CoreNtscFilter::composite), ntsc);
+  setDataChecked("ntscSVideoAction",
+    static_cast<int>(CoreNtscFilter::sVideo), ntsc);
+  setDataChecked("ntscRgbAction", static_cast<int>(CoreNtscFilter::rgb), ntsc);
+  findChild<QAction*>(QStringLiteral("singleFieldRenderAction"))->setChecked(
+    videoSettings_.core.interlacedRender ==
+      CoreInterlacedRenderMode::singleField);
+  findChild<QAction*>(QStringLiteral("doubleFieldRenderAction"))->setChecked(
+    videoSettings_.core.interlacedRender ==
+      CoreInterlacedRenderMode::doubleField);
+  findChild<QAction*>(QStringLiteral("gameGearExtendedScreenAction"))->setChecked(
+    videoSettings_.core.gameGearExtendedScreen);
 }
 
 void MainWindow::setInputConfiguration(input::InputConfiguration configuration)

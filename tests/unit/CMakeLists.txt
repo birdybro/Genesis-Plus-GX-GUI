@@ -184,6 +184,19 @@ target_link_libraries(
 add_test(NAME unit.video_geometry COMMAND genplusgx_video_geometry_test)
 set_tests_properties(unit.video_geometry PROPERTIES LABELS "unit;video")
 
+add_executable(genplusgx_video_settings_test video_settings_test.cpp)
+target_link_libraries(
+  genplusgx_video_settings_test
+  PRIVATE
+    GenesisPlusGX::Settings
+    genplusgx_project_warnings
+    Qt6::Core
+)
+add_test(NAME unit.video_settings COMMAND genplusgx_video_settings_test)
+set_tests_properties(
+  unit.video_settings PROPERTIES LABELS "unit;video;settings;persistence" TIMEOUT 30
+)
+
 add_executable(genplusgx_frame_pacer_test frame_pacer_test.cpp)
 target_link_libraries(
   genplusgx_frame_pacer_test

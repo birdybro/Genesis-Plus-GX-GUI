@@ -86,6 +86,7 @@ add_subdirectory(desktop/timing)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
 add_subdirectory(desktop/input)
+add_subdirectory(desktop/settings)
 
 if(GENPLUSGX_BUILD_DESKTOP)
   add_subdirectory(desktop/ui)

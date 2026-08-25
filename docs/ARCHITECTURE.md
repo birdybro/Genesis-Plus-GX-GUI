@@ -245,6 +245,21 @@ uses exact native pixel multiples whenever at least 1x fits, and falls back to a
 instead of cropping on undersized windows. Both rendering backends consume that one
 result, keeping resize and fullscreen behavior consistent.
 
+`VideoSettings` combines those presentation policies with the core-neutral
+`CoreVideoSettings` snapshot. The latter contains only settings the desktop core host
+actually implements: the four-value overscan mask, Game Gear extended viewport,
+single/double-field interlaced rendering, and disabled/monochrome/composite/S-Video/RGB
+Blargg NTSC filtering. The adapter owns the large MD/SMS NTSC tables, initializes the
+chosen preset before setting the core flag, and refreshes the upstream viewport using
+the same notification and horizontal-border policy as the libretro host. No Qt type or
+settings-file concern crosses this boundary.
+
+The GUI changes its display policy immediately, then submits the typed core subset as a
+worker command. Pending video-settings commands coalesce because only the newest
+snapshot matters; a command already being processed remains ordered between frames.
+This makes resizing and settings interaction independent of frame execution while
+preserving the single core owner.
+
 The application composition root shares the exchange between worker and widget. An
 8 ms GUI timer drains the bounded event channel and asks the widget to consume only a
 newest-frame event; it does not execute or pace emulation. Shutdown exits the Qt loop,
@@ -378,7 +393,9 @@ temporary root and never touch real user data. Within the application root, the 
 layout is:
 
 ```text
-config/settings.json
+config/video-settings.json
+config/input-profiles.json
+config/recent-games.json
 config/games/<game-id>.json
 saves/<game-id>/cartridge.srm
 saves/<game-id>/scd-internal.brm
@@ -400,6 +417,12 @@ Settings have a versioned schema with migrations. Global settings are loaded fir
 an existing per-game override is applied only for fields explicitly marked overridden.
 Defaults and validation are pure, testable logic. UI Apply sends a complete validated
 snapshot rather than mutating core globals piecemeal.
+
+The implemented video store uses bounded schema-1 JSON and atomic replacement. Schema
+0's legacy flat booleans/mask migrate to named enum values; malformed values and future
+schemas return defaults plus a diagnostic without overwriting the source. The
+composition root applies presentation values before showing the window, queues the core
+snapshot after worker startup, and persists only validated user changes.
 
 `ApplicationPaths::fromPlatform()` resolves the root through Qt's standard application
 data location; every test constructs it with an absolute temporary root. Relative roots

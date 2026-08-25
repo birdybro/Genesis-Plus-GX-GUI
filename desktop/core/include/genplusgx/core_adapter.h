@@ -2,6 +2,7 @@
 
 #include "genplusgx/audio_frame.h"
 #include "genplusgx/backup_memory.h"
+#include "genplusgx/core_video_settings.h"
 #include "genplusgx/input_snapshot.h"
 
 #include <cstddef>
@@ -34,6 +35,7 @@ enum class CoreError {
   audioBufferTooSmall,
   invalidAudioBatch,
   invalidTiming,
+  invalidSettings,
   staleInputSnapshot,
   invalidStatePayload,
   invalidBackupMemory,
@@ -151,6 +153,9 @@ public:
     BackupMemoryKind kind,
     std::span<const std::uint8_t> data);
   [[nodiscard]] CoreResult initializeBackupMemory(BackupMemoryKind kind);
+  [[nodiscard]] CoreResult applyVideoSettings(
+    const CoreVideoSettings& settings);
+  [[nodiscard]] CoreResult videoSettings(CoreVideoSettings& output) const;
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

@@ -1,13 +1,17 @@
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
+#include <QComboBox>
 #include <QLabel>
 #include <QMenu>
+#include <QPushButton>
 #include <QStatusBar>
 #include <QTest>
 
@@ -46,6 +50,7 @@ private slots:
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
+  void videoSettingsDialogAppliesCancelsAndRestores();
   void saveStateActionsExposeSlotSemantics();
 };
 
@@ -76,7 +81,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   const char* menuNames[]{
     "fileMenu", "emulationMenu", "videoMenu", "audioMenu", "inputMenu",
     "toolsMenu", "helpMenu", "openRecentMenu", "stateSlotMenu", "videoScaleMenu",
-    "aspectRatioMenu", "filteringMenu", "overscanMenu"};
+    "aspectRatioMenu", "filteringMenu", "overscanMenu", "ntscFilterMenu",
+    "interlacedRenderMenu"};
   for (const auto* name : menuNames) {
     QVERIFY2(window.findChild<QMenu*>(QString::fromLatin1(name)) != nullptr, name);
   }
@@ -159,6 +165,10 @@ void MainWindowTest::exitActionClosesWindow()
 void MainWindowTest::videoActionsDriveDisplayPolicy()
 {
   genplusgx::ui::MainWindow window;
+  std::vector<genplusgx::settings::VideoSettings> updates;
+  window.setVideoSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+  });
   window.show();
   QApplication::processEvents();
   auto* display = window.displayWidget();
@@ -179,6 +189,21 @@ void MainWindowTest::videoActionsDriveDisplayPolicy()
   QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::native);
   QCOMPARE(display->videoFilter(), genplusgx::video::VideoFilter::nearest);
 
+  window.findChild<QAction*>(QStringLiteral("overscanFullAction"))->trigger();
+  QCOMPARE(window.videoSettings().core.overscan,
+    genplusgx::CoreOverscanMode::full);
+  window.findChild<QAction*>(QStringLiteral("ntscSVideoAction"))->trigger();
+  QCOMPARE(window.videoSettings().core.ntscFilter,
+    genplusgx::CoreNtscFilter::sVideo);
+  window.findChild<QAction*>(QStringLiteral("doubleFieldRenderAction"))->trigger();
+  QCOMPARE(window.videoSettings().core.interlacedRender,
+    genplusgx::CoreInterlacedRenderMode::doubleField);
+  window.findChild<QAction*>(
+    QStringLiteral("gameGearExtendedScreenAction"))->trigger();
+  QVERIFY(window.videoSettings().core.gameGearExtendedScreen);
+  QVERIFY(updates.size() >= 10U);
+  QCOMPARE(updates.back(), window.videoSettings());
+
   auto* fullscreen = window.findChild<QAction*>(QStringLiteral("fullscreenAction"));
   fullscreen->trigger();
   QApplication::processEvents();
@@ -188,6 +213,101 @@ void MainWindowTest::videoActionsDriveDisplayPolicy()
   QApplication::processEvents();
   QVERIFY(!window.isFullScreen());
   QVERIFY(!fullscreen->isChecked());
+}
+
+void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
+{
+  genplusgx::ui::MainWindow window;
+  genplusgx::settings::VideoSettings initial;
+  initial.aspect = genplusgx::video::AspectMode::fourThree;
+  initial.core.overscan = genplusgx::CoreOverscanMode::vertical;
+  window.setVideoSettings(initial);
+  std::vector<genplusgx::settings::VideoSettings> updates;
+  window.setVideoSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+  });
+  window.show();
+
+  window.findChild<QAction*>(QStringLiteral("settingsAction"))->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::VideoSettingsDialog*>(
+    QStringLiteral("videoSettingsDialog"));
+  QVERIFY(dialog != nullptr);
+  QVERIFY(dialog->isVisible());
+  auto* aspect = dialog->findChild<QComboBox*>(QStringLiteral("videoAspectCombo"));
+  auto* scaling = dialog->findChild<QComboBox*>(QStringLiteral("videoScalingCombo"));
+  auto* filter = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationFilterCombo"));
+  auto* overscan = dialog->findChild<QComboBox*>(QStringLiteral("coreOverscanCombo"));
+  auto* ntsc = dialog->findChild<QComboBox*>(QStringLiteral("coreNtscFilterCombo"));
+  auto* render = dialog->findChild<QComboBox*>(
+    QStringLiteral("coreInterlacedRenderCombo"));
+  auto* gameGear = dialog->findChild<QCheckBox*>(
+    QStringLiteral("gameGearExtendedScreenCheckBox"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyVideoSettingsButton"));
+  auto* restore = dialog->findChild<QPushButton*>(
+    QStringLiteral("restoreVideoDefaultsButton"));
+  QVERIFY(aspect != nullptr && scaling != nullptr && filter != nullptr);
+  QVERIFY(overscan != nullptr && ntsc != nullptr && render != nullptr);
+  QVERIFY(gameGear != nullptr && apply != nullptr && restore != nullptr);
+  QCOMPARE(aspect->currentData().toInt(),
+    static_cast<int>(genplusgx::video::AspectMode::fourThree));
+  QCOMPARE(overscan->currentData().toInt(),
+    static_cast<int>(genplusgx::CoreOverscanMode::vertical));
+
+  aspect->setCurrentIndex(aspect->findData(
+    static_cast<int>(genplusgx::video::AspectMode::stretch)));
+  dialog->reject();
+  QApplication::processEvents();
+  QVERIFY(updates.empty());
+  QCOMPARE(window.videoSettings(), initial);
+
+  window.findChild<QAction*>(QStringLiteral("videoSettingsAction"))->trigger();
+  QApplication::processEvents();
+  dialog = window.findChild<genplusgx::ui::VideoSettingsDialog*>(
+    QStringLiteral("videoSettingsDialog"));
+  QVERIFY(dialog != nullptr);
+  scaling = dialog->findChild<QComboBox*>(QStringLiteral("videoScalingCombo"));
+  filter = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationFilterCombo"));
+  ntsc = dialog->findChild<QComboBox*>(QStringLiteral("coreNtscFilterCombo"));
+  render = dialog->findChild<QComboBox*>(
+    QStringLiteral("coreInterlacedRenderCombo"));
+  gameGear = dialog->findChild<QCheckBox*>(
+    QStringLiteral("gameGearExtendedScreenCheckBox"));
+  apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyVideoSettingsButton"));
+  restore = dialog->findChild<QPushButton*>(
+    QStringLiteral("restoreVideoDefaultsButton"));
+  scaling->setCurrentIndex(scaling->findData(
+    static_cast<int>(genplusgx::video::ScaleMode::integer)));
+  filter->setCurrentIndex(filter->findData(
+    static_cast<int>(genplusgx::video::VideoFilter::bilinear)));
+  ntsc->setCurrentIndex(ntsc->findData(
+    static_cast<int>(genplusgx::CoreNtscFilter::rgb)));
+  render->setCurrentIndex(render->findData(
+    static_cast<int>(genplusgx::CoreInterlacedRenderMode::doubleField)));
+  gameGear->setChecked(true);
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{1});
+  QCOMPARE(window.videoSettings().scaling,
+    genplusgx::video::ScaleMode::integer);
+  QCOMPARE(window.videoSettings().presentationFilter,
+    genplusgx::video::VideoFilter::bilinear);
+  QCOMPARE(window.videoSettings().core.ntscFilter,
+    genplusgx::CoreNtscFilter::rgb);
+  QVERIFY(window.videoSettings().core.gameGearExtendedScreen);
+  QCOMPARE(window.displayWidget()->scaleMode(),
+    genplusgx::video::ScaleMode::integer);
+
+  QTest::mouseClick(restore, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{1});
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{2});
+  QCOMPARE(window.videoSettings(),
+    genplusgx::settings::defaultVideoSettings());
+  dialog->close();
 }
 
 void MainWindowTest::saveStateActionsExposeSlotSemantics()

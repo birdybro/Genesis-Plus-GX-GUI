@@ -23,6 +23,7 @@ target_link_libraries(
     GenesisPlusGX::AppSupport
     GenesisPlusGX::Input
     GenesisPlusGX::Persistence
+    GenesisPlusGX::Settings
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
     genplusgx_project_options

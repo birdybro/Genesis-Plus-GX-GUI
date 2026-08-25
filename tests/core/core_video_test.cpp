@@ -108,5 +108,73 @@ int main()
     return 11;
   }
 
-  return adapter.shutdown() ? 0 : 12;
+  const genplusgx::CoreVideoSettings enhanced{
+    .overscan = genplusgx::CoreOverscanMode::full,
+    .ntscFilter = genplusgx::CoreNtscFilter::sVideo,
+    .interlacedRender = genplusgx::CoreInterlacedRenderMode::doubleField,
+    .gameGearExtendedScreen = true,
+  };
+  genplusgx::CoreVideoSettings applied;
+  if (!check(adapter.applyVideoSettings(enhanced),
+        "Core video settings could not be applied") ||
+      !check(adapter.videoSettings(applied) && applied == enhanced,
+        "Core video setting values were not retained") ||
+      !check(adapter.runFrame(false), "Filtered overscan frame failed")) {
+    return 12;
+  }
+  genplusgx::CoreVideoFrameInfo enhancedInfo;
+  std::vector<std::uint16_t> enhancedPixels(720U * 576U);
+  if (!check(adapter.copyVideoFrame(enhancedPixels, enhancedInfo),
+        "Filtered overscan output could not be copied") ||
+      !check(enhancedInfo.width > 320U && enhancedInfo.height > 224U,
+        "Core NTSC and overscan settings did not change output geometry")) {
+    return 13;
+  }
+
+  for (const auto filter : {
+         genplusgx::CoreNtscFilter::monochrome,
+         genplusgx::CoreNtscFilter::composite,
+         genplusgx::CoreNtscFilter::sVideo,
+         genplusgx::CoreNtscFilter::rgb}) {
+    auto preset = enhanced;
+    preset.ntscFilter = filter;
+    if (!check(adapter.applyVideoSettings(preset),
+          "A bundled NTSC preset could not be initialized") ||
+        !check(adapter.runFrame(false),
+          "A bundled NTSC preset could not render a frame") ||
+        !check(adapter.copyVideoFrame(enhancedPixels, enhancedInfo) &&
+            enhancedInfo.width > 320U,
+          "A bundled NTSC preset did not produce expanded output")) {
+      return 14;
+    }
+  }
+  if (!check(adapter.applyVideoSettings(enhanced),
+        "Active video settings could not be restored after preset coverage")) {
+    return 15;
+  }
+
+  auto invalidSettings = enhanced;
+  invalidSettings.overscan = static_cast<genplusgx::CoreOverscanMode>(99);
+  if (!check(adapter.applyVideoSettings(invalidSettings).error ==
+          genplusgx::CoreError::invalidSettings,
+        "An unsupported core video setting was accepted") ||
+      !check(adapter.videoSettings(applied) && applied == enhanced,
+        "A rejected setting changed the active core configuration")) {
+    return 16;
+  }
+
+  const auto defaults = genplusgx::CoreVideoSettings{};
+  if (!check(adapter.applyVideoSettings(defaults),
+        "Default core video settings could not be restored") ||
+      !check(adapter.runFrame(false), "Default output frame failed")) {
+    return 17;
+  }
+  genplusgx::CoreVideoFrameInfo restoredInfo;
+  if (!check(adapter.videoFrameInfo(restoredInfo) &&
+        restoredInfo.width == 320U && restoredInfo.height == 224U,
+      "Disabling the core video options did not restore native geometry")) {
+    return 18;
+  }
+
+  return adapter.shutdown() ? 0 : 19;
 }

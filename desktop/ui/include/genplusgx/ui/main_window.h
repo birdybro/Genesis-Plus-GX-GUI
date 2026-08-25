@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/input/input_profile.h"
+#include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 
@@ -59,6 +60,8 @@ public:
   using ClearRecentGamesSink = std::function<void()>;
   using StateOperationSink =
     std::function<void(StateUiOperation, std::uint32_t)>;
+  using VideoSettingsSink =
+    std::function<void(const settings::VideoSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -74,6 +77,10 @@ public:
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
   void setStateOperationSink(StateOperationSink sink);
+  void setVideoSettings(settings::VideoSettings settings);
+  void setVideoSettingsSink(VideoSettingsSink sink);
+  [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
+  void showVideoSettings();
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
@@ -120,6 +127,10 @@ private:
   void presentGameLoadError(
     const std::filesystem::path& path,
     const std::string& detail);
+  void applyVideoSettings(
+    const settings::VideoSettings& settings,
+    bool notifySink);
+  void updateVideoActionChecks();
 
   QLabel* gameStatus_{nullptr};
   QLabel* systemStatus_{nullptr};
@@ -136,6 +147,8 @@ private:
   GameCloseSink gameCloseSink_;
   ClearRecentGamesSink clearRecentGamesSink_;
   StateOperationSink stateOperationSink_;
+  settings::VideoSettings videoSettings_{settings::defaultVideoSettings()};
+  VideoSettingsSink videoSettingsSink_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;

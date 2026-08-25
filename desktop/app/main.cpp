@@ -11,6 +11,7 @@
 #include "genplusgx/persistence.h"
 #include "genplusgx/recent_games.h"
 #include "genplusgx/state_storage_service.h"
+#include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -112,6 +113,20 @@ int main(int argc, char* argv[])
       qWarning().noquote() << QString::fromStdString(migrated.message);
     }
   }
+  genplusgx::settings::VideoSettingsStore videoSettingsStore{
+    applicationPaths.configDirectory() / "video-settings.json"};
+  auto loadedVideoSettings = videoSettingsStore.load();
+  if (!loadedVideoSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedVideoSettings.status.message);
+  }
+  auto videoSettings = loadedVideoSettings.settings;
+  if (loadedVideoSettings.migrated) {
+    const auto migrated = videoSettingsStore.save(videoSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+    }
+  }
 
   genplusgx::AudioOutput audioOutput;
   const auto audioInitialized = audioOutput.initialize();
@@ -147,6 +162,30 @@ int main(int argc, char* argv[])
 
   genplusgx::ui::MainWindow window;
   window.displayWidget()->setFrameExchange(videoFrames);
+  window.setVideoSettings(videoSettings);
+  std::uint64_t videoSettingsOperationId = 500'000U;
+  const auto initialVideoSettings = worker.submit(
+    genplusgx::EmulationCommand::updateVideoSettings(
+      ++videoSettingsOperationId, videoSettings.core));
+  if (!initialVideoSettings) {
+    qWarning().noquote() << QString::fromStdString(initialVideoSettings.message);
+  }
+  window.setVideoSettingsSink(
+    [&videoSettings, &videoSettingsOperationId, &videoSettingsStore, &worker](
+      const genplusgx::settings::VideoSettings& settings) {
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateVideoSettings(
+          ++videoSettingsOperationId, settings.core));
+      if (!submitted) {
+        qWarning().noquote() << QString::fromStdString(submitted.message);
+        return;
+      }
+      videoSettings = settings;
+      const auto saved = videoSettingsStore.save(settings);
+      if (!saved) {
+        qWarning().noquote() << QString::fromStdString(saved.message);
+      }
+    });
   const auto refreshRecentGamesMenu = [&recentGames, &window] {
     std::vector<std::filesystem::path> paths;
     paths.reserve(recentGames.size());
@@ -608,6 +647,7 @@ int main(int argc, char* argv[])
   window.setGameCloseSink({});
   window.setClearRecentGamesSink({});
   window.setStateOperationSink({});
+  window.setVideoSettingsSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();
   if (!workerStopped) {

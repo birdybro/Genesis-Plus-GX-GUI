@@ -8,6 +8,9 @@ extern "C" {
 #include "cdd.h"
 #include "md_ntsc.h"
 #include "sms_ntsc.h"
+
+extern md_ntsc_t* md_ntsc;
+extern sms_ntsc_t* sms_ntsc;
 }
 
 #include <algorithm>
@@ -115,6 +118,9 @@ public:
   bool hasPendingInput{false};
   std::vector<std::uint8_t> stateScratch;
   std::vector<std::uint8_t> stateLoadScratch;
+  std::unique_ptr<md_ntsc_t> mdNtsc;
+  std::unique_ptr<sms_ntsc_t> smsNtsc;
+  CoreVideoSettings videoSettings;
 };
 
 CoreAdapter::CoreAdapter(int audioSampleRate)
@@ -151,6 +157,8 @@ CoreResult CoreAdapter::initialize()
   privateState->audioScratch.resize(maximumAudioFramesPerBatch * 2U, 0);
   privateState->stateScratch.resize(STATE_SIZE, 0U);
   privateState->stateLoadScratch.resize(STATE_SIZE, 0U);
+  privateState->mdNtsc = std::make_unique<md_ntsc_t>();
+  privateState->smsNtsc = std::make_unique<sms_ntsc_t>();
 
   private_ = privateState.release();
   activeAdapter = this;
@@ -561,6 +569,71 @@ CoreResult CoreAdapter::initializeBackupMemory(BackupMemoryKind kind)
   return success();
 }
 
+CoreResult CoreAdapter::applyVideoSettings(const CoreVideoSettings& settings)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    return owner;
+  }
+  if (!validateCoreVideoSettings(settings)) {
+    return failure(CoreError::invalidSettings,
+      "The requested core video settings contain an unsupported value.");
+  }
+
+  if (settings.ntscFilter != CoreNtscFilter::disabled) {
+    const md_ntsc_setup_t* mdSetup = &md_ntsc_composite;
+    const sms_ntsc_setup_t* smsSetup = &sms_ntsc_composite;
+    switch (settings.ntscFilter) {
+      case CoreNtscFilter::monochrome:
+        mdSetup = &md_ntsc_monochrome;
+        smsSetup = &sms_ntsc_monochrome;
+        break;
+      case CoreNtscFilter::composite:
+        break;
+      case CoreNtscFilter::sVideo:
+        mdSetup = &md_ntsc_svideo;
+        smsSetup = &sms_ntsc_svideo;
+        break;
+      case CoreNtscFilter::rgb:
+        mdSetup = &md_ntsc_rgb;
+        smsSetup = &sms_ntsc_rgb;
+        break;
+      case CoreNtscFilter::disabled:
+        break;
+    }
+    md_ntsc_init(private_->mdNtsc.get(), mdSetup);
+    sms_ntsc_init(private_->smsNtsc.get(), smsSetup);
+    md_ntsc = private_->mdNtsc.get();
+    sms_ntsc = private_->smsNtsc.get();
+  }
+
+  config.overscan = static_cast<uint8>(settings.overscan);
+  config.ntsc = settings.ntscFilter == CoreNtscFilter::disabled ? 0U : 1U;
+  config.gg_extra = settings.gameGearExtendedScreen ? 1U : 0U;
+  config.render = static_cast<uint8>(settings.interlacedRender);
+  private_->videoSettings = settings;
+  bitmap.viewport.changed = 11;
+  if (state_ == CoreLifecycleState::loaded) {
+    if (system_hw == SYSTEM_GG && config.gg_extra == 0U) {
+      bitmap.viewport.x = (config.overscan & 2U) != 0U ? 14 : -48;
+    } else {
+      bitmap.viewport.x = (config.overscan & 2U) != 0U ? 14 : 0;
+    }
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::videoSettings(CoreVideoSettings& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    output = {};
+    return owner;
+  }
+  output = private_->videoSettings;
+  return success();
+}
+
 CoreLifecycleState CoreAdapter::state() const noexcept
 {
   std::scoped_lock lock{coreMutex};
@@ -762,6 +835,8 @@ void CoreAdapter::unloadUnchecked() noexcept
 void CoreAdapter::releaseOwnership() noexcept
 {
   std::memset(&bitmap, 0, sizeof(bitmap));
+  md_ntsc = nullptr;
+  sms_ntsc = nullptr;
   delete private_;
   private_ = nullptr;
   state_ = CoreLifecycleState::uninitialized;

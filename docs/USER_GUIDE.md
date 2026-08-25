@@ -98,8 +98,29 @@ format and recovery details.
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu
-also provides fit/integer scale, native/4:3/stretch aspect, and nearest/bilinear filter
-choices. Keyboard and SDL game-controller defaults and remapping are documented in
+also provides fit/integer scale, native/4:3/stretch aspect, and nearest/bilinear texture
+filter choices. **Overscan** can show no border, top/bottom, left/right, or every border.
+The bundled NTSC filter offers monochrome, composite, S-Video, and RGB presets in
+addition to disabled. Interlaced games may use the core's single-field or double-field
+output, and Game Gear software can opt into the extended 256×192 viewport.
+
+Choose **Video → Video Settings…** or **Tools → Settings…** to edit the same controls
+in one dialog. **Apply** updates a running game without closing the dialog, **OK**
+applies and closes, **Cancel** discards changes not already applied, and **Restore
+Defaults** stages the native/fit/nearest presentation with all optional core processing
+disabled. Every quick menu item and dialog control reflects the same active snapshot.
+Settings are saved atomically as `config/video-settings.json` beneath the platform
+application-data directory and restored on the next launch. A malformed or unsupported
+settings file is ignored with a diagnostic and safe defaults; it is not silently
+destroyed.
+
+The presentation filter controls GPU/Qt scaling. The NTSC filter is separate: it runs
+inside Genesis Plus GX and changes the native framebuffer geometry. Overscan and Game
+Gear viewport changes likewise come from the core rather than cropping the final
+window image. Region and VDP system selection are intentionally handled by the later
+System settings page instead of being conflated with display scaling.
+
+Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).
 

@@ -33,8 +33,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 19 Game loading UI | COMPLETE | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | `568c811` |
 | 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | `8615cac` |
 | 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | `6e50cac` |
-| 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | recorded by milestone 23 |
-| 23 Video settings | PLANNED | Expose overscan, GG, NTSC, mode/region geometry | video settings UI/adapter | propagation and GUI persistence | Supported settings affect core/display | pending |
+| 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | `c8a3a2a` |
+| 23 Video settings | COMPLETE | Expose presentation, overscan, GG, NTSC, and interlaced rendering | settings model/dialog/adapter | schema, propagation, geometry, and GUI tests | Supported settings affect core/display | recorded by milestone 24 |
 | 24 Audio settings | PLANNED | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | pending |
 | 25 System settings | PLANNED | Region, VDP, clock and safe system options | system settings UI/adapter | validation and reinit tests | Accurate defaults and controlled reinit | pending |
 | 26 BIOS manager | PLANNED | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | pending |
@@ -1280,4 +1280,76 @@ a separate bounded storage thread. Operation and game-generation IDs prevent sta
 results from crossing a replacement. Only a successfully validated raw payload is
 submitted to the worker, and corrupt/wrong-game files can be deleted without loading.
 
-**Commit SHA:** recorded by milestone 23
+**Commit SHA:** `c8a3a2a`
+
+## Milestone 23 detail
+
+**Status:** COMPLETE
+
+**Goal:** Provide one validated, versioned video configuration for display presentation
+and supported Genesis Plus GX output controls; apply core changes only on the emulation
+thread; and expose synchronized quick actions plus a keyboard-accessible settings
+dialog with Apply, Cancel, OK, and Restore Defaults semantics.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/core_video_settings.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/settings/CMakeLists.txt`
+- `desktop/settings/include/genplusgx/settings/video_settings.h`
+- `desktop/settings/src/video_settings.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/include/genplusgx/ui/video_settings_dialog.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/video_settings_dialog.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/video_settings_test.cpp`
+- `tests/core/core_video_test.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.video_settings` verifies missing-file defaults, complete atomic
+round-trip, invalid enum rejection, schema 0 migration, malformed JSON isolation, and
+future-schema rejection in a temporary root. `core.video_frame` now initializes and
+executes every bundled Blargg NTSC preset path, validates live overscan geometry,
+round-trips the active core snapshot, rejects invalid values without partial mutation,
+and restores native output. `core.emulation_worker` proves that a settings command
+crosses the ownership boundary and affects a subsequently published frame.
+`gui.main_window` drives all quick actions and verifies dialog initialization,
+Apply/Cancel/Restore behavior, synchronized action checks, display policy changes, and
+stable object names.
+
+**Gate evidence:**
+
+- Focused video settings/model/core/worker/GUI checks passed five consecutive Debug
+  executions.
+- Debug build and complete CTest: passed (38/38).
+- Release build and complete CTest: passed (38/38).
+- ASan/UBSan build and complete CTest: passed (38/38) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New settings, adapter, worker, GUI, composition, and test code compiled under the
+  frontend warning policy without warnings.
+
+**Acceptance criteria:** `config/video-settings.json` has a strict schema 1 with an
+explicit schema 0 migration and atomic bounded writes. Native/4:3/stretch layout,
+fit/integer scaling, and nearest/bilinear sampling update the display immediately.
+Overscan, Game Gear extended screen, NTSC monochrome/composite/S-Video/RGB filtering,
+and single/double-field interlaced rendering are converted to a typed core-neutral
+snapshot, coalesced in the bounded worker queue, and applied between frames on the sole
+core-owning thread. NTSC table memory is adapter-owned and cannot be enabled with null
+filter tables. Runtime core viewport notifications are refreshed without touching
+authoritative core source. Invalid, corrupt, or future settings fail closed to safe
+defaults.
+
+**Commit SHA:** recorded by milestone 24
