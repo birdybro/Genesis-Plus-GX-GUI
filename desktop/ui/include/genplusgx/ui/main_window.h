@@ -6,6 +6,10 @@ class QAction;
 class QLabel;
 class QMenu;
 
+namespace genplusgx::video {
+class DisplayWidget;
+}
+
 namespace genplusgx::ui {
 
 class MainWindow final : public QMainWindow {
@@ -13,6 +17,7 @@ public:
   explicit MainWindow(QWidget* parent = nullptr);
 
   void showAboutDialog();
+  [[nodiscard]] video::DisplayWidget* displayWidget() const noexcept;
 
 private:
   QAction* addAction(
@@ -30,6 +35,7 @@ private:
   QLabel* regionStatus_{nullptr};
   QLabel* fpsStatus_{nullptr};
   QLabel* slotStatus_{nullptr};
+  video::DisplayWidget* displayWidget_{nullptr};
 };
 
 } // namespace genplusgx::ui

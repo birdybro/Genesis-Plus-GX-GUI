@@ -66,12 +66,21 @@ if(GENPLUSGX_ENABLE_SANITIZERS)
   genplusgx_enable_sanitizers(genplusgx_project_options)
 endif()
 
+add_library(genplusgx_frontend_types INTERFACE)
+add_library(GenesisPlusGX::FrontendTypes ALIAS genplusgx_frontend_types)
+target_include_directories(
+  genplusgx_frontend_types
+  INTERFACE $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/desktop/core/include>
+)
+target_link_libraries(genplusgx_frontend_types INTERFACE genplusgx_project_options)
+
 message(STATUS "Genesis Plus GX GUI ${GENPLUSGX_VERSION} (${GENPLUSGX_GIT_COMMIT})")
 message(STATUS "Qt: ${Qt6_VERSION}")
 message(STATUS "SDL3: ${SDL3_VERSION}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
 
+add_subdirectory(desktop/video)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/audio)
 add_subdirectory(desktop/persistence)

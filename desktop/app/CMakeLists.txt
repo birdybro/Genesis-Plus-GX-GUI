@@ -6,6 +6,7 @@ target_link_libraries(
   genplusgx_desktop
   PRIVATE
     genplusgx::ui
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_options
     genplusgx_project_warnings
     Qt6::Widgets

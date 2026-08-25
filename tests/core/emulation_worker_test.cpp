@@ -129,10 +129,27 @@ int main()
     return 5;
   }
 
-  const auto runningFrame = waitForType(
+  auto runningFrame = waitForType(
     worker, genplusgx::EmulationEventType::frameCompleted);
+  while (runningFrame && runningFrame->frameNumber < 2U) {
+    runningFrame = waitForType(
+      worker, genplusgx::EmulationEventType::frameCompleted);
+  }
+  std::vector<std::uint16_t> videoPixels(
+    genplusgx::VideoFrameExchange::maximumSurfacePixels, 0U);
+  genplusgx::CoreVideoFrameInfo videoInfo;
+  std::uint64_t videoGeneration = 0;
   if (!check(runningFrame && runningFrame->frameNumber >= 1U,
         "Running worker did not publish a frame") ||
+      !check(worker.videoFrames()->copyLatest(
+          videoPixels, videoInfo, videoGeneration),
+        "Worker frame was not transferred through the bounded exchange") ||
+      !check(videoInfo.width == 320U && videoInfo.height == 224U &&
+          videoGeneration >= runningFrame->videoGeneration &&
+          genplusgx::hashVideoFrame(
+            std::span<const std::uint16_t>{videoPixels}.first(videoInfo.pixelCount())) ==
+            0x0cfd2d0b9af92325ULL,
+        "Worker exchange changed the deterministic core framebuffer") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::pause, 5U), event),

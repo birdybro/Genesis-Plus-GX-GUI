@@ -199,6 +199,26 @@ preallocated storage and rejects undersized spans. A core viewport notification 
 acknowledged only after that copy succeeds. The later triple-buffer exchange owns those
 caller-side slots, so this boundary requires no framebuffer allocation per frame.
 
+The implemented `VideoFrameExchange` owns exactly three fixed 720x576-capable RGB565
+surfaces. Its single producer acquires a movable lease to a slot that is neither
+published nor being read, lets `CoreAdapter::copyVideoFrame()` write directly into that
+surface, then atomically publishes metadata plus a monotonic generation. The GUI marks
+the published slot as read while copying into its one preallocated receive surface; the
+remaining slots keep the producer nonblocking. If no slot is safe, that presentation
+frame is dropped and instrumented rather than queued or allocated.
+
+`DisplayWidget` currently uses Qt's portable backing-store painter to render the tight
+RGB565 surface with nearest-neighbor sampling, native pixel aspect, centered aspect fit,
+and black letterboxing. It remains stable across logical-size and high-DPI backing-store
+changes and is fully testable on Qt's offscreen platform. Milestone 13 adds selectable
+geometry/filter policy and the accelerated texture-upload backend while retaining this
+deterministic software presentation path for headless tests and renderer fallback.
+
+The application composition root shares the exchange between worker and widget. An
+8 ms GUI timer drains the bounded event channel and asks the widget to consume only a
+newest-frame event; it does not execute or pace emulation. Shutdown exits the Qt loop,
+then stops and joins the worker before stack-owned presentation resources are destroyed.
+
 ## Audio data flow
 
 ```text

@@ -60,3 +60,11 @@ target_link_libraries(
 )
 add_test(NAME unit.bounded_queue COMMAND genplusgx_bounded_queue_test)
 set_tests_properties(unit.bounded_queue PROPERTIES LABELS "unit;concurrency")
+
+add_executable(genplusgx_frame_exchange_test frame_exchange_test.cpp)
+target_link_libraries(
+  genplusgx_frame_exchange_test
+  PRIVATE GenesisPlusGX::VideoExchange genplusgx_project_warnings
+)
+add_test(NAME unit.frame_exchange COMMAND genplusgx_frame_exchange_test)
+set_tests_properties(unit.frame_exchange PROPERTIES LABELS "unit;video;concurrency")

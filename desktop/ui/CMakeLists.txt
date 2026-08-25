@@ -18,6 +18,7 @@ target_link_libraries(
   genplusgx_ui
   PUBLIC
     Qt6::Widgets
+    GenesisPlusGX::VideoWidget
   PRIVATE
     genplusgx_project_options
     genplusgx_project_warnings

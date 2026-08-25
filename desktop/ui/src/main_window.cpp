@@ -2,16 +2,15 @@
 
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/version.h"
+#include "genplusgx/video/display_widget.h"
 
 #include <QAction>
 #include <QApplication>
-#include <QFrame>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
 #include <QStatusBar>
-#include <QVBoxLayout>
 
 namespace genplusgx::ui {
 namespace {
@@ -69,19 +68,8 @@ QAction* MainWindow::addAction(
 
 void MainWindow::createCanvas()
 {
-  auto* canvas = new QFrame(this);
-  canvas->setObjectName(QStringLiteral("emulatorCanvas"));
-  canvas->setFrameShape(QFrame::NoFrame);
-  canvas->setStyleSheet(QStringLiteral("#emulatorCanvas { background: black; }"));
-  canvas->setAccessibleName(tr("Emulator display"));
-
-  auto* layout = new QVBoxLayout(canvas);
-  auto* prompt = new QLabel(tr("Open or drop a game to begin"), canvas);
-  prompt->setObjectName(QStringLiteral("emptyCanvasLabel"));
-  prompt->setAlignment(Qt::AlignCenter);
-  prompt->setStyleSheet(QStringLiteral("color: #b8b8b8; font-size: 16px;"));
-  layout->addWidget(prompt);
-  setCentralWidget(canvas);
+  displayWidget_ = new video::DisplayWidget(this);
+  setCentralWidget(displayWidget_);
 }
 
 void MainWindow::buildMenus()
@@ -195,6 +183,11 @@ void MainWindow::showAboutDialog()
   auto* dialog = new AboutDialog(this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->open();
+}
+
+video::DisplayWidget* MainWindow::displayWidget() const noexcept
+{
+  return displayWidget_;
 }
 
 } // namespace genplusgx::ui

@@ -89,11 +89,14 @@ public:
     EmulationWorker& owner,
     std::size_t commandCapacity,
     std::size_t eventCapacity,
-    int audioSampleRate)
+    int audioSampleRate,
+    std::shared_ptr<VideoFrameExchange> videoFrames)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
-      audioSampleRate_(audioSampleRate)
+      audioSampleRate_(audioSampleRate),
+      videoFrames_(videoFrames ? std::move(videoFrames)
+                               : std::make_shared<VideoFrameExchange>())
   {
   }
 
@@ -201,6 +204,11 @@ public:
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
     };
+  }
+
+  std::shared_ptr<VideoFrameExchange> videoFrames() const
+  {
+    return videoFrames_;
   }
 
 private:
@@ -343,7 +351,7 @@ private:
       case EmulationCommandType::frameAdvance:
         validTransition = current == EmulationWorkerState::paused;
         if (validTransition) {
-          coreResult = adapter.runFrame(false);
+          coreResult = executeOneFrame(adapter);
         }
         break;
       case EmulationCommandType::setFastForward:
@@ -400,6 +408,7 @@ private:
     event.command = command.type;
     event.operationId = command.operationId;
     event.frameNumber = adapter.frameCount();
+    event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
     event.rawState = std::move(capturedState);
@@ -408,7 +417,7 @@ private:
 
   void runOneFrame(CoreAdapter& adapter)
   {
-    const auto result = adapter.runFrame(false);
+    const auto result = executeOneFrame(adapter);
     if (!result) {
       owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
       auto event = eventFor(
@@ -428,10 +437,35 @@ private:
     auto event = eventFor(
       EmulationEventType::frameCompleted, EmulationWorkerState::running);
     event.frameNumber = adapter.frameCount();
+    event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
     latestFrame_ = std::move(event);
     eventReady_.notify_all();
+  }
+
+  CoreResult executeOneFrame(CoreAdapter& adapter)
+  {
+    const auto result = adapter.runFrame(false);
+    if (!result) {
+      return result;
+    }
+    auto write = videoFrames_->beginWrite();
+    if (!write) {
+      return {};
+    }
+    CoreVideoFrameInfo frame;
+    const auto copied = adapter.copyVideoFrame(write->pixels(), frame);
+    if (!copied) {
+      return copied;
+    }
+    if (!write->publish(frame)) {
+      return {
+        CoreError::invalidVideoFrame,
+        "The bounded video exchange rejected a core frame.",
+      };
+    }
+    return {};
   }
 
   void publishOperation(EmulationEvent event)
@@ -447,6 +481,7 @@ private:
   {
     std::scoped_lock lock{mutex_};
     latestFrame_.reset();
+    videoFrames_->clear();
   }
 
   std::optional<EmulationEvent> takeEvent()
@@ -474,6 +509,7 @@ private:
   bool acceptingCommands_{false};
   bool stopRequested_{false};
   bool fastForward_{false};
+  std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::uint64_t coalescedInputCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
@@ -482,9 +518,10 @@ private:
 EmulationWorker::EmulationWorker(
   std::size_t commandCapacity,
   std::size_t eventCapacity,
-  int audioSampleRate)
+  int audioSampleRate,
+  std::shared_ptr<VideoFrameExchange> videoFrames)
   : private_(std::make_unique<Private>(
-      *this, commandCapacity, eventCapacity, audioSampleRate))
+      *this, commandCapacity, eventCapacity, audioSampleRate, std::move(videoFrames)))
 {
 }
 
@@ -527,6 +564,11 @@ EmulationWorkerState EmulationWorker::state() const noexcept
 EmulationWorkerMetrics EmulationWorker::metrics() const
 {
   return private_->metrics();
+}
+
+std::shared_ptr<VideoFrameExchange> EmulationWorker::videoFrames() const
+{
+  return private_->videoFrames();
 }
 
 } // namespace genplusgx

@@ -22,8 +22,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 08 Persistence | COMPLETE | Platform paths, safe names, SRAM/BRAM atomic files | `desktop/persistence` | path, collision, corruption, atomic round-trip | No current-directory/user-data leakage in tests | `1e4dc1e` |
 | 09 Save states | COMPLETE | Metadata wrapper, slots, validation | state manager | round-trip, corruption, wrong-game, replacement | Raw payload preserved; unsafe states rejected | `0422e36` |
 | 10 Qt shell | COMPLETE | QApplication, MainWindow, menus/status/canvas/About | `desktop/app`, `desktop/ui`, resources | offscreen startup and menu semantic tests | Native shell starts headlessly | `0312e53` |
-| 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | recorded by milestone 12 |
-| 12 Display widget | PLANNED | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable texture path | pending |
+| 11 Emulation worker | COMPLETE | Command queue, worker lifecycle, safe shutdown | worker/coordinator | concurrency, queue bounds, repeated start/stop | No core calls on GUI thread | `0a04aa1` |
+| 12 Display widget | COMPLETE | Present synthetic/core frames and handle resize | video widget | integration and shown-frame tests | Stable reusable presentation path | recorded by milestone 13 |
 | 13 Video scaling | PLANNED | Native, 4:3, stretch, integer and filter modes | video geometry/settings | property/unit and GUI settings tests | Correct letterbox/high-DPI calculations | pending |
 | 14 Audio playback | PLANNED | SDL3 output, device lifecycle, pause/resume | `desktop/audio` | null-device init and buffer integrity | Clean bounded low-latency pipeline | pending |
 | 15 Timing/pacing | PLANNED | NTSC/PAL/CD pacing, FF, pause, frame advance | timing service | rate tolerance and state tests | Monotonic non-busy pacing | pending |
@@ -616,4 +616,67 @@ Stop rejects new commands, interrupts waits, shuts down the core on its owner th
 joins synchronously, and is idempotent. A failed game replacement cannot leave the
 worker claiming a loaded/running state.
 
-**Commit SHA:** recorded by milestone 12
+**Commit SHA:** `0a04aa1`
+
+## Milestone 12 detail
+
+**Status:** COMPLETE
+
+**Goal:** Carry each complete core RGB565 frame through bounded reusable storage and
+present it in the native Qt shell with stable nearest-neighbor resize behavior.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/video/CMakeLists.txt`
+- `desktop/video/include/genplusgx/video/display_widget.h`
+- `desktop/video/include/genplusgx/video/frame_exchange.h`
+- `desktop/video/src/display_widget.cpp`
+- `desktop/video/src/frame_exchange.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/display_widget_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/frame_exchange_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.frame_exchange` verifies construction bounds, exactly three fixed
+pixel surfaces, empty/undersized errors, producer lease publication/cancellation,
+complete pixel/metadata copies, newest-frame selection, skipped-frame metrics, invalid
+geometry, and clear. The worker integration now hashes a real 320x224 generated-ROM
+frame after it crosses the exchange and matches `0x0cfd2d0b9af92325`.
+`gui.display_widget` publishes a controlled red/green RGB565 frame, presents it through
+the production widget on Qt offscreen, asserts metadata/pixels and empty-state behavior,
+renders the widget to an image, and semantically verifies nearest boundaries, aspect
+fit, black borders, and stable portrait/landscape resize.
+
+**Gate evidence:**
+
+- Debug build and complete CTest: passed (19/19).
+- Exchange, worker video integration, and display tests each passed five consecutive
+  Debug executions.
+- Release build and complete CTest: passed (19/19).
+- ASan/UBSan preset build and complete CTest: passed (19/19).
+- `make -f Makefile.libretro platform=unix -j4`: passed with only the two documented
+  inherited qualifier warnings, then cleaned.
+- New frame exchange, display, integration, and test code compiled under the frontend
+  warning policy without warnings.
+
+**Acceptance criteria:** The worker copies directly from `CoreAdapter` into a leased
+exchange slot, with no framebuffer-sized per-frame allocation or intermediate worker
+copy. A producer never overwrites the published slot or a slot being read. Three slots,
+one coalesced frame event, explicit producer-drop/skipped-frame instrumentation, and a
+preallocated GUI receive surface bound memory. The main process starts the worker,
+polls only its bounded events from an 8 ms GUI timer, repaints the newest frame, and
+stops/joins the worker after the Qt event loop; the timer never drives emulation.
+
+**Commit SHA:** recorded by milestone 13

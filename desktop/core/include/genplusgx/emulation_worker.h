@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/input_snapshot.h"
+#include "genplusgx/video/frame_exchange.h"
 
 #include <atomic>
 #include <chrono>
@@ -104,6 +105,7 @@ struct EmulationEvent final {
   CoreError coreError{CoreError::none};
   std::string message;
   std::uint64_t frameNumber{0};
+  std::uint64_t videoGeneration{0};
   std::uint64_t appliedInputSequence{0};
   bool fastForward{false};
   std::thread::id workerThreadId;
@@ -128,7 +130,8 @@ public:
   explicit EmulationWorker(
     std::size_t commandCapacity = 64U,
     std::size_t eventCapacity = 64U,
-    int audioSampleRate = 48'000);
+    int audioSampleRate = 48'000,
+    std::shared_ptr<VideoFrameExchange> videoFrames = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;
@@ -145,6 +148,7 @@ public:
     std::chrono::milliseconds timeout);
   [[nodiscard]] EmulationWorkerState state() const noexcept;
   [[nodiscard]] EmulationWorkerMetrics metrics() const;
+  [[nodiscard]] std::shared_ptr<VideoFrameExchange> videoFrames() const;
 
 private:
   class Private;
