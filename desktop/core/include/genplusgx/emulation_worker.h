@@ -107,6 +107,7 @@ struct EmulationEvent final {
   CoreError coreError{CoreError::none};
   std::string message;
   std::uint64_t frameNumber{0};
+  std::uint32_t hardware{0};
   std::uint64_t videoGeneration{0};
   std::uint64_t appliedInputSequence{0};
   bool fastForward{false};

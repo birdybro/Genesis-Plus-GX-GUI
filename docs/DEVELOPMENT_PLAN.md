@@ -32,8 +32,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 18 Input UI | COMPLETE | Capture, profiles, deadzones, conflicts, advanced devices | profile store, runtime mappings, input dialogs | GUI capture/conflict and persistence tests | Keyboard-accessible remapping works | `87c13b8` |
 | 19 Game loading UI | COMPLETE | Open/close, drag/drop, CLI, safe errors | file/dialog services and MainWindow | valid/invalid/drop/CLI GUI integration | Different games load without restart | `568c811` |
 | 20 Recent games | COMPLETE | Bounded persistent recents and clear menu | recent model/menu | model migration and GUI action tests | Missing paths handled gracefully | `8615cac` |
-| 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | recorded by milestone 22 |
-| 22 Save-state GUI | PLANNED | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | pending |
+| 21 Live SRAM/BRAM | COMPLETE | Connect persistence to core load/unload/exit | adapter/session | cartridge and CD store mapping; live unload/reload tests | Dirty saves flush before teardown | `6e50cac` |
+| 22 Save-state GUI | COMPLETE | Slots 0-9, quick actions, timestamps/delete | state UI | GUI and full workflow tests | Wrong-game states never reach core | recorded by milestone 23 |
 | 23 Video settings | PLANNED | Expose overscan, GG, NTSC, mode/region geometry | video settings UI/adapter | propagation and GUI persistence | Supported settings affect core/display | pending |
 | 24 Audio settings | PLANNED | Levels, mono/filter/LPF/EQ/chip/HQ/device/latency | audio settings UI/adapter | validation/propagation/GUI tests | Supported options affect pipeline/core | pending |
 | 25 System settings | PLANNED | Region, VDP, clock and safe system options | system settings UI/adapter | validation and reinit tests | Accurate defaults and controlled reinit | pending |
@@ -1215,4 +1215,69 @@ all I/O remains on the emulation thread. Replacement and unload flush before rel
 the old core; a failed atomic write leaves that game loaded and surfaces a GUI error.
 Shutdown always releases core and persistence resources but returns the save failure.
 
-**Commit SHA:** recorded by milestone 22
+**Commit SHA:** `6e50cac`
+
+## Milestone 22 detail
+
+**Status:** COMPLETE
+
+**Goal:** Connect the existing validated state envelope and raw core capture/restore
+commands to an asynchronous desktop workflow with quick save/load, slots 0–9,
+timestamps, previous/next selection, deletion, useful failures, and strict game/system
+identity checks before a payload reaches the core.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/state_storage_service.h`
+- `desktop/persistence/src/state_storage_service.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/state_storage_service_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/main_window_test.cpp`
+- `tests/gui/save_state_workflow_test.cpp`
+- `docs/ARCHITECTURE.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/SAVE_STATES.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.state_storage_service` verifies service lifecycle, bounded
+command validation, asynchronous identity creation, ten-slot discovery, save/load
+payload round trips, timestamps/frame metadata, stale-generation rejection, corrupt
+slot discovery, deletion, deactivation, and restart. `gui.main_window` drives all slot
+states and action enablement, selection/navigation, busy gating, sink dispatch,
+notifications, and error presentation. `gui.save_state_workflow` runs a generated ROM
+through real worker capture, atomic wrapping, execution mutation, validated restore,
+raw-state equality, deletion, and a copied wrong-game envelope that remains visibly
+invalid and never reaches `state_load()`.
+
+**Gate evidence:**
+
+- Focused state unit/core/GUI/integration checks passed five consecutive Debug
+  executions.
+- Debug build and complete CTest: passed (37/37).
+- Release build and complete CTest: passed (37/37).
+- ASan/UBSan build and complete CTest: passed (37/37) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New storage service, composition, UI, and tests compiled under the frontend warning
+  policy without warnings.
+
+**Acceptance criteria:** The GUI exposes stable slot 0–9 actions, F5/F8 quick actions,
+Ctrl+0–9 selection, previous/next navigation, timestamps, invalid-state markers, and
+delete. Exactly one operation is in flight and lifecycle actions are gated until it
+finishes. Core capture/restore remains on the emulation thread; hashing, bounded reads,
+checksum/schema/game/system validation, atomic writes, slot scans, and deletion run on
+a separate bounded storage thread. Operation and game-generation IDs prevent stale
+results from crossing a replacement. Only a successfully validated raw payload is
+submitted to the worker, and corrupt/wrong-game files can be deleted without loading.
+
+**Commit SHA:** recorded by milestone 23

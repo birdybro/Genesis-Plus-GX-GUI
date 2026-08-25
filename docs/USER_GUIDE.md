@@ -74,6 +74,27 @@ wrong-sized save is rejected before emulation begins rather than partially copie
 the core. The application never reads or writes `game.srm`, `scd.brm`, or other save
 files relative to its current working directory.
 
+## Save states
+
+Use **Emulation → Save State** (`F5`) and **Load State** (`F8`) with the selected slot.
+The **State Slot** submenu offers slots 0–9, `Ctrl+0` through `Ctrl+9` selection,
+previous/next navigation, timestamps for existing states, and deletion. The status bar
+always shows the selected slot and indicates while an operation is running.
+
+State files live under `states/<title>-<sha256>/slot-N.gpgxstate` in the platform
+application-data directory. The frontend preserves the raw Genesis Plus GX state bytes
+inside a metadata envelope recording game SHA-256, hardware, slot, timestamp, frame
+number, payload length, core signature, and payload checksum. Reads and writes run off
+the GUI thread. A state for another game or hardware type, a truncated state, a corrupt
+checksum, and an unsupported schema are rejected before the core loader is called.
+Invalid entries appear as **Invalid** and can be deleted; they cannot be loaded.
+
+Saving replaces a slot atomically. Loading first validates the complete envelope, then
+restores through the emulation thread and reports success in the status bar. Opening or
+closing a game is temporarily disabled during an active state operation so its result
+cannot cross into another game session. See [SAVE_STATES.md](SAVE_STATES.md) for the
+format and recovery details.
+
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu

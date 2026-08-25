@@ -4,6 +4,7 @@ add_library(
   src/persistence.cpp
   src/recent_games.cpp
   src/state_manager.cpp
+  src/state_storage_service.cpp
 )
 add_library(GenesisPlusGX::Persistence ALIAS genplusgx_persistence)
 target_include_directories(

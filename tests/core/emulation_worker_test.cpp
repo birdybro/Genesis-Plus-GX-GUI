@@ -118,7 +118,8 @@ int main()
           genplusgx::EmulationCommand::load(3U, fixture.path()), event),
         "Worker game load failed") ||
       !check(event.workerState == genplusgx::EmulationWorkerState::paused &&
-          event.workerThreadId == started->workerThreadId,
+          event.workerThreadId == started->workerThreadId &&
+          event.hardware == 0x80U,
         "Loaded worker state or ownership was incorrect") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(

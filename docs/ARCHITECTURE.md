@@ -446,6 +446,27 @@ asks the running core for its exact hardware-specific state size before calling 
 core's lengthless `state_load()` API. It keeps the current raw snapshot in reusable
 storage and reloads it if the core rejects a candidate, making failed loads transactional.
 
+Save-state UI file work runs on `StateStorageService`, a dedicated bounded worker that
+owns `SaveStateManager`. Activating a successful game computes its content identity and
+scans slots away from the GUI thread. Each summary is `empty`, fully validated
+`available`, or `invalid`; available summaries carry timestamp and emulated frame
+metadata, while invalid entries retain a safe diagnostic and remain deletable. The GUI
+keeps one state operation in flight:
+
+```text
+quick save: GUI -> core-worker capture -> storage-worker atomic wrap/write -> GUI
+quick load: GUI -> storage-worker validate/read -> core-worker restore -> GUI
+delete:     GUI -> storage-worker remove/refresh -> GUI
+```
+
+Both worker channels use operation IDs. The storage channel also requires a monotonic
+game-generation ID, so a result queued for a previous image cannot restore into a
+replacement. Open/close/recent and state actions are disabled during an operation.
+Raw payloads never pass from disk to `CoreAdapter::loadRawState()` until magic, schema,
+length, SHA-256, game identity, hardware, slot, and core signature checks all succeed.
+The storage queue drains accepted file operations during shutdown; the core worker is
+still joined before the storage and audio services are destroyed.
+
 ## Game loading and library
 
 The implemented preflight service checks that a selected path uses a format enabled in

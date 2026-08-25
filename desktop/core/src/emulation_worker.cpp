@@ -563,6 +563,7 @@ private:
       event.error = EmulationWorkerError::invalidTransition;
       event.message = "The command is invalid in the current emulation state.";
       event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
       publishOperation(std::move(event));
@@ -577,6 +578,7 @@ private:
       event.coreError = coreResult.error;
       event.message = coreResult.message;
       event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
       publishOperation(std::move(event));
@@ -588,6 +590,7 @@ private:
     event.command = command.type;
     event.operationId = command.operationId;
     event.frameNumber = adapter.frameCount();
+    event.hardware = adapter.hardware();
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
@@ -608,6 +611,7 @@ private:
       event.coreError = result.error;
       event.message = result.message;
       event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
       publishOperation(std::move(event));
       return;
     }
@@ -622,6 +626,7 @@ private:
     auto event = eventFor(
       EmulationEventType::frameCompleted, EmulationWorkerState::running);
     event.frameNumber = adapter.frameCount();
+    event.hardware = adapter.hardware();
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;

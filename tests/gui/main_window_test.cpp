@@ -1,4 +1,5 @@
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/version.h"
 #include "genplusgx/video/display_widget.h"
@@ -10,7 +11,30 @@
 #include <QStatusBar>
 #include <QTest>
 
+#include <array>
+#include <chrono>
+#include <memory>
+#include <optional>
+#include <tuple>
+#include <vector>
+
 namespace {
+
+class FakeDialogService final : public genplusgx::ui::DialogService {
+public:
+  std::vector<QString> errors;
+
+  std::optional<std::filesystem::path> chooseGame(
+    QWidget*, const std::filesystem::path&) override
+  {
+    return std::nullopt;
+  }
+
+  void showError(QWidget*, const QString& title, const QString& message) override
+  {
+    errors.push_back(title + QStringLiteral(": ") + message);
+  }
+};
 
 class MainWindowTest final : public QObject {
   Q_OBJECT
@@ -22,6 +46,7 @@ private slots:
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
+  void saveStateActionsExposeSlotSemantics();
 };
 
 void MainWindowTest::shellIsVisibleAndIdentified()
@@ -163,6 +188,95 @@ void MainWindowTest::videoActionsDriveDisplayPolicy()
   QApplication::processEvents();
   QVERIFY(!window.isFullScreen());
   QVERIFY(!fullscreen->isChecked());
+}
+
+void MainWindowTest::saveStateActionsExposeSlotSemantics()
+{
+  genplusgx::ui::MainWindow window;
+  auto dialogs = std::make_shared<FakeDialogService>();
+  window.setDialogService(dialogs);
+  window.setGameLoaded(std::filesystem::path{"fixture.md"});
+  auto* save = window.findChild<QAction*>(QStringLiteral("saveStateAction"));
+  auto* load = window.findChild<QAction*>(QStringLiteral("loadStateAction"));
+  auto* remove = window.findChild<QAction*>(QStringLiteral("deleteStateAction"));
+  auto* menu = window.findChild<QMenu*>(QStringLiteral("stateSlotMenu"));
+  QVERIFY(save != nullptr && load != nullptr && remove != nullptr && menu != nullptr);
+  QVERIFY(!save->isEnabled());
+  QVERIFY(!load->isEnabled());
+  QVERIFY(!menu->isEnabled());
+
+  std::array<genplusgx::ui::StateSlotView, 10> views{};
+  for (std::uint32_t slot = 0U; slot < views.size(); ++slot) {
+    views[slot].slot = slot;
+  }
+  views[0].state = genplusgx::ui::StateSlotViewState::available;
+  views[0].timestamp = std::chrono::system_clock::time_point{
+    std::chrono::milliseconds{1'700'000'000'000LL}};
+  views[0].emulatedFrameNumber = 42U;
+  views[1].state = genplusgx::ui::StateSlotViewState::invalid;
+  views[1].detail = "Checksum mismatch";
+  window.setStateSlotViews(views);
+
+  std::vector<std::tuple<genplusgx::ui::StateUiOperation, std::uint32_t>> requests;
+  window.setStateOperationSink([&requests](auto operation, auto slot) {
+    requests.emplace_back(operation, slot);
+  });
+  window.setStateSessionReady(true);
+  QVERIFY(menu->isEnabled());
+  QVERIFY(save->isEnabled());
+  QVERIFY(load->isEnabled());
+  QVERIFY(remove->isEnabled());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("stateSlotAction0"))->text()
+    .contains(QStringLiteral("2023")));
+
+  window.findChild<QAction*>(QStringLiteral("stateSlotAction1"))->trigger();
+  QCOMPARE(window.selectedStateSlot(), 1U);
+  QVERIFY(!load->isEnabled());
+  QVERIFY(remove->isEnabled());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("stateSlotAction1"))->text()
+    .contains(QStringLiteral("Invalid")));
+
+  window.findChild<QAction*>(QStringLiteral("nextStateSlotAction"))->trigger();
+  QCOMPARE(window.selectedStateSlot(), 2U);
+  QVERIFY(save->isEnabled());
+  QVERIFY(!load->isEnabled());
+  QVERIFY(!remove->isEnabled());
+  window.findChild<QAction*>(QStringLiteral("previousStateSlotAction"))->trigger();
+  QCOMPARE(window.selectedStateSlot(), 1U);
+  window.setSelectedStateSlot(0U);
+
+  save->trigger();
+  QCOMPARE(requests.size(), std::size_t{1});
+  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::save);
+  QCOMPARE(std::get<1>(requests.back()), 0U);
+  QVERIFY(!save->isEnabled());
+  QVERIFY(!window.findChild<QAction*>(QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(!window.findChild<QAction*>(QStringLiteral("closeGameAction"))->isEnabled());
+  QVERIFY(window.findChild<QLabel*>(QStringLiteral("stateSlotStatusLabel"))->text()
+    .contains(QStringLiteral("Working")));
+
+  window.setStateOperationBusy(false);
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("closeGameAction"))->isEnabled());
+  load->trigger();
+  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::load);
+  window.setStateOperationBusy(false);
+  remove->trigger();
+  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::remove);
+  window.setStateOperationBusy(false);
+
+  window.showStateOperationSuccess(genplusgx::ui::StateUiOperation::save, 0U);
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("saved")));
+  window.showStateOperationError(
+    genplusgx::ui::StateUiOperation::load, "Injected corrupt state.");
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("Load State Failed")));
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("corrupt")));
+
+  window.setNoGameLoaded();
+  QVERIFY(!menu->isEnabled());
+  QVERIFY(!save->isEnabled());
+  QVERIFY(!load->isEnabled());
 }
 
 } // namespace

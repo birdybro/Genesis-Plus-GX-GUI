@@ -27,3 +27,26 @@ Ctrl, Alt, and Command/Meta chords are reserved for application shortcuts and ar
 interpreted as gameplay input. The standalone hotkey list will expand alongside the
 emulation actions and configurable binding UI in later milestones; the menu always
 shows the currently assigned application shortcuts.
+
+## Application shortcuts
+
+| Action | Shortcut |
+| --- | --- |
+| Open game | Ctrl+O (Command+O on macOS) |
+| Close game | Ctrl+W (Command+W on macOS) |
+| Fullscreen | Alt+Return |
+| Pause/resume | Space |
+| Hard reset | Ctrl+R |
+| Fast forward | Tab |
+| Frame advance | N |
+| Save selected state slot | F5 |
+| Load selected state slot | F8 |
+| Select state slot 0–9 | Ctrl+0 through Ctrl+9 |
+| Previous / next state slot | Ctrl+[ / Ctrl+] |
+| Delete selected state | Ctrl+Delete |
+| Screenshot | F12 |
+| Mute | M |
+
+Shortcuts whose runtime service is not yet connected remain disabled; their menu text
+still documents the intended binding. Configurable emulator hotkeys are introduced by
+the later settings milestone without changing gameplay mappings silently.

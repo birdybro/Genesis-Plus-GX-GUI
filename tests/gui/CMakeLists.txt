@@ -43,6 +43,32 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+qt_add_executable(
+  genplusgx_save_state_workflow_test save_state_workflow_test.cpp
+)
+set_target_properties(
+  genplusgx_save_state_workflow_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_save_state_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Persistence
+    genplusgx::ui
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.save_state_workflow COMMAND genplusgx_save_state_workflow_test)
+set_tests_properties(
+  gui.save_state_workflow
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;integration;state;persistence;fixture;concurrency"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_display_widget_test display_widget_test.cpp)
 set_target_properties(genplusgx_display_widget_test PROPERTIES AUTOMOC ON)
 target_link_libraries(

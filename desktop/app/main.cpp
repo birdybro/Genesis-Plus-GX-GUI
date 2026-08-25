@@ -10,6 +10,7 @@
 #include "genplusgx/input/keyboard_input.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/recent_games.h"
+#include "genplusgx/state_storage_service.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/video/display_widget.h"
 
@@ -20,9 +21,40 @@
 #include <QTimer>
 
 #include <chrono>
+#include <array>
 #include <cstdint>
 #include <memory>
 #include <optional>
+
+namespace {
+
+std::array<genplusgx::ui::StateSlotView, 10> stateSlotViews(
+  const genplusgx::StateSlotSummaries& summaries)
+{
+  std::array<genplusgx::ui::StateSlotView, 10> views{};
+  for (std::size_t index = 0U; index < summaries.size(); ++index) {
+    const auto& summary = summaries[index];
+    auto& view = views[index];
+    view.slot = summary.slot;
+    view.timestamp = summary.metadata.timestamp;
+    view.emulatedFrameNumber = summary.metadata.emulatedFrameNumber;
+    view.detail = summary.message;
+    switch (summary.availability) {
+      case genplusgx::StateSlotAvailability::empty:
+        view.state = genplusgx::ui::StateSlotViewState::empty;
+        break;
+      case genplusgx::StateSlotAvailability::available:
+        view.state = genplusgx::ui::StateSlotViewState::available;
+        break;
+      case genplusgx::StateSlotAvailability::invalid:
+        view.state = genplusgx::ui::StateSlotViewState::invalid;
+        break;
+    }
+  }
+  return views;
+}
+
+} // namespace
 
 int main(int argc, char* argv[])
 {
@@ -93,6 +125,11 @@ int main(int argc, char* argv[])
   auto videoFrames = std::make_shared<genplusgx::VideoFrameExchange>();
   auto backupStore = std::make_shared<genplusgx::PerGameBackupStore>(
     genplusgx::PersistenceStore{applicationPaths});
+  genplusgx::StateStorageService stateStorage{applicationPaths};
+  const auto stateStorageStarted = stateStorage.start();
+  if (!stateStorageStarted) {
+    qWarning().noquote() << QString::fromStdString(stateStorageStarted.message);
+  }
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -103,6 +140,7 @@ int main(int argc, char* argv[])
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
+    static_cast<void>(stateStorage.stop());
     static_cast<void>(audioOutput.shutdown());
     return 1;
   }
@@ -213,9 +251,29 @@ int main(int argc, char* argv[])
     std::filesystem::path path;
   };
   std::uint64_t lifecycleOperationId = 2'000'000U;
+  std::uint64_t stateOperationId = 3'000'000U;
+  std::uint64_t gameGeneration = 0U;
+  bool stateSessionAvailable = false;
   std::optional<PendingLoad> pendingLoad;
   std::optional<std::uint64_t> pendingUnload;
   std::filesystem::path closingGamePath;
+  enum class PendingStatePhase {
+    capturing,
+    saving,
+    loading,
+    restoring,
+    deleting,
+  };
+  struct PendingState final {
+    std::uint64_t operationId{0};
+    std::uint64_t gameGeneration{0};
+    std::uint32_t slot{0};
+    genplusgx::ui::StateUiOperation operation{
+      genplusgx::ui::StateUiOperation::save};
+    PendingStatePhase phase{PendingStatePhase::capturing};
+  };
+  std::optional<PendingState> pendingState;
+  std::optional<std::uint64_t> stateActivationOperation;
   window.setGameLoadSink(
     [&lifecycleOperationId, &pendingLoad, &window, &worker](
       const std::filesystem::path& path) {
@@ -242,20 +300,108 @@ int main(int argc, char* argv[])
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
     });
+  window.setStateOperationSink(
+    [&gameGeneration, &pendingState, &stateOperationId, &stateStorage,
+     &window, &worker](genplusgx::ui::StateUiOperation operation,
+                       std::uint32_t slot) {
+      if (gameGeneration == 0U || pendingState) {
+        window.setStateOperationBusy(false);
+        window.showStateOperationError(
+          operation, "A save-state operation is already in progress.");
+        return;
+      }
+      const auto operationId = ++stateOperationId;
+      PendingState pending{
+        .operationId = operationId,
+        .gameGeneration = gameGeneration,
+        .slot = slot,
+        .operation = operation,
+        .phase = PendingStatePhase::capturing,
+      };
+      genplusgx::StateStorageStatus submitted;
+      if (operation == genplusgx::ui::StateUiOperation::save) {
+        const auto workerSubmitted = worker.submit(
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::captureState, operationId));
+        if (!workerSubmitted) {
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, workerSubmitted.message);
+          return;
+        }
+        pending.phase = PendingStatePhase::capturing;
+      } else {
+        const auto commandType = operation == genplusgx::ui::StateUiOperation::load
+          ? genplusgx::StateStorageCommandType::loadSlot
+          : genplusgx::StateStorageCommandType::deleteSlot;
+        submitted = stateStorage.submit(genplusgx::StateStorageCommand::simple(
+          commandType, operationId, gameGeneration, slot));
+        if (!submitted) {
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, submitted.message);
+          return;
+        }
+        pending.phase = operation == genplusgx::ui::StateUiOperation::load
+          ? PendingStatePhase::loading
+          : PendingStatePhase::deleting;
+      }
+      pendingState = std::move(pending);
+    });
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
     &eventPump,
     &QTimer::timeout,
     &window,
-    [&audioOutput, &controllerInput, &inputAggregator, &inputOperationId,
-     &lifecycleOperationId, &pendingLoad, &pendingUnload, &closingGamePath,
-     &recentGames, &recentGamesStore, &refreshRecentGamesMenu, &worker, &window] {
+    [&audioOutput, &controllerInput, &gameGeneration, &inputAggregator,
+     &inputOperationId, &lifecycleOperationId, &pendingLoad, &pendingState,
+     &pendingUnload, &closingGamePath, &recentGames, &recentGamesStore,
+     &refreshRecentGamesMenu, &stateActivationOperation, &stateOperationId,
+     &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
-    while (const auto event = worker.pollEvent()) {
+    while (auto event = worker.pollEvent()) {
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.displayWidget()->presentLatestFrame());
         continue;
+      }
+      if (pendingState && event->operationId == pendingState->operationId &&
+          pendingState->gameGeneration == gameGeneration) {
+        if (pendingState->phase == PendingStatePhase::capturing &&
+            event->command == genplusgx::EmulationCommandType::captureState) {
+          if (!event->succeeded()) {
+            const auto operation = pendingState->operation;
+            pendingState.reset();
+            window.setStateOperationBusy(false);
+            window.showStateOperationError(operation, event->message);
+          } else {
+            const auto submitted = stateStorage.submit(
+              genplusgx::StateStorageCommand::save(
+                event->operationId,
+                gameGeneration,
+                pendingState->slot,
+                event->frameNumber,
+                std::move(event->rawState)));
+            if (!submitted) {
+              const auto operation = pendingState->operation;
+              pendingState.reset();
+              window.setStateOperationBusy(false);
+              window.showStateOperationError(operation, submitted.message);
+            } else {
+              pendingState->phase = PendingStatePhase::saving;
+            }
+          }
+        } else if (pendingState->phase == PendingStatePhase::restoring &&
+                   event->command ==
+                     genplusgx::EmulationCommandType::restoreState) {
+          const auto operation = pendingState->operation;
+          const auto slot = pendingState->slot;
+          pendingState.reset();
+          window.setStateOperationBusy(false);
+          if (event->succeeded()) {
+            window.showStateOperationSuccess(operation, slot);
+          } else {
+            window.showStateOperationError(operation, event->message);
+          }
+        }
       }
       if (pendingLoad && event->operationId == pendingLoad->operationId &&
           event->command == genplusgx::EmulationCommandType::loadGame) {
@@ -263,6 +409,20 @@ int main(int argc, char* argv[])
         pendingLoad.reset();
         if (event->succeeded()) {
           window.setGameLoaded(loadedPath);
+          ++gameGeneration;
+          stateSessionAvailable = false;
+          const auto activationId = ++stateOperationId;
+          stateActivationOperation = activationId;
+          const auto stateActivated = stateStorage.submit(
+            genplusgx::StateStorageCommand::activate(
+              activationId, gameGeneration, loadedPath, event->hardware));
+          if (!stateActivated) {
+            stateActivationOperation.reset();
+            stateSessionAvailable = false;
+            window.showStateOperationError(
+              genplusgx::ui::StateUiOperation::load,
+              "Save states are unavailable: " + stateActivated.message);
+          }
           const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
           if (recentGames.add(loadedPath, now)) {
@@ -290,11 +450,38 @@ int main(int argc, char* argv[])
              event->workerState == genplusgx::EmulationWorkerState::running);
           window.showGameLoadError(
             loadedPath, event->message, !previousGameRemainsLoaded);
+          if (previousGameRemainsLoaded) {
+            window.setStateSessionReady(stateSessionAvailable);
+          }
+          if (!previousGameRemainsLoaded && gameGeneration != 0U) {
+            static_cast<void>(stateStorage.submit(
+              genplusgx::StateStorageCommand::simple(
+                genplusgx::StateStorageCommandType::deactivateGame,
+                ++stateOperationId,
+                gameGeneration)));
+            gameGeneration = 0U;
+            stateSessionAvailable = false;
+            stateActivationOperation.reset();
+            pendingState.reset();
+            window.setStateOperationBusy(false);
+            window.setStateSessionReady(false);
+          }
         }
       } else if (pendingUnload && event->operationId == *pendingUnload &&
                  event->command == genplusgx::EmulationCommandType::unloadGame) {
         pendingUnload.reset();
         if (event->succeeded()) {
+          if (gameGeneration != 0U) {
+            static_cast<void>(stateStorage.submit(
+              genplusgx::StateStorageCommand::simple(
+                genplusgx::StateStorageCommandType::deactivateGame,
+                ++stateOperationId,
+                gameGeneration)));
+          }
+          gameGeneration = 0U;
+          stateSessionAvailable = false;
+          stateActivationOperation.reset();
+          pendingState.reset();
           window.setNoGameLoaded();
           closingGamePath.clear();
         } else {
@@ -322,6 +509,79 @@ int main(int argc, char* argv[])
         }
       }
     }
+    while (const auto event = stateStorage.pollEvent()) {
+      if (event->type == genplusgx::StateStorageEventType::serviceStarted) {
+        qInfo() << "Save-state storage service started.";
+        continue;
+      }
+      if (event->type == genplusgx::StateStorageEventType::sessionActivated &&
+          event->gameGeneration == gameGeneration &&
+          stateActivationOperation &&
+          event->operationId == *stateActivationOperation) {
+        stateActivationOperation.reset();
+        stateSessionAvailable = true;
+        window.setStateSlotViews(stateSlotViews(event->slotSummaries));
+        window.setStateSessionReady(true);
+        continue;
+      }
+      if (event->type == genplusgx::StateStorageEventType::operationFailed) {
+        if (stateActivationOperation &&
+            event->operationId == *stateActivationOperation &&
+            event->gameGeneration == gameGeneration) {
+          stateActivationOperation.reset();
+          stateSessionAvailable = false;
+          window.setStateSessionReady(false);
+          window.showStateOperationError(
+            genplusgx::ui::StateUiOperation::load,
+            "Save states are unavailable: " + event->message);
+        } else if (pendingState &&
+                   event->operationId == pendingState->operationId &&
+                   event->gameGeneration == pendingState->gameGeneration) {
+          const auto operation = pendingState->operation;
+          pendingState.reset();
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, event->message);
+        } else if (event->operationId == 0U) {
+          qWarning().noquote() << QString::fromStdString(event->message);
+        }
+        continue;
+      }
+      if (!pendingState || event->operationId != pendingState->operationId ||
+          event->gameGeneration != pendingState->gameGeneration ||
+          event->gameGeneration != gameGeneration) {
+        continue;
+      }
+      if (event->type == genplusgx::StateStorageEventType::slotLoaded &&
+          pendingState->phase == PendingStatePhase::loading) {
+        window.setStateSlotViews(stateSlotViews(event->slotSummaries));
+        const auto restored = worker.submit(genplusgx::EmulationCommand::restore(
+          event->operationId, event->rawPayload));
+        if (!restored) {
+          const auto operation = pendingState->operation;
+          pendingState.reset();
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, restored.message);
+        } else {
+          pendingState->phase = PendingStatePhase::restoring;
+        }
+      } else if (event->type == genplusgx::StateStorageEventType::slotSaved &&
+                 pendingState->phase == PendingStatePhase::saving) {
+        const auto operation = pendingState->operation;
+        const auto slot = pendingState->slot;
+        window.setStateSlotViews(stateSlotViews(event->slotSummaries));
+        pendingState.reset();
+        window.setStateOperationBusy(false);
+        window.showStateOperationSuccess(operation, slot);
+      } else if (event->type == genplusgx::StateStorageEventType::slotDeleted &&
+                 pendingState->phase == PendingStatePhase::deleting) {
+        const auto operation = pendingState->operation;
+        const auto slot = pendingState->slot;
+        window.setStateSlotViews(stateSlotViews(event->slotSummaries));
+        pendingState.reset();
+        window.setStateOperationBusy(false);
+        window.showStateOperationSuccess(operation, slot);
+      }
+    }
   });
   eventPump.start();
   window.show();
@@ -347,10 +607,15 @@ int main(int argc, char* argv[])
   window.setGameLoadSink({});
   window.setGameCloseSink({});
   window.setClearRecentGamesSink({});
+  window.setStateOperationSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();
   if (!workerStopped) {
     qWarning().noquote() << QString::fromStdString(workerStopped.message);
+  }
+  const auto stateStorageStopped = stateStorage.stop();
+  if (!stateStorageStopped) {
+    qWarning().noquote() << QString::fromStdString(stateStorageStopped.message);
   }
   static_cast<void>(audioOutput.shutdown());
   return result;

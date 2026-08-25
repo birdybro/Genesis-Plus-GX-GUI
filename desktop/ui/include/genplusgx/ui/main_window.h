@@ -6,11 +6,14 @@
 
 #include <QMainWindow>
 
+#include <array>
+#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <functional>
 #include <filesystem>
 #include <memory>
+#include <string>
 #include <vector>
 
 class QAction;
@@ -25,6 +28,26 @@ class DisplayWidget;
 
 namespace genplusgx::ui {
 
+enum class StateSlotViewState {
+  empty,
+  available,
+  invalid,
+};
+
+struct StateSlotView final {
+  std::uint32_t slot{0};
+  StateSlotViewState state{StateSlotViewState::empty};
+  std::chrono::system_clock::time_point timestamp{};
+  std::uint64_t emulatedFrameNumber{0};
+  std::string detail;
+};
+
+enum class StateUiOperation {
+  save,
+  load,
+  remove,
+};
+
 class MainWindow final : public QMainWindow {
 public:
   using InputConfigurationSink =
@@ -34,6 +57,8 @@ public:
   using GameLoadSink = std::function<void(const std::filesystem::path&)>;
   using GameCloseSink = std::function<void()>;
   using ClearRecentGamesSink = std::function<void()>;
+  using StateOperationSink =
+    std::function<void(StateUiOperation, std::uint32_t)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -48,7 +73,15 @@ public:
   void setGameLoadSink(GameLoadSink sink);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
+  void setStateOperationSink(StateOperationSink sink);
   void setRecentGames(std::vector<std::filesystem::path> paths);
+  void setStateSessionReady(bool ready);
+  void setStateOperationBusy(bool busy);
+  void setStateSlotViews(std::array<StateSlotView, 10> views);
+  void setSelectedStateSlot(std::uint32_t slot);
+  [[nodiscard]] std::uint32_t selectedStateSlot() const noexcept;
+  void showStateOperationSuccess(StateUiOperation operation, std::uint32_t slot);
+  void showStateOperationError(StateUiOperation operation, const std::string& detail);
   [[nodiscard]] bool requestGameLoad(const std::filesystem::path& path);
   void setGameLoading(const std::filesystem::path& path);
   void setGameLoaded(const std::filesystem::path& path);
@@ -81,6 +114,9 @@ private:
   void setGameActionsEnabled(bool enabled);
   void chooseGame();
   void closeGame();
+  void requestStateOperation(StateUiOperation operation);
+  void updateStateActions();
+  void updateStateSlotPresentation();
   void presentGameLoadError(
     const std::filesystem::path& path,
     const std::string& detail);
@@ -99,10 +135,15 @@ private:
   GameLoadSink gameLoadSink_;
   GameCloseSink gameCloseSink_;
   ClearRecentGamesSink clearRecentGamesSink_;
+  StateOperationSink stateOperationSink_;
+  std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path pendingGamePath_;
   bool hasRecentGames_{false};
   bool gameLoading_{false};
+  bool stateSessionReady_{false};
+  bool stateOperationBusy_{false};
+  std::uint32_t selectedStateSlot_{0};
 };
 
 } // namespace genplusgx::ui

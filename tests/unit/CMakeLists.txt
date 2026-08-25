@@ -141,6 +141,25 @@ set_tests_properties(
   unit.state_manager PROPERTIES LABELS "unit;persistence;state" TIMEOUT 30
 )
 
+add_executable(
+  genplusgx_state_storage_service_test state_storage_service_test.cpp
+)
+target_link_libraries(
+  genplusgx_state_storage_service_test
+  PRIVATE
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(
+  NAME unit.state_storage_service COMMAND genplusgx_state_storage_service_test
+)
+set_tests_properties(
+  unit.state_storage_service
+  PROPERTIES LABELS "unit;persistence;state;concurrency" TIMEOUT 30
+)
+
 add_executable(genplusgx_bounded_queue_test bounded_queue_test.cpp)
 target_link_libraries(
   genplusgx_bounded_queue_test
