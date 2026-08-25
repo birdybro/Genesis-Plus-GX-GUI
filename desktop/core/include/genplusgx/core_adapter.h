@@ -3,6 +3,7 @@
 #include "genplusgx/audio_frame.h"
 #include "genplusgx/backup_memory.h"
 #include "genplusgx/core_audio_settings.h"
+#include "genplusgx/core_cheat.h"
 #include "genplusgx/core_firmware_settings.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/core_video_settings.h"
@@ -39,6 +40,7 @@ enum class CoreError {
   invalidAudioBatch,
   invalidTiming,
   invalidSettings,
+  invalidCheats,
   missingFirmware,
   notSegaCd,
   invalidDiscImage,
@@ -186,6 +188,8 @@ public:
   [[nodiscard]] CoreResult systemSettings(CoreSystemSettings& output) const;
   [[nodiscard]] CoreResult applyFirmwareSettings(
     const CoreFirmwareSettings& settings);
+  [[nodiscard]] CoreResult applyCheats(
+    std::span<const CoreCheatPatch> patches);
   [[nodiscard]] CoreResult firmwareSettings(
     CoreFirmwareSettings& output) const;
   [[nodiscard]] CoreResult discInfo(CoreDiscInfo& output) const;

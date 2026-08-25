@@ -7,6 +7,19 @@ target_link_libraries(
 add_test(NAME core.library_link COMMAND genplusgx_core_link_test)
 set_tests_properties(core.library_link PROPERTIES LABELS "core;smoke")
 
+add_executable(genplusgx_core_cheat_test core_cheat_test.cpp)
+target_link_libraries(
+  genplusgx_core_cheat_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME core.cheats COMMAND genplusgx_core_cheat_test)
+set_tests_properties(
+  core.cheats PROPERTIES LABELS "core;integration;cheats;fixture" TIMEOUT 30
+)
+
 add_executable(genplusgx_core_synthetic_rom_test synthetic_rom_test.cpp)
 target_link_libraries(
   genplusgx_core_synthetic_rom_test

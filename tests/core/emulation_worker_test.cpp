@@ -190,6 +190,22 @@ int main()
     return 7;
   }
 
+  const std::array cheatPatches{
+    genplusgx::CoreCheatPatch{
+      .address = 0xff0010U,
+      .data = 0x1234U,
+      .width = genplusgx::CoreCheatWidth::word,
+    },
+  };
+  if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateCheats(541U, cheatPatches), event),
+        "Worker cheat update failed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateCheats(542U, {}), event),
+        "Worker cheat clear failed")) {
+    return 7;
+  }
+
   genplusgx::CoreAudioSettings silentAudio;
   silentAudio.filter = genplusgx::CoreAudioFilter::disabled;
   silentAudio.psgLevelPercent = 0;

@@ -4,6 +4,7 @@
 #include "genplusgx/audio_output.h"
 #include "genplusgx/backup_store.h"
 #include "genplusgx/bounded_queue.h"
+#include "genplusgx/cheats/cheat_manager.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/input_aggregator.h"
@@ -98,6 +99,23 @@ std::string discRegionName(genplusgx::CoreDiscRegion region)
   return "Unknown";
 }
 
+genplusgx::cheats::CheatSystem cheatSystem(std::uint32_t hardware)
+{
+  constexpr std::uint32_t pbcMask = 0x81U;
+  constexpr std::uint32_t genesisHardware = 0x80U;
+  return (hardware & pbcMask) == genesisHardware
+    ? genplusgx::cheats::CheatSystem::genesis
+    : genplusgx::cheats::CheatSystem::masterSystem;
+}
+
+genplusgx::PersistenceStatus workerPersistenceFailure(std::string message)
+{
+  return {
+    .error = genplusgx::PersistenceError::invalidData,
+    .message = std::move(message),
+  };
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -132,6 +150,8 @@ int main(int argc, char* argv[])
   }
   const auto gameLibraryPath =
     applicationPaths.libraryDirectory() / "game-library.sqlite3";
+  genplusgx::cheats::CheatStore cheatStore{
+    applicationPaths.configDirectory() / "cheats"};
   genplusgx::library::GameLibraryDatabase gameLibrary{gameLibraryPath};
   const auto gameLibraryInitialized = gameLibrary.initialize();
   if (!gameLibraryInitialized) {
@@ -776,6 +796,19 @@ int main(int argc, char* argv[])
   };
   std::uint64_t metadataOperationId = 4'000'000U;
   std::optional<PendingMetadata> pendingMetadata;
+  struct PendingCheatMetadata final {
+    std::uint64_t operationId{0};
+    std::filesystem::path path;
+    genplusgx::cheats::CheatSystem system{
+      genplusgx::cheats::CheatSystem::genesis};
+  };
+  std::uint64_t cheatMetadataOperationId = 4'250'000U;
+  std::optional<PendingCheatMetadata> pendingCheatMetadata;
+  std::uint64_t cheatOperationId = 4'300'000U;
+  std::optional<std::uint64_t> pendingCheatOperation;
+  std::optional<genplusgx::GameIdentity> activeCheatIdentity;
+  std::optional<genplusgx::cheats::CheatSystem> activeCheatSystem;
+  genplusgx::cheats::CheatConfiguration activeCheatConfiguration;
   std::uint64_t screenshotOperationId = 4'500'000U;
   std::optional<std::uint64_t> pendingScreenshot;
   if (screenshotServiceStarted) {
@@ -905,6 +938,45 @@ int main(int argc, char* argv[])
         window.showGameInformationError(submitted.message);
       }
     });
+  window.setCheatConfigurationSink(
+    [&activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
+     &cheatOperationId, &cheatStore, &pendingCheatOperation, &worker](
+      const genplusgx::cheats::CheatConfiguration& configuration) {
+      if (!activeCheatIdentity || !activeCheatSystem) {
+        return workerPersistenceFailure(
+          "No active per-game cheat session is available.");
+      }
+      std::vector<genplusgx::CoreCheatPatch> patches;
+      const auto validated = genplusgx::cheats::validateCheatConfiguration(
+        *activeCheatSystem, configuration, &patches);
+      if (!validated) {
+        return workerPersistenceFailure(validated.message);
+      }
+      const auto saved = cheatStore.save(
+        *activeCheatIdentity, *activeCheatSystem, configuration);
+      if (!saved) {
+        return saved;
+      }
+      const auto operationId = ++cheatOperationId;
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateCheats(operationId, patches));
+      if (!submitted) {
+        const auto rollback = cheatStore.save(
+          *activeCheatIdentity,
+          *activeCheatSystem,
+          activeCheatConfiguration);
+        std::string detail = "The emulation worker could not accept the cheat update: " +
+          submitted.message;
+        if (!rollback) {
+          detail += " The previous cheat file also could not be restored: " +
+            rollback.message;
+        }
+        return workerPersistenceFailure(std::move(detail));
+      }
+      pendingCheatOperation = operationId;
+      activeCheatConfiguration = configuration;
+      return genplusgx::PersistenceStatus{};
+    });
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
@@ -917,6 +989,9 @@ int main(int argc, char* argv[])
      &lifecycleOperationId,
      &metadataService, &pendingDisc,
      &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
+     &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
+     &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
+     &pendingCheatMetadata, &pendingCheatOperation,
      &pendingScreenshot, &screenshotService,
      &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
@@ -927,6 +1002,15 @@ int main(int argc, char* argv[])
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
         continue;
+      }
+      if (pendingCheatOperation &&
+          event->operationId == *pendingCheatOperation &&
+          event->command == genplusgx::EmulationCommandType::cheats) {
+        pendingCheatOperation.reset();
+        if (!event->succeeded()) {
+          window.clearCheatSession();
+          window.showCheatError(event->message);
+        }
       }
       if (pendingState && event->operationId == pendingState->operationId &&
           pendingState->gameGeneration == gameGeneration) {
@@ -973,6 +1057,12 @@ int main(int argc, char* argv[])
         const auto loadedPath = pendingLoad->path;
         pendingLoad.reset();
         if (event->succeeded()) {
+          window.clearCheatSession();
+          activeCheatIdentity.reset();
+          activeCheatSystem.reset();
+          activeCheatConfiguration = {};
+          pendingCheatMetadata.reset();
+          pendingCheatOperation.reset();
           window.setGameLoaded(loadedPath);
           window.setSegaCdSession(
             event->disc.segaCd,
@@ -1025,6 +1115,20 @@ int main(int argc, char* argv[])
           if (!started) {
             qWarning().noquote() << QString::fromStdString(started.message);
           }
+          const auto cheatMetadataId = ++cheatMetadataOperationId;
+          pendingCheatMetadata = PendingCheatMetadata{
+            .operationId = cheatMetadataId,
+            .path = loadedPath,
+            .system = cheatSystem(event->hardware),
+          };
+          const auto cheatMetadataSubmitted = metadataService.request(
+            cheatMetadataId, loadedPath);
+          if (!cheatMetadataSubmitted) {
+            pendingCheatMetadata.reset();
+            window.showCheatError(
+              "Cheat metadata could not be read: " +
+              cheatMetadataSubmitted.message);
+          }
         } else {
           const bool previousGameRemainsLoaded =
             event->coreError == genplusgx::CoreError::persistenceFailed &&
@@ -1054,6 +1158,13 @@ int main(int argc, char* argv[])
             window.setStateOperationBusy(false);
             window.setStateSessionReady(false);
           }
+          if (!previousGameRemainsLoaded) {
+            activeCheatIdentity.reset();
+            activeCheatSystem.reset();
+            activeCheatConfiguration = {};
+            pendingCheatMetadata.reset();
+            pendingCheatOperation.reset();
+          }
         }
       } else if (pendingUnload && event->operationId == *pendingUnload &&
                  event->command == genplusgx::EmulationCommandType::unloadGame) {
@@ -1071,6 +1182,12 @@ int main(int argc, char* argv[])
           stateActivationOperation.reset();
           pendingState.reset();
           window.setNoGameLoaded();
+          window.clearCheatSession();
+          activeCheatIdentity.reset();
+          activeCheatSystem.reset();
+          activeCheatConfiguration = {};
+          pendingCheatMetadata.reset();
+          pendingCheatOperation.reset();
           closingGamePath.clear();
         } else {
           window.setGameLoaded(closingGamePath);
@@ -1235,6 +1352,66 @@ int main(int argc, char* argv[])
           genplusgx::library::GameMetadataEventType::serviceStopped) {
         continue;
       }
+      if (pendingCheatMetadata &&
+          event->operationId == pendingCheatMetadata->operationId &&
+          event->path == pendingCheatMetadata->path) {
+        const auto requestedPath = pendingCheatMetadata->path;
+        const auto system = pendingCheatMetadata->system;
+        pendingCheatMetadata.reset();
+        const bool belongsToVisibleGame =
+          !window.isGameLoading() && window.isGameLoaded() &&
+          window.loadedGamePath() == requestedPath;
+        if (!belongsToVisibleGame) {
+          continue;
+        }
+        if (!event->succeeded()) {
+          window.showCheatError(
+            "Cheat metadata could not be read: " + event->status.message);
+          continue;
+        }
+        auto titleSlug = genplusgx::sanitizeFilename(
+          event->metadata.displayTitle());
+        if (titleSlug.empty()) {
+          titleSlug = "game";
+        }
+        const genplusgx::GameIdentity identity{
+          .sha256 = event->metadata.sha256,
+          .titleSlug = std::move(titleSlug),
+        };
+        if (!identity.valid()) {
+          window.showCheatError(
+            "The loaded game could not be assigned a safe cheat identity.");
+          continue;
+        }
+        auto loaded = cheatStore.load(identity, system);
+        if (!loaded.status) {
+          qWarning().noquote() << QString::fromStdString(loaded.status.message);
+          window.showCheatError(
+            "Stored cheats could not be loaded; an empty list will be used: " +
+            loaded.status.message);
+          loaded.configuration = {};
+        }
+        std::vector<genplusgx::CoreCheatPatch> patches;
+        const auto validated = genplusgx::cheats::validateCheatConfiguration(
+          system, loaded.configuration, &patches);
+        if (!validated) {
+          window.showCheatError(validated.message);
+          continue;
+        }
+        const auto operationId = ++cheatOperationId;
+        const auto submitted = worker.submit(
+          genplusgx::EmulationCommand::updateCheats(operationId, patches));
+        if (!submitted) {
+          window.showCheatError(submitted.message);
+          continue;
+        }
+        activeCheatIdentity = identity;
+        activeCheatSystem = system;
+        activeCheatConfiguration = loaded.configuration;
+        pendingCheatOperation = operationId;
+        window.setCheatSession(system, std::move(loaded.configuration));
+        continue;
+      }
       if (!pendingMetadata ||
           event->operationId != pendingMetadata->operationId ||
           event->path != pendingMetadata->path) {
@@ -1324,6 +1501,7 @@ int main(int argc, char* argv[])
   window.setGameLibraryActions({});
   window.setScreenshotSink({});
   window.setScreenshotSettingsSink({});
+  window.setCheatConfigurationSink({});
   window.setVideoSettingsSink({});
   inputAggregator.setSnapshotSink({});
   const auto workerStopped = worker.stop();

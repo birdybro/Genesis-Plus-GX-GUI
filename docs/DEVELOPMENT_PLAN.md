@@ -42,8 +42,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | `c9e0c03` |
 | 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | `58d46df` |
 | 30 Library UI | COMPLETE | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | `6667162` |
-| 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | recorded by milestone 32 |
-| 32 Cheats | PLANNED | GG/PAR validation, persistence and enable UI | `desktop/cheats`, dialog | parser property, persistence, GUI tests | Invalid codes never applied | pending |
+| 31 Screenshots | COMPLETE | Native PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | `7f04063` |
+| 32 Cheats | COMPLETE | GG/PAR validation, persistence and enable UI | `desktop/cheats`, core host bridge, dialog | parser property, persistence, core and GUI tests | Invalid codes never applied | recorded by milestone 33 |
 | 33 Per-game overrides | PLANNED | Sparse overrides and precedence | settings model/UI | precedence, schema, GUI tests | No file until override exists | pending |
 | 34 Theme/accessibility | PLANNED | System/light/dark, high-DPI and keyboard access | theme/accessibility services | persistence and navigation GUI tests | Critical controls keyboard accessible | pending |
 | 35 Diagnostics/logging | PLANNED | Structured logs and copyable safe diagnostics | logging/diagnostics dialog | redaction/log creation/GUI tests | Useful bounded diagnostics, no secrets | pending |
@@ -1890,4 +1890,72 @@ completion or failure is visible and logged. Starting a new load clears the prev
 presentation frame. The application explicitly starts, drains, disconnects, and joins
 the screenshot service during shutdown.
 
-**Commit SHA:** recorded by milestone 32
+**Commit SHA:** `7f04063`
+
+## Milestone 32 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add a system-aware, user-friendly per-game cheat manager without allowing
+unvalidated text, persistence data, or GUI timing to mutate Genesis Plus GX globals.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/cheats/`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/c_api/desktop_core_cheats.c`
+- `desktop/core/c_api/desktop_core_host.{c,h}`
+- `desktop/core/c_api/osd.h`
+- `desktop/core/include/genplusgx/core_cheat.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/ui/include/genplusgx/ui/cheat_manager_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/cheat_manager_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/cheat_manager_test.cpp`
+- `tests/core/core_cheat_test.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/gui/cheat_manager_dialog_test.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/CHEATS.md`
+- `docs/USER_GUIDE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.cheats` checks exact Genesis Game Genie and Action Replay,
+Master System/Game Gear Game Genie and Action Replay, Fusion RAM/ROM, case/whitespace
+normalization, multi-part codes, invalid alphabet/separators/trailing data, aggregate
+limits, 10,000 fixed-seed bounded arbitrary inputs, deterministic re-decoding, atomic
+per-game round trips, identity/system mismatch, malformed/future JSON, and invalid-save
+rejection. `core.cheats` proves immediate generated-ROM patching, reverse restoration,
+VBlank work-RAM application/clear, pre-load rejection, and typed patch/count limits.
+`gui.cheats` drives Add/Remove/Enable/Apply, inline validation, persistence failure,
+normalization, stable object names, and MainWindow session gating. The worker regression
+also applies and clears a typed patch list on the core-owning thread.
+
+**Gate evidence:**
+
+- Focused parser/core/worker/GUI cheat workflows passed.
+- Debug build and complete CTest: passed (51/51).
+- Release build and complete CTest: passed (51/51).
+- ASan/UBSan build and complete CTest: passed (51/51) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New C/C++/Qt source compiles under the frontend warning policy without warnings;
+  authoritative `core/` sources remain unchanged.
+
+**Acceptance criteria:** **Tools → Cheats…** is enabled only after a loaded game has a
+safe SHA-256 identity and detected hardware family. Exact supported code forms are
+decoded into at most 150 typed patches before crossing the command queue. Enabled lists
+apply only on the emulation thread; Genesis ROM bytes restore on replacement/unload,
+8-bit banked ROM cheats follow mapper changes, RAM patches use the established VBlank
+hook, and Sega CD RAM classification matches the existing frontend behavior. Schema 1
+JSON is bounded, atomic, and keyed by complete game identity/system. Invalid UI or disk
+content fails closed without a partial save or core mutation.
+
+**Commit SHA:** recorded by milestone 33

@@ -132,7 +132,8 @@ separate workers only through their service interfaces.
 
 Commands are a finite tagged set: load, unload, start, pause, resume, hard reset, soft
 reset, frame advance, fast-forward mode, save/load/delete state, input snapshot,
-settings and firmware snapshots, disc change/eject, and shutdown. Commands with
+settings and firmware snapshots, decoded cheat patch lists, disc change/eject, and
+shutdown. Commands with
 superseding semantics (input and live settings) are coalesced. A failed coalescing
 search does not move from the command that is subsequently queued. Lifecycle,
 persistence, and disc commands retain ordering. The queue has a fixed capacity and
@@ -141,6 +142,34 @@ reports saturation rather than growing without bound.
 The worker emits immutable events containing operation IDs. The coordinator discards
 stale completion events after a newer load/unload generation, preventing late UI
 updates from a previous game.
+
+## Cheat data flow
+
+```text
+Qt table text -> exact system-aware decoder -> atomic per-game JSON
+                         |                         |
+                         +--> enabled typed patches
+                                      |
+                           bounded/coalesced command
+                                      |
+                              emulation thread
+                                      |
+                    desktop C host patch lifecycle
+                            /                 \
+               ROM restore/apply       RAM VBlank update
+```
+
+Metadata hashing creates the same collision-resistant game identity used by other
+persistence services. The actual loaded hardware byte—not an extension guess—selects
+Genesis-family versus 8-bit code decoding, so archived or generically named files do
+not receive the wrong grammar. Text and JSON never cross the core boundary.
+
+The C host bridge owns at most 150 fixed cheat entries. Genesis ROM words are restored
+in reverse before replacement or unload. Master System mapper hooks reapply validated
+byte patches after bank changes while retaining the prior bank byte for restoration.
+RAM updates use the same VBlank/input callback point as the existing libretro frontend,
+including Sega CD program and word RAM. All mutation occurs under `CoreAdapter`'s
+thread/lease checks; the GUI cannot call these functions directly.
 
 The implemented `EmulationWorker` owns `CoreAdapter` inside a dedicated `std::thread`.
 Its public calls never execute core work: they validate and enqueue operations with

@@ -21,6 +21,7 @@ target_link_libraries(
   PRIVATE
     GenesisPlusGX::Audio
     GenesisPlusGX::AppSupport
+    GenesisPlusGX::Cheats
     GenesisPlusGX::Input
     GenesisPlusGX::Library
     GenesisPlusGX::Persistence

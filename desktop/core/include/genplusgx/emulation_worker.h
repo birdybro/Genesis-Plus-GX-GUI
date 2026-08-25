@@ -45,6 +45,7 @@ enum class EmulationCommandType {
   audioSettings,
   systemSettings,
   firmwareSettings,
+  cheats,
   setDiscEjected,
   changeDisc,
   captureState,
@@ -62,6 +63,7 @@ struct EmulationCommand final {
   CoreSystemSettings coreSystemSettings;
   CoreFirmwareSettings coreFirmwareSettings;
   std::vector<std::uint8_t> rawState;
+  std::vector<CoreCheatPatch> coreCheats;
 
   [[nodiscard]] static EmulationCommand simple(
     EmulationCommandType type,
@@ -87,6 +89,9 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand updateFirmwareSettings(
     std::uint64_t operationId,
     CoreFirmwareSettings settings);
+  [[nodiscard]] static EmulationCommand updateCheats(
+    std::uint64_t operationId,
+    std::span<const CoreCheatPatch> patches);
   [[nodiscard]] static EmulationCommand discEjected(
     std::uint64_t operationId,
     bool ejected);
@@ -157,6 +162,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedAudioSettingsCommands{0};
   std::uint64_t coalescedSystemSettingsCommands{0};
   std::uint64_t coalescedFirmwareSettingsCommands{0};
+  std::uint64_t coalescedCheatCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
   std::uint64_t pacedFrameCount{0};

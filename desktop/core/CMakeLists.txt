@@ -81,7 +81,10 @@ if(GENPLUSGX_ENABLE_TREMOR)
   )
 endif()
 
-add_library(genplusgx_core_host OBJECT c_api/desktop_core_host.c)
+add_library(genplusgx_core_host OBJECT
+  c_api/desktop_core_cheats.c
+  c_api/desktop_core_host.c
+)
 target_link_libraries(
   genplusgx_core_host
   PRIVATE genplusgx_project_options genplusgx_project_warnings
@@ -91,9 +94,16 @@ target_include_directories(
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/c_api
     ${GENPLUSGX_CORE_ROOT}
+    ${GENPLUSGX_CORE_ROOT}/z80
+    ${GENPLUSGX_CORE_ROOT}/m68k
     ${GENPLUSGX_CORE_ROOT}/input_hw
     ${GENPLUSGX_CORE_ROOT}/ntsc
     ${GENPLUSGX_CORE_ROOT}/sound
+    ${GENPLUSGX_CORE_ROOT}/sound/minimp3
+    ${GENPLUSGX_CORE_ROOT}/sound/tremor
+    ${GENPLUSGX_CORE_ROOT}/cd_hw
+    ${GENPLUSGX_CORE_ROOT}/cart_hw
+    ${GENPLUSGX_CORE_ROOT}/cart_hw/svp
 )
 
 add_library(genplusgx_core STATIC ${GENPLUSGX_CORE_SOURCES})

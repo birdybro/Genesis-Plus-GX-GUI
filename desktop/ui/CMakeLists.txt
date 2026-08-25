@@ -3,6 +3,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/about_dialog.h
   include/genplusgx/ui/bios_settings_dialog.h
   include/genplusgx/ui/binding_capture_button.h
+  include/genplusgx/ui/cheat_manager_dialog.h
   include/genplusgx/ui/dialog_service.h
   include/genplusgx/ui/game_information_dialog.h
   include/genplusgx/ui/game_library_dialog.h
@@ -15,6 +16,7 @@ add_library(genplusgx_ui STATIC
   src/audio_settings_dialog.cpp
   src/bios_settings_dialog.cpp
   src/binding_capture_button.cpp
+  src/cheat_manager_dialog.cpp
   src/dialog_service.cpp
   src/game_information_dialog.cpp
   src/game_library_dialog.cpp
@@ -38,6 +40,7 @@ target_link_libraries(
   genplusgx_ui
   PUBLIC
     Qt6::Widgets
+    GenesisPlusGX::Cheats
     GenesisPlusGX::GameFiles
     GenesisPlusGX::Input
     GenesisPlusGX::Library

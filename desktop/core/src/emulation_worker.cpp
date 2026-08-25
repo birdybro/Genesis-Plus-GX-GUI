@@ -124,6 +124,15 @@ EmulationCommand EmulationCommand::updateFirmwareSettings(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateCheats(
+  std::uint64_t operationId,
+  std::span<const CoreCheatPatch> patches)
+{
+  auto command = simple(EmulationCommandType::cheats, operationId);
+  command.coreCheats.assign(patches.begin(), patches.end());
+  return command;
+}
+
 EmulationCommand EmulationCommand::discEjected(
   std::uint64_t operationId,
   bool ejected)
@@ -266,6 +275,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::cheats &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::cheats;
+          },
+          std::move(command))) {
+      ++coalescedCheatCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -321,6 +340,7 @@ public:
       .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,
       .coalescedSystemSettingsCommands = coalescedSystemSettingsCommands_,
       .coalescedFirmwareSettingsCommands = coalescedFirmwareSettingsCommands_,
+      .coalescedCheatCommands = coalescedCheatCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -650,6 +670,9 @@ private:
       case EmulationCommandType::firmwareSettings:
         coreResult = adapter.applyFirmwareSettings(command.coreFirmwareSettings);
         break;
+      case EmulationCommandType::cheats:
+        coreResult = adapter.applyCheats(command.coreCheats);
+        break;
       case EmulationCommandType::setDiscEjected:
         validTransition = current == EmulationWorkerState::paused ||
                           current == EmulationWorkerState::running;
@@ -904,6 +927,7 @@ private:
   std::uint64_t coalescedAudioSettingsCommands_{0};
   std::uint64_t coalescedSystemSettingsCommands_{0};
   std::uint64_t coalescedFirmwareSettingsCommands_{0};
+  std::uint64_t coalescedCheatCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

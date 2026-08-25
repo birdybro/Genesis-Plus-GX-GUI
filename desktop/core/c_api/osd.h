@@ -30,6 +30,8 @@ extern char MS_BIOS_JP[GENPLUSGX_HOST_PATH_CAPACITY];
 extern char GG_BIOS[GENPLUSGX_HOST_PATH_CAPACITY];
 
 void osd_input_update(void);
+#define CHEATS_UPDATE() genplusgx_host_rom_cheats_update()
+void genplusgx_host_rom_cheats_update(void);
 int load_archive(char *filename, unsigned char *buffer, int maxsize, char *extension);
 unsigned long crc32(unsigned long crc, const unsigned char *buffer, unsigned int length);
 void error(char *format, ...);

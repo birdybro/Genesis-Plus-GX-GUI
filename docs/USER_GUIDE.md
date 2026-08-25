@@ -160,6 +160,24 @@ number. If that exact name already exists, the application adds a numeric suffix
 never overwrites it. PNG data is first completed in a temporary file in the destination
 directory, so an interrupted encode cannot leave a partially named capture.
 
+## Cheats
+
+With a game loaded, choose **Tools → Cheats…** to manage its local cheat list. Add a
+name and code, choose whether it is enabled, then use Apply or OK. Genesis / Mega Drive
+and Sega CD games accept Genesis Game Genie and Action Replay / Pro Action Replay
+codes. SG-1000, Mark III, Master System, and Game Gear games accept their Game Genie
+and Action Replay forms plus Fusion RAM/ROM codes. Join multi-address codes with `+`.
+
+Every row is validated before the list is saved or applied. Unsupported alphabets,
+wrong separators, partial/trailing data, invalid disabled rows, and lists above the
+150-patch core limit remain visible as an inline error and never reach emulated memory.
+Enabled changes take effect through the emulation worker without pausing the GUI.
+
+Lists are stored atomically in `config/cheats/` using the game's complete SHA-256
+identity. Loading another game clears the live patch list before its own stored list is
+resolved. Corrupt, future-schema, wrong-game, and wrong-system files fail closed to an
+empty list. See [CHEATS.md](CHEATS.md) for exact formats and lifecycle details.
+
 ## Display and input
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu

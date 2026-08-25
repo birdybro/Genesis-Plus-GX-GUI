@@ -4,6 +4,7 @@
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
+#include "genplusgx/ui/cheat_manager_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
@@ -416,7 +417,8 @@ void MainWindow::buildMenus()
   });
 
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
-  addAction(*tools, tr("&Cheats…"), "cheatsAction");
+  auto* cheats = addAction(*tools, tr("&Cheats…"), "cheatsAction");
+  connect(cheats, &QAction::triggered, this, &MainWindow::showCheats);
   auto* gameInformation = addAction(
     *tools, tr("Game &Information…"), "gameInformationAction");
   connect(gameInformation, &QAction::triggered,
@@ -469,6 +471,84 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateDiscActions();
   updateStateActions();
   updateScreenshotAction();
+  updateCheatAction();
+}
+
+void MainWindow::setCheatSession(
+  cheats::CheatSystem system,
+  cheats::CheatConfiguration configuration)
+{
+  if (!isGameLoaded() ||
+      !cheats::validateCheatConfiguration(system, configuration)) {
+    return;
+  }
+  cheatSystem_ = system;
+  cheatConfiguration_ = std::move(configuration);
+  cheatSessionReady_ = true;
+  if (auto* dialog = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    dialog->setConfiguration(cheatConfiguration_);
+  }
+  updateCheatAction();
+}
+
+void MainWindow::clearCheatSession()
+{
+  cheatSessionReady_ = false;
+  cheatConfiguration_ = {};
+  if (auto* dialog = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    dialog->reject();
+  }
+  updateCheatAction();
+}
+
+void MainWindow::setCheatConfigurationSink(CheatConfigurationSink sink)
+{
+  cheatConfigurationSink_ = std::move(sink);
+}
+
+void MainWindow::showCheats()
+{
+  if (!cheatSessionReady_ || !isGameLoaded()) {
+    return;
+  }
+  if (auto* existing = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new CheatManagerDialog(
+    cheatSystem_, cheatConfiguration_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setConfigurationSink(
+    [this](const cheats::CheatConfiguration& configuration) {
+      if (cheatConfigurationSink_) {
+        const auto saved = cheatConfigurationSink_(configuration);
+        if (!saved) {
+          return saved;
+        }
+      }
+      cheatConfiguration_ = configuration;
+      statusBar()->showMessage(tr("Cheat configuration applied."), 3'000);
+      return PersistenceStatus{};
+    });
+  dialog->open();
+}
+
+void MainWindow::showCheatError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Cheat operation failed"), 5'000);
+  dialogService_->showError(
+    this, tr("Cheat Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::updateCheatAction()
+{
+  if (auto* action = findChild<QAction*>(QStringLiteral("cheatsAction"))) {
+    action->setEnabled(isGameLoaded() && cheatSessionReady_);
+  }
 }
 
 void MainWindow::setGameInformationRequestSink(GameInformationRequestSink sink)
@@ -1318,6 +1398,10 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
         QStringLiteral("gameInformationDialog"))) {
     information->close();
   }
+  if (auto* cheats = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    cheats->reject();
+  }
   gameLoading_ = true;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
@@ -1354,6 +1438,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
 
 void MainWindow::setNoGameLoaded()
 {
+  clearCheatSession();
   if (auto* information = findChild<GameInformationDialog*>(
         QStringLiteral("gameInformationDialog"))) {
     information->close();

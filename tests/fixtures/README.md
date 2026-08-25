@@ -116,3 +116,11 @@ green, blue, and white pixels. It writes PNG files only beneath a Qt temporary d
 and reads them back to verify conversion and collision behavior. The pixel pattern is
 original test data dedicated to CC0-1.0; no image fixture, game artwork, or golden binary
 is committed.
+
+`core.cheats` reuses the generated Genesis RAM marker ROM. It installs a word patch in
+unused generated ROM padding, verifies the changed host word, clears the patch, and
+verifies exact restoration. It also applies and clears a work-RAM patch at an address
+the original test program does not touch. `unit.cheats` generates no binary data; its
+fixed examples and 10,000-case deterministic bounded text corpus exercise the cheat
+decoder and temporary JSON store. No commercial cheat database, game code, or copied
+code list is included.

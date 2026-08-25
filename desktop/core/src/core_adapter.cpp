@@ -744,6 +744,40 @@ CoreResult CoreAdapter::initializeBackupMemory(BackupMemoryKind kind)
   return success();
 }
 
+CoreResult CoreAdapter::applyCheats(
+  std::span<const CoreCheatPatch> patches)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
+  if (patches.size() > maximumCoreCheatPatches ||
+      !std::ranges::all_of(patches, validateCoreCheatPatch)) {
+    return failure(
+      CoreError::invalidCheats,
+      "The cheat patch set exceeds the core limit or contains invalid data.");
+  }
+
+  std::array<genplusgx_host_cheat, maximumCoreCheatPatches> hostCheats{};
+  for (std::size_t index = 0; index < patches.size(); ++index) {
+    const auto& patch = patches[index];
+    hostCheats[index] = {
+      .address = patch.address,
+      .data = patch.data,
+      .reference = patch.reference,
+      .width = static_cast<std::uint8_t>(patch.width),
+      .reference_required = static_cast<std::uint8_t>(
+        patch.referenceRequired ? 1U : 0U),
+    };
+  }
+  if (genplusgx_host_set_cheats(hostCheats.data(), patches.size()) == 0) {
+    return failure(
+      CoreError::invalidCheats,
+      "Genesis Plus GX rejected the cheat patch set.");
+  }
+  return success();
+}
+
 CoreResult CoreAdapter::applyFirmwareSettings(
   const CoreFirmwareSettings& settings)
 {
@@ -1201,6 +1235,7 @@ void CoreAdapter::applyPendingInput() noexcept
 
 void CoreAdapter::unloadUnchecked() noexcept
 {
+  genplusgx_host_clear_cheats();
   audio_shutdown();
   ggenie_shutdown();
   areplay_shutdown();

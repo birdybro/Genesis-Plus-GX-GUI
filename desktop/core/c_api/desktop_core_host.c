@@ -62,6 +62,7 @@ void set_config_defaults(void)
 void genplusgx_host_reset_defaults(void)
 {
   set_config_defaults();
+  genplusgx_host_clear_cheats();
   memset(&input, 0, sizeof(input));
   input.system[0] = SYSTEM_GAMEPAD;
   input.system[1] = SYSTEM_GAMEPAD;
@@ -71,6 +72,7 @@ void genplusgx_host_reset_defaults(void)
 
 void osd_input_update(void)
 {
+  genplusgx_host_ram_cheats_update();
 }
 
 int load_archive(char *filename, unsigned char *buffer, int maxsize, char *extension)

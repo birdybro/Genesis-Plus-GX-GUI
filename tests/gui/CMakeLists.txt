@@ -2,6 +2,27 @@ qt_add_executable(genplusgx_main_window_test
   main_window_test.cpp
 )
 
+qt_add_executable(
+  genplusgx_cheat_manager_dialog_test cheat_manager_dialog_test.cpp
+)
+set_target_properties(genplusgx_cheat_manager_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_cheat_manager_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.cheats COMMAND genplusgx_cheat_manager_dialog_test)
+set_tests_properties(
+  gui.cheats
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;cheats;persistence"
+    TIMEOUT 30
+)
+
 set_target_properties(genplusgx_main_window_test PROPERTIES AUTOMOC ON)
 
 target_link_libraries(
