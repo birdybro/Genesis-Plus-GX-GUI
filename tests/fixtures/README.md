@@ -96,3 +96,10 @@ interleaving, and CUE text itself in a temporary directory. A fixed-seed corpus 
 2,000 bounded arbitrary byte arrays up to 70,000 bytes to exercise truncated header
 offsets. No corpus binary or result is stored, downloaded, or automatically promoted
 to a golden reference.
+
+`unit.game_library_scanner` writes the generated Genesis ROM and a four-byte original
+SG-1000 placeholder into a temporary directory alongside an unsupported text file. It
+then performs flat and recursive scans, verifies exact indexed systems and paths, and
+removes one temporary generated file to exercise stale-row cleanup. The database test
+creates malformed text and structurally incomplete SQLite files solely inside its
+temporary directory to verify collision-safe recovery. No fixture survives the test.

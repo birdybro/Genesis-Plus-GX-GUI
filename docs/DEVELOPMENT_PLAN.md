@@ -39,8 +39,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 25 System settings | COMPLETE | Region, VDP, clock and safe system options | system settings UI/adapter | validation and deferred-load tests | Accurate defaults and controlled reinit | `97db779` |
 | 26 BIOS manager | COMPLETE | Paths, existence, hashes, detected status | BIOS service/page | missing/valid/invalid generated fixtures | No download/bundled proprietary firmware | `77a562d` |
 | 27 Sega CD workflow | COMPLETE | Disc load/change/eject, BIOS, BRAM, CDDA/CHD | CD adapter/UI | synthetic frontend paths; optional external suite | First-class typed CD behavior | `1baef5d` |
-| 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | recorded by milestone 29 |
-| 29 Library database | PLANNED | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | pending |
+| 28 Game information | COMPLETE | Safe header metadata and SHA-256 dialog | metadata parser/dialog | bounded parser/fuzz corpus and GUI test | Metadata never changes core behavior | `c9e0c03` |
+| 29 Library database | COMPLETE | SQLite schema, directories, async scanner | `desktop/library` | migration, corruption, recursive scan tests | Scanner cannot freeze GUI | recorded by milestone 30 |
 | 30 Library UI | PLANNED | Search/filter/favorite/recent/sort/art/launch | library widgets/models | full GUI workflows | Useful offline local library | pending |
 | 31 Screenshots | PLANNED | Native/display PNG with collision-safe paths | screenshot service/UI | deterministic PNG and action tests | Atomic image writing and notification | pending |
 | 32 Cheats | PLANNED | GG/PAR validation, persistence and enable UI | `desktop/cheats`, dialog | parser property, persistence, GUI tests | Invalid codes never applied | pending |
@@ -1696,4 +1696,62 @@ region, product, sizes, checksum, mapper/media, disc tracks, path, and SHA-256 w
 stable object names and keyboard accessibility. Metadata remains descriptive and
 never calls or overrides the core.
 
-**Commit SHA:** recorded by milestone 29
+**Commit SHA:** `c9e0c03`
+
+## Milestone 29 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add a recoverable, versioned SQLite index for local game directories and a
+bounded asynchronous scanner that reuses the safe milestone 28 metadata reader without
+blocking the GUI or exposing a database connection across threads.
+
+**Files changed:**
+
+- `desktop/library/CMakeLists.txt`
+- `desktop/library/include/genplusgx/library/game_library_database.h`
+- `desktop/library/include/genplusgx/library/game_library_scanner.h`
+- `desktop/library/src/game_library_database.cpp`
+- `desktop/library/src/game_library_scanner.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/game_library_database_test.cpp`
+- `tests/unit/game_library_scanner_test.cpp`
+- `tests/fixtures/README.md`
+- `docs/ARCHITECTURE.md`
+- `docs/GAME_LIBRARY.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `unit.game_library_database` verifies schema creation and persistence,
+canonical non-overlapping roots, recursive-mode updates, fixed scan-batch limits,
+metadata round trips, transaction rollback, stale deletion, favorite/launch preservation
+across rescans, directory cascading, binary and structurally corrupt database recovery,
+future-schema rejection, and cross-thread access rejection. `unit.game_library_scanner`
+indexes generated Genesis and SG-1000 files, distinguishes flat and recursive scans,
+ignores unsupported input, removes stale entries, preserves the last complete index when
+a root disappears, restarts cleanly, and surfaces preserved corrupt-database recovery.
+
+**Gate evidence:**
+
+- Focused database/scanner tests passed five consecutive Debug executions.
+- Debug build and complete CTest: passed (46/46).
+- Release build and complete CTest: passed (46/46).
+- ASan/UBSan build and complete CTest: passed (46/46) with no findings.
+- Legacy libretro regression passed with only the two documented inherited qualifier
+  warnings, then cleaned.
+- New database, scanner, application-composition, and test code compiled under the
+  frontend warning policy without warnings; authoritative `core/` files are unchanged.
+
+**Acceptance criteria:** Schema 1 stores source directories, complete parsed metadata,
+favorites, play counts, last-played timestamps, and optional local artwork paths. Database
+startup runs SQLite integrity and structural checks; malformed current databases are
+moved to a collision-safe `.corrupt-*` backup with sidecars before an empty index is
+created, while unknown future schemas fail closed. Directory roots are canonical,
+non-overlapping, and capped at 256. Scans run on their own thread with fixed-capacity
+command/event queues, a 100,000-file traversal limit, no symlink following, 128-record
+batches, and transactional stale cleanup. Cancellation, incomplete traversal, metadata
+failures, and missing roots cannot publish a partial replacement index. The application
+owns and shuts down the service explicitly; milestone 30 will connect the model to the
+native library window.
+
+**Commit SHA:** recorded by milestone 30

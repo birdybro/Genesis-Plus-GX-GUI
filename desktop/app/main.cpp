@@ -8,6 +8,8 @@
 #include "genplusgx/input/input_aggregator.h"
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/input/keyboard_input.h"
+#include "genplusgx/library/game_library_database.h"
+#include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/library/game_metadata_service.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
@@ -121,6 +123,28 @@ int main(int argc, char* argv[])
   const auto pathsInitialized = applicationPaths.initialize();
   if (!pathsInitialized) {
     qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
+  }
+  const auto gameLibraryPath =
+    applicationPaths.libraryDirectory() / "game-library.sqlite3";
+  genplusgx::library::GameLibraryDatabase gameLibrary{gameLibraryPath};
+  const auto gameLibraryInitialized = gameLibrary.initialize();
+  if (!gameLibraryInitialized) {
+    qWarning().noquote() << QString::fromStdString(gameLibraryInitialized.message);
+  } else if (gameLibrary.recoveredCorruption()) {
+    qWarning().noquote()
+      << "A corrupt game-library database was preserved as"
+      << genplusgx::ui::pathToQString(gameLibrary.recoveryBackupPath());
+  }
+  genplusgx::library::GameLibraryScanner gameLibraryScanner{gameLibraryPath};
+  const auto gameLibraryScannerStarted = gameLibraryInitialized
+    ? gameLibraryScanner.start()
+    : genplusgx::library::GameLibraryScannerStatus{
+        .error = genplusgx::library::GameLibraryScannerError::databaseFailure,
+        .message = gameLibraryInitialized.message,
+      };
+  if (!gameLibraryScannerStarted) {
+    qWarning().noquote() << QString::fromStdString(
+      gameLibraryScannerStarted.message);
   }
   genplusgx::input::InputProfileStore inputProfileStore{
     applicationPaths.configDirectory() / "input-profiles.json"};
@@ -253,6 +277,7 @@ int main(int argc, char* argv[])
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
     static_cast<void>(stateStorage.stop());
+    static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
     return 1;
   }
@@ -629,7 +654,8 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&audioOutput, &controllerInput, &gameGeneration, &inputAggregator,
-     &inputOperationId, &lifecycleOperationId, &metadataService, &pendingDisc,
+     &gameLibraryScanner, &inputOperationId, &lifecycleOperationId,
+     &metadataService, &pendingDisc,
      &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
      &closingGamePath, &recentGames, &recentGamesStore,
      &refreshRecentGamesMenu, &stateActivationOperation, &stateOperationId,
@@ -923,6 +949,15 @@ int main(int argc, char* argv[])
         window.showGameInformationError(event->status.message);
       }
     }
+    while (auto event = gameLibraryScanner.pollEvent()) {
+      if (event->type ==
+          genplusgx::library::GameLibraryScanEventType::serviceStarted) {
+        qInfo() << "Game-library scanner started.";
+      } else if (event->type ==
+                 genplusgx::library::GameLibraryScanEventType::scanFailed) {
+        qWarning().noquote() << QString::fromStdString(event->status.message);
+      }
+    }
   });
   eventPump.start();
   window.show();
@@ -964,6 +999,11 @@ int main(int argc, char* argv[])
   if (!metadataServiceStopped) {
     qWarning().noquote() << QString::fromStdString(
       metadataServiceStopped.message);
+  }
+  const auto gameLibraryScannerStopped = gameLibraryScanner.stop();
+  if (!gameLibraryScannerStopped) {
+    qWarning().noquote() << QString::fromStdString(
+      gameLibraryScannerStopped.message);
   }
   static_cast<void>(audioOutput.shutdown());
   return result;

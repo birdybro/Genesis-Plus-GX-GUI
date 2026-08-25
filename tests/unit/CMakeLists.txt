@@ -27,6 +27,49 @@ set_tests_properties(
   PROPERTIES LABELS "unit;library;metadata;filesystem;fuzz;concurrency" TIMEOUT 30
 )
 
+add_executable(
+  genplusgx_game_library_database_test game_library_database_test.cpp
+)
+target_link_libraries(
+  genplusgx_game_library_database_test
+  PRIVATE
+    GenesisPlusGX::Library
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+    Qt6::Sql
+    Threads::Threads
+)
+add_test(
+  NAME unit.game_library_database
+  COMMAND genplusgx_game_library_database_test
+)
+set_tests_properties(
+  unit.game_library_database
+  PROPERTIES LABELS "unit;library;database;filesystem;persistence" TIMEOUT 30
+)
+
+add_executable(
+  genplusgx_game_library_scanner_test game_library_scanner_test.cpp
+)
+target_link_libraries(
+  genplusgx_game_library_scanner_test
+  PRIVATE
+    GenesisPlusGX::Library
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+    Threads::Threads
+)
+add_test(
+  NAME unit.game_library_scanner
+  COMMAND genplusgx_game_library_scanner_test
+)
+set_tests_properties(
+  unit.game_library_scanner
+  PROPERTIES LABELS "unit;library;database;filesystem;concurrency;fixture" TIMEOUT 30
+)
+
 if(TARGET genplusgx_app_support)
   add_executable(genplusgx_command_line_test command_line_test.cpp)
   target_link_libraries(

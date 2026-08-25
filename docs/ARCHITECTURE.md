@@ -634,10 +634,34 @@ race Genesis Plus GX globals. Genesis, SMD, 8-bit Sega, raw/cooked Sega CD, CUE,
 conditional CHD paths remain descriptive only. CUE references are constrained to safe
 relative paths before a small data-header read.
 
-The next library milestone reuses this parser from a scanner outside the GUI thread
-and submits database batches. SQLite operations use transactions, schema migrations,
-integrity checks, and recoverable rebuild behavior. No network access is part of
-scanning or artwork handling.
+## Game-library database and scanner
+
+```text
+configured canonical roots --> bounded scan command --> scanner thread
+                                                        |
+                       metadata parser <--- safe directory walk
+                                                        |
+                                      batches of at most 128 records
+                                                        v
+Qt library model <-------- query connection ------ SQLite WAL database
+                                                        |
+                                      generation transaction / stale cleanup
+```
+
+The scanner owns its `GameLibraryDatabase` connection on the scanner thread. A
+connection records its initializing thread and rejects cross-thread use. Recursive and
+flat walks skip permission-denied entries, never follow symlinks, and stop at a fixed
+100,000-file ceiling. Metadata reaches SQLite in bounded batches while one generation
+transaction ensures that cancelled, incomplete, or failed scans cannot delete the last
+complete index. Rescans update file-owned fields but preserve favorite, play-count,
+last-played, and local-artwork state.
+
+The schema is versioned with SQLite `user_version`, enables foreign keys and WAL, and
+validates both `quick_check` and required tables/columns at startup. Corrupt or
+structurally incomplete current databases are preserved under a collision-safe
+`.corrupt-<timestamp>` name before a clean rebuild. Future schema versions fail closed
+without modification. Configured roots are canonical, non-overlapping, and bounded.
+No network access is part of scanning or artwork handling.
 
 ## Error handling and diagnostics
 
