@@ -53,7 +53,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
 | 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
-| 42 Release automation | IN PROGRESS | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
+| 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
 
@@ -2515,7 +2515,7 @@ produces an unsigned native `.app` in both ZIP and DMG forms.
 
 ## Milestone 42 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Turn an authorized version tag into the already verified native packages only
 after matching project identity, complete platform tests, sanitizer coverage, legacy
@@ -2553,7 +2553,17 @@ checksums, verifies aggregate creation, corrupts one archive, and requires rejec
   dry-run upload or tag-driven publication.
 - Debug, Release, and ASan/UBSan each pass all 66 tests locally; the inherited libretro
   target builds and cleans with only its two documented qualifier warnings. Actionlint
-  1.7.7 reports no findings. The non-publishing hosted rehearsal remains pending.
+  1.7.7 reports no findings.
+- Manual hosted rehearsal `32919521105` passed release identity, Linux x86-64 Release,
+  Windows MSVC x64 Release, native macOS arm64 and x86-64 Release, Linux ASan/UBSan, the
+  inherited libretro regression, and final asset assembly. Each platform package job ran
+  all 66 tests before staging, runtime verification, application smoke testing, CPack,
+  checksum generation, and artifact upload.
+- The final job downloaded all four platform artifact sets, recomputed all six package
+  digests, wrote the aggregate checksum file, and uploaded a 141,363,849-byte
+  `release-candidate-v0.1.0` artifact. Its publication step is recorded as skipped. Remote
+  inspection confirmed no `v0.1.0` tag and no GitHub release were created. The ordinary
+  branch CI run `32919510095` also passed all ten jobs on the same commit.
 
 **Acceptance criteria:** A malformed or mismatched tag fails before building; a missing or
 corrupt package prevents publication; every supported host passes its complete Release
@@ -2561,4 +2571,4 @@ suite and package smoke gate; sanitizers and legacy regression pass; a manual ru
 the complete path without creating a tag or release; only an authorized tag event may
 publish the six archives and verified checksums.
 
-**Commit SHA:** recorded by milestone 43
+**Commit SHA:** `12f66c1`
