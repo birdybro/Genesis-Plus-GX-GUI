@@ -55,7 +55,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
 | 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
 | 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | `98137f7` |
-| 44 Release candidate | IN PROGRESS | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
+| 44 Release candidate | COMPLETE | Adversarial review, complete clean regressions and report | hotkeys, audio recovery, final report and release gates | 67-test clean Debug/Release/ASan suites; four-host CI; package and adversarial audits | Clean tree and all required gates green | `d84f7eb` |
 
 ## Execution policy
 
@@ -2642,3 +2642,86 @@ packages contain the complete maintained guides and notices; no proprietary ROM,
 firmware, artwork, credential, or generated user data is added.
 
 **Commit SHA:** `98137f7`
+
+## Milestone 44 detail
+
+**Status:** COMPLETE
+
+**Goal:** Perform the final adversarial implementation review, close every substantive
+acceptance gap found, prove the exact release-candidate code through clean local and
+hosted cross-platform gates, package the maintained documentation, and publish an honest
+final test report without creating an unauthorized release.
+
+**Files changed:**
+
+- `desktop/app/src/main_window.cpp`
+- `desktop/audio/include/genplusgx/audio/audio_output.h`
+- `desktop/audio/src/audio_output.cpp`
+- `desktop/input/include/genplusgx/input/binding_capture_button.h`
+- `desktop/input/include/genplusgx/input/input_configuration_dialog.h`
+- `desktop/input/include/genplusgx/input/input_profile.h`
+- `desktop/input/src/binding_capture_button.cpp`
+- `desktop/input/src/input_configuration_dialog.cpp`
+- `desktop/input/src/input_profile.cpp`
+- `tests/unit/input_profile_test.cpp`
+- `tests/unit/audio_output_test.cpp`
+- `tests/gui/input_configuration_dialog_test.cpp`
+- `README.md`
+- `CHANGELOG.md`
+- `cmake/Packaging.cmake`
+- `cmake/ValidateDocumentation.cmake`
+- `tests/infrastructure/package_metadata_test.cmake.in`
+- `docs/ARCHITECTURE.md`
+- `docs/INPUT_CONFIGURATION.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/USER_GUIDE.md`
+- `docs/TEST_MATRIX.md`
+- `docs/FINAL_TEST_REPORT.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** Input-profile tests now cover the complete 28-action emulator-hotkey
+model, defaults, schema migration, persistence, duplicate detection, gameplay conflicts,
+and modifier semantics. GUI tests exercise the stable capture widgets, keyboard-only
+capture, duplicate/conflict rejection, Restore Defaults, persistence, and live action
+application. Audio tests inject a bounded event burst, prove the 64-event-per-poll limit,
+and simulate selected-device removal to verify default-device recovery without losing
+the shared ring or running state. Documentation/package tests require the final report in
+both the source publication set and generated install graph.
+
+**Gate evidence:**
+
+- Clean Debug and Release builds each compile 315 targets without new frontend warnings
+  and pass all 67 CTest registrations. A clean ASan/UBSan build also passes 67/67 with no
+  sanitizer findings. The accelerated stability workload executes 20,000 frames in every
+  configuration without queue growth, lifecycle failure, or resource-bound violation.
+- The named test inventory is 7 infrastructure, 15 core, 1 end-to-end integration, 29
+  unit, and 15 GUI/smoke tests. Cross-cutting CTest labels intentionally overlap and are
+  itemized in `docs/FINAL_TEST_REPORT.md`.
+- The inherited Unix libretro target builds and cleans successfully. Its only compiler
+  diagnostics remain the two documented inherited discarded-qualifier warnings in
+  `libretro/libretro.c`; no new frontend warning is present.
+- Actionlint 1.7.7, downloaded from its official checksum-verified release, reports no
+  findings for the CI and release workflows. Hosted candidate run `32922820386` passes
+  all ten jobs: Linux Debug, Release/package, ASan/UBSan, and legacy libretro; Windows
+  MSVC x64 Debug and Release/package; and macOS arm64/x86-64 Debug and Release/package.
+- The report-inclusive Linux Release install contains 44 files, passes runtime dependency
+  and `--version` smoke checks, and produces a 17,053,814-byte versioned x86-64 TGZ whose
+  SHA-256 verifies after staging. A case-insensitive scan finds no ROM, BIOS, save, state,
+  or other prohibited fixture extension in the install or archive.
+- The final source audit searches authored production, test, build, workflow, and
+  documentation files for unfinished markers and fatal placeholders; reviews disabled,
+  skipped, and expected-failure tests; checks all significant actions and settings for
+  implementation; inspects thread/queue bounds and shutdown order; and finds no
+  accidental ROM, firmware, credential, generated save, or committed build artifact.
+  The only expected-failure registrations are the two negative release-tag validation
+  tests, and the proprietary Sega CD BIOS suite remains explicitly optional.
+
+**Acceptance criteria:** Every definition-of-done feature has an implemented frontend
+path and maintained documentation; all local clean build/test/sanitizer/package gates and
+the complete hosted platform matrix are green; limitations requiring proprietary BIOS,
+physical controller/audio hardware, signing credentials, or a broader Linux bundling
+format are stated rather than hidden; the final tree contains no prohibited content or
+known-broken milestone.
+
+**Commit SHA:** `d84f7eb` (tested implementation; this ledger/report closure is recorded
+by the following commit because a commit cannot contain its own final SHA)

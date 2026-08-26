@@ -28,6 +28,7 @@ set(required_documents
   docs/RELEASES.md
   docs/UPSTREAM_MAINTENANCE.md
   docs/DEVELOPMENT_PLAN.md
+  docs/FINAL_TEST_REPORT.md
   docs/TEST_MATRIX.md
 )
 

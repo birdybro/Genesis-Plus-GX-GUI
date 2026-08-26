@@ -159,7 +159,8 @@ ctest --preset debug -L gui --output-on-failure
 ctest --preset asan --output-on-failure
 ```
 
-See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), and the fixture
+See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
+[final release-candidate report](docs/FINAL_TEST_REPORT.md), and the fixture
 [provenance record](tests/fixtures/README.md).
 
 ## Documentation
@@ -171,6 +172,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), and th
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)
+- [Final test report](docs/FINAL_TEST_REPORT.md)
 - [Changelog](CHANGELOG.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 
 ## Contributing

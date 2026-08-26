@@ -47,6 +47,7 @@ foreach(document IN ITEMS
     BUILDING.md
     CHEATS.md
     DEVELOPMENT.md
+    FINAL_TEST_REPORT.md
     GAME_INFORMATION.md
     GAME_LIBRARY.md
     INPUT_CONFIGURATION.md
