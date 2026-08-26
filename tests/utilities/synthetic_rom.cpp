@@ -189,6 +189,55 @@ std::vector<std::uint8_t> makeGenesisSramWriterRom()
   return rom;
 }
 
+std::vector<std::uint8_t> makeGenesisBootRom()
+{
+  std::vector<std::uint8_t> bios(2U * 1024U, 0U);
+  write32(bios, 0x000U, 0x00FFFF00U);
+  for (std::size_t vector = 1U; vector < 64U; ++vector) {
+    write32(bios, vector * 4U, static_cast<std::uint32_t>(programAddress));
+  }
+  writeText(bios, 0x120U, std::to_array("GENESIS OS TEST "));
+  write16(bios, programAddress, 0x60FEU);
+  for (std::size_t offset = 0x300U; offset < bios.size(); ++offset) {
+    bios[offset] = static_cast<std::uint8_t>((offset * 29U + 7U) & 0xFFU);
+  }
+  return bios;
+}
+
+std::vector<std::uint8_t> makeZ80RamMarkerRom(std::uint8_t marker)
+{
+  std::vector<std::uint8_t> rom(32U * 1024U, 0U);
+  // DI; LD SP,$DFF0; LD A,marker; LD ($C000),A; JP $0009.
+  // The program is valid on SG-1000, Mark III, Master System, and Game Gear.
+  constexpr std::array prefix{
+    std::uint8_t{0xF3U}, std::uint8_t{0x31U}, std::uint8_t{0xF0U},
+    std::uint8_t{0xDFU}, std::uint8_t{0x3EU},
+  };
+  std::ranges::copy(prefix, rom.begin());
+  rom[5U] = marker;
+  rom[6U] = 0x32U;
+  rom[7U] = 0x00U;
+  rom[8U] = 0xC0U;
+  rom[9U] = 0xC3U;
+  rom[10U] = 0x09U;
+  rom[11U] = 0x00U;
+  return rom;
+}
+
+std::vector<std::uint8_t> makeZ80BootRom(std::size_t size)
+{
+  if (size == 0U || size > 4U * 1024U * 1024U ||
+      (size % 1'024U) != 0U) {
+    throw std::invalid_argument{"Z80 boot ROM size must be 1 KiB aligned"};
+  }
+  auto bios = makeZ80RamMarkerRom(0xB1U);
+  bios.resize(size);
+  for (std::size_t offset = 0x100U; offset < bios.size(); ++offset) {
+    bios[offset] = static_cast<std::uint8_t>((offset * 17U + 3U) & 0xFFU);
+  }
+  return bios;
+}
+
 std::vector<std::uint8_t> makeSegaCdBios()
 {
   std::vector<std::uint8_t> bios(segaCdBiosSize, 0U);

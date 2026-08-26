@@ -15,6 +15,11 @@ enum class SyntheticSegaCdRegion : std::uint8_t {
 
 [[nodiscard]] std::vector<std::uint8_t> makeGenesisRamMarkerRom();
 [[nodiscard]] std::vector<std::uint8_t> makeGenesisSramWriterRom();
+[[nodiscard]] std::vector<std::uint8_t> makeGenesisBootRom();
+[[nodiscard]] std::vector<std::uint8_t> makeZ80RamMarkerRom(
+  std::uint8_t marker = 0x5AU);
+[[nodiscard]] std::vector<std::uint8_t> makeZ80BootRom(
+  std::size_t size = 1U * 1024U);
 [[nodiscard]] std::vector<std::uint8_t> makeSegaCdBios();
 [[nodiscard]] std::vector<std::uint8_t> makeSegaCdDiscImage(
   SyntheticSegaCdRegion region = SyntheticSegaCdRegion::usa);

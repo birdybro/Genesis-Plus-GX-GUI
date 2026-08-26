@@ -36,6 +36,36 @@ by the generator. Input tests inject neutral frontend snapshots and verify both 
 core state and the active-low byte observed by the 68000 program. There is no third-party
 program code, game content, artwork, sampled audio, or trademark graphic in the fixture.
 
+## Generated 8-bit Z80 RAM marker ROMs
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; runtime extensions are `.sg`, `.sms`, and `.gg` |
+| Generator | `makeZ80RamMarkerRom()` in `tests/utilities/synthetic_rom.cpp` |
+| Purpose | Execute the same semantic Z80 RAM-write test on SG-1000, Mark III, Master System, and Game Gear |
+| Size | 32 KiB |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+| Expected systems | `SYSTEM_SG`, `SYSTEM_MARKIII`, `SYSTEM_SMS2`, and `SYSTEM_GG` |
+
+The ROM contains a twelve-byte original Z80 program that disables interrupts, creates
+a safe stack, writes marker byte `0x5a` to work RAM at `0xc000`, and loops in bounds.
+The test loads it through each real core hardware path, executes a frame, checks the
+RAM marker, and verifies native viewport geometry including the 160×144 Game Gear view.
+
+## Generated cartridge boot firmware
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; all files are generated in the temporary directory |
+| Generators | `makeGenesisBootRom()` and `makeZ80BootRom()` |
+| Purpose | Prove Genesis, regional Master System, and Game Gear firmware settings reach and activate in the core |
+| Sizes | 2 KiB Genesis; 1 KiB Master System/Game Gear |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+
+The Genesis image contains the core-recognized `GENESIS OS` structural marker and an
+original self-loop. The Z80 images contain the original marker program plus deterministic
+non-uniform padding. They test firmware plumbing only and contain no Sega firmware code.
+
 ## Generated Genesis SRAM writer ROM
 
 | Field | Value |

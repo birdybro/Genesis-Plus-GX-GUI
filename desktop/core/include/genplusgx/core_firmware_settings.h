@@ -6,6 +6,11 @@
 namespace genplusgx {
 
 struct CoreFirmwareSettings final {
+  std::filesystem::path genesis;
+  std::filesystem::path masterSystemUsa;
+  std::filesystem::path masterSystemEurope;
+  std::filesystem::path masterSystemJapan;
+  std::filesystem::path gameGear;
   std::filesystem::path segaCdUsa;
   std::filesystem::path segaCdEurope;
   std::filesystem::path segaCdJapan;
@@ -21,7 +26,12 @@ inline constexpr std::size_t maximumCoreFirmwarePathBytes = 4'095U;
   const auto validPath = [](const std::filesystem::path& path) {
     return path.empty() || path.string().size() <= maximumCoreFirmwarePathBytes;
   };
-  return validPath(settings.segaCdUsa) &&
+  return validPath(settings.genesis) &&
+         validPath(settings.masterSystemUsa) &&
+         validPath(settings.masterSystemEurope) &&
+         validPath(settings.masterSystemJapan) &&
+         validPath(settings.gameGear) &&
+         validPath(settings.segaCdUsa) &&
          validPath(settings.segaCdEurope) &&
          validPath(settings.segaCdJapan);
 }

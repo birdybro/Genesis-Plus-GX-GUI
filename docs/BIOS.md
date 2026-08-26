@@ -18,6 +18,13 @@ exists, names a regular file, can be read completely within its slot's bound, me
 expected size, and is not made from one repeated byte. It then displays a SHA-256 hash
 and a detected firmware family where the image contains a recognizable model marker.
 
+Every structurally valid cartridge-firmware path is passed to the core on the
+emulation thread before the next game load. Genesis boot firmware is checked for the
+upstream `GENESIS OS` marker and mirrored into the core's 64 KiB boot bank. The core's
+normal regional loader selects USA, Europe, or Japan Master System firmware after ROM
+region detection; Game Gear uses its independent slot. Cartridge firmware is optional,
+and clearing all five cartridge slots restores direct cartridge boot on the next load.
+
 These checks are intentionally structural. A valid status does not authenticate a
 dump, guarantee compatibility, or prove its legal provenance. The application does not
 ship a list of proprietary firmware hashes, so legitimate regional and hardware
@@ -53,4 +60,6 @@ uploaded by project automation.
 Changing a setting is staged inside the dialog. **Apply** saves without closing,
 **OK** saves and closes, and **Cancel** discards changes not already applied. The JSON
 configuration uses an atomic replacement transaction, so an interrupted write cannot
-partially replace a previously valid configuration.
+partially replace a previously valid configuration. Because boot firmware is machine
+initialization state, changes apply to the next game load rather than mutating a running
+session.

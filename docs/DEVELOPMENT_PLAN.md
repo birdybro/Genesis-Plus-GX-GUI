@@ -56,6 +56,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
 | 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | `98137f7` |
 | 44 Release candidate | COMPLETE | Adversarial review, complete clean regressions and report | hotkeys, audio recovery, final report and release gates | 67-test clean Debug/Release/ASan suites; four-host CI; package and adversarial audits | Clean tree and all required gates green | `d84f7eb` |
+| 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | pending |
 
 ## Execution policy
 
@@ -2725,3 +2726,50 @@ known-broken milestone.
 
 **Commit SHA:** `d84f7eb` (tested implementation; this ledger/report closure is recorded
 by the following commit because a commit cannot contain its own final SHA)
+
+## Milestone 45 detail
+
+**Status:** COMPLETE
+
+**Goal:** Reopen the release-candidate claims against runtime evidence, ensure every
+advertised 8-bit console executes through the isolated adapter, and connect every BIOS
+slot shown by the GUI to the authoritative core instead of retaining inert paths.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_firmware_settings.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/app/main.cpp`
+- `tests/utilities/synthetic_rom.h`
+- `tests/utilities/synthetic_rom.cpp`
+- `tests/core/eight_bit_systems_test.cpp`
+- `tests/core/core_firmware_application_test.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/fixtures/README.md`
+- `docs/BIOS.md`
+- `docs/ARCHITECTURE.md`
+- `docs/TEST_MATRIX.md`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.eight_bit_systems` executes an original generated Z80 program on
+SG-1000, forced Mark III, auto-detected Master System II, and Game Gear hardware and
+asserts semantic work RAM plus native viewport geometry. `core.firmware_application`
+configures generated Genesis, three regional Master System, and Game Gear boot images,
+then proves all paths cross the C host boundary and that each relevant BIOS is activated
+by the core. Existing Sega CD coverage continues to verify all three CD slots.
+
+**Gate evidence:**
+
+- Focused generated-fixture tests pass 2/2.
+- The complete Debug suite passes 69/69 with no new frontend compiler warning.
+- The complete Release suite passes 69/69.
+- Fixture provenance documents the original CC0 Z80 and boot-firmware generators; no
+  generated ROM or firmware binary is stored in the repository.
+
+**Acceptance criteria:** SG-1000, Mark III, Master System, and Game Gear support is
+demonstrated by real instruction execution rather than metadata parsing or extensions.
+Every optional cartridge BIOS chosen in the manager reaches the core and is either
+activated by the appropriate hardware loader or cleanly disabled when cleared.
+
+**Commit SHA:** pending (recorded by the following milestone)

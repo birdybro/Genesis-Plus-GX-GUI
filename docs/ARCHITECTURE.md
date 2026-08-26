@@ -673,9 +673,12 @@ existence, regular-file status, the size shape accepted by the corresponding ups
 loader, bounded readability, and obviously blank repeated-byte content. SHA-256 and
 detected family are identification aids, not a proprietary hash allowlist. This permits
 legitimate revisions and user dumps without claiming authenticity. The manager never
-downloads, modifies, or copies a firmware file. Only structurally valid Sega CD paths
-are projected into a `CoreFirmwareSettings` value and queued to the core-owning thread;
-changing them does not mutate a running machine and takes effect on the next load.
+downloads, modifies, or copies a firmware file. Structurally valid Genesis, regional
+Master System, Game Gear, and Sega CD paths are projected into a
+`CoreFirmwareSettings` value and queued to the core-owning thread. Before the next load,
+the adapter copies every path into the bounded C host interface, validates and mirrors
+the optional Genesis boot image, and enables the core's normal cartridge-firmware handoff.
+Changing firmware does not mutate a running machine and takes effect on the next load.
 
 ## Sega CD session and disc flow
 
@@ -711,6 +714,12 @@ do not change the game identity or reinitialize backup memory. Tests exercise IS
 CUE/BIN mounting, USA/Europe BIOS selection, eject/close, failed swap recovery, a frame,
 both BRAM files, clean worker shutdown, and an opt-in user-firmware smoke path. No
 proprietary fixture is part of the default build or CI.
+
+Generated Z80 fixtures independently load and execute through SG-1000, Mark III,
+Master System II, and Game Gear hardware. Their semantic work-RAM marker and native
+viewport assertions keep support for the 8-bit systems as a runtime regression gate,
+not merely an extension-list claim. Generated non-proprietary cartridge boot images
+also verify that all optional BIOS slots reach and activate in the authoritative core.
 
 ## Read-only game metadata flow
 

@@ -125,12 +125,45 @@ bool copyHostPath(
 void configureFirmware(const CoreFirmwareSettings& settings)
 {
   static_cast<void>(copyHostPath(
+    settings.genesis, MD_BIOS, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.masterSystemUsa, MS_BIOS_US, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.masterSystemEurope, MS_BIOS_EU, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.masterSystemJapan, MS_BIOS_JP, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
+    settings.gameGear, GG_BIOS, GENPLUSGX_HOST_PATH_CAPACITY));
+  static_cast<void>(copyHostPath(
     settings.segaCdUsa, CD_BIOS_US, GENPLUSGX_HOST_PATH_CAPACITY));
   static_cast<void>(copyHostPath(
     settings.segaCdEurope, CD_BIOS_EU, GENPLUSGX_HOST_PATH_CAPACITY));
   static_cast<void>(copyHostPath(
     settings.segaCdJapan, CD_BIOS_JP, GENPLUSGX_HOST_PATH_CAPACITY));
-  system_bios &= static_cast<uint8>(~0x10U);
+
+  system_bios = 0U;
+  std::memset(boot_rom, 0xFF, sizeof(boot_rom));
+  if (!settings.genesis.empty() &&
+      load_archive(MD_BIOS, boot_rom, 0x800, nullptr) == 0x800 &&
+      std::memcmp(boot_rom + 0x120, "GENESIS OS", 10U) == 0) {
+    system_bios |= SYSTEM_MD;
+#ifdef LSB_FIRST
+    for (std::size_t index = 0U; index < 0x800U; index += 2U) {
+      std::swap(boot_rom[index], boot_rom[index + 1U]);
+    }
+#endif
+    for (std::size_t index = 0x800U; index < sizeof(boot_rom); ++index) {
+      boot_rom[index] = boot_rom[index & 0x7FFU];
+    }
+  }
+
+  const bool cartridgeFirmwareConfigured =
+    !settings.genesis.empty() || !settings.masterSystemUsa.empty() ||
+    !settings.masterSystemEurope.empty() ||
+    !settings.masterSystemJapan.empty() || !settings.gameGear.empty();
+  // Bit 0 enables boot firmware. Bit 1 keeps the cartridge mapped so firmware
+  // can hand control to it; this is the normal standalone-emulator workflow.
+  config.bios = cartridgeFirmwareConfigured ? 3U : 0U;
 }
 
 CoreDiscRegion discRegion() noexcept

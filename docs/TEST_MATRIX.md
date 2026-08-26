@@ -24,7 +24,7 @@ ctest --preset debug -L gui --output-on-failure
 | Audio | Mute, volume, output/latency and core audio controls, bounded hot-plug events, selected-device recovery, Apply/Cancel/defaults | `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
 | Controller/input UI | Gameplay/hotkey capture, duplicate and cross-domain conflicts, schema migration/persistence, assignments, stable tabs | `unit.input_profile`, `gui.input_configuration` |
-| BIOS | Missing/valid/invalid generated firmware, browse seam, validation status, persistence failure and Cancel | `gui.main_window` |
+| BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
 | Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state | `gui.main_window` |
 | Game library | Directory add/remove, async scan, search/system filter, favorite, sorting, local art, launch | `gui.game_library` |
 | Game information | Asynchronous request, bounded parsed metadata fields, failure recovery | `gui.main_window` |
@@ -34,6 +34,12 @@ ctest --preset debug -L gui --output-on-failure
 | Appearance/accessibility | System/light/dark themes, Apply/OK/Cancel/defaults, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility` |
 | Diagnostics | Live snapshot refresh, privacy filtering, read-only report, clipboard equality, one-dialog ownership | `gui.diagnostics` |
 | CLI smoke | `--help` and `--version` without constructing a window | `gui.desktop_help`, `gui.desktop_version` |
+
+Core system coverage uses original runtime-generated Z80 programs rather than metadata
+placeholders. `core.eight_bit_systems` loads and executes SG-1000, forced Mark III,
+Master System II, and Game Gear sessions, verifies a semantic work-RAM write, and checks
+256×192 or 160×144 native geometry. Genesis and Sega CD retain their independent
+generated 68000/disc workflow tests.
 
 The GUI layer deliberately avoids platform-native pixel goldens. Presentation geometry
 and emulator pixels are validated independently by deterministic unit/core hashes, while

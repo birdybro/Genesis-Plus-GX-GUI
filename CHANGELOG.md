@@ -31,6 +31,8 @@ platform documentation.
   an explicitly selected playback device disconnects.
 - Generated CC0 fixtures and unit, core, integration, GUI, property, stress, and
   ASan/UBSan coverage through CTest.
+- Runtime-generated Z80 fixtures covering SG-1000, Mark III, Master System, and Game
+  Gear execution, plus generated cartridge-firmware activation tests for every BIOS slot.
 - Reproducible CMake presets, three-platform CI, CPack distributions, checksum gates,
   and guarded tag-driven release automation.
 

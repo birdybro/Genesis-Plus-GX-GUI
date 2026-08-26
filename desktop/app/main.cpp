@@ -82,6 +82,13 @@ genplusgx::CoreFirmwareSettings coreFirmwareSettings(
       ? snapshot.configuration.path(slot) : std::filesystem::path{};
   };
   return {
+    .genesis = validPath(genplusgx::platform::BiosSlot::genesis),
+    .masterSystemUsa = validPath(genplusgx::platform::BiosSlot::masterSystemUsa),
+    .masterSystemEurope = validPath(
+      genplusgx::platform::BiosSlot::masterSystemEurope),
+    .masterSystemJapan = validPath(
+      genplusgx::platform::BiosSlot::masterSystemJapan),
+    .gameGear = validPath(genplusgx::platform::BiosSlot::gameGear),
     .segaCdUsa = validPath(genplusgx::platform::BiosSlot::segaCdUsa),
     .segaCdEurope = validPath(genplusgx::platform::BiosSlot::segaCdEurope),
     .segaCdJapan = validPath(genplusgx::platform::BiosSlot::segaCdJapan),
@@ -98,6 +105,13 @@ genplusgx::CoreFirmwareSettings coreFirmwareSettings(
       : std::filesystem::path{};
   };
   return {
+    .genesis = validPath(genplusgx::platform::BiosSlot::genesis),
+    .masterSystemUsa = validPath(genplusgx::platform::BiosSlot::masterSystemUsa),
+    .masterSystemEurope = validPath(
+      genplusgx::platform::BiosSlot::masterSystemEurope),
+    .masterSystemJapan = validPath(
+      genplusgx::platform::BiosSlot::masterSystemJapan),
+    .gameGear = validPath(genplusgx::platform::BiosSlot::gameGear),
     .segaCdUsa = validPath(genplusgx::platform::BiosSlot::segaCdUsa),
     .segaCdEurope = validPath(genplusgx::platform::BiosSlot::segaCdEurope),
     .segaCdJapan = validPath(genplusgx::platform::BiosSlot::segaCdJapan),

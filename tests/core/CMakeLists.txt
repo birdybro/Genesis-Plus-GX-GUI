@@ -71,6 +71,40 @@ set_tests_properties(
   core.lifecycle PROPERTIES LABELS "core;integration;lifecycle" TIMEOUT 30
 )
 
+add_executable(genplusgx_eight_bit_systems_test eight_bit_systems_test.cpp)
+target_link_libraries(
+  genplusgx_eight_bit_systems_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME core.eight_bit_systems COMMAND genplusgx_eight_bit_systems_test)
+set_tests_properties(
+  core.eight_bit_systems
+  PROPERTIES LABELS "core;integration;fixture;system;sg1000;mark-iii;sms;game-gear"
+)
+
+add_executable(
+  genplusgx_core_firmware_application_test
+  core_firmware_application_test.cpp
+)
+target_link_libraries(
+  genplusgx_core_firmware_application_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(
+  NAME core.firmware_application
+  COMMAND genplusgx_core_firmware_application_test
+)
+set_tests_properties(
+  core.firmware_application
+  PROPERTIES LABELS "core;integration;firmware;bios;fixture"
+)
+
 add_executable(genplusgx_core_backup_memory_test core_backup_memory_test.cpp)
 target_link_libraries(
   genplusgx_core_backup_memory_test
