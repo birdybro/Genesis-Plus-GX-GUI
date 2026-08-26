@@ -69,6 +69,24 @@ jobs:
           ctest --test-dir build/ci-${{ matrix.build_type }}
           --output-on-failure --no-tests=error --timeout 120
 
+      - name: Install and package portable Linux application
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake --install build/ci-Release --prefix "$PWD/build/package-root"
+          cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
+            -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
+          build/package-root/bin/genesis-plus-gx-gui --version
+          cpack --config build/ci-Release/CPackConfig.cmake \
+            -G TGZ -B build/packages
+
+      - name: Upload portable Linux package
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: Genesis-Plus-GX-GUI-linux-x86_64
+          path: build/packages/*
+          if-no-files-found: error
+
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
@@ -200,6 +218,25 @@ jobs:
           -C ${{ matrix.build_type }}
           --output-on-failure --no-tests=error --timeout 120
 
+      - name: Install and package portable Windows application
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake --install build/ci-windows --config Release --prefix build/package-root
+          cmake "-DPACKAGE_ROOT=$pwd/build/package-root" `
+            -DVERIFY_PLATFORM=windows -P cmake/VerifyPackage.cmake
+          & ./build/package-root/bin/genesis-plus-gx-gui.exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cpack --config build/ci-windows/CPackConfig.cmake `
+            -C Release -G ZIP -B build/packages
+
+      - name: Upload portable Windows package
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: Genesis-Plus-GX-GUI-windows-x86_64
+          path: build/packages/*
+          if-no-files-found: error
+
       - name: Upload failure diagnostics
         if: failure()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
@@ -261,6 +298,28 @@ jobs:
         run: >-
           ctest --test-dir build/ci-${{ matrix.build_type }}
           --output-on-failure --no-tests=error --timeout 120
+
+      - name: Install and package native macOS application
+        if: matrix.build_type == 'Release'
+        run: |
+          cmake --install build/ci-Release --prefix "$PWD/build/package-root"
+          cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
+            -DVERIFY_PLATFORM=macos -P cmake/VerifyPackage.cmake
+          build/package-root/genesis-plus-gx-gui.app/Contents/MacOS/genesis-plus-gx-gui \
+            --version
+          cpack --config build/ci-Release/CPackConfig.cmake \
+            -G ZIP -B build/packages
+          cpack --config build/ci-Release/CPackConfig.cmake \
+            -G DragNDrop -B build/packages
+
+      - name: Upload native macOS packages
+        if: matrix.build_type == 'Release'
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: >-
+            Genesis-Plus-GX-GUI-macos-${{ matrix.host.architecture }}
+          path: build/packages/*
+          if-no-files-found: error
 
       - name: Upload failure diagnostics
         if: failure()

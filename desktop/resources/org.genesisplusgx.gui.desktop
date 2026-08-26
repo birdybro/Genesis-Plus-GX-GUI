@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Genesis Plus GX GUI
+GenericName=Sega Emulator
+Comment=Play supported Sega systems with the Genesis Plus GX core
+Exec=genesis-plus-gx-gui %f
+Icon=org.genesisplusgx.gui
+Terminal=false
+Categories=Game;Emulator;
+StartupNotify=true

@@ -1,0 +1,53 @@
+cmake_minimum_required(VERSION 3.25)
+
+set(prefix "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
+set(binary "${prefix}/@CMAKE_INSTALL_BINDIR@/genesis-plus-gx-gui")
+set(library_directory "${prefix}/@CMAKE_INSTALL_LIBDIR@")
+set(plugin_directory "${library_directory}/qt6/plugins")
+
+if(NOT EXISTS "${binary}")
+  message(FATAL_ERROR "Installed Linux executable is missing: ${binary}")
+endif()
+
+file(GLOB_RECURSE plugin_modules LIST_DIRECTORIES FALSE
+  "${plugin_directory}/*.so")
+if(NOT plugin_modules)
+  message(FATAL_ERROR "No selected Qt plugins were installed")
+endif()
+
+file(GET_RUNTIME_DEPENDENCIES
+  EXECUTABLES "${binary}"
+  MODULES ${plugin_modules}
+  RESOLVED_DEPENDENCIES_VAR resolved_dependencies
+  UNRESOLVED_DEPENDENCIES_VAR unresolved_dependencies
+  PRE_EXCLUDE_REGEXES
+    "^ld-linux.*"
+    "^libc\\.so.*"
+    "^libdl\\.so.*"
+    "^libgcc_s\\.so.*"
+    "^libm\\.so.*"
+    "^libpthread\\.so.*"
+    "^librt\\.so.*"
+    "^libstdc\\+\\+\\.so.*"
+    "^linux-vdso.*"
+)
+
+if(unresolved_dependencies)
+  list(JOIN unresolved_dependencies ", " unresolved_text)
+  message(FATAL_ERROR "Unresolved Linux package dependencies: ${unresolved_text}")
+endif()
+
+foreach(dependency IN LISTS resolved_dependencies)
+  get_filename_component(dependency_name "${dependency}" NAME)
+  if(dependency_name MATCHES "^libQt6.*\\.so" OR
+     dependency_name MATCHES "^libSDL3.*\\.so")
+    file(INSTALL "${dependency}"
+      DESTINATION "${library_directory}"
+      FOLLOW_SYMLINK_CHAIN)
+  endif()
+endforeach()
+
+file(WRITE "${prefix}/@CMAKE_INSTALL_BINDIR@/qt.conf"
+  "[Paths]\nPrefix=..\nLibraries=@CMAKE_INSTALL_LIBDIR@\nPlugins=@CMAKE_INSTALL_LIBDIR@/qt6/plugins\n")
+
+message(STATUS "Deployed selected Qt and SDL runtimes for the Linux package")

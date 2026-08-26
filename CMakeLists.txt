@@ -101,6 +101,7 @@ add_subdirectory(desktop/library)
 if(GENPLUSGX_BUILD_DESKTOP)
   add_subdirectory(desktop/ui)
   add_subdirectory(desktop/app)
+  include(Packaging)
 endif()
 
 if(BUILD_TESTING)

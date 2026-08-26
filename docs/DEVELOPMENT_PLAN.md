@@ -52,7 +52,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
-| 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
+| 41 Packaging | IN PROGRESS | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
@@ -2420,3 +2420,63 @@ build the full `.app` target and every test, execute Debug and Release headlessl
 retain bounded failure diagnostics without proprietary fixtures or signing credentials.
 
 **Commit SHA:** `dad6c48`
+
+## Milestone 41 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Produce self-contained, versioned Windows x64 ZIP, Linux x86-64 tarball, and
+native macOS arm64/x86-64 ZIP and DMG artifacts from one CMake install graph, with a
+SHA-256 checksum and executable smoke gate before upload.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `CMakePresets.json`
+- `cmake/LinuxDeploy.cmake.in`
+- `cmake/Packaging.cmake`
+- `cmake/VerifyPackage.cmake`
+- `desktop/app/CMakeLists.txt`
+- `desktop/resources/org.genesisplusgx.gui.desktop`
+- `desktop/resources/org.genesisplusgx.gui.svg`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/package_metadata_test.cmake.in`
+- `.github/workflows/ci.yml`
+- `docs/PACKAGING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `infrastructure.package_metadata` verifies that platform/architecture
+normalization produces the required versioned basename, CPack configuration exists, and
+desktop integration resources are present. Every Release artifact job stages an install,
+uses `cmake/VerifyPackage.cmake` to require the application, Qt Core, SDL3, and native Qt
+platform plugin, runs `--version` from that staged application, then invokes CPack.
+
+**Gate evidence:**
+
+- CMake recognizes the cross-platform `release` package preset and generated CPack
+  configuration; actionlint 1.7.7 reports no workflow findings.
+- The first local generic Qt install deliberately failed because the host Qt package
+  advertised unrelated KDE plugins with immutable RPATH layouts. Linux deployment was
+  narrowed to the application's resolved Qt/SDL libraries plus xcb, offscreen, SQLite,
+  JPEG, GIF, and ICO plugins. The resulting staged tree is 41 MiB instead of copying the
+  host's entire plugin and multimedia graph.
+- The Linux staged layout passed dependency verification and ran `--help` and `--version`
+  through its private Qt/SDL libraries and offscreen plugin.
+- CPack produced
+  `Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` and its SHA-256 file. The checksum
+  verified, the archive extracted into a fresh temporary directory, and its executable
+  reported version 0.1.0.
+- Complete local Debug, Release, and ASan/UBSan suites pass (62/62 each), including the
+  new package metadata test. The inherited libretro target still builds and cleans with
+  only its two documented qualifier warnings.
+- Hosted Windows/macOS package construction and artifact upload remain pending this
+  workflow-bearing commit.
+
+**Acceptance criteria:** Packages derive the application/package version from the root
+CMake project, carry a platform and normalized architecture in every filename, and
+contain no ROM, BIOS, save, state, artwork, or secret material. CI refuses to upload an
+artifact with a missing runtime or failed executable smoke check. Windows is portable,
+Linux is relocatable against the CI distribution's base system, and each macOS host
+produces an unsigned native `.app` in both ZIP and DMG forms.
+
+**Commit SHA:** recorded by milestone 42

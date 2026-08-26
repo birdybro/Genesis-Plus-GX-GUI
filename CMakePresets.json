@@ -116,5 +116,16 @@
         "QT_QPA_PLATFORM": "offscreen"
       }
     }
+  ],
+  "packagePresets": [
+    {
+      "name": "release",
+      "displayName": "Release packages",
+      "configurePreset": "release",
+      "configurations": [
+        "Release"
+      ],
+      "packageDirectory": "${sourceDir}/build/packages"
+    }
   ]
 }

@@ -48,8 +48,61 @@ set_target_properties(
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 
+if(UNIX AND NOT APPLE)
+  set_target_properties(
+    genplusgx_desktop
+    PROPERTIES INSTALL_RPATH "$ORIGIN/../${CMAKE_INSTALL_LIBDIR}"
+  )
+  target_link_options(genplusgx_desktop PRIVATE "LINKER:--disable-new-dtags")
+endif()
+
 install(
   TARGETS genplusgx_desktop
   BUNDLE DESTINATION .
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
+
+if(UNIX AND NOT APPLE)
+  set(genplusgx_linux_plugins
+    Qt6::QXcbIntegrationPlugin
+    Qt6::QOffscreenIntegrationPlugin
+    Qt6::QSQLiteDriverPlugin
+  )
+  foreach(optional_plugin IN ITEMS
+      Qt6::QGifPlugin
+      Qt6::QICOPlugin
+      Qt6::QJpegPlugin)
+    if(TARGET "${optional_plugin}")
+      list(APPEND genplusgx_linux_plugins "${optional_plugin}")
+    endif()
+  endforeach()
+
+  foreach(plugin IN LISTS genplusgx_linux_plugins)
+    if(NOT TARGET "${plugin}")
+      message(FATAL_ERROR "Required Linux Qt plugin target is missing: ${plugin}")
+    endif()
+    get_target_property(plugin_type "${plugin}" QT_PLUGIN_TYPE)
+    if(NOT plugin_type)
+      message(FATAL_ERROR "Qt plugin target has no plugin type: ${plugin}")
+    endif()
+    install(
+      FILES "$<TARGET_FILE:${plugin}>"
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}/qt6/plugins/${plugin_type}"
+    )
+  endforeach()
+
+  configure_file(
+    "${PROJECT_SOURCE_DIR}/cmake/LinuxDeploy.cmake.in"
+    "${CMAKE_CURRENT_BINARY_DIR}/LinuxDeploy.cmake"
+    @ONLY
+  )
+  install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/LinuxDeploy.cmake")
+else()
+  qt_generate_deploy_app_script(
+    TARGET genplusgx_desktop
+    OUTPUT_SCRIPT genplusgx_deploy_script
+    NO_TRANSLATIONS
+    NO_UNSUPPORTED_PLATFORM_ERROR
+  )
+  install(SCRIPT "${genplusgx_deploy_script}")
+endif()

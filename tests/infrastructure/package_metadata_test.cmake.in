@@ -1,0 +1,29 @@
+set(package_basename "@GENPLUSGX_PACKAGE_BASENAME@")
+set(package_platform "@GENPLUSGX_PACKAGE_PLATFORM@")
+set(package_architecture "@GENPLUSGX_PACKAGE_ARCHITECTURE@")
+set(package_version "@PROJECT_VERSION@")
+
+foreach(required IN ITEMS
+    package_basename
+    package_platform
+    package_architecture
+    package_version)
+  if("${${required}}" STREQUAL "")
+    message(FATAL_ERROR "Configured ${required} is empty")
+  endif()
+endforeach()
+
+set(expected
+  "Genesis-Plus-GX-GUI-${package_version}-${package_platform}-${package_architecture}")
+if(NOT package_basename STREQUAL expected)
+  message(FATAL_ERROR
+    "Package basename '${package_basename}' does not match '${expected}'")
+endif()
+
+if(NOT EXISTS "@CMAKE_BINARY_DIR@/CPackConfig.cmake")
+  message(FATAL_ERROR "CPack configuration was not generated")
+endif()
+if(NOT EXISTS "@PROJECT_SOURCE_DIR@/desktop/resources/org.genesisplusgx.gui.desktop" OR
+   NOT EXISTS "@PROJECT_SOURCE_DIR@/desktop/resources/org.genesisplusgx.gui.svg")
+  message(FATAL_ERROR "Linux desktop integration resources are missing")
+endif()
