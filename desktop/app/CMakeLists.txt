@@ -105,11 +105,60 @@ if(UNIX AND NOT APPLE)
   )
   install(SCRIPT "${CMAKE_CURRENT_BINARY_DIR}/LinuxDeploy.cmake")
 else()
-  qt_generate_deploy_app_script(
-    TARGET genplusgx_desktop
-    OUTPUT_SCRIPT genplusgx_deploy_script
-    NO_TRANSLATIONS
-    NO_UNSUPPORTED_PLATFORM_ERROR
-  )
+  if(TARGET SDL3::SDL3-shared)
+    if(APPLE)
+      install(
+        FILES "$<TARGET_FILE:SDL3::SDL3-shared>"
+        DESTINATION "genesis-plus-gx-gui.app/Contents/Frameworks"
+      )
+    elseif(WIN32)
+      install(
+        FILES "$<TARGET_FILE:SDL3::SDL3-shared>"
+        DESTINATION "${CMAKE_INSTALL_BINDIR}"
+      )
+    endif()
+  endif()
+
+  if(APPLE)
+    set(genplusgx_macos_plugins
+      Qt6::QCocoaIntegrationPlugin
+      Qt6::QSQLiteDriverPlugin
+    )
+    foreach(optional_plugin IN ITEMS
+        Qt6::QGifPlugin
+        Qt6::QICOPlugin
+        Qt6::QJpegPlugin)
+      if(TARGET "${optional_plugin}")
+        list(APPEND genplusgx_macos_plugins "${optional_plugin}")
+      endif()
+    endforeach()
+    foreach(plugin IN LISTS genplusgx_macos_plugins)
+      if(NOT TARGET "${plugin}")
+        message(FATAL_ERROR "Required macOS Qt plugin target is missing: ${plugin}")
+      endif()
+      get_target_property(plugin_type "${plugin}" QT_PLUGIN_TYPE)
+      if(NOT plugin_type)
+        message(FATAL_ERROR "Qt plugin target has no plugin type: ${plugin}")
+      endif()
+      install(
+        FILES "$<TARGET_FILE:${plugin}>"
+        DESTINATION "genesis-plus-gx-gui.app/Contents/PlugIns/${plugin_type}"
+      )
+    endforeach()
+    qt_generate_deploy_app_script(
+      TARGET genplusgx_desktop
+      OUTPUT_SCRIPT genplusgx_deploy_script
+      NO_PLUGINS
+      NO_TRANSLATIONS
+      NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+  else()
+    qt_generate_deploy_app_script(
+      TARGET genplusgx_desktop
+      OUTPUT_SCRIPT genplusgx_deploy_script
+      NO_TRANSLATIONS
+      NO_UNSUPPORTED_PLATFORM_ERROR
+    )
+  endif()
   install(SCRIPT "${genplusgx_deploy_script}")
 endif()

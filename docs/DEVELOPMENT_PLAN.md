@@ -2482,7 +2482,13 @@ platform plugin, runs `--version` from that staged application, then invokes CPa
   deployment script now records both imported-package library roots, Windows stages to
   an absolute path, and the macOS gate checks the canonical QtCore framework path
   directly. Local staged Linux and synthetic macOS layout probes pass those corrected
-  checks; a corrective hosted run remains pending.
+  checks. Corrective run `32915449819` confirmed the Linux package and upload end to end,
+  and confirmed both macOS architectures and Windows reach deployment after all tests;
+  those three jobs then consistently reported SDL3 as the only missing runtime. SDL3 is
+  now an explicit Windows/macOS install dependency rather than relying on Qt's deploy
+  tools to discover a non-Qt library. The macOS install also selects only Cocoa, SQLite,
+  and supported image plugins, avoiding unrelated database drivers with absent vendor
+  libraries. A final corrective hosted run remains pending.
 
 **Acceptance criteria:** Packages derive the application/package version from the root
 CMake project, carry a platform and normalized architecture in every filename, and
