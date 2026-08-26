@@ -743,8 +743,12 @@ Change Disc / Eject --> typed command --> cdd mount/tray state --> result event 
 
 Disc UI is enabled only when a loaded event identifies `SYSTEM_MCD`. Change requests
 preflight the build's `.bin`, `.cue`, `.iso`, and conditional `.chd` set, then the core
-mounts the complete image on its owner thread. Mount failure leaves the existing CD
-session alive, the tray open, audio output cleared, and no stale disc path exposed.
+mounts the complete image on its owner thread. CUE preflight uses a 1 MiB file bound,
+the inherited parser's 127-byte line bound, sequential track/index validation, and
+canonical directory containment for every referenced file. Absolute, traversal,
+missing, empty, directory, and symlink-escaping references never cross the core boundary.
+A preflight failure preserves the mounted disc. A later core mount failure leaves the
+existing CD session alive, the tray open, audio output cleared, and no stale disc path.
 Closing the tray resumes the mounted image through the same status transition used by
 the upstream libretro frontend. CUE/BIN, CDDA, and CHD decoding remain upstream core
 responsibilities; the frontend adds no alternate sector or audio algorithms.
@@ -752,9 +756,10 @@ responsibilities; the frontend adds no alternate sector or audio algorithms.
 Internal 8 KiB BRAM and the 512 KiB RAM cartridge are discovered immediately after CD
 initialization and use the normal per-content atomic persistence lifecycle. Disc swaps
 do not change the game identity or reinitialize backup memory. Tests exercise ISO and
-CUE/BIN mounting, USA/Europe BIOS selection, eject/close, failed swap recovery, a frame,
-both BRAM files, clean worker shutdown, and an opt-in user-firmware smoke path. No
-proprietary fixture is part of the default build or CI.
+CUE/BIN mounting, unsafe preflight without active-disc mutation, USA/Europe BIOS
+selection, eject/close, failed swap recovery, a frame, both BRAM files, clean worker
+shutdown, and an opt-in user-firmware smoke path. No proprietary fixture is part of the
+default build or CI.
 
 Generated Z80 fixtures independently load and execute through SG-1000, Mark III,
 Master System II, and Game Gear hardware. Their semantic work-RAM marker and native

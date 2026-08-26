@@ -117,6 +117,14 @@ USA and Europe variants and a CUE sheet that references a generated local BIN fi
 There is no game program, Sega security program, sampled audio, artwork, or third-party
 data. Real-BIOS testing is excluded by default and never creates or fetches firmware.
 
+`unit.game_file` creates all CUE sheets and referenced files inside temporary directories.
+Its original text cases cover valid multi-file data/audio layouts, malformed quoting,
+track/index ordering, invalid time fields, overlong lines/files, binary controls,
+absolute and slash/backslash traversal, missing/empty/directory targets, and a symlink
+that resolves outside the CUE directory where the host permits symlink creation. A
+fixed-seed 2,000-input bounded byte corpus exercises the pure parser. No fuzz input or
+temporary disc material is retained or promoted to a golden file.
+
 ## Generated metadata/property fixtures
 
 `unit.game_metadata` derives cartridge, SMD, Master System, Game Gear, SG-1000, Sega CD,

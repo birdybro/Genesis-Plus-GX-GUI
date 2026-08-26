@@ -63,7 +63,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | `14cb507` |
 | 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | `b62a1c7` |
 | 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | `63b5a46` |
-| 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | pending |
+| 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | `bcda084` |
+| 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | pending |
 
 ## Execution policy
 
@@ -1070,6 +1071,7 @@ and support conventional help, version, and fullscreen command-line behavior.
 - `desktop/ui/src/main_window.cpp`
 - `tests/unit/CMakeLists.txt`
 - `tests/unit/game_file_test.cpp`
+- `tests/unit/game_metadata_test.cpp`
 - `tests/unit/command_line_test.cpp`
 - `tests/gui/CMakeLists.txt`
 - `tests/gui/game_loading_test.cpp`
@@ -3117,5 +3119,53 @@ are collected with subsystem context. Empty/duplicate noise is removed and long 
 are bounded. OpenGL initialization fallback, unrecoverable audio hot-unplug, and fatal
 emulation-worker startup each reach a visible error path. Structured logs remain the
 detailed source, and the app continues whenever its emulation worker is viable.
+
+**Commit SHA:** `bcda084`
+
+## Milestone 53 detail
+
+**Status:** COMPLETE
+
+**Goal:** Put deterministic, cross-platform CUE safety checks at every desktop route
+that can send a disc path into the inherited Genesis Plus GX C parser.
+
+**Files changed:**
+
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/include/genplusgx/game_file.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/game_file.cpp`
+- `tests/core/sega_cd_workflow_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/game_file_test.cpp`
+- `tests/fixtures/README.md`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/TEST_MATRIX.md`
+
+**Tests added:** `unit.game_file` now covers a legal multi-file CUE, malformed quotes
+and directives, non-sequential or inconsistent data/audio tracks, missing indexes,
+invalid times, binary controls, the core's line bound, the frontend file-size bound,
+slash and backslash traversal, POSIX/Windows absolute paths, missing/empty/directory
+tracks, canonical symlink escape where supported, and 2,000 fixed-seed bounded arbitrary
+inputs. `core.sega_cd_workflow` proves direct `loadGame` and `changeDisc` calls reject an
+unsafe sheet without unloading or replacing the already mounted legal CUE/BIN disc. The
+metadata fixture now uses the same complete sequential indexes required of a loadable
+two-track sheet.
+
+**Gate evidence:**
+
+- Focused CUE parser and direct Sega CD adapter tests pass 2/2.
+- The complete Debug suite passes 73/73 with no new frontend warning.
+- The complete Release suite passes 73/73.
+- The complete ASan/UBSan suite passes 73/73 with no finding.
+
+**Acceptance criteria:** The parser reads at most 1 MiB, rejects logical lines beyond
+the inherited 127-byte buffer, requires a data track followed only by supported audio
+tracks with sequential indexes, and returns typed errors. Each relative FILE reference
+must canonically remain in the CUE directory and identify a readable non-empty regular
+file within the core's path limit. Both initial load and disc swap invoke this validation
+before changing core state; upstream sector/CDDA decoding remains untouched.
 
 **Commit SHA:** pending (recorded by the following milestone)

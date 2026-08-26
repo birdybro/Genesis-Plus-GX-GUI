@@ -334,13 +334,6 @@ bool requiresDiscImage(const std::filesystem::path& path)
   return extension == ".cue" || extension == ".iso" || extension == ".chd";
 }
 
-bool supportsDiscChange(const std::filesystem::path& path)
-{
-  const auto extension = lowercaseExtension(path);
-  return extension == ".bin" || extension == ".cue" ||
-         extension == ".iso" || extension == ".chd";
-}
-
 std::span<std::uint8_t> backupMemory(BackupMemoryKind kind)
 {
   switch (kind) {
@@ -492,15 +485,12 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
     return owner;
   }
 
-  std::error_code pathError;
-  if (path.empty() || !std::filesystem::is_regular_file(path, pathError) || pathError) {
-    return failure(CoreError::invalidPath, "The game path does not identify a readable regular file.");
+  if (const auto status = validateGameFile(path); !status) {
+    return failure(requiresDiscImage(path) ? CoreError::invalidDiscImage
+                                          : CoreError::invalidPath,
+      status.message);
   }
-
   const std::string nativePath = path.string();
-  if (nativePath.size() < 3U || nativePath.size() > maximumCorePathBytes) {
-    return failure(CoreError::invalidPath, "The game path cannot be represented safely by the core file interface.");
-  }
 
   if (state_ == CoreLifecycleState::loaded) {
     unloadUnchecked();
@@ -1028,17 +1018,10 @@ CoreResult CoreAdapter::changeDisc(const std::filesystem::path& path)
     return failure(CoreError::notSegaCd,
       "Disc operations require an active Sega CD / Mega CD session.");
   }
-  std::error_code pathError;
-  if (path.empty() || !supportsDiscChange(path) ||
-      !std::filesystem::is_regular_file(path, pathError) || pathError) {
-    return failure(CoreError::invalidDiscImage,
-      "The replacement disc path is missing, unreadable, or unsupported.");
+  if (const auto status = validateDiscImageFile(path); !status) {
+    return failure(CoreError::invalidDiscImage, status.message);
   }
   const auto nativePath = path.string();
-  if (nativePath.size() < 3U || nativePath.size() > maximumCorePathBytes) {
-    return failure(CoreError::invalidPath,
-      "The replacement disc path cannot be represented safely by the core file interface.");
-  }
 
   cdd.status = CD_OPEN;
   scd.regs[0x36U >> 1U].byte.h = 0x01U;

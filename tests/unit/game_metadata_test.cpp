@@ -188,7 +188,9 @@ int main()
   constexpr std::string_view cue{
     "FILE \"track01.bin\" BINARY\n"
     "  TRACK 01 MODE1/2048\n"
-    "  TRACK 02 AUDIO\n"};
+    "    INDEX 01 00:00:00\n"
+    "  TRACK 02 AUDIO\n"
+    "    INDEX 01 00:02:00\n"};
   if (!check(writeBytes(discPath, discBytes) && writeText(cuePath, cue),
       "CUE/BIN fixtures could not be written")) {
     return 10;

@@ -61,5 +61,8 @@ platform documentation.
 
 - Bounded metadata/file parsers, validated CUE paths, atomic writes, wrong-game state
   rejection, privacy-filtered diagnostics, and deterministic malformed-input corpora.
+- CUE sheets are now size/line bounded and structurally preflighted at both game-load
+  and disc-swap boundaries; absolute, traversal, missing, empty, and symlink-escaping
+  track references are rejected before the inherited core parser opens them.
 
 [Unreleased]: https://github.com/birdybro/Genesis-Plus-GX-GUI/commits/master

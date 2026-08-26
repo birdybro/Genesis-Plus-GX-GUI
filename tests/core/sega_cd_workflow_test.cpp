@@ -188,10 +188,37 @@ int main()
       !check(adapter.changeDisc(cuePath) && adapter.discInfo(disc) &&
         disc.discPresent && !disc.trayOpen && disc.trackCount >= 1U &&
         disc.path == cuePath,
-        "valid CUE/BIN replacement disc did not mount") ||
+        "valid CUE/BIN replacement disc did not mount")) {
+    return 11;
+  }
+
+  const auto unsafeCuePath = cueRoot / "unsafe.cue";
+  const std::string unsafeCueText =
+    "FILE \"../fixture.bin\" BINARY\n"
+    "  TRACK 01 MODE1/2048\n"
+    "    INDEX 01 00:00:00\n";
+  if (!check(writeBytes(unsafeCuePath, std::span<const std::uint8_t>{
+        reinterpret_cast<const std::uint8_t*>(unsafeCueText.data()),
+        unsafeCueText.size()}), "unsafe CUE fixture write failed")) {
+    return 12;
+  }
+  const auto rejectedCueSwap = adapter.changeDisc(unsafeCuePath);
+  if (!check(!rejectedCueSwap &&
+        rejectedCueSwap.error == genplusgx::CoreError::invalidDiscImage &&
+        adapter.discInfo(disc) && disc.discPresent && !disc.trayOpen &&
+        disc.path == cuePath,
+      "unsafe CUE replacement reached or disturbed the mounted core disc")) {
+    return 13;
+  }
+  const auto rejectedCueLoad = adapter.loadGame(unsafeCuePath);
+  if (!check(!rejectedCueLoad &&
+        rejectedCueLoad.error == genplusgx::CoreError::invalidDiscImage &&
+        adapter.state() == genplusgx::CoreLifecycleState::loaded &&
+        adapter.discInfo(disc) && disc.path == cuePath,
+      "unsafe CUE game loading bypassed preflight or unloaded the active game") ||
       !check(adapter.unloadGame() && adapter.shutdown(),
         "direct Sega CD session did not shut down cleanly")) {
-    return 11;
+    return 14;
   }
 
   QTemporaryDir persistenceDirectory;

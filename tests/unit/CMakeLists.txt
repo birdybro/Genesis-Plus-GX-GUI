@@ -52,7 +52,10 @@ target_link_libraries(
     genplusgx_test_utilities
 )
 add_test(NAME unit.game_file COMMAND genplusgx_game_file_test)
-set_tests_properties(unit.game_file PROPERTIES LABELS "unit;filesystem;loading")
+set_tests_properties(
+  unit.game_file
+  PROPERTIES LABELS "unit;filesystem;loading;disc;parser;fuzz;security" TIMEOUT 30
+)
 
 add_executable(genplusgx_game_metadata_test game_metadata_test.cpp)
 target_link_libraries(

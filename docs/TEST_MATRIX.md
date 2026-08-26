@@ -26,7 +26,7 @@ ctest --preset debug -L gui --output-on-failure
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
 | Controller/input UI | Gameplay/hotkey capture, separate fast-forward hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
 | BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
-| Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state | `gui.main_window` |
+| Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state, bounded CUE syntax/reference preflight without mounted-disc mutation | `unit.game_file`, `core.sega_cd_workflow`, `gui.main_window` |
 | Game library | Directory add/remove, async scan, search/system filter, favorite, sorting, local art, launch | `gui.game_library` |
 | Game information | Asynchronous request, bounded parsed metadata fields, failure recovery | `gui.main_window` |
 | Screenshots | Native frame capture request, busy/error/success states, directory chooser and settings | `gui.main_window` |
@@ -49,7 +49,8 @@ GUI tests assert semantics and state transitions across platforms.
 ## Supporting layers
 
 CTest labels allow focused gates: `unit`, `core`, `integration`, `gui`, `persistence`,
-`filesystem`, `timing`, `audio`, `input`, `database`, `fuzz`, and `smoke`. A milestone
+`filesystem`, `security`, `parser`, `timing`, `audio`, `input`, `database`, `fuzz`, and
+`smoke`. A milestone
 gate always runs its focused tests and the complete applicable suite. ASan/UBSan runs use
 the same deterministic corpus; optional user-supplied Sega CD BIOS tests remain outside
 CI and are never counted as required.
