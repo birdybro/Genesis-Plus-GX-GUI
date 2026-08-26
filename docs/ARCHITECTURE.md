@@ -939,19 +939,25 @@ cross-file transaction format in the settings center.
 
 Shutdown is an explicit, idempotent workflow:
 
-1. stop the GUI event pump, detach input callbacks, and disable new commands;
-2. stop controller input and close its SDL handles;
-3. wake the emulation worker, stop frame execution, and atomically flush available
-   SRAM/BRAM on the core-owning thread;
-4. shut down the core, release the active persistence identity, publish final status,
-   and join the emulation thread even when a save failed;
-5. join independent metadata/library workers and discard their queued UI results;
-6. stop and close the SDL3 audio stream/device;
-7. release OpenGL resources while their context is current;
-8. persist remaining frontend settings/library state and destroy the GUI.
+1. stop the GUI event pump, disconnect window/input producers and renderer sinks, and
+   disable new commands;
+2. wake the emulation worker, stop frame execution, atomically flush available
+   SRAM/BRAM on the core-owning thread, shut down the core, and join the worker even
+   when a save failed;
+3. stop and close the SDL3 audio stream/device;
+4. stop controller input and close its SDL handles on the GUI/owner thread;
+5. stop and join the state, metadata, screenshot, and library-scanner workers, clearing
+   any pending UI operation rather than leaving it busy;
+6. release the bounded display frame exchange after its producer has joined;
+7. aggregate every cleanup failure without replacing a prior nonzero application exit,
+   emit the final structured log, and shut down logging;
+8. return the aggregate process status while Qt destroys the window and graphics
+   resources.
 
 Each stage has tests for no-game, running, paused, audio-disabled, dirty-save, and
-fullscreen variants. No detached thread is permitted.
+fullscreen variants. `ShutdownReport` normalizes cleanup errors and upgrades an
+otherwise successful exit if final persistence or service teardown failed. No detached
+thread is permitted.
 
 ## Upstream maintenance boundary
 

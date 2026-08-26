@@ -5,60 +5,62 @@ performed on 2026-08-25 (America/Denver).
 
 ## Candidate identity
 
-- Tested implementation commit: `d84f7eb575e36f4bb6dd5c270c40b351dbd7b047`
+- Tested implementation commit: `55135e039876dbaf992b60393f7d74723239ebd0`
 - Branch: `master`
 - Application/package version: `0.1.0`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
   Qt 6.11.1, and SDL 3.4.14
 - Final report/ledger closure: the commit containing this file; use
-  `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without a circular SHA
-  embedded in that commit
+  `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
+  SHA in that commit
 
-No golden reference was changed during final verification. The final adversarial pass
-found fixed emulator shortcuts and incomplete selected-audio-device recovery as two
-substantive acceptance gaps. The candidate adds schema-migrated configurable hotkeys,
-cross-domain conflict checks, live action updates, bounded audio hot-plug polling, and
-automatic fallback to the default output after an explicitly selected device is
-removed.
+No golden reference changed during final verification. The final hardening pass closed
+the remaining post-load failures that could previously be confined to logs: runtime
+worker, audio, state, metadata, scanner, and library-history failures now reach bounded
+user-visible paths. Final save or service cleanup failure is aggregated and cannot
+silently return a successful process status.
 
 ## Build configurations tested
 
-Every local configuration was cleaned before reconfiguration and compilation. Newly
-authored frontend code produced no compiler warnings.
+Every local configuration was rebuilt with `--clean-first`. Newly authored frontend
+code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 67/67 | Passed |
-| Release | Optimized native x86-64 | 67/67 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 67/67 | Passed; no sanitizer findings |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 74/74 | Passed |
+| Release | Optimized native x86-64 | 74/74 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 74/74 | Passed; no finding |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; two inherited `const`-qualifier warnings only |
 
-The sanitizer suite includes generated cartridge/disc/firmware inputs, core adapter and
-save-state paths, bounded parser/property corpora, worker lifecycle, GUI workflows, and
+All three CMake suites include legal generated cartridge, disc, and firmware inputs;
+core lifecycle, adapter, persistence, and save-state paths; bounded parser/property
+corpora; worker lifecycle; semantic GUI workflows; actual-process startup/shutdown; and
 the accelerated 20,000-frame stability test. No suppression was added for project code.
 
 ## Test totals
 
-CTest registers 67 distinct tests:
+CTest registers 74 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 7 |
-| Core | 15 |
+| Core | 18 |
 | Integration | 1 |
-| Unit | 29 |
-| GUI/smoke | 15 |
-| **Total** | **67** |
+| Unit | 30 |
+| GUI/smoke | 18 |
+| **Total** | **74** |
 
-Tests carry overlapping cross-cutting labels because a core or GUI workflow can also be
-an integration or unit-level gate. Label counts are 45 `unit`, 16 `core`, 23
-`integration`, and 15 `gui`. Other focused coverage includes persistence (24), fixtures
-(19), concurrency (13), settings (10), input (8), video (6), audio (5), timing (4),
-release (4), fuzz/property (2), and packaging (2).
+Tests carry overlapping labels because end-to-end workflows intentionally cross
+layers. Label counts are 47 `unit`, 19 `core`, 28 `integration`, and 18 `gui`. Focused
+coverage also includes persistence (24), fixtures (22), concurrency (13), settings
+(12), input (9), video (6), audio (5), timing (4), release (4), fuzz/property (3), and
+packaging (2).
 
 ## Operating-system CI matrix
 
-The candidate is exercised by Continuous Integration run `32922820386`:
+Continuous Integration run
+[`32932307724`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32932307724)
+completed successfully against the exact tested implementation SHA:
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -73,83 +75,84 @@ The candidate is exercised by Continuous Integration run `32922820386`:
 | macOS Intel x86-64 | Debug | Passed |
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
-Run `32922820386` completed with all ten jobs successful against the exact candidate
-SHA. Each hosted Debug/Release job ran the complete 67-test suite; package jobs also
-staged and verified native runtimes before uploading artifacts.
-
-The previously completed native packaging run `32918267812` and non-publishing release
-rehearsal `32919521105` independently passed all supported hosts. The rehearsal assembled
-and reverified every platform checksum, uploaded a release-candidate artifact, skipped
-the publication step, and created neither a tag nor a GitHub release.
+Each hosted Debug/Release job ran all 74 registered tests. Package jobs staged and
+verified native runtimes before uploading artifacts. The completed native packaging
+run `32918267812` and non-publishing release rehearsal `32919521105` independently
+passed all supported hosts; the rehearsal assembled and reverified checksums but
+created neither a tag nor a GitHub release.
 
 ## Packaging results
 
-The local Release install was staged in a new temporary root and passed runtime
-verification plus an installed `--version` smoke test. The installed tree contained 43
-files before the final report was added and no cartridge, disc, BIOS, SRAM, BRAM, or
-state-file extensions. That pre-report CPack pass produced:
+The local Release install was staged without a deployment warning in a fresh temporary
+root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
+`--version` process smoke. The tree contains 44 files and no cartridge, disc, firmware,
+SRAM, BRAM, or state payload. CPack produces the versioned
+`Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
+closure archive's digest is intentionally not embedded in this packaged report because
+doing so would recursively change the archive.
 
-- `Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` — 17,050,452 bytes
-- SHA-256: `7e3b742f7da027d91b36c7591124ff4320ef81259dc16566e3218c6eacb48622`
-
-A second install/package/checksum pass includes this report and is the milestone-closure
-artifact. Its generated neighboring checksum is deliberately not embedded here because
-changing this packaged report would recursively change that archive digest.
-
-Hosted packaging produces the versioned Windows x86-64 portable ZIP, Linux x86-64 TGZ,
-macOS arm64 ZIP and unsigned DMG, and macOS x86-64 ZIP and unsigned DMG. Runtime
-verification requires the executable, Qt platform/runtime libraries, SDL3, and relevant
-native plugins before any artifact can upload. Release publication remains guarded by
-an authorized matching `v0.1.0` tag and was not performed.
+Hosted packaging produces a Windows x86-64 portable ZIP, Linux x86-64 TGZ, macOS arm64
+ZIP and unsigned DMG, and macOS x86-64 ZIP and unsigned DMG. Runtime verification
+requires the executable, Qt platform/runtime libraries, SDL3, and relevant plugins
+before any artifact can upload. Release publication remains guarded by an authorized
+matching `v0.1.0` tag and was not performed.
 
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
-  CD sessions run through the separated desktop adapter and emulation thread.
-- [x] Dynamic video, high-DPI OpenGL/software presentation, aspect/integer scaling,
-  overscan, filters, interlace, fullscreen, and native PNG screenshots.
-- [x] Bounded stereo audio, mute/volume/core mixing, selectable device/latency,
-  underrun/overrun metrics, pause behavior, and device-removal recovery.
-- [x] Keyboard and SDL3 controllers, hot-plug, eight assignments, button/axis capture,
-  deadzones, profiles, specialized core device selection, and configurable hotkeys.
-- [x] Open/replace/close, drag/drop, command line, malformed-file errors, and bounded
-  recent-game history for every format supported by this build.
+  CD run through the separated desktop adapter and owner-thread emulation worker.
+- [x] Dynamic high-DPI OpenGL/software video, aspect/integer scaling, overscan, filters,
+  interlace, Game Gear viewport, fullscreen, runtime FPS, and native PNG screenshots.
+- [x] Bounded stereo audio, core mixing options, device/latency selection, live
+  transactional reconfiguration, instrumentation, pause, and disconnect recovery.
+- [x] Keyboard and SDL3 controllers, hot-plug, eight player assignments, button/axis
+  capture, deadzones, profiles, specialized devices, multitaps, and configurable
+  conflict-checked hotkeys including independent fast-forward hold/toggle.
+- [x] Open/replace/close, drag/drop, command line, strict bounded CUE preflight,
+  descriptive malformed-file errors, and persistent recent-game history.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
-  automatic load/flush, and safe platform application-data paths.
-- [x] Slots 0–9, quick save/load, timestamps, delete, corruption/wrong-game rejection,
-  thumbnails, and deterministic restore.
-- [x] Regional BIOS validation, CUE/BIN/ISO/CHD workflows, CDDA, disc change/eject, and
-  user-facing missing-firmware errors without bundled or downloaded firmware.
-- [x] Versioned global settings and migrations, sparse per-game overrides, themes,
-  accessibility, game information, cheats, and privacy-filtered diagnostics/logging.
-- [x] Asynchronous recoverable SQLite game library with scanning, search/filter/sort,
-  favorites, play history, launch, and user-provided local art.
+  automatic load/flush, and platform-standard application-data paths.
+- [x] State slots 0-9, quick operations, timestamps, delete, corruption/wrong-game
+  rejection, thumbnails, and deterministic restoration.
+- [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
+  disc change/eject, and missing-firmware errors without bundled firmware.
+- [x] Versioned global settings and migration, a unified eight-page Preferences center,
+  sparse per-game overrides, themes, accessibility, metadata, cheats, diagnostics, and
+  privacy-filtered structured logs.
+- [x] Recoverable asynchronous SQLite game library with scanning, search/filter/sort,
+  favorites, play history, launch, and user-provided local artwork.
+- [x] Visible bounded runtime failures and deterministic shutdown ordering that flushes
+  core-owned saves, joins every worker, releases bounded exchanges, and reports cleanup
+  failure through logs and process status.
 - [x] Windows, Linux, Apple Silicon macOS, and Intel macOS builds; package/checksum and
-  guarded release workflows; complete user/developer/legal documentation.
+  guarded release workflows; complete user, developer, architecture, testing, and legal
+  documentation.
 
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
 `TODO`, `FIXME`, `XXX`, `HACK`, `stub`, `placeholder`, `not implemented`, `abort()`, and
-`assert(false)`. Remaining `placeholder` matches describe generated negative fixtures,
-release-asset test files, or the intentional no-commercial-screenshot policy; none is an
-unfinished production path. There are no skipped or disabled CTest/Qt tests. The two
-`WILL_FAIL` registrations are negative tests proving malformed and mismatched release
-tags are rejected. Every production menu action has a connection and stable object
-name. Per-frame command, video, and audio paths use bounded storage.
+`assert(false)`. Remaining legacy `gcw0` TODOs are outside the desktop target, and
+frontend placeholder/disabled matches describe generated negative fixtures, deliberate
+test states, or the no-commercial-screenshot policy; none is an unfinished production
+path. There are no skipped or disabled CTest/Qt tests. The two `WILL_FAIL`
+registrations are negative tests proving malformed and mismatched release tags are
+rejected. Every production menu action has a connection and stable object name.
 
-The tree was also checked for current-directory save names, workstation paths,
-proprietary game/firmware files, build artifacts, secrets, unhandled action entries,
-stale documentation links, and workflow syntax. Documentation validation resolved all
-local links, actionlint 1.7.7 reported no workflow findings, the inherited libretro
-output was cleaned, and ignored output is confined to `build/`.
+The tree was also checked for unbounded command/video/audio storage, current-directory
+save names, workstation paths, proprietary game/firmware files, accidental build
+artifacts, secrets, hard-coded platform separators, unhandled actions, stale local
+documentation links, and shutdown races. Documentation/package validation passed;
+GitHub accepted and executed both workflows on every declared host; the inherited
+libretro output was cleaned; ignored output is confined to intentional build/package
+directories.
 
 ## Known limitations and optional tests
 
 - No commercial ROM, proprietary Sega BIOS, or copyrighted box art is distributed or
   fetched. Real Sega CD boot testing needs a user-supplied regional BIOS and is an
   optional external-fixture suite; CI validates the frontend path with generated legal
-  firmware/disc fixtures.
+  firmware and disc fixtures.
 - Controller and audio hot-plug behavior is deterministically tested with injected SDL
   events and the SDL dummy audio driver. Maintainers should still smoke-test target
   hardware and vendor drivers before a public release.

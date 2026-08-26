@@ -1,5 +1,9 @@
 cmake_minimum_required(VERSION 3.25)
 
+if(POLICY CMP0207)
+  cmake_policy(SET CMP0207 NEW)
+endif()
+
 set(prefix "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
 set(binary "${prefix}/@CMAKE_INSTALL_BINDIR@/genesis-plus-gx-gui")
 set(library_directory "${prefix}/@CMAKE_INSTALL_LIBDIR@")

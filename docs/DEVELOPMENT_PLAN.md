@@ -66,7 +66,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | `bcda084` |
 | 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | `a0c7b6a` |
 | 54 Runtime configuration transactions | COMPLETE | Prevent silent or partial settings/history mutations after startup | result-bearing UI callbacks, runtime/persistence rollback, visible errors, tests/docs | 73-test Debug/Release/ASan suites; rejected video/system/input/assignment/history workflows | Failed worker/store operations preserve the last committed UI and runtime snapshot | `41ddd20` |
-| 55 Runtime failure and shutdown integrity | COMPLETE | Resolve live service failure visibly and make incomplete cleanup machine-detectable | runtime service dispatch, shutdown report, UI/tests/docs | 74-test Debug/Release/ASan suites; runtime dialog, cleanup aggregation, real-process smoke | No pending workflow stays busy after service loss; final save/service failure cannot return success | pending |
+| 55 Runtime failure and shutdown integrity | COMPLETE | Resolve live service failure visibly and make incomplete cleanup machine-detectable | runtime service dispatch, shutdown report, UI/tests/docs | 74-test Debug/Release/ASan suites; runtime dialog, cleanup aggregation, real-process smoke | No pending workflow stays busy after service loss; final save/service failure cannot return success | `55135e0` |
+| 56 Final release-candidate evidence | COMPLETE | Rebuild every local configuration and refresh exact hosted/package/report evidence | Linux deploy policy, final report, architecture shutdown order, milestone ledger | clean 74-test Debug/Release/ASan suites; libretro; ten-job hosted matrix; warning-free staged install and CPack | Final documentation describes the tested candidate and current behavior; tree and package remain clean | pending |
 
 ## Execution policy
 
@@ -3270,4 +3271,47 @@ Exit disconnects producers, joins the save-flushing worker, stops audio and auxi
 services, releases the display exchange, aggregates every failure in the structured
 log, and cannot return success after incomplete cleanup.
 
-**Commit SHA:** pending (recorded by the following milestone)
+**Commit SHA:** `55135e0`
+
+## Milestone 56 detail
+
+**Status:** COMPLETE
+
+**Goal:** Perform the final release-candidate audit against the completed runtime,
+refresh stale evidence, and prove that the source, installed tree, platform matrix, and
+published documentation all describe the same candidate.
+
+**Files changed:**
+
+- `CHANGELOG.md`
+- `cmake/LinuxDeploy.cmake.in`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+
+**Tests added:** None. This closure milestone reruns every applicable automated gate and
+corrects release evidence; it does not add product behavior.
+
+**Gate evidence:**
+
+- Clean-first Debug, Release, and ASan/UBSan builds each compile 330 targets and pass
+  the complete 74/74 CTest suite; sanitizers report no finding.
+- The accelerated stability workload executes 20,000 frames in each configuration and
+  the actual desktop-process smoke verifies event-loop entry and normal service exit.
+- The legacy Unix libretro target builds and links with only two inherited
+  `const`-qualifier warnings, then cleans its output.
+- Continuous Integration run `32932307724` passes all ten jobs against exact candidate
+  `55135e039876dbaf992b60393f7d74723239ebd0`: Linux Debug/Release/sanitizers/libretro,
+  Windows Debug/Release, and arm64/x86_64 macOS Debug/Release.
+- A fresh warning-free Release install contains 44 verified files, runs its installed
+  `--version` smoke, contains no game/firmware/save payload, and produces the versioned
+  Linux TGZ plus SHA-256 checksum. The deploy script explicitly selects CMake's
+  normalized runtime-dependency matching policy when that policy is available.
+
+**Acceptance criteria:** The report contains the exact implementation SHA, current
+74-test totals, current four-platform CI results, package results, feature checklist,
+and honest external-fixture/signing/format limitations. Architecture documents the
+actual shutdown sequence. Adversarial source and tree scans find no unfinished desktop
+path or accidental proprietary/build artifact.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/FINAL_TEST_REPORT.md`)

@@ -61,6 +61,8 @@ platform documentation.
   the upstream core, legacy libretro, GameCube/Wii, and SDL build paths.
 - Desktop saves and settings use platform application-data directories instead of
   current-directory filenames.
+- Linux packaging explicitly uses normalized runtime-dependency matching on CMake 4.4
+  and newer, eliminating a policy warning without changing older supported CMake runs.
 
 ### Security
 
