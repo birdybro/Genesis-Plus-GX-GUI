@@ -31,6 +31,9 @@ if(VERIFY_PLATFORM STREQUAL "windows")
   require_match("*Qt6Core.dll" "deployed Qt Core runtime")
   require_match("*SDL3*.dll" "deployed SDL3 runtime")
   require_match("*qwindows.dll" "deployed Qt Windows platform plugin")
+  require_match(
+    "*vc_redist.x64.exe"
+    "official Microsoft Visual C++ x64 Redistributable installer")
 elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(bundle "${package_root}/genesis-plus-gx-gui.app")
   require_file(

@@ -14,6 +14,7 @@ and bundled libraries also retain their local license files.
 | [Qt 6](https://doc.qt.io/qt-6/licensing.html) | Core, GUI, Widgets, OpenGLWidgets, SQL/SQLite, and Test framework | Minimum 6.5; hosted builds use 6.8.3; dynamically deployed desktop modules/plugins | GNU LGPL v3 or GPL v3 open-source editions, or a separately purchased commercial license, as offered by The Qt Company |
 | [SDL 3](https://wiki.libsdl.org/SDL3/FrontPage) | Controller discovery/input and host audio | Minimum 3.2; hosted builds use 3.4.14; dynamically deployed | zlib license |
 | SQLite | Game-library database via Qt's QSQLITE driver | Supplied by the selected Qt deployment | Public domain; Qt driver code retains Qt's license |
+| Microsoft Visual C++ Redistributable | Runtime installer for Windows x64 packages | Official `vc_redist.x64.exe` supplied by the Visual Studio 2022 hosted toolchain | Microsoft software license terms distributed with the installer |
 
 Users redistributing binaries must satisfy both the repository's non-commercial terms
 and the terms of the exact Qt/SDL packages they redistribute. Official packages keep Qt

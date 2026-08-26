@@ -36,9 +36,9 @@ code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 74/74 | Passed |
-| Release | Optimized native x86-64 | 74/74 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 74/74 | Passed; no finding |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 75/75 | Passed |
+| Release | Optimized native x86-64 | 75/75 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 75/75 | Passed; no finding |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; two inherited `const`-qualifier warnings only |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -48,22 +48,22 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-CTest registers 74 distinct tests:
+CTest registers 75 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
-| Infrastructure | 7 |
+| Infrastructure | 8 |
 | Core | 18 |
 | Integration | 1 |
 | Unit | 30 |
 | GUI/smoke | 18 |
-| **Total** | **74** |
+| **Total** | **75** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 47 `unit`, 19 `core`, 28 `integration`, and 18 `gui`. Focused
+layers. Label counts are 48 `unit`, 19 `core`, 28 `integration`, and 18 `gui`. Focused
 coverage also includes persistence (24), fixtures (22), concurrency (13), settings
 (12), input (9), video (6), audio (5), timing (4), release (4), fuzz/property (3), and
-packaging (2).
+packaging (3).
 
 ## Operating-system CI matrix
 
@@ -104,9 +104,10 @@ doing so would recursively change the archive.
 
 Hosted packaging produces a Windows x86-64 portable ZIP, Linux x86-64 TGZ, macOS arm64
 ZIP and unsigned DMG, and macOS x86-64 ZIP and unsigned DMG. Runtime verification
-requires the executable, Qt platform/runtime libraries, SDL3, and relevant plugins
-before any artifact can upload. Release publication remains guarded by an authorized
-matching version tag.
+requires the executable, Qt platform/runtime libraries, SDL3, relevant plugins, and on
+Windows Microsoft's official Visual C++ x64 Redistributable installer before any
+artifact can upload. Release publication remains guarded by an authorized matching
+version tag.
 
 ## Tagged-release log audit
 
@@ -133,6 +134,18 @@ enable a warning-as-error option only for authored frontend/test targets. Public
 now creates a draft, uploads and retries each verified asset independently, and promotes
 the release only after the complete set succeeds. Because the published `v0.1.0` tag is
 immutable, the corrected candidate advances to `v0.1.1` rather than moving that tag.
+
+A subsequent exact warning-gated CI run
+[`33021653673`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33021653673)
+passed all ten jobs on Linux, Windows, macOS arm64, and macOS x86-64. Reading those logs
+and downloading the Windows artifact found one remaining inherited libchdr typedef
+warning on both Apple architectures and an incomplete Windows compiler-runtime story:
+Qt warned that the Visual Studio location was unavailable, and the ZIP contained
+neither `vc_redist.x64.exe` nor compiler runtime DLLs. The final package closure scopes
+the understood vendor typedef collision to `genplusgx_chd`, locates and installs the
+official redistributable, suppresses only unused D3D/DXC deployment probes, and adds a
+synthetic package regression that fails if the redistributable is absent. Hosted
+confirmation of those changes is required before tagging.
 
 ## Linux startup correction verification
 

@@ -1,0 +1,53 @@
+set(fixture_directory
+  "@CMAKE_CURRENT_BINARY_DIR@/windows-package-verification-fixture")
+file(REMOVE_RECURSE "${fixture_directory}")
+file(MAKE_DIRECTORY
+  "${fixture_directory}/bin"
+  "${fixture_directory}/plugins/platforms")
+
+foreach(runtime IN ITEMS
+    bin/genesis-plus-gx-gui.exe
+    bin/Qt6Core.dll
+    bin/SDL3.dll
+    plugins/platforms/qwindows.dll)
+  file(WRITE "${fixture_directory}/${runtime}" "package verification fixture")
+endforeach()
+
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DPACKAGE_ROOT=${fixture_directory}"
+    -DVERIFY_PLATFORM=windows
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyPackage.cmake"
+  RESULT_VARIABLE missing_result
+  OUTPUT_VARIABLE missing_output
+  ERROR_VARIABLE missing_error
+)
+if(missing_result EQUAL 0)
+  message(FATAL_ERROR
+    "Windows package verification accepted a package without vc_redist.x64.exe")
+endif()
+if(NOT "${missing_output}${missing_error}" MATCHES "Visual C\\+\\+ x64 Redistributable")
+  message(FATAL_ERROR
+    "Missing-runtime rejection was not descriptive:\n${missing_output}${missing_error}")
+endif()
+
+file(WRITE
+  "${fixture_directory}/vc_redist.x64.exe"
+  "official redistributable fixture placeholder")
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DPACKAGE_ROOT=${fixture_directory}"
+    -DVERIFY_PLATFORM=windows
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyPackage.cmake"
+  RESULT_VARIABLE complete_result
+  OUTPUT_VARIABLE complete_output
+  ERROR_VARIABLE complete_error
+)
+if(NOT complete_result EQUAL 0)
+  message(FATAL_ERROR
+    "Complete Windows package fixture was rejected:\n${complete_output}${complete_error}")
+endif()
+
+file(REMOVE_RECURSE "${fixture_directory}")

@@ -65,6 +65,13 @@ platform documentation.
 - A CI-only warning-as-error gate for newly authored desktop/frontend and test targets
   on GCC, Clang, Apple Clang, and MSVC.
 
+### Fixed
+
+- Windows release archives include Microsoft's official Visual C++ x64 Redistributable
+  installer, and package verification rejects incomplete archives.
+- Windows deployment does not probe for unused DirectX shader compilers, and the final
+  inherited libchdr typedef warning is scoped out on Apple Clang.
+
 ### Changed
 
 - The repository README now presents the standalone desktop experience while retaining

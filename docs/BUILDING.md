@@ -109,6 +109,7 @@ Useful cache options are:
 | `GENPLUSGX_ENABLE_SANITIZERS` | `OFF` | Enable ASan and UBSan on supported compilers |
 | `GENPLUSGX_ENABLE_CHD` | `ON` | Build bundled libchdr CHD decoding |
 | `GENPLUSGX_ENABLE_TREMOR` | `ON` | Build integer Ogg/Vorbis CD-audio decoding |
+| `GENPLUSGX_WINDOWS_REDIST` | empty | Official `vc_redist.x64.exe` included in Windows packages |
 | `GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS` | `OFF` | Register user-owned BIOS fixture tests |
 
 Do not enable external fixture tests in public CI. See [BIOS.md](BIOS.md) for their

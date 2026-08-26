@@ -61,7 +61,9 @@ artifacts or can be built from source.
 
 Download `Genesis-Plus-GX-GUI-<version>-windows-x86_64.zip`, verify its checksum,
 extract the entire archive, and run `bin/genesis-plus-gx-gui.exe`. The portable package
-contains the required Qt and SDL runtimes and does not modify the registry.
+contains the required Qt and SDL runtimes and does not modify the registry. It also
+includes Microsoft's official `vc_redist.x64.exe`; run that installer if Windows
+reports that the Microsoft Visual C++ runtime is missing.
 
 ### Linux x86-64
 

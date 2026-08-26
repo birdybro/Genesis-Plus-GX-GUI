@@ -72,6 +72,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | `70bfa8b` |
 | 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | pending |
 | 60 Tagged release hardening | COMPLETE | Audit every first-release job log, eliminate authored cross-platform warnings, and make asset publication retry-safe | warning policy/fixes, reduced links, release workflow, version/docs | warning-as-error Debug/Release/ASan; 74-test suites; hosted Windows/Linux/macOS matrix and release retry | No authored warning is hidden by a green job; transient upload failure cannot publish a partial release | pending |
+| 61 Cross-platform package closure | COMPLETE | Resolve issues found by the warning-gated hosted-log and artifact audit before tagging | Windows runtime/deploy policy, Apple vendor diagnostic scope, package test/docs | warning-as-error Debug/Release/ASan 75-test suites; hosted matrix and archive inspection | Windows testers receive the official compiler runtime; successful macOS logs have no unresolved vendor warning | pending |
 
 ## Execution policy
 
@@ -3547,3 +3548,59 @@ and the immutable failed-attempt tag is not moved or force-rewritten.
 
 **Commit SHA:** pending (resolve with
 `git log -1 -- .github/workflows/release.yml`; a commit cannot contain its own SHA)
+
+## Milestone 61 detail
+
+**Status:** COMPLETE
+
+**Goal:** Close every actionable issue found by reading the complete warning-gated
+Windows and macOS logs and inspecting the actual Windows archive, rather than relying
+only on green job conclusions.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/app/CMakeLists.txt`
+- `desktop/core/CMakeLists.txt`
+- `cmake/VerifyPackage.cmake`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/windows_package_verification_test.cmake.in`
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `README.md`
+- `CHANGELOG.md`
+- `THIRD_PARTY_NOTICES.md`
+- `docs/BUILDING.md`
+- `docs/PACKAGING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+
+**Tests added:** `infrastructure.windows_package_verification` constructs a synthetic
+Windows staging tree, proves the verifier rejects it without `vc_redist.x64.exe`, then
+adds the required installer and proves the complete layout is accepted. The test uses
+only zero-content placeholders and runs on every desktop host.
+
+**Gate evidence:** Exact warning-gated CI run
+[`33021653673`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33021653673)
+passed all ten jobs and all 74 then-registered tests on Linux, Windows MSVC x64, macOS
+arm64, and macOS x86-64. Full-log inspection found one inherited Apple Clang duplicate
+`Byte` typedef warning in bundled libchdr and two Windows deployment warnings about
+unused DirectX compiler DLLs and an unavailable Visual Studio runtime location. Archive
+inspection confirmed the Windows ZIP had Qt and SDL but neither a supported runtime
+installer nor compiler-runtime DLLs. Apple handling now belongs to the vendor target.
+Windows workflows locate Microsoft's official x64 redistributable from Visual Studio;
+CMake installs it, Qt skips compiler-runtime fallback and unused D3D/DXC probing, and
+the package gate requires it. Clean local warning-as-error Debug, Release, and
+ASan/UBSan builds each pass all 75 tests; sanitizers report no finding. Hosted
+confirmation is performed against this commit after its non-rewritten push and is
+recorded in the release-closure evidence.
+
+**Acceptance criteria:** The Windows archive contains the official redistributable and
+cannot pass verification without it; Qt deployment does not attempt to ship unsupported
+individual runtime DLLs or unused shader compilers; both Apple architectures compile
+the understood bundled-header collision without a warning; all authored warnings remain
+fatal; all tests pass without skips; and the final hosted logs and native artifacts are
+audited before the immutable `v0.1.1` tag is created.
+
+**Commit SHA:** pending (resolve with
+`git log -1 -- cmake/VerifyPackage.cmake`; a commit cannot contain its own SHA)

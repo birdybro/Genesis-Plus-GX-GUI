@@ -229,6 +229,13 @@ if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
       $<$<COMPILE_LANGUAGE:C>:-Wno-absolute-value>
       $<$<COMPILE_LANGUAGE:C>:-Wno-typedef-redefinition>
   )
+  if(TARGET genplusgx_chd)
+    # Bundled LZMA and zlib headers both use the conventional Byte typedef.
+    target_compile_options(
+      genplusgx_chd
+      PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wno-typedef-redefinition>
+    )
+  endif()
 endif()
 
 if(UNIX)

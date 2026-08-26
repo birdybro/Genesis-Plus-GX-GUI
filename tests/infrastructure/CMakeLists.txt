@@ -23,6 +23,22 @@ if(GENPLUSGX_BUILD_DESKTOP)
     infrastructure.package_metadata
     PROPERTIES LABELS "unit;infrastructure;packaging"
   )
+
+  configure_file(
+    windows_package_verification_test.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/windows_package_verification_test.cmake"
+    @ONLY
+  )
+  add_test(
+    NAME infrastructure.windows_package_verification
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -P "${CMAKE_CURRENT_BINARY_DIR}/windows_package_verification_test.cmake"
+  )
+  set_tests_properties(
+    infrastructure.windows_package_verification
+    PROPERTIES LABELS "unit;infrastructure;packaging"
+  )
 endif()
 
 add_test(

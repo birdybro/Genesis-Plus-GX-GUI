@@ -128,6 +128,21 @@ else()
     endif()
   endif()
 
+  if(WIN32)
+    set(genplusgx_windows_redist "${GENPLUSGX_WINDOWS_REDIST}")
+    if(NOT genplusgx_windows_redist AND
+       DEFINED ENV{GENPLUSGX_WINDOWS_REDIST})
+      set(genplusgx_windows_redist "$ENV{GENPLUSGX_WINDOWS_REDIST}")
+    endif()
+    if(genplusgx_windows_redist)
+      if(NOT EXISTS "${genplusgx_windows_redist}")
+        message(FATAL_ERROR
+          "GENPLUSGX_WINDOWS_REDIST does not exist: ${genplusgx_windows_redist}")
+      endif()
+      install(PROGRAMS "${genplusgx_windows_redist}" DESTINATION .)
+    endif()
+  endif()
+
   if(APPLE)
     set(genplusgx_macos_plugins
       Qt6::QCocoaIntegrationPlugin
@@ -165,6 +180,10 @@ else()
     qt_generate_deploy_app_script(
       TARGET genplusgx_desktop
       OUTPUT_SCRIPT genplusgx_deploy_script
+      NO_COMPILER_RUNTIME
+      DEPLOY_TOOL_OPTIONS
+        --no-system-d3d-compiler
+        --no-system-dxc-compiler
       NO_TRANSLATIONS
       NO_UNSUPPORTED_PLATFORM_ERROR
     )

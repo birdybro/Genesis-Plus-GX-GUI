@@ -22,6 +22,12 @@ option(
 )
 option(GENPLUSGX_ENABLE_CHD "Enable CHD disc-image support" ON)
 option(GENPLUSGX_ENABLE_TREMOR "Enable bundled Tremor Ogg/Vorbis decoding" ON)
+set(
+  GENPLUSGX_WINDOWS_REDIST
+  ""
+  CACHE FILEPATH
+  "Path to Microsoft's official vc_redist.x64.exe for Windows packages"
+)
 option(
   GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS
   "Enable tests that require user-supplied firmware or hardware fixtures"
