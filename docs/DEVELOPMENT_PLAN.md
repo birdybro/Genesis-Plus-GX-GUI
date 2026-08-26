@@ -69,7 +69,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 55 Runtime failure and shutdown integrity | COMPLETE | Resolve live service failure visibly and make incomplete cleanup machine-detectable | runtime service dispatch, shutdown report, UI/tests/docs | 74-test Debug/Release/ASan suites; runtime dialog, cleanup aggregation, real-process smoke | No pending workflow stays busy after service loss; final save/service failure cannot return success | `55135e0` |
 | 56 Final release-candidate evidence | COMPLETE | Rebuild every local configuration and refresh exact hosted/package/report evidence | Linux deploy policy, final report, architecture shutdown order, milestone ledger | clean 74-test Debug/Release/ASan suites; libretro; ten-job hosted matrix; warning-free staged install and CPack | Final documentation describes the tested candidate and current behavior; tree and package remain clean | `2f53681` |
 | 57 Composite-disc release hardening | COMPLETE | Unify multi-file disc identity, library ownership, and shutdown cancellation after a full requirements audit | game-file/content hash, persistence, metadata/library scanner, worker cancellation, audit/tests/docs | clean 74-test Debug/Release/ASan suites; libretro; package; exact ten-job hosted matrix | CUE identity covers every track, library avoids track duplicates, and no large hash blocks shutdown | `4d2e7d0` |
-| 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | pending |
+| 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | `70bfa8b` |
+| 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | pending |
 
 ## Execution policy
 
@@ -3431,3 +3432,50 @@ with `origin` after the closure workflow succeeds.
 
 **Commit SHA:** pending (resolve with
 `git log -1 -- docs/FINAL_TEST_REPORT.md`; a commit cannot contain its own SHA)
+
+## Milestone 59 detail
+
+**Status:** COMPLETE
+
+**Goal:** Reproduce and correct the Linux portable package starting as a featureless
+black window when Qt cannot construct an XCB OpenGL context.
+
+**Files changed:**
+
+- `desktop/video/src/display_widget.cpp`
+- `desktop/app/CMakeLists.txt`
+- `cmake/VerifyPackage.cmake`
+- `tests/gui/main_window_test.cpp`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+- `docs/PACKAGING.md`
+
+**Tests added:** The existing real-shell GUI regression now asserts that the status bar
+and empty-game prompt are visible after showing the window and, on Linux, that the menu
+bar is visible and its captured surface is not black. Linux package verification now
+rejects a staged tree without an XCB EGL/GLX integration plugin.
+
+**Gate evidence:** The old staged executable was launched on the actual KDE
+Wayland/XWayland desktop and captured as a black 1080-by-750 client with no menu,
+prompt, or status bar. Its structured log reported that neither GLX nor EGL was
+enabled, repeated `QOpenGLWidget` context failures, and then incorrectly selected the
+OpenGL renderer. For the corrected build, a real accelerated desktop capture shows all
+seven menus, the centered open/drop prompt, and status bar. A disposable copy of the
+corrected package was then stripped of both XCB GL plugins: startup logged one failed
+preflight, selected `Qt software painter`, entered the event loop, retained the shell,
+and shut down normally. Debug, Release, and ASan/UBSan each pass 74/74 CTest cases with
+no sanitizer finding. A fresh 47-file Release staging tree contains both
+`libqxcb-egl-integration.so` and `libqxcb-glx-integration.so`, passes package layout and
+installed `--version` verification, and produces the versioned TGZ plus SHA-256 file.
+
+**Acceptance criteria:** Linux deployment cannot omit every XCB OpenGL integration.
+The display widget proves that a context and compatible offscreen surface exist before
+constructing `QOpenGLWidget`; otherwise it remains on the software backing store. Both
+accelerated and fallback starts expose the normal menus/status and an actionable empty
+state, while loaded-frame presentation retains the existing bounded GPU/software
+paths.
+
+**Commit SHA:** pending (resolve with
+`git log -1 -- desktop/video/src/display_widget.cpp`; a commit cannot contain its own
+SHA)

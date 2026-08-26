@@ -53,6 +53,9 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   if(NOT platform_plugins)
     message(FATAL_ERROR "Missing deployed Qt Linux platform plugin")
   endif()
+  require_match(
+    "*libqxcb-*-integration.so"
+    "deployed Qt XCB OpenGL integration plugin")
 else()
   message(FATAL_ERROR "Unsupported VERIFY_PLATFORM value: ${VERIFY_PLATFORM}")
 endif()

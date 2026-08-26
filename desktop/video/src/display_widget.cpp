@@ -1,9 +1,12 @@
 #include "genplusgx/video/display_widget.h"
 
-#include <QGuiApplication>
+#include <QColor>
 #include <QDebug>
+#include <QFont>
+#include <QGuiApplication>
 #include <QImage>
 #include <QLabel>
+#include <QOffscreenSurface>
 #include <QOpenGLBuffer>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
@@ -13,6 +16,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QStackedLayout>
+#include <QSurfaceFormat>
 #include <QTimer>
 
 #include <array>
@@ -20,6 +24,28 @@
 #include <utility>
 
 namespace genplusgx::video {
+
+namespace {
+
+bool canCreateOpenGLRenderer()
+{
+  QOpenGLContext context;
+  context.setFormat(QSurfaceFormat::defaultFormat());
+  if (!context.create() || !context.isValid()) {
+    return false;
+  }
+
+  QOffscreenSurface surface;
+  surface.setFormat(context.format());
+  surface.create();
+  if (!surface.isValid() || !context.makeCurrent(&surface)) {
+    return false;
+  }
+  context.doneCurrent();
+  return true;
+}
+
+} // namespace
 
 class OpenGLCanvas final : public QOpenGLWidget, protected QOpenGLFunctions {
 public:
@@ -127,7 +153,17 @@ protected:
       static_cast<GLsizei>(std::lround(height() * devicePixelRatioF())));
     glClearColor(0.0F, 0.0F, 0.0F, 1.0F);
     glClear(GL_COLOR_BUFFER_BIT);
-    if (!initialized_ || !owner_.hasFrame_) {
+    if (!initialized_) {
+      return;
+    }
+    if (!owner_.hasFrame_) {
+      QPainter painter(this);
+      painter.setPen(QColor{184, 184, 184});
+      auto font = painter.font();
+      font.setPixelSize(16);
+      painter.setFont(font);
+      painter.drawText(
+        rect(), Qt::AlignCenter, owner_.emptyLabel_->text());
       return;
     }
 
@@ -211,8 +247,13 @@ DisplayWidget::DisplayWidget(QWidget* parent)
     "GENPLUSGX_FORCE_SOFTWARE_VIDEO");
   if (!forceSoftware && platform != QStringLiteral("offscreen") &&
       platform != QStringLiteral("minimal")) {
-    openGLCanvas_ = new OpenGLCanvas(*this);
-    layout->addWidget(openGLCanvas_);
+    if (canCreateOpenGLRenderer()) {
+      openGLCanvas_ = new OpenGLCanvas(*this);
+      layout->addWidget(openGLCanvas_);
+    } else {
+      qWarning().noquote()
+        << "OpenGL context preflight failed; using Qt software rendering.";
+    }
   }
   emptyLabel_ = new QLabel(tr("Open or drop a game to begin"), this);
   emptyLabel_->setObjectName(QStringLiteral("emptyCanvasLabel"));
@@ -220,6 +261,7 @@ DisplayWidget::DisplayWidget(QWidget* parent)
   emptyLabel_->setStyleSheet(QStringLiteral("color: #b8b8b8; font-size: 16px;"));
   emptyLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
   layout->addWidget(emptyLabel_);
+  emptyLabel_->setVisible(openGLCanvas_ == nullptr);
 }
 
 void DisplayWidget::setFrameExchange(std::shared_ptr<VideoFrameExchange> exchange)
@@ -257,7 +299,7 @@ void DisplayWidget::clearFrame()
   hasFrame_ = false;
   frame_ = {};
   generation_ = 0;
-  emptyLabel_->show();
+  emptyLabel_->setVisible(openGLCanvas_ == nullptr);
   requestRepaint();
 }
 
@@ -363,6 +405,7 @@ void DisplayWidget::scheduleSoftwareFallback()
       openGLCanvas_->hide();
       openGLCanvas_->deleteLater();
       openGLCanvas_ = nullptr;
+      emptyLabel_->setVisible(!hasFrame_);
       update();
       if (rendererFailureSink_) {
         rendererFailureSink_(detail);

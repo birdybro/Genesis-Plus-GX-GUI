@@ -70,6 +70,13 @@ platform documentation.
 - Linux packaging explicitly uses normalized runtime-dependency matching on CMake 4.4
   and newer, eliminating a policy warning without changing older supported CMake runs.
 
+### Fixed
+
+- Linux portable packages now include Qt's XCB EGL/GLX integration plugins. The video
+  widget also preflights an OpenGL context and offscreen surface before it can select
+  accelerated rendering, preserving the menu bar, empty-game prompt, and status bar by
+  falling back to Qt software rendering when OpenGL is unavailable.
+
 ### Security
 
 - Bounded metadata/file parsers, validated CUE paths, atomic writes, wrong-game state

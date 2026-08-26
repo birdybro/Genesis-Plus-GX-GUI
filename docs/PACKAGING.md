@@ -61,6 +61,9 @@ The Linux archive targets the Ubuntu version used by CI. It is relocatable and i
 Qt and SDL application libraries, but intentionally relies on base-system graphics,
 window-system, C/C++ runtime, and libc libraries for ABI compatibility. Building on the
 oldest supported Linux distribution gives the broadest compatibility.
+The archive includes Qt's XCB EGL and GLX integration plugins. Runtime rendering also
+preflights a context and surface before creating the accelerated display, automatically
+retaining the complete software-rendered shell if host OpenGL is unavailable.
 
 Packages contain the root license/notices plus the complete user, BIOS, input, save,
 build, test, packaging, and maintenance guides under the platform documentation

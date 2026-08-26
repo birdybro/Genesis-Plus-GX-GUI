@@ -71,6 +71,8 @@ if(UNIX AND NOT APPLE)
     Qt6::QSQLiteDriverPlugin
   )
   foreach(optional_plugin IN ITEMS
+      Qt6::QXcbEglIntegrationPlugin
+      Qt6::QXcbGlxIntegrationPlugin
       Qt6::QGifPlugin
       Qt6::QICOPlugin
       Qt6::QJpegPlugin)
@@ -78,6 +80,19 @@ if(UNIX AND NOT APPLE)
       list(APPEND genplusgx_linux_plugins "${optional_plugin}")
     endif()
   endforeach()
+
+  set(genplusgx_has_xcb_gl_integration FALSE)
+  foreach(xcb_gl_plugin IN ITEMS
+      Qt6::QXcbEglIntegrationPlugin
+      Qt6::QXcbGlxIntegrationPlugin)
+    if(TARGET "${xcb_gl_plugin}")
+      set(genplusgx_has_xcb_gl_integration TRUE)
+    endif()
+  endforeach()
+  if(NOT genplusgx_has_xcb_gl_integration)
+    message(FATAL_ERROR
+      "The Linux package requires at least one Qt XCB OpenGL integration plugin")
+  endif()
 
   foreach(plugin IN LISTS genplusgx_linux_plugins)
     if(NOT TARGET "${plugin}")

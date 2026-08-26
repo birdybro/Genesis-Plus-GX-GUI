@@ -1,11 +1,15 @@
 # Final Test Report
 
-This report records the Genesis Plus GX GUI 0.1.0 release-candidate verification
-performed on 2026-08-26 (America/Denver).
+This report records the Genesis Plus GX GUI 0.1.0 release-candidate verification and
+Linux startup correction performed on 2026-08-26 (America/Denver).
 
 ## Candidate identity
 
-- Tested implementation commit: `4d2e7d086d6dd0c0a1adb8aa5efbcd8783dca42f`
+- Tested implementation: the current commit containing this report; use
+  `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
+  SHA
+- Prior full-matrix implementation baseline:
+  `4d2e7d086d6dd0c0a1adb8aa5efbcd8783dca42f`
 - Branch: `master`
 - Application/package version: `0.1.0`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -14,7 +18,10 @@ performed on 2026-08-26 (America/Denver).
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA in that commit
 
-No golden reference changed during final verification. The final hardening pass made
+No golden reference changed during final verification. The Linux correction deploys
+Qt's XCB EGL/GLX integrations and preflights a usable context/surface before creating
+the accelerated child widget, so unavailable OpenGL now preserves the complete shell
+through the software renderer. The final hardening pass also made
 multi-file CUE identity cover the validated sheet and every referenced track, reused
 that identity for metadata, saves, states, cheats, overrides, and library records,
 suppressed library rows for owned raw tracks, and made live backup/state/metadata/library
@@ -61,7 +68,10 @@ packaging (2).
 
 Continuous Integration run
 [`32937516898`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32937516898)
-completed successfully against the exact tested implementation SHA:
+completed successfully against the prior full-matrix implementation baseline. The
+Linux startup correction receives the same matrix after its non-rewritten push; that
+result is recorded in the final handoff because a commit cannot contain the ID of the
+workflow run that starts after it exists.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -86,8 +96,9 @@ created neither a tag nor a GitHub release.
 
 The local Release install was staged without a deployment warning in a fresh temporary
 root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
-`--version` process smoke. The tree contains 45 files and no cartridge, disc, firmware,
-SRAM, BRAM, or state payload. CPack produces the versioned
+`--version` process smoke. The tree contains 47 files, including the XCB EGL and GLX
+integration plugins, and no cartridge, disc, firmware, SRAM, BRAM, or state payload.
+CPack produces the versioned
 `Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
 closure archive's digest is intentionally not embedded in this packaged report because
 doing so would recursively change the archive.
@@ -97,6 +108,26 @@ ZIP and unsigned DMG, and macOS x86-64 ZIP and unsigned DMG. Runtime verificatio
 requires the executable, Qt platform/runtime libraries, SDL3, and relevant plugins
 before any artifact can upload. Release publication remains guarded by an authorized
 matching `v0.1.0` tag and was not performed.
+
+## Linux startup correction verification
+
+The previously staged portable executable was launched on the real KDE
+Wayland/XWayland desktop, not under Qt's offscreen test platform. Its captured window
+was entirely black below the title bar, while its structured log showed missing GLX
+and EGL integration, repeated `QOpenGLWidget` context failures, and a false OpenGL
+selection. Running the same executable with the existing software override restored
+all seven menus, the empty-game prompt, and the status bar, isolating the failure to
+renderer creation.
+
+The corrected installed executable was then exercised twice on that desktop. With its
+deployed XCB integrations it initialized OpenGL 4.6 and a full-window capture showed
+the File through Help menus, centered open/drop prompt, and status. In a disposable
+copy with both integration plugins deliberately removed, context preflight failed
+before `QOpenGLWidget` construction, the log selected `Qt software painter`, the normal
+shell remained available, and shutdown completed. The package verifier now makes the
+first condition mandatory, while renderer preflight protects users from missing or
+broken graphics drivers. Debug, Release, and ASan/UBSan each pass 74/74 after the
+correction; the sanitizer suite reports no finding.
 
 ## Final feature checklist
 

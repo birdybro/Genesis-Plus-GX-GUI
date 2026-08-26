@@ -19,6 +19,7 @@
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
+#include <QMenuBar>
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStatusBar>
@@ -116,6 +117,17 @@ void MainWindowTest::shellIsVisibleAndIdentified()
   QCOMPARE(canvas, window.centralWidget());
   QVERIFY(!canvas->accessibleName().isEmpty());
   QVERIFY(prompt->text().contains(QStringLiteral("Open")));
+  QVERIFY(window.statusBar()->isVisible());
+  QVERIFY(prompt->isVisible());
+
+#if defined(Q_OS_LINUX)
+  QVERIFY(window.menuBar()->isVisible());
+  QVERIFY(window.menuBar()->height() > 0);
+  const QImage rendered = window.grab().toImage();
+  QVERIFY(!rendered.isNull());
+  QVERIFY(rendered.pixelColor(
+    window.menuBar()->geometry().center()).value() > 0);
+#endif
 }
 
 void MainWindowTest::menusAndActionsHaveStableSemantics()
