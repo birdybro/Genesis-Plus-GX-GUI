@@ -2492,7 +2492,12 @@ platform plugin, runs `--version` from that staged application, then invokes CPa
   but all macOS jobs stopped at configure because Qt 6.8 exposes plugin suppression only
   through `DEPLOY_TOOL_OPTIONS` (the direct `NO_PLUGINS` convenience flag was added later).
   The deployment request now uses the Qt 6.8-compatible `macdeployqt -no-plugins` path; a
-  final corrective hosted run remains pending.
+  final corrective hosted run reached verified, executable ZIP and DMG packages on both
+  macOS hosts. GitHub's uploader then recursively included CPack's `_CPack_Packages`
+  scratch tree through the broad `build/packages/*` pattern and exhausted its Node heap
+  on arm64. Artifact patterns now select only final archives and checksum files, exclude
+  CPack scratch data, and disable redundant compression of ZIP/DMG/TGZ payloads. A final
+  upload verification run remains pending.
 
 **Acceptance criteria:** Packages derive the application/package version from the root
 CMake project, carry a platform and normalized architecture in every filename, and

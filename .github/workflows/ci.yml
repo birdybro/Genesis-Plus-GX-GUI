@@ -84,8 +84,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: Genesis-Plus-GX-GUI-linux-x86_64
-          path: build/packages/*
+          path: |
+            build/packages/*.tar.gz
+            build/packages/*.tar.gz.sha256
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload failure diagnostics
         if: failure()
@@ -235,8 +238,11 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
           name: Genesis-Plus-GX-GUI-windows-x86_64
-          path: build/packages/*
+          path: |
+            build/packages/*.zip
+            build/packages/*.zip.sha256
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload failure diagnostics
         if: failure()
@@ -319,8 +325,13 @@ jobs:
         with:
           name: >-
             Genesis-Plus-GX-GUI-macos-${{ matrix.host.architecture }}
-          path: build/packages/*
+          path: |
+            build/packages/*.zip
+            build/packages/*.zip.sha256
+            build/packages/*.dmg
+            build/packages/*.dmg.sha256
           if-no-files-found: error
+          compression-level: 0
 
       - name: Upload failure diagnostics
         if: failure()
