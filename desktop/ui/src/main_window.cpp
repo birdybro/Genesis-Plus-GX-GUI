@@ -25,6 +25,7 @@
 #include <QDragEnterEvent>
 #include <QDateTime>
 #include <QDropEvent>
+#include <QKeyCombination>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -74,6 +75,7 @@ MainWindow::MainWindow(QWidget* parent)
 
   createCanvas();
   buildMenus();
+  applyHotkeyShortcuts();
   buildStatusBar();
   for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
     stateSlotViews_[slot].slot = slot;
@@ -479,6 +481,62 @@ void MainWindow::buildMenus()
   connect(about, &QAction::triggered, this, &MainWindow::showAboutDialog);
   auto* aboutQt = addAction(*help, tr("About &Qt"), "aboutQtAction");
   connect(aboutQt, &QAction::triggered, qApp, &QApplication::aboutQt);
+}
+
+void MainWindow::applyHotkeyShortcuts()
+{
+  const std::array actionMappings{
+    std::pair{input::EmulatorHotkeyAction::openGame, "openGameAction"},
+    std::pair{input::EmulatorHotkeyAction::closeGame, "closeGameAction"},
+    std::pair{input::EmulatorHotkeyAction::gameLibrary, "gameLibraryAction"},
+    std::pair{input::EmulatorHotkeyAction::pause, "pauseAction"},
+    std::pair{input::EmulatorHotkeyAction::hardReset, "resetAction"},
+    std::pair{input::EmulatorHotkeyAction::softReset, "softResetAction"},
+    std::pair{input::EmulatorHotkeyAction::fullscreen, "fullscreenAction"},
+    std::pair{input::EmulatorHotkeyAction::fastForward, "fastForwardAction"},
+    std::pair{input::EmulatorHotkeyAction::frameAdvance, "frameAdvanceAction"},
+    std::pair{input::EmulatorHotkeyAction::saveState, "saveStateAction"},
+    std::pair{input::EmulatorHotkeyAction::loadState, "loadStateAction"},
+    std::pair{input::EmulatorHotkeyAction::previousStateSlot,
+      "previousStateSlotAction"},
+    std::pair{input::EmulatorHotkeyAction::nextStateSlot,
+      "nextStateSlotAction"},
+    std::pair{input::EmulatorHotkeyAction::deleteState, "deleteStateAction"},
+    std::pair{input::EmulatorHotkeyAction::screenshot, "screenshotAction"},
+    std::pair{input::EmulatorHotkeyAction::mute, "muteAction"},
+    std::pair{input::EmulatorHotkeyAction::volumeUp, "volumeUpAction"},
+    std::pair{input::EmulatorHotkeyAction::volumeDown, "volumeDownAction"},
+  };
+  for (const auto& [hotkey, objectName] : actionMappings) {
+    const auto combination = input::hotkeyCombination(inputConfiguration_, hotkey);
+    if (auto* action = findChild<QAction*>(QString::fromLatin1(objectName));
+        action != nullptr && combination) {
+      action->setShortcut(
+        QKeySequence{QKeyCombination::fromCombined(*combination)});
+    }
+  }
+  constexpr std::array slotActions{
+    input::EmulatorHotkeyAction::stateSlot0,
+    input::EmulatorHotkeyAction::stateSlot1,
+    input::EmulatorHotkeyAction::stateSlot2,
+    input::EmulatorHotkeyAction::stateSlot3,
+    input::EmulatorHotkeyAction::stateSlot4,
+    input::EmulatorHotkeyAction::stateSlot5,
+    input::EmulatorHotkeyAction::stateSlot6,
+    input::EmulatorHotkeyAction::stateSlot7,
+    input::EmulatorHotkeyAction::stateSlot8,
+    input::EmulatorHotkeyAction::stateSlot9,
+  };
+  for (std::size_t slot = 0U; slot < slotActions.size(); ++slot) {
+    const auto combination = input::hotkeyCombination(
+      inputConfiguration_, slotActions[slot]);
+    if (auto* action = findChild<QAction*>(
+          QStringLiteral("stateSlotAction%1").arg(slot));
+        action != nullptr && combination) {
+      action->setShortcut(
+        QKeySequence{QKeyCombination::fromCombined(*combination)});
+    }
+  }
 }
 
 void MainWindow::showUserGuide()
@@ -1080,6 +1138,7 @@ void MainWindow::showInputConfiguration(InputConfigurationTab tab)
   dialog->setConfigurationSink(
     [this](const input::InputConfiguration& configuration) {
       inputConfiguration_ = configuration;
+      applyHotkeyShortcuts();
       if (inputConfigurationSink_) {
         inputConfigurationSink_(configuration);
       }
@@ -1484,6 +1543,7 @@ void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
 {
   if (input::validateInputConfiguration(configuration)) {
     inputConfiguration_ = std::move(configuration);
+    applyHotkeyShortcuts();
   }
 }
 

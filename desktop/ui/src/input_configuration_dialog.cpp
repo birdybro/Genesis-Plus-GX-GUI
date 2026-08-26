@@ -43,6 +43,45 @@ constexpr std::array inputDescriptions{
   InputDescription{InputButton::start, "Start", "Start"},
 };
 
+struct HotkeyDescription final {
+  input::EmulatorHotkeyAction action;
+  const char* name;
+  const char* suffix;
+};
+
+constexpr std::array hotkeyDescriptions{
+  HotkeyDescription{input::EmulatorHotkeyAction::openGame, "Open game", "OpenGame"},
+  HotkeyDescription{input::EmulatorHotkeyAction::closeGame, "Close game", "CloseGame"},
+  HotkeyDescription{input::EmulatorHotkeyAction::gameLibrary, "Game library", "GameLibrary"},
+  HotkeyDescription{input::EmulatorHotkeyAction::pause, "Pause / resume", "Pause"},
+  HotkeyDescription{input::EmulatorHotkeyAction::hardReset, "Hard reset", "HardReset"},
+  HotkeyDescription{input::EmulatorHotkeyAction::softReset, "Soft reset", "SoftReset"},
+  HotkeyDescription{input::EmulatorHotkeyAction::fullscreen, "Fullscreen", "Fullscreen"},
+  HotkeyDescription{input::EmulatorHotkeyAction::fastForward, "Fast forward", "FastForward"},
+  HotkeyDescription{input::EmulatorHotkeyAction::frameAdvance, "Frame advance", "FrameAdvance"},
+  HotkeyDescription{input::EmulatorHotkeyAction::saveState, "Save state", "SaveState"},
+  HotkeyDescription{input::EmulatorHotkeyAction::loadState, "Load state", "LoadState"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot0, "Select state slot 0", "StateSlot0"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot1, "Select state slot 1", "StateSlot1"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot2, "Select state slot 2", "StateSlot2"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot3, "Select state slot 3", "StateSlot3"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot4, "Select state slot 4", "StateSlot4"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot5, "Select state slot 5", "StateSlot5"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot6, "Select state slot 6", "StateSlot6"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot7, "Select state slot 7", "StateSlot7"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot8, "Select state slot 8", "StateSlot8"},
+  HotkeyDescription{input::EmulatorHotkeyAction::stateSlot9, "Select state slot 9", "StateSlot9"},
+  HotkeyDescription{input::EmulatorHotkeyAction::previousStateSlot, "Previous state slot", "PreviousStateSlot"},
+  HotkeyDescription{input::EmulatorHotkeyAction::nextStateSlot, "Next state slot", "NextStateSlot"},
+  HotkeyDescription{input::EmulatorHotkeyAction::deleteState, "Delete state", "DeleteState"},
+  HotkeyDescription{input::EmulatorHotkeyAction::screenshot, "Screenshot", "Screenshot"},
+  HotkeyDescription{input::EmulatorHotkeyAction::mute, "Mute", "Mute"},
+  HotkeyDescription{input::EmulatorHotkeyAction::volumeUp, "Volume up", "VolumeUp"},
+  HotkeyDescription{input::EmulatorHotkeyAction::volumeDown, "Volume down", "VolumeDown"},
+};
+
+static_assert(hotkeyDescriptions.size() == input::emulatorHotkeyActionCount);
+
 struct DeviceDescription final {
   input::LogicalDeviceType type;
   const char* name;
@@ -112,12 +151,12 @@ InputConfigurationDialog::InputConfigurationDialog(
   QWidget* parent)
   : QDialog(parent),
     configuration_(std::move(configuration)),
-    controllers_(std::move(controllers)),
-    reservedHotkeys_(input::defaultReservedHotkeyKeys())
+    controllers_(std::move(controllers))
 {
   if (!input::validateInputConfiguration(configuration_)) {
     configuration_ = input::defaultInputConfiguration();
   }
+  reservedHotkeys_ = input::reservedGameplayHotkeyKeys(configuration_.hotkeys);
   setObjectName(QStringLiteral("inputConfigurationDialog"));
   setWindowTitle(tr("Input Configuration"));
   setModal(true);
@@ -131,6 +170,7 @@ InputConfigurationDialog::InputConfigurationDialog(
   tabs_->addTab(buildBindingsPage(), tr("Bindings"));
   tabs_->addTab(buildAssignmentsPage(), tr("Player Assignments"));
   tabs_->addTab(buildAdvancedPage(), tr("Advanced Devices"));
+  tabs_->addTab(buildHotkeysPage(), tr("Hotkeys"));
   layout->addWidget(tabs_, 1);
 
   conflictLabel_ = new QLabel(this);
@@ -428,6 +468,44 @@ QWidget* InputConfigurationDialog::buildAdvancedPage()
   return page;
 }
 
+QWidget* InputConfigurationDialog::buildHotkeysPage()
+{
+  auto* page = new QWidget(this);
+  page->setObjectName(QStringLiteral("emulatorHotkeysPage"));
+  auto* layout = new QGridLayout(page);
+  auto* note = new QLabel(
+    tr("Activate a shortcut, then press one keyboard key combination. "
+       "Shortcuts must be unique and cannot overlap gameplay keys."), page);
+  note->setObjectName(QStringLiteral("emulatorHotkeysNoteLabel"));
+  note->setWordWrap(true);
+  layout->addWidget(note, 0, 0, 1, 4);
+
+  constexpr std::size_t columnLength = hotkeyDescriptions.size() / 2U;
+  hotkeyButtons_.reserve(hotkeyDescriptions.size());
+  for (std::size_t index = 0U; index < hotkeyDescriptions.size(); ++index) {
+    const auto& description = hotkeyDescriptions[index];
+    const int row = static_cast<int>(index % columnLength) + 1;
+    const int column = index < columnLength ? 0 : 2;
+    auto* label = new QLabel(tr(description.name), page);
+    auto* button = new BindingCaptureButton(
+      BindingCaptureKind::hotkey, InputButton::a, page);
+    button->setObjectName(QStringLiteral("hotkey%1Button")
+        .arg(QString::fromLatin1(description.suffix)));
+    label->setBuddy(button);
+    connect(button, &QPushButton::clicked, this,
+      [this, button] { cancelOtherCaptures(button); });
+    connect(button, &BindingCaptureButton::hotkeyCaptured, this,
+      [this, action = description.action](int keyCombination) {
+        hotkeyCaptured(action, keyCombination);
+      });
+    layout->addWidget(label, row, column);
+    layout->addWidget(button, row, column + 1);
+    hotkeyButtons_.push_back(button);
+  }
+  layout->setRowStretch(static_cast<int>(columnLength + 1U), 1);
+  return page;
+}
+
 void InputConfigurationDialog::refreshProfileList()
 {
   const QSignalBlocker blocker{profileCombo_};
@@ -447,6 +525,7 @@ void InputConfigurationDialog::refreshEditor()
 {
   clearConflict();
   refreshBindings();
+  refreshHotkeys();
   const auto* profile = activeProfile();
   if (profile == nullptr) {
     return;
@@ -473,6 +552,17 @@ void InputConfigurationDialog::refreshEditor()
     const QSignalBlocker blocker{axisMappingCombos_[index]};
     axisMappingCombos_[index]->setCurrentIndex(
       axisMappingCombos_[index]->findData(static_cast<int>(input)));
+  }
+}
+
+void InputConfigurationDialog::refreshHotkeys()
+{
+  for (std::size_t index = 0U; index < hotkeyDescriptions.size(); ++index) {
+    const auto combination = input::hotkeyCombination(
+      configuration_, hotkeyDescriptions[index].action);
+    if (combination) {
+      hotkeyButtons_[index]->setHotkeyBinding(*combination);
+    }
   }
 }
 
@@ -525,9 +615,32 @@ void InputConfigurationDialog::deleteProfile()
 
 void InputConfigurationDialog::restoreCurrentProfile()
 {
+  if (tabs_->currentIndex() == static_cast<int>(InputConfigurationTab::hotkeys)) {
+    auto candidate = configuration_;
+    candidate.hotkeys = input::defaultEmulatorHotkeys();
+    const auto validation = input::validateInputConfiguration(candidate);
+    if (!validation) {
+      showConflict(tr("Default hotkeys conflict with a gameplay binding. "
+                      "Restore the affected input profile first."));
+      return;
+    }
+    configuration_ = std::move(candidate);
+    reservedHotkeys_ = input::reservedGameplayHotkeyKeys(configuration_.hotkeys);
+    clearConflict();
+    refreshHotkeys();
+    return;
+  }
   if (auto* profile = activeProfile()) {
     const auto name = profile->name;
-    *profile = input::defaultInputProfile(name);
+    auto candidate = configuration_;
+    *candidate.active() = input::defaultInputProfile(name);
+    const auto validation = input::validateInputConfiguration(candidate);
+    if (!validation) {
+      showConflict(tr("Default gameplay bindings conflict with an emulator hotkey. "
+                      "Restore the hotkeys first."));
+      return;
+    }
+    configuration_ = std::move(candidate);
     refreshEditor();
   }
 }
@@ -558,9 +671,46 @@ void InputConfigurationDialog::keyboardCaptured(InputButton input, int key)
     refreshBindings();
     return;
   }
-  static_cast<void>(input::setKeyboardBinding(*profile, input, key));
+  static_cast<void>(input::setKeyboardBinding(
+    *profile, input, key, reservedHotkeys_));
   clearConflict();
   refreshBindings();
+}
+
+void InputConfigurationDialog::hotkeyCaptured(
+  input::EmulatorHotkeyAction action,
+  int keyCombination)
+{
+  auto candidate = configuration_;
+  const auto found = std::find_if(candidate.hotkeys.begin(), candidate.hotkeys.end(),
+    [action](const input::HotkeyBinding& binding) {
+      return binding.action == action;
+    });
+  if (found == candidate.hotkeys.end()) {
+    showConflict(tr("That emulator hotkey is not available."));
+    refreshHotkeys();
+    return;
+  }
+  const auto duplicate = std::find_if(candidate.hotkeys.begin(), candidate.hotkeys.end(),
+    [action, keyCombination](const input::HotkeyBinding& binding) {
+      return binding.action != action && binding.keyCombination == keyCombination;
+    });
+  if (duplicate != candidate.hotkeys.end()) {
+    showConflict(tr("That shortcut is already assigned to another emulator hotkey."));
+    refreshHotkeys();
+    return;
+  }
+  found->keyCombination = keyCombination;
+  const auto validation = input::validateInputConfiguration(candidate);
+  if (!validation) {
+    showConflict(tr("That shortcut conflicts with a gameplay binding."));
+    refreshHotkeys();
+    return;
+  }
+  configuration_ = std::move(candidate);
+  reservedHotkeys_ = input::reservedGameplayHotkeyKeys(configuration_.hotkeys);
+  clearConflict();
+  refreshHotkeys();
 }
 
 void InputConfigurationDialog::controllerCaptured(
@@ -591,6 +741,11 @@ void InputConfigurationDialog::cancelOtherCaptures(BindingCaptureButton* active)
     }
   }
   for (auto* button : controllerButtons_) {
+    if (button != active) {
+      button->cancelCapture();
+    }
+  }
+  for (auto* button : hotkeyButtons_) {
     if (button != active) {
       button->cancelCapture();
     }

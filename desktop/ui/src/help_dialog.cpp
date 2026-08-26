@@ -36,6 +36,7 @@ QString keyboardShortcutText()
     "Game library              Ctrl+L\n"
     "Pause / resume            Space\n"
     "Hard reset                Ctrl+R\n"
+    "Soft reset                Ctrl+Shift+R\n"
     "Fast forward toggle       Tab\n"
     "Frame advance             N (while paused)\n"
     "Save state                F5\n"
@@ -48,7 +49,9 @@ QString keyboardShortcutText()
     "Mute                      M\n"
     "Volume up / down          + / -\n"
     "Preferences               Platform standard shortcut\n"
-    "Quit                      Platform standard shortcut");
+    "Quit                      Platform standard shortcut\n"
+    "\n"
+    "Change emulator hotkeys under Input → Controller Configuration → Hotkeys.");
 }
 
 } // namespace

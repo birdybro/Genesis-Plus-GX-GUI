@@ -18,7 +18,8 @@ platform documentation.
 - OpenGL/software presentation with dynamic viewport, aspect and integer scaling,
   filtering, overscan, interlace, Game Gear, high-DPI, fullscreen, and screenshots.
 - Keyboard/controller profiles, hot-plug, player assignments, capture-based mappings,
-  deadzones, conflict validation, and advanced emulated device selection.
+  configurable emulator hotkeys, deadzones, conflict validation, and advanced emulated
+  device selection.
 - Per-game SRAM, Sega CD BRAM/RAM-cartridge persistence and identity-checked save-state
   slots with atomic files.
 - Sega CD BIOS validation, CUE/BIN, ISO, CHD, CDDA, disc-change, and eject workflows.
@@ -26,6 +27,8 @@ platform documentation.
   local artwork, cheats, and sparse per-game overrides.
 - Versioned settings, system/light/dark appearance, structured rotating logs, and
   privacy-filtered diagnostics.
+- Bounded audio-device hot-plug handling with automatic default-device recovery after
+  an explicitly selected playback device disconnects.
 - Generated CC0 fixtures and unit, core, integration, GUI, property, stress, and
   ASan/UBSan coverage through CTest.
 - Reproducible CMake presets, three-platform CI, CPack distributions, checksum gates,

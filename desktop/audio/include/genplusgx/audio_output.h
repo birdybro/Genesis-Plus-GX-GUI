@@ -52,6 +52,15 @@ struct AudioOutputMetrics final {
   AudioRingMetrics ring;
 };
 
+struct AudioDeviceEventSummary final {
+  std::size_t processedEvents{0};
+  bool playbackDevicesChanged{false};
+  bool selectedDeviceRemoved{false};
+  bool formatChanged{false};
+  bool recoveredToDefault{false};
+  AudioOutputStatus recoveryStatus;
+};
+
 [[nodiscard]] std::size_t audioRingCapacityFrames(
   const AudioOutputConfig& config) noexcept;
 void applyAudioOutputGain(
@@ -75,6 +84,7 @@ public:
   [[nodiscard]] AudioOutputStatus resume();
   [[nodiscard]] AudioOutputStatus shutdown();
   [[nodiscard]] AudioOutputStatus setVolumePercent(int volumePercent);
+  [[nodiscard]] AudioDeviceEventSummary pollDeviceEvents();
   void setMuted(bool muted) noexcept;
 
   [[nodiscard]] bool isInitialized() const noexcept;

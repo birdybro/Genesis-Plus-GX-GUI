@@ -249,9 +249,15 @@ Settings dialog instead of being conflated with display scaling.
 
 Choose **Input → Controller Configuration…** to edit named keyboard/controller profiles,
 capture Genesis three-/six-button bindings, reset mappings, set the SDL analog deadzone,
-and select advanced emulated devices. Activate a binding and press a key or standardized
+select advanced emulated devices, and configure emulator hotkeys. Activate a binding and press a key or standardized
 controller button; Escape cancels capture. Duplicate bindings and unmodified keys reserved
 by emulator actions are rejected before Apply or OK can publish the profile.
+
+The **Hotkeys** tab captures unique keyboard combinations for Open/Close, the library,
+pause, hard/soft reset, fullscreen, fast forward, frame advance, save-state slots,
+screenshots, mute, and volume. Apply updates the live menu shortcuts immediately;
+Restore Defaults on this tab resets only emulator shortcuts. See
+[KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md) for the complete default table.
 
 Choose **Input → Player Assignments…** to open the assignments page directly. Controllers
 are discovered at startup and hot-plugged while the application runs. Assigning a device
@@ -299,7 +305,10 @@ Mute, volume, and core mixing/chip settings affect a running game immediately at
 frame boundary. Playback device and latency define the SDL stream and bounded ring, so
 the dialog marks them as taking effect after restarting. If a configured device is no
 longer available, the application logs the condition and safely opens the system
-default. Settings are atomically stored as `config/audio-settings.json`; malformed or
+default. SDL audio hot-plug events are drained in bounded batches; if an explicitly
+selected device disconnects while running, playback automatically reopens on the
+current default device without replacing the saved preference. Settings are atomically
+stored as `config/audio-settings.json`; malformed or
 unsupported files fail closed to defaults.
 
 ## System settings

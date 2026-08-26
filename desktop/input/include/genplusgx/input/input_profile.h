@@ -28,6 +28,49 @@ enum class LogicalDeviceType : std::uint8_t {
   activator,
 };
 
+enum class EmulatorHotkeyAction : std::uint8_t {
+  openGame,
+  closeGame,
+  gameLibrary,
+  pause,
+  hardReset,
+  softReset,
+  fullscreen,
+  fastForward,
+  frameAdvance,
+  saveState,
+  loadState,
+  stateSlot0,
+  stateSlot1,
+  stateSlot2,
+  stateSlot3,
+  stateSlot4,
+  stateSlot5,
+  stateSlot6,
+  stateSlot7,
+  stateSlot8,
+  stateSlot9,
+  previousStateSlot,
+  nextStateSlot,
+  deleteState,
+  screenshot,
+  mute,
+  volumeUp,
+  volumeDown,
+};
+
+inline constexpr std::size_t emulatorHotkeyActionCount = 28U;
+
+struct HotkeyBinding final {
+  EmulatorHotkeyAction action{EmulatorHotkeyAction::openGame};
+  int keyCombination{0};
+
+  friend bool operator==(const HotkeyBinding&, const HotkeyBinding&) = default;
+};
+
+[[nodiscard]] std::string_view emulatorHotkeyActionName(
+  EmulatorHotkeyAction action) noexcept;
+
 [[nodiscard]] std::string_view logicalDeviceTypeName(LogicalDeviceType type) noexcept;
 
 struct InputProfile final {
@@ -42,11 +85,12 @@ struct InputProfile final {
 };
 
 struct InputConfiguration final {
-  static constexpr int currentSchemaVersion = 1;
+  static constexpr int currentSchemaVersion = 2;
 
   int schemaVersion{currentSchemaVersion};
   std::string activeProfile;
   std::vector<InputProfile> profiles;
+  std::vector<HotkeyBinding> hotkeys;
 
   [[nodiscard]] InputProfile* active() noexcept;
   [[nodiscard]] const InputProfile* active() const noexcept;
@@ -95,7 +139,13 @@ struct InputBindingConflict final {
 
 [[nodiscard]] InputProfile defaultInputProfile(std::string name = "Default");
 [[nodiscard]] InputConfiguration defaultInputConfiguration();
+[[nodiscard]] std::vector<HotkeyBinding> defaultEmulatorHotkeys();
+[[nodiscard]] std::vector<int> reservedGameplayHotkeyKeys(
+  const std::vector<HotkeyBinding>& hotkeys);
 [[nodiscard]] std::vector<int> defaultReservedHotkeyKeys();
+[[nodiscard]] std::optional<int> hotkeyCombination(
+  const InputConfiguration& configuration,
+  EmulatorHotkeyAction action) noexcept;
 [[nodiscard]] InputProfileStatus validateInputProfile(const InputProfile& profile);
 [[nodiscard]] InputProfileStatus validateInputConfiguration(
   const InputConfiguration& configuration);
@@ -110,6 +160,11 @@ struct InputBindingConflict final {
   InputButton input,
   SDL_GamepadButton button);
 [[nodiscard]] bool setKeyboardBinding(InputProfile& profile, InputButton input, int key);
+[[nodiscard]] bool setKeyboardBinding(
+  InputProfile& profile,
+  InputButton input,
+  int key,
+  const std::vector<int>& applicationHotkeys);
 [[nodiscard]] bool setControllerBinding(
   InputProfile& profile,
   InputButton input,

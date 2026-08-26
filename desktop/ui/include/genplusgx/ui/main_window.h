@@ -252,6 +252,7 @@ private:
     const char* objectName,
     const QKeySequence& shortcut = {});
   void buildMenus();
+  void applyHotkeyShortcuts();
   void buildStatusBar();
   void createCanvas();
   void setGameActionsEnabled(bool enabled);

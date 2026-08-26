@@ -1488,6 +1488,28 @@ int main(int argc, char* argv[])
      &stateOperationId,
      &stateSessionAvailable, &stateStorage, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
+    const auto audioDeviceEvents = audioOutput.pollDeviceEvents();
+    if (audioDeviceEvents.playbackDevicesChanged) {
+      std::vector<std::string> names;
+      const auto devices = genplusgx::availableAudioOutputDevices();
+      names.reserve(devices.size());
+      for (const auto& device : devices) {
+        names.push_back(device.name);
+      }
+      window.setAvailableAudioDevices(std::move(names));
+    }
+    if (audioDeviceEvents.selectedDeviceRemoved) {
+      if (audioDeviceEvents.recoveredToDefault) {
+        qWarning().noquote()
+          << "Selected audio device disconnected; recovered with:"
+          << QString::fromStdString(audioOutput.deviceName());
+      } else {
+        qWarning().noquote()
+          << QString::fromStdString(audioDeviceEvents.recoveryStatus.message);
+      }
+    } else if (audioDeviceEvents.formatChanged) {
+      qInfo() << "Audio device format changed; SDL stream conversion remains active.";
+    }
     const auto instrumentationNow = std::chrono::steady_clock::now();
     if (instrumentationNow >= nextInstrumentationLog) {
       const auto audioMetrics = audioOutput.metrics().ring;

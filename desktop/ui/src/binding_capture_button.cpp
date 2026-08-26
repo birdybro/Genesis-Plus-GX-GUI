@@ -13,6 +13,12 @@ QString keyboardBindingName(int key)
   return name.isEmpty() ? QObject::tr("Key %1").arg(key) : name;
 }
 
+bool isModifierKey(Qt::Key key) noexcept
+{
+  return key == Qt::Key_Shift || key == Qt::Key_Control ||
+    key == Qt::Key_Meta || key == Qt::Key_Alt || key == Qt::Key_AltGr;
+}
+
 QString controllerBindingName(SDL_GamepadButton button)
 {
   const char* name = SDL_GetGamepadStringForButton(button);
@@ -47,6 +53,14 @@ void BindingCaptureButton::setControllerBinding(SDL_GamepadButton button)
 {
   kind_ = BindingCaptureKind::controller;
   bindingCode_ = static_cast<int>(button);
+  capturing_ = false;
+  updateLabel();
+}
+
+void BindingCaptureButton::setHotkeyBinding(int keyCombination)
+{
+  kind_ = BindingCaptureKind::hotkey;
+  bindingCode_ = keyCombination;
   capturing_ = false;
   updateLabel();
 }
@@ -116,18 +130,24 @@ void BindingCaptureButton::keyPressEvent(QKeyEvent* event)
     event->accept();
     return;
   }
-  if (kind_ != BindingCaptureKind::keyboard) {
+  if (kind_ == BindingCaptureKind::controller) {
     event->accept();
     return;
   }
-  if (event->key() == Qt::Key_unknown) {
+  if (event->key() == Qt::Key_unknown || isModifierKey(
+        static_cast<Qt::Key>(event->key()))) {
     event->ignore();
     return;
   }
-  bindingCode_ = event->key();
+  bindingCode_ = kind_ == BindingCaptureKind::hotkey
+    ? event->keyCombination().toCombined() : event->key();
   capturing_ = false;
   updateLabel();
-  emit keyboardCaptured(bindingCode_);
+  if (kind_ == BindingCaptureKind::hotkey) {
+    emit hotkeyCaptured(bindingCode_);
+  } else {
+    emit keyboardCaptured(bindingCode_);
+  }
   event->accept();
 }
 
@@ -139,13 +159,14 @@ void BindingCaptureButton::focusOutEvent(QFocusEvent* event)
 
 void BindingCaptureButton::updateLabel()
 {
-  const auto label = kind_ == BindingCaptureKind::keyboard
-    ? keyboardBindingName(bindingCode_)
-    : controllerBindingName(static_cast<SDL_GamepadButton>(bindingCode_));
+  const auto label = kind_ == BindingCaptureKind::controller
+    ? controllerBindingName(static_cast<SDL_GamepadButton>(bindingCode_))
+    : keyboardBindingName(bindingCode_);
   setText(label);
   setAccessibleName(tr("%1 binding: %2")
       .arg(QString::fromLatin1(kind_ == BindingCaptureKind::keyboard
-            ? "Keyboard" : "Controller"), label));
+            ? "Keyboard" : kind_ == BindingCaptureKind::controller
+              ? "Controller" : "Hotkey"), label));
 }
 
 } // namespace genplusgx::ui

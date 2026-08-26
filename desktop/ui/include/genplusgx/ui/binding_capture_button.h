@@ -11,6 +11,7 @@ namespace genplusgx::ui {
 enum class BindingCaptureKind {
   keyboard,
   controller,
+  hotkey,
 };
 
 class BindingCaptureButton final : public QPushButton {
@@ -24,6 +25,7 @@ public:
 
   void setKeyboardBinding(int key);
   void setControllerBinding(SDL_GamepadButton button);
+  void setHotkeyBinding(int keyCombination);
   [[nodiscard]] int bindingCode() const noexcept;
   [[nodiscard]] InputButton input() const noexcept;
   [[nodiscard]] BindingCaptureKind kind() const noexcept;
@@ -36,6 +38,7 @@ public:
 signals:
   void keyboardCaptured(int key);
   void controllerCaptured(int button);
+  void hotkeyCaptured(int keyCombination);
 
 protected:
   void keyPressEvent(QKeyEvent* event) override;

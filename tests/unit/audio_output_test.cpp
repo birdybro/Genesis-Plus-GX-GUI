@@ -1,5 +1,8 @@
 #include "genplusgx/audio_output.h"
 
+#include <SDL3/SDL_events.h>
+#include <SDL3/SDL_init.h>
+
 #include <array>
 #include <algorithm>
 #include <chrono>
@@ -61,7 +64,9 @@ int main()
   }
 
   genplusgx::AudioOutput output{config};
-  if (!check(output.pause().error == genplusgx::AudioOutputError::notInitialized,
+  if (!check(output.pollDeviceEvents().processedEvents == 0U,
+        "Uninitialized audio output consumed SDL events") ||
+      !check(output.pause().error == genplusgx::AudioOutputError::notInitialized,
         "Uninitialized audio output accepted pause") ||
       !check(output.resume().error == genplusgx::AudioOutputError::notInitialized,
         "Uninitialized audio output accepted resume") ||
@@ -89,6 +94,33 @@ int main()
     return 3;
   }
   output.setMuted(false);
+
+  // SDL's event queue can receive hot-plug bursts. The frontend drains only a
+  // bounded batch per GUI tick so device churn cannot stall the event loop.
+  static_cast<void>(output.pollDeviceEvents());
+  for (std::size_t index = 0U; index < 70U; ++index) {
+    SDL_Event event{};
+    event.type = index == 0U
+      ? SDL_EVENT_AUDIO_DEVICE_ADDED
+      : SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED;
+    event.adevice.which = static_cast<SDL_AudioDeviceID>(index + 1U);
+    event.adevice.recording = false;
+    if (!check(SDL_PushEvent(&event), "Could not queue an SDL audio-device event")) {
+      return 4;
+    }
+  }
+  const auto firstDeviceBatch = output.pollDeviceEvents();
+  const auto secondDeviceBatch = output.pollDeviceEvents();
+  if (!check(firstDeviceBatch.processedEvents == 64U,
+        "Audio device polling did not enforce its per-tick bound") ||
+      !check(firstDeviceBatch.playbackDevicesChanged &&
+        firstDeviceBatch.formatChanged,
+        "Playback-device events were not classified") ||
+      !check(secondDeviceBatch.processedEvents == 6U &&
+        secondDeviceBatch.formatChanged,
+        "Deferred audio-device events were not drained on the next tick")) {
+    return 4;
+  }
 
   std::array<genplusgx::StereoAudioFrame, 1'024> source{};
   for (std::size_t index = 0; index < source.size(); ++index) {
@@ -146,6 +178,40 @@ int main()
         "Shutdown audio output accepted resume")) {
     return 6;
   }
+
+  if (!check(SDL_InitSubSystem(SDL_INIT_AUDIO),
+        "Could not initialize SDL for selected-device recovery")) {
+    return 7;
+  }
+  const auto devices = genplusgx::availableAudioOutputDevices();
+  if (!check(!devices.empty(), "SDL dummy driver exposed no playback device")) {
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    return 7;
+  }
+  auto selectedConfig = config;
+  selectedConfig.deviceId = devices.front().id;
+  genplusgx::AudioOutput selected{selectedConfig};
+  if (!check(selected.initialize(), "Selected SDL dummy output did not initialize")) {
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    return 7;
+  }
+  static_cast<void>(selected.pollDeviceEvents());
+  SDL_Event removed{};
+  removed.type = SDL_EVENT_AUDIO_DEVICE_REMOVED;
+  removed.adevice.which = static_cast<SDL_AudioDeviceID>(selectedConfig.deviceId);
+  removed.adevice.recording = false;
+  if (!check(SDL_PushEvent(&removed), "Could not queue selected-device removal") ) {
+    return 7;
+  }
+  const auto recovered = selected.pollDeviceEvents();
+  if (!check(recovered.selectedDeviceRemoved && recovered.recoveredToDefault &&
+        recovered.recoveryStatus && selected.isInitialized() &&
+        selected.config().deviceId == 0U && !selected.deviceName().empty(),
+        "Removed selected output did not recover to the default device") ||
+      !check(selected.shutdown(), "Recovered audio output did not shut down")) {
+    return 7;
+  }
+  SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
   return 0;
 }

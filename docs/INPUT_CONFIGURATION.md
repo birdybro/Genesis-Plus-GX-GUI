@@ -49,10 +49,18 @@ cancelled with Escape. Captured controller buttons are consumed by the dialog an
 not leak into a running game.
 
 Duplicate physical bindings are rejected with an inline explanation. Unmodified keys
-reserved by emulator hotkeys are also rejected, preventing a gameplay mapping from
+reserved by the configured emulator hotkeys are also rejected, preventing a gameplay mapping from
 silently shadowing Pause, Fast Forward, Frame Advance, save/load, screenshot, mute, or
 volume shortcuts. Restore Defaults resets the selected profile; Cancel leaves the live
 configuration unchanged; Apply and OK validate before publishing changes.
+
+The Hotkeys tab captures a single keyboard combination for Open/Close, library,
+pause/reset, fullscreen, fast forward, frame advance, save-state operations and slots,
+screenshot, mute, and volume. Shortcuts must be unique. A shortcut that would consume a
+gameplay key in any stored profile is rejected, while Ctrl, Alt, and Command/Meta chords
+remain available because gameplay input deliberately ignores those modifiers. Apply or
+OK changes the live menu shortcuts immediately. Restore Defaults while this tab is
+selected resets the hotkeys rather than the active gameplay profile.
 
 The Advanced Devices tab configures the analog deadzone, the logical device selected
 for each of eight frontend players, and the emulated action produced by each left-stick
@@ -68,6 +76,6 @@ profile is applied immediately after a successful Apply or OK.
 
 Profiles are stored atomically as versioned JSON at
 `<application-data>/config/input-profiles.json`. The file contains no hardware secrets.
-Schema 0 data is migrated to the current schema with explicit defaults for fields that
-did not previously exist. A missing file produces defaults; malformed, oversized,
+Schema 0 and 1 data is migrated to schema 2 with explicit device, axis, and hotkey
+defaults for fields that did not previously exist. A missing file produces defaults; malformed, oversized,
 future-schema, or invalid data is rejected without partially applying it.

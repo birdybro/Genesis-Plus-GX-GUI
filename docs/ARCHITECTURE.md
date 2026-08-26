@@ -397,7 +397,11 @@ emulator UI or core worker from running.
 
 Playback devices are enumerated through SDL and persisted by display name rather than
 their process-local numeric IDs. A missing configured device falls back to the default
-with a diagnostic. The callback applies bounded integer master gain after filling
+with a diagnostic. The GUI event pump drains at most 64 audio hot-plug events per tick.
+SDL automatically migrates streams opened on the default logical device; removal of an
+explicitly selected device destroys its stream and reopens the default while retaining
+the shared bounded ring and pause state. The device list and diagnostics then refresh.
+The callback applies bounded integer master gain after filling
 shortages; mute writes silence while continuing to drain the ring, preventing muted
 sessions from building a backlog. Neither operation locks or allocates on the audio
 thread.

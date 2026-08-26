@@ -1,7 +1,8 @@
 # Keyboard Controls and Shortcuts
 
 The same default shortcut reference is available in the application through **Help →
-Keyboard Shortcuts**.
+Keyboard Shortcuts**. Emulator shortcuts can be changed under **Input → Controller
+Configuration… → Hotkeys**; Preferences and Quit retain their platform-standard keys.
 
 ## Default Player 1 controls
 
@@ -40,7 +41,7 @@ shortcuts.
 | Fullscreen | Alt+Return |
 | Pause/resume | Space |
 | Hard reset | Ctrl+R |
-| Soft reset | No default shortcut; use Emulation menu |
+| Soft reset | Ctrl+Shift+R |
 | Fast forward | Tab |
 | Frame advance | N |
 | Save selected state slot | F5 |
@@ -55,5 +56,9 @@ shortcuts.
 | Quit | Platform standard shortcut |
 
 Game-dependent shortcuts stay disabled until a game or first video frame makes the
-operation valid. Application hotkeys and gameplay bindings are conflict-checked; input
-capture rejects an unmodified key reserved by one of these emulator actions.
+operation valid. Activate a Hotkeys-tab button and press one keyboard combination;
+Escape cancels capture. Every shortcut must be unique. Unmodified shortcuts—and
+Shift-only chords where either physical key is a gameplay control—are rejected when
+they would shadow a gameplay binding in any profile. Ctrl, Alt, or Command/Meta chords
+remain separate from gameplay input. **Restore Defaults** on the Hotkeys tab resets all
+emulator shortcuts without changing controller profiles.

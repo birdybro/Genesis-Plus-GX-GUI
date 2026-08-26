@@ -2,10 +2,14 @@
 
 #include "genplusgx/persistence.h"
 
+#include <QCoreApplication>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
+#include <QKeyCombination>
+#include <QKeySequence>
 #include <QString>
 
 #include <algorithm>
@@ -46,6 +50,39 @@ constexpr std::array deviceTypes{
   LogicalDeviceType::graphicBoard,
   LogicalDeviceType::activator,
 };
+
+constexpr std::array hotkeyActions{
+  EmulatorHotkeyAction::openGame,
+  EmulatorHotkeyAction::closeGame,
+  EmulatorHotkeyAction::gameLibrary,
+  EmulatorHotkeyAction::pause,
+  EmulatorHotkeyAction::hardReset,
+  EmulatorHotkeyAction::softReset,
+  EmulatorHotkeyAction::fullscreen,
+  EmulatorHotkeyAction::fastForward,
+  EmulatorHotkeyAction::frameAdvance,
+  EmulatorHotkeyAction::saveState,
+  EmulatorHotkeyAction::loadState,
+  EmulatorHotkeyAction::stateSlot0,
+  EmulatorHotkeyAction::stateSlot1,
+  EmulatorHotkeyAction::stateSlot2,
+  EmulatorHotkeyAction::stateSlot3,
+  EmulatorHotkeyAction::stateSlot4,
+  EmulatorHotkeyAction::stateSlot5,
+  EmulatorHotkeyAction::stateSlot6,
+  EmulatorHotkeyAction::stateSlot7,
+  EmulatorHotkeyAction::stateSlot8,
+  EmulatorHotkeyAction::stateSlot9,
+  EmulatorHotkeyAction::previousStateSlot,
+  EmulatorHotkeyAction::nextStateSlot,
+  EmulatorHotkeyAction::deleteState,
+  EmulatorHotkeyAction::screenshot,
+  EmulatorHotkeyAction::mute,
+  EmulatorHotkeyAction::volumeUp,
+  EmulatorHotkeyAction::volumeDown,
+};
+
+static_assert(hotkeyActions.size() == emulatorHotkeyActionCount);
 
 InputProfileStatus success()
 {
@@ -107,6 +144,76 @@ std::optional<LogicalDeviceType> parseDeviceType(const QString& name)
   const auto found = std::find_if(deviceTypes.begin(), deviceTypes.end(),
     [&text](LogicalDeviceType type) { return logicalDeviceTypeName(type) == text; });
   return found == deviceTypes.end() ? std::nullopt : std::optional{*found};
+}
+
+std::optional<EmulatorHotkeyAction> parseHotkeyAction(const QString& name)
+{
+  const auto text = name.toStdString();
+  const auto found = std::find_if(hotkeyActions.begin(), hotkeyActions.end(),
+    [&text](EmulatorHotkeyAction action) {
+      return emulatorHotkeyActionName(action) == text;
+    });
+  return found == hotkeyActions.end() ? std::nullopt : std::optional{*found};
+}
+
+bool isModifierKey(Qt::Key key) noexcept
+{
+  return key == Qt::Key_Shift || key == Qt::Key_Control ||
+    key == Qt::Key_Meta || key == Qt::Key_Alt || key == Qt::Key_AltGr;
+}
+
+bool isValidHotkeyCombination(int combined) noexcept
+{
+  if (combined == 0) {
+    return false;
+  }
+  const auto combination = QKeyCombination::fromCombined(combined);
+  return combination.key() != Qt::Key_unknown &&
+    !isModifierKey(combination.key()) &&
+    !QKeySequence{combination}.toString(QKeySequence::PortableText).isEmpty();
+}
+
+int standardCombination(QKeySequence::StandardKey standard, int fallback)
+{
+  if (qobject_cast<QGuiApplication*>(QCoreApplication::instance()) == nullptr) {
+    return fallback;
+  }
+  const QKeySequence sequence{standard};
+  return sequence.count() == 0 ? fallback : sequence[0].toCombined();
+}
+
+int combined(Qt::KeyboardModifiers modifiers, Qt::Key key) noexcept
+{
+  return QKeyCombination{modifiers, key}.toCombined();
+}
+
+std::optional<std::vector<HotkeyBinding>> hotkeysFromJson(const QJsonValue& value)
+{
+  if (!value.isArray()) {
+    return std::nullopt;
+  }
+  std::vector<HotkeyBinding> hotkeys;
+  const auto values = value.toArray();
+  hotkeys.reserve(static_cast<std::size_t>(values.size()));
+  for (const auto entry : values) {
+    if (!entry.isObject()) {
+      return std::nullopt;
+    }
+    const auto object = entry.toObject();
+    const auto action = parseHotkeyAction(
+      object.value(QStringLiteral("action")).toString());
+    const auto sequenceText = object.value(QStringLiteral("sequence"));
+    if (!action || !sequenceText.isString()) {
+      return std::nullopt;
+    }
+    const auto sequence = QKeySequence::fromString(
+      sequenceText.toString(), QKeySequence::PortableText);
+    if (sequence.count() != 1 || !isValidHotkeyCombination(sequence[0].toCombined())) {
+      return std::nullopt;
+    }
+    hotkeys.push_back({*action, sequence[0].toCombined()});
+  }
+  return hotkeys;
 }
 
 QJsonObject profileToJson(const InputProfile& profile)
@@ -247,10 +354,21 @@ QByteArray configurationToJson(const InputConfiguration& configuration)
   for (const auto& profile : configuration.profiles) {
     profiles.push_back(profileToJson(profile));
   }
+  QJsonArray hotkeys;
+  for (const auto& binding : configuration.hotkeys) {
+    hotkeys.push_back(QJsonObject{
+      {QStringLiteral("action"),
+        QString::fromLatin1(emulatorHotkeyActionName(binding.action))},
+      {QStringLiteral("sequence"),
+        QKeySequence{QKeyCombination::fromCombined(binding.keyCombination)}
+          .toString(QKeySequence::PortableText)},
+    });
+  }
   return QJsonDocument{QJsonObject{
     {QStringLiteral("schemaVersion"), InputConfiguration::currentSchemaVersion},
     {QStringLiteral("activeProfile"), QString::fromStdString(configuration.activeProfile)},
     {QStringLiteral("profiles"), profiles},
+    {QStringLiteral("hotkeys"), hotkeys},
   }}.toJson(QJsonDocument::Indented);
 }
 
@@ -292,6 +410,20 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
     ? QStringLiteral("selectedProfile")
     : QStringLiteral("activeProfile");
   configuration.activeProfile = root.value(activeKey).toString().toStdString();
+  if (schema < 2) {
+    configuration.hotkeys = defaultEmulatorHotkeys();
+  } else {
+    const auto hotkeys = hotkeysFromJson(root.value(QStringLiteral("hotkeys")));
+    if (!hotkeys) {
+      return {
+        .status = failure(InputProfileError::parseFailed,
+          "Input profile JSON contains invalid emulator hotkeys."),
+        .exists = true,
+        .configuration = defaultInputConfiguration(),
+      };
+    }
+    configuration.hotkeys = *hotkeys;
+  }
   for (const auto value : root.value(QStringLiteral("profiles")).toArray()) {
     if (!value.isObject()) {
       return {
@@ -329,6 +461,69 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
 }
 
 } // namespace
+
+std::string_view emulatorHotkeyActionName(EmulatorHotkeyAction action) noexcept
+{
+  switch (action) {
+  case EmulatorHotkeyAction::openGame:
+    return "open-game";
+  case EmulatorHotkeyAction::closeGame:
+    return "close-game";
+  case EmulatorHotkeyAction::gameLibrary:
+    return "game-library";
+  case EmulatorHotkeyAction::pause:
+    return "pause";
+  case EmulatorHotkeyAction::hardReset:
+    return "hard-reset";
+  case EmulatorHotkeyAction::softReset:
+    return "soft-reset";
+  case EmulatorHotkeyAction::fullscreen:
+    return "fullscreen";
+  case EmulatorHotkeyAction::fastForward:
+    return "fast-forward";
+  case EmulatorHotkeyAction::frameAdvance:
+    return "frame-advance";
+  case EmulatorHotkeyAction::saveState:
+    return "save-state";
+  case EmulatorHotkeyAction::loadState:
+    return "load-state";
+  case EmulatorHotkeyAction::stateSlot0:
+    return "state-slot-0";
+  case EmulatorHotkeyAction::stateSlot1:
+    return "state-slot-1";
+  case EmulatorHotkeyAction::stateSlot2:
+    return "state-slot-2";
+  case EmulatorHotkeyAction::stateSlot3:
+    return "state-slot-3";
+  case EmulatorHotkeyAction::stateSlot4:
+    return "state-slot-4";
+  case EmulatorHotkeyAction::stateSlot5:
+    return "state-slot-5";
+  case EmulatorHotkeyAction::stateSlot6:
+    return "state-slot-6";
+  case EmulatorHotkeyAction::stateSlot7:
+    return "state-slot-7";
+  case EmulatorHotkeyAction::stateSlot8:
+    return "state-slot-8";
+  case EmulatorHotkeyAction::stateSlot9:
+    return "state-slot-9";
+  case EmulatorHotkeyAction::previousStateSlot:
+    return "previous-state-slot";
+  case EmulatorHotkeyAction::nextStateSlot:
+    return "next-state-slot";
+  case EmulatorHotkeyAction::deleteState:
+    return "delete-state";
+  case EmulatorHotkeyAction::screenshot:
+    return "screenshot";
+  case EmulatorHotkeyAction::mute:
+    return "mute";
+  case EmulatorHotkeyAction::volumeUp:
+    return "volume-up";
+  case EmulatorHotkeyAction::volumeDown:
+    return "volume-down";
+  }
+  return {};
+}
 
 std::string_view logicalDeviceTypeName(LogicalDeviceType type) noexcept
 {
@@ -393,16 +588,92 @@ InputConfiguration defaultInputConfiguration()
   InputConfiguration configuration;
   configuration.activeProfile = "Default";
   configuration.profiles.push_back(defaultInputProfile());
+  configuration.hotkeys = defaultEmulatorHotkeys();
   return configuration;
+}
+
+std::vector<HotkeyBinding> defaultEmulatorHotkeys()
+{
+  const auto control = Qt::ControlModifier;
+  return {
+    {EmulatorHotkeyAction::openGame,
+      standardCombination(QKeySequence::Open,
+        combined(control, Qt::Key_O))},
+    {EmulatorHotkeyAction::closeGame,
+      standardCombination(QKeySequence::Close,
+        combined(control, Qt::Key_W))},
+    {EmulatorHotkeyAction::gameLibrary, combined(control, Qt::Key_L)},
+    {EmulatorHotkeyAction::pause, combined(Qt::NoModifier, Qt::Key_Space)},
+    {EmulatorHotkeyAction::hardReset, combined(control, Qt::Key_R)},
+    {EmulatorHotkeyAction::softReset,
+      combined(control | Qt::ShiftModifier, Qt::Key_R)},
+    {EmulatorHotkeyAction::fullscreen, combined(Qt::AltModifier, Qt::Key_Return)},
+    {EmulatorHotkeyAction::fastForward, combined(Qt::NoModifier, Qt::Key_Tab)},
+    {EmulatorHotkeyAction::frameAdvance, combined(Qt::NoModifier, Qt::Key_N)},
+    {EmulatorHotkeyAction::saveState, combined(Qt::NoModifier, Qt::Key_F5)},
+    {EmulatorHotkeyAction::loadState, combined(Qt::NoModifier, Qt::Key_F8)},
+    {EmulatorHotkeyAction::stateSlot0, combined(control, Qt::Key_0)},
+    {EmulatorHotkeyAction::stateSlot1, combined(control, Qt::Key_1)},
+    {EmulatorHotkeyAction::stateSlot2, combined(control, Qt::Key_2)},
+    {EmulatorHotkeyAction::stateSlot3, combined(control, Qt::Key_3)},
+    {EmulatorHotkeyAction::stateSlot4, combined(control, Qt::Key_4)},
+    {EmulatorHotkeyAction::stateSlot5, combined(control, Qt::Key_5)},
+    {EmulatorHotkeyAction::stateSlot6, combined(control, Qt::Key_6)},
+    {EmulatorHotkeyAction::stateSlot7, combined(control, Qt::Key_7)},
+    {EmulatorHotkeyAction::stateSlot8, combined(control, Qt::Key_8)},
+    {EmulatorHotkeyAction::stateSlot9, combined(control, Qt::Key_9)},
+    {EmulatorHotkeyAction::previousStateSlot,
+      combined(control, Qt::Key_BracketLeft)},
+    {EmulatorHotkeyAction::nextStateSlot,
+      combined(control, Qt::Key_BracketRight)},
+    {EmulatorHotkeyAction::deleteState, combined(control, Qt::Key_Delete)},
+    {EmulatorHotkeyAction::screenshot, combined(Qt::NoModifier, Qt::Key_F12)},
+    {EmulatorHotkeyAction::mute, combined(Qt::NoModifier, Qt::Key_M)},
+    {EmulatorHotkeyAction::volumeUp, combined(Qt::NoModifier, Qt::Key_Plus)},
+    {EmulatorHotkeyAction::volumeDown, combined(Qt::NoModifier, Qt::Key_Minus)},
+  };
+}
+
+std::vector<int> reservedGameplayHotkeyKeys(
+  const std::vector<HotkeyBinding>& hotkeys)
+{
+  std::set<int> reserved;
+  for (const auto& binding : hotkeys) {
+    const auto combination = QKeyCombination::fromCombined(binding.keyCombination);
+    const auto modifiers = combination.keyboardModifiers();
+    if (modifiers.testAnyFlags(
+          Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier)) {
+      continue;
+    }
+    reserved.insert(static_cast<int>(combination.key()));
+    if (modifiers.testFlag(Qt::ShiftModifier)) {
+      reserved.insert(Qt::Key_Shift);
+    }
+  }
+  return {reserved.begin(), reserved.end()};
 }
 
 std::vector<int> defaultReservedHotkeyKeys()
 {
-  return {Qt::Key_Space, Qt::Key_Tab, Qt::Key_N, Qt::Key_F5,
-    Qt::Key_F8, Qt::Key_F12, Qt::Key_M, Qt::Key_Plus, Qt::Key_Minus};
+  return reservedGameplayHotkeyKeys(defaultEmulatorHotkeys());
 }
 
-InputProfileStatus validateInputProfile(const InputProfile& profile)
+std::optional<int> hotkeyCombination(
+  const InputConfiguration& configuration,
+  EmulatorHotkeyAction action) noexcept
+{
+  const auto found = std::find_if(configuration.hotkeys.begin(),
+    configuration.hotkeys.end(),
+    [action](const HotkeyBinding& binding) { return binding.action == action; });
+  return found == configuration.hotkeys.end()
+    ? std::nullopt : std::optional{found->keyCombination};
+}
+
+namespace {
+
+InputProfileStatus validateInputProfileWithHotkeys(
+  const InputProfile& profile,
+  const std::vector<int>& reservedHotkeys)
 {
   if (profile.name.empty() || profile.name.size() > 64U) {
     return failure(InputProfileError::invalidConfiguration,
@@ -414,7 +685,6 @@ InputProfileStatus validateInputProfile(const InputProfile& profile)
   }
   std::set<int> keyboardKeys;
   std::set<InputButton> keyboardInputs;
-  const auto reservedHotkeys = defaultReservedHotkeyKeys();
   for (const auto& binding : profile.keyboardBindings) {
     if (binding.key == 0 || !isValidInput(binding.button) ||
         std::find(reservedHotkeys.begin(), reservedHotkeys.end(), binding.key) !=
@@ -457,6 +727,13 @@ InputProfileStatus validateInputProfile(const InputProfile& profile)
   return success();
 }
 
+} // namespace
+
+InputProfileStatus validateInputProfile(const InputProfile& profile)
+{
+  return validateInputProfileWithHotkeys(profile, defaultReservedHotkeyKeys());
+}
+
 InputProfileStatus validateInputConfiguration(const InputConfiguration& configuration)
 {
   if (configuration.schemaVersion != InputConfiguration::currentSchemaVersion ||
@@ -464,9 +741,26 @@ InputProfileStatus validateInputConfiguration(const InputConfiguration& configur
     return failure(InputProfileError::invalidConfiguration,
       "Input configuration schema or profile count is invalid.");
   }
+  if (configuration.hotkeys.size() != emulatorHotkeyActionCount) {
+    return failure(InputProfileError::invalidConfiguration,
+      "Every emulator hotkey must have exactly one assignment.");
+  }
+  std::set<EmulatorHotkeyAction> hotkeyAssignments;
+  std::set<int> hotkeyCombinations;
+  for (const auto& binding : configuration.hotkeys) {
+    if (std::find(hotkeyActions.begin(), hotkeyActions.end(), binding.action) ==
+          hotkeyActions.end() ||
+        !isValidHotkeyCombination(binding.keyCombination) ||
+        !hotkeyAssignments.insert(binding.action).second ||
+        !hotkeyCombinations.insert(binding.keyCombination).second) {
+      return failure(InputProfileError::invalidConfiguration,
+        "Emulator hotkeys contain an empty, unknown, or duplicate assignment.");
+    }
+  }
+  const auto reservedHotkeys = reservedGameplayHotkeyKeys(configuration.hotkeys);
   std::set<std::string> names;
   for (const auto& profile : configuration.profiles) {
-    const auto validation = validateInputProfile(profile);
+    const auto validation = validateInputProfileWithHotkeys(profile, reservedHotkeys);
     if (!validation) {
       return validation;
     }
@@ -536,8 +830,18 @@ std::optional<InputBindingConflict> controllerBindingConflict(
 
 bool setKeyboardBinding(InputProfile& profile, InputButton input, int key)
 {
+  return setKeyboardBinding(
+    profile, input, key, defaultReservedHotkeyKeys());
+}
+
+bool setKeyboardBinding(
+  InputProfile& profile,
+  InputButton input,
+  int key,
+  const std::vector<int>& applicationHotkeys)
+{
   if (key == 0 || !isValidInput(input) ||
-      keyboardBindingConflict(profile, input, key, defaultReservedHotkeyKeys())) {
+      keyboardBindingConflict(profile, input, key, applicationHotkeys)) {
     return false;
   }
   const auto found = std::find_if(profile.keyboardBindings.begin(),

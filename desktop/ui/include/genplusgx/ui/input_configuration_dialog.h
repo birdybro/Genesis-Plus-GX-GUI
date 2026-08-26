@@ -26,6 +26,7 @@ enum class InputConfigurationTab {
   bindings,
   assignments,
   advanced,
+  hotkeys,
 };
 
 class InputConfigurationDialog final : public QDialog {
@@ -54,9 +55,11 @@ private:
   QWidget* buildBindingsPage();
   QWidget* buildAssignmentsPage();
   QWidget* buildAdvancedPage();
+  QWidget* buildHotkeysPage();
   void refreshProfileList();
   void refreshEditor();
   void refreshBindings();
+  void refreshHotkeys();
   void refreshAssignments();
   void addProfile();
   void deleteProfile();
@@ -64,6 +67,7 @@ private:
   void selectProfile(int index);
   void keyboardCaptured(InputButton input, int key);
   void controllerCaptured(InputButton input, SDL_GamepadButton button);
+  void hotkeyCaptured(input::EmulatorHotkeyAction action, int keyCombination);
   void cancelOtherCaptures(BindingCaptureButton* active);
   void showConflict(const QString& message);
   void clearConflict();
@@ -84,6 +88,7 @@ private:
   QFormLayout* assignmentsLayout_{nullptr};
   std::vector<BindingCaptureButton*> keyboardButtons_;
   std::vector<BindingCaptureButton*> controllerButtons_;
+  std::vector<BindingCaptureButton*> hotkeyButtons_;
   std::vector<QComboBox*> assignmentCombos_;
   std::vector<QComboBox*> deviceCombos_;
   std::vector<QComboBox*> axisMappingCombos_;

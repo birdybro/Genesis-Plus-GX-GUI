@@ -2,6 +2,7 @@
 
 #include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_error.h>
+#include <SDL3/SDL_events.h>
 #include <SDL3/SDL_init.h>
 
 #include <algorithm>
@@ -23,6 +24,7 @@ constexpr auto maximumLatency = std::chrono::milliseconds{500};
 constexpr std::size_t callbackScratchFrames = 1'024U;
 constexpr int minimumVolumePercent = 0;
 constexpr int maximumVolumePercent = 100;
+constexpr std::size_t maximumDeviceEventsPerPoll = 64U;
 
 AudioOutputStatus success()
 {
@@ -250,6 +252,49 @@ public:
     return success();
   }
 
+  AudioDeviceEventSummary pollDeviceEvents()
+  {
+    AudioDeviceEventSummary summary;
+    if (!initialized_.load(std::memory_order_acquire)) {
+      return summary;
+    }
+    SDL_PumpEvents();
+    std::array<SDL_Event, maximumDeviceEventsPerPoll> events{};
+    const int count = SDL_PeepEvents(
+      events.data(),
+      static_cast<int>(events.size()),
+      SDL_GETEVENT,
+      SDL_EVENT_AUDIO_DEVICE_ADDED,
+      SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED);
+    if (count <= 0) {
+      return summary;
+    }
+    summary.processedEvents = static_cast<std::size_t>(count);
+    for (int index = 0; index < count; ++index) {
+      const auto& deviceEvent = events[static_cast<std::size_t>(index)].adevice;
+      if (deviceEvent.recording) {
+        continue;
+      }
+      if (deviceEvent.type == SDL_EVENT_AUDIO_DEVICE_ADDED ||
+          deviceEvent.type == SDL_EVENT_AUDIO_DEVICE_REMOVED) {
+        summary.playbackDevicesChanged = true;
+      }
+      if (deviceEvent.type == SDL_EVENT_AUDIO_DEVICE_FORMAT_CHANGED) {
+        summary.formatChanged = true;
+      }
+      if (deviceEvent.type == SDL_EVENT_AUDIO_DEVICE_REMOVED &&
+          config_.deviceId != 0U &&
+          deviceEvent.which == static_cast<SDL_AudioDeviceID>(config_.deviceId)) {
+        summary.selectedDeviceRemoved = true;
+      }
+    }
+    if (summary.selectedDeviceRemoved) {
+      summary.recoveryStatus = recoverToDefaultDevice();
+      summary.recoveredToDefault = summary.recoveryStatus.ok();
+    }
+    return summary;
+  }
+
   AudioOutputMetrics metrics() const noexcept
   {
     AudioOutputMetrics snapshot;
@@ -334,6 +379,50 @@ public:
     metricsGeneration_.fetch_add(1U, std::memory_order_release);
   }
 
+  AudioOutputStatus recoverToDefaultDevice()
+  {
+    std::scoped_lock lock{controlMutex_};
+    if (!initialized_.load(std::memory_order_acquire) || stream_ == nullptr) {
+      return failure(AudioOutputError::notInitialized,
+        "The removed audio output was no longer initialized.");
+    }
+    const bool wasPaused = paused_.load(std::memory_order_acquire);
+    static_cast<void>(SDL_PauseAudioStreamDevice(stream_));
+    SDL_DestroyAudioStream(stream_);
+    stream_ = nullptr;
+
+    SDL_AudioSpec sourceSpec{};
+    sourceSpec.format = SDL_AUDIO_S16;
+    sourceSpec.channels = 2;
+    sourceSpec.freq = config_.sampleRate;
+    stream_ = SDL_OpenAudioDeviceStream(
+      SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK,
+      &sourceSpec,
+      &Private::audioCallback,
+      this);
+    config_.deviceId = 0U;
+    ring_->clear();
+    if (stream_ == nullptr) {
+      initialized_.store(false, std::memory_order_release);
+      paused_.store(true, std::memory_order_release);
+      deviceName_.clear();
+      return failure(AudioOutputError::deviceOpenFailed,
+        sdlFailureMessage(
+          "SDL could not recover the removed audio output using the default device"));
+    }
+    const auto openedDevice = SDL_GetAudioStreamDevice(stream_);
+    const char* openedName = openedDevice == 0U
+      ? nullptr : SDL_GetAudioDeviceName(openedDevice);
+    deviceName_ = openedName == nullptr ? "Default playback device" : openedName;
+    if (!wasPaused && !SDL_ResumeAudioStreamDevice(stream_)) {
+      paused_.store(true, std::memory_order_release);
+      return failure(AudioOutputError::deviceControlFailed,
+        sdlFailureMessage("SDL recovered the audio device but could not resume it"));
+    }
+    paused_.store(wasPaused, std::memory_order_release);
+    return success();
+  }
+
   AudioOutputConfig config_;
   std::shared_ptr<StereoAudioRingBuffer> ring_;
   mutable std::mutex controlMutex_;
@@ -383,6 +472,11 @@ AudioOutputStatus AudioOutput::shutdown()
 AudioOutputStatus AudioOutput::setVolumePercent(int volumePercent)
 {
   return private_->setVolumePercent(volumePercent);
+}
+
+AudioDeviceEventSummary AudioOutput::pollDeviceEvents()
+{
+  return private_->pollDeviceEvents();
 }
 
 void AudioOutput::setMuted(bool muted) noexcept

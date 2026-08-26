@@ -5,8 +5,11 @@
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
+#include <QKeyCombination>
+#include <QKeySequence>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <cstdlib>
 #include <iostream>
 #include <span>
@@ -41,6 +44,7 @@ int main()
   using namespace genplusgx::input;
 
   auto configuration = defaultInputConfiguration();
+  const auto reservedDefaults = defaultReservedHotkeyKeys();
   if (!check(validateInputConfiguration(configuration),
         "Default input configuration did not validate") ||
       !check(configuration.active() != nullptr,
@@ -51,7 +55,16 @@ int main()
         "Default profile does not contain both complete six-button layouts") ||
       !check(configuration.active()->devices[0] == LogicalDeviceType::pad6Button &&
         configuration.active()->devices[1] == LogicalDeviceType::pad6Button,
-        "Default logical devices are incorrect")) {
+        "Default logical devices are incorrect") ||
+      !check(configuration.hotkeys.size() == emulatorHotkeyActionCount,
+        "Default emulator hotkeys are incomplete") ||
+      !check(hotkeyCombination(configuration, EmulatorHotkeyAction::softReset) ==
+        QKeyCombination{Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_R}
+          .toCombined(),
+        "Soft-reset hotkey default is incorrect") ||
+      !check(std::ranges::find(reservedDefaults, Qt::Key_M) !=
+        reservedDefaults.end(),
+        "Unmodified emulator hotkeys were not reserved from gameplay")) {
     return EXIT_FAILURE;
   }
 
@@ -86,6 +99,19 @@ int main()
   }
   profile->deadzone = 12'500;
   profile->devices[0] = LogicalDeviceType::segaMouse;
+  const auto mute = std::ranges::find_if(configuration.hotkeys,
+    [](const HotkeyBinding& binding) {
+      return binding.action == EmulatorHotkeyAction::mute;
+    });
+  if (!check(mute != configuration.hotkeys.end(), "Mute hotkey was not found")) {
+    return EXIT_FAILURE;
+  }
+  mute->keyCombination = QKeyCombination{
+    Qt::ControlModifier | Qt::AltModifier, Qt::Key_M}.toCombined();
+  if (!check(validateInputConfiguration(configuration),
+        "A unique customized hotkey was rejected")) {
+    return EXIT_FAILURE;
+  }
 
   QTemporaryDir directory;
   if (!check(directory.isValid(), "Could not create temporary profile directory")) {
@@ -125,11 +151,46 @@ int main()
       "A persisted application-hotkey conflict was accepted")) {
     return EXIT_FAILURE;
   }
+  auto duplicateHotkey = defaultInputConfiguration();
+  duplicateHotkey.hotkeys[1].keyCombination =
+    duplicateHotkey.hotkeys[0].keyCombination;
+  auto missingHotkey = defaultInputConfiguration();
+  missingHotkey.hotkeys.pop_back();
+  auto gameplayConflict = configuration;
+  const auto pause = std::ranges::find_if(gameplayConflict.hotkeys,
+    [](const HotkeyBinding& binding) {
+      return binding.action == EmulatorHotkeyAction::pause;
+    });
+  pause->keyCombination = QKeyCombination{Qt::NoModifier, Qt::Key_Q}.toCombined();
+  if (!check(validateInputConfiguration(duplicateHotkey).error ==
+        InputProfileError::invalidConfiguration,
+        "Duplicate emulator shortcut was accepted") ||
+      !check(validateInputConfiguration(missingHotkey).error ==
+        InputProfileError::invalidConfiguration,
+        "Incomplete emulator hotkeys were accepted") ||
+      !check(validateInputConfiguration(gameplayConflict).error ==
+        InputProfileError::invalidConfiguration,
+        "Configured hotkey/gameplay conflict was accepted")) {
+    return EXIT_FAILURE;
+  }
 
   const auto persisted = readFileBounded(path, InputProfileStore::maximumFileBytes);
   auto legacyRoot = QJsonDocument::fromJson(QByteArray{
     reinterpret_cast<const char*>(persisted.data.data()),
     static_cast<qsizetype>(persisted.data.size())}).object();
+  legacyRoot.insert(QStringLiteral("schemaVersion"), 1);
+  legacyRoot.remove(QStringLiteral("hotkeys"));
+  if (!check(writeBytes(path, QJsonDocument{legacyRoot}.toJson()),
+        "Could not create the schema-1 migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto schemaOne = store.load();
+  if (!check(schemaOne.status && schemaOne.migrated &&
+        schemaOne.configuration.hotkeys == defaultEmulatorHotkeys(),
+        "Schema 1 did not migrate to complete default hotkeys")) {
+    return EXIT_FAILURE;
+  }
+
   legacyRoot.insert(QStringLiteral("schemaVersion"), 0);
   legacyRoot.insert(QStringLiteral("selectedProfile"),
     legacyRoot.take(QStringLiteral("activeProfile")));
@@ -153,7 +214,9 @@ int main()
         "Migrated configuration retained its old schema") ||
       !check(migrated.configuration.active()->devices[0] ==
         LogicalDeviceType::pad6Button,
-        "Migration did not supply the legacy device default")) {
+        "Migration did not supply the legacy device default") ||
+      !check(migrated.configuration.hotkeys == defaultEmulatorHotkeys(),
+        "Migration did not supply default emulator hotkeys")) {
     return EXIT_FAILURE;
   }
 

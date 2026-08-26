@@ -6,6 +6,8 @@
 #include <QAction>
 #include <QComboBox>
 #include <QDialogButtonBox>
+#include <QKeyCombination>
+#include <QKeySequence>
 #include <QLabel>
 #include <QPushButton>
 #include <QSignalSpy>
@@ -13,6 +15,7 @@
 #include <QTabWidget>
 #include <QtTest/QTest>
 
+#include <algorithm>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -42,11 +45,17 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
     QStringLiteral("controllerBindingAButton"));
   auto* controllerC = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
     QStringLiteral("controllerBindingCButton"));
+  auto* pauseHotkey = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeyPauseButton"));
+  auto* softResetHotkey = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeySoftResetButton"));
   auto* conflict = dialog.findChild<QLabel*>(QStringLiteral("inputConflictLabel"));
   QVERIFY(keyboardA != nullptr);
   QVERIFY(keyboardB != nullptr);
   QVERIFY(controllerA != nullptr);
   QVERIFY(controllerC != nullptr);
+  QVERIFY(pauseHotkey != nullptr);
+  QVERIFY(softResetHotkey != nullptr);
   QVERIFY(conflict != nullptr);
 
   QTest::mouseClick(keyboardA, Qt::LeftButton);
@@ -68,6 +77,30 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
   QTest::keyClick(keyboardB, Qt::Key_M);
   QCOMPARE(keyboardB->bindingCode(), originalB);
   QVERIFY(conflict->text().contains(QStringLiteral("hotkey")));
+
+  const auto originalPause = pauseHotkey->bindingCode();
+  QTest::mouseClick(pauseHotkey, Qt::LeftButton);
+  QTest::keyClick(pauseHotkey, Qt::Key_Q);
+  QCOMPARE(pauseHotkey->bindingCode(), originalPause);
+  QVERIFY(conflict->text().contains(QStringLiteral("gameplay")));
+
+  const auto controlP = QKeyCombination{
+    Qt::ControlModifier, Qt::Key_P}.toCombined();
+  QTest::mouseClick(pauseHotkey, Qt::LeftButton);
+  QTest::keyClick(pauseHotkey, Qt::Key_P, Qt::ControlModifier);
+  QCOMPARE(pauseHotkey->bindingCode(), controlP);
+  QVERIFY(!conflict->isVisible());
+
+  const auto originalSoftReset = softResetHotkey->bindingCode();
+  QTest::mouseClick(softResetHotkey, Qt::LeftButton);
+  QTest::keyClick(softResetHotkey, Qt::Key_P, Qt::ControlModifier);
+  QCOMPARE(softResetHotkey->bindingCode(), originalSoftReset);
+  QVERIFY(conflict->text().contains(QStringLiteral("already assigned")));
+
+  QTest::mouseClick(keyboardB, Qt::LeftButton);
+  QTest::keyClick(keyboardB, Qt::Key_P);
+  QCOMPARE(keyboardB->bindingCode(), Qt::Key_P);
+  QVERIFY(!conflict->isVisible());
 
   QTest::mouseClick(controllerA, Qt::LeftButton);
   QVERIFY(dialog.captureControllerButton(SDL_GAMEPAD_BUTTON_MISC1));
@@ -142,6 +175,19 @@ void InputConfigurationDialogTest::profilesDefaultsAndApplySemantics()
   QCOMPARE(deadzone->value(), 8'000);
   QCOMPARE(device->currentData().toInt(),
     static_cast<int>(genplusgx::input::LogicalDeviceType::pad6Button));
+  dialog.openTab(genplusgx::ui::InputConfigurationTab::hotkeys);
+  auto* pauseHotkey = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeyPauseButton"));
+  QVERIFY(pauseHotkey != nullptr);
+  QTest::mouseClick(pauseHotkey, Qt::LeftButton);
+  QTest::keyClick(pauseHotkey, Qt::Key_P, Qt::ControlModifier);
+  const auto controlP = QKeyCombination{
+    Qt::ControlModifier, Qt::Key_P}.toCombined();
+  QCOMPARE(pauseHotkey->bindingCode(), controlP);
+  QTest::mouseClick(restore, Qt::LeftButton);
+  const auto space = QKeyCombination{
+    Qt::NoModifier, Qt::Key_Space}.toCombined();
+  QCOMPARE(pauseHotkey->bindingCode(), space);
   QTest::mouseClick(remove, Qt::LeftButton);
   QCOMPARE(profileCombo->count(), 1);
   QCOMPARE(profileCombo->currentText(), QStringLiteral("Default"));
@@ -186,6 +232,19 @@ void InputConfigurationDialogTest::assignmentsAreValidated()
 void InputConfigurationDialogTest::mainWindowActionsOpenStablePages()
 {
   genplusgx::ui::MainWindow window;
+  auto custom = genplusgx::input::defaultInputConfiguration();
+  const auto pauseBinding = std::find_if(custom.hotkeys.begin(), custom.hotkeys.end(),
+    [](const genplusgx::input::HotkeyBinding& binding) {
+      return binding.action == genplusgx::input::EmulatorHotkeyAction::pause;
+    });
+  QVERIFY(pauseBinding != custom.hotkeys.end());
+  pauseBinding->keyCombination = QKeyCombination{
+    Qt::ControlModifier, Qt::Key_P}.toCombined();
+  window.setInputConfiguration(custom);
+  const QKeySequence controlP{
+    QKeyCombination{Qt::ControlModifier, Qt::Key_P}};
+  QCOMPARE(window.findChild<QAction*>(QStringLiteral("pauseAction"))->shortcut(),
+    controlP);
   window.show();
   window.findChild<QAction*>(QStringLiteral("controllerConfigurationAction"))->trigger();
   QApplication::processEvents();
@@ -207,6 +266,11 @@ void InputConfigurationDialogTest::mainWindowActionsOpenStablePages()
   QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("noControllersLabel")) == nullptr);
   QVERIFY(dialog->findChild<QComboBox*>(
     QStringLiteral("controllerAssignment0Combo")) != nullptr);
+  dialog->openTab(genplusgx::ui::InputConfigurationTab::hotkeys);
+  QCOMPARE(dialog->findChild<QTabWidget*>(QStringLiteral("inputConfigurationTabs"))
+      ->currentIndex(), 3);
+  QVERIFY(dialog->findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeySoftResetButton")) != nullptr);
   dialog->close();
 }
 
