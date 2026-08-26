@@ -65,7 +65,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | `63b5a46` |
 | 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | `bcda084` |
 | 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | `a0c7b6a` |
-| 54 Runtime configuration transactions | COMPLETE | Prevent silent or partial settings/history mutations after startup | result-bearing UI callbacks, runtime/persistence rollback, visible errors, tests/docs | 73-test Debug/Release/ASan suites; rejected video/system/input/assignment/history workflows | Failed worker/store operations preserve the last committed UI and runtime snapshot | pending |
+| 54 Runtime configuration transactions | COMPLETE | Prevent silent or partial settings/history mutations after startup | result-bearing UI callbacks, runtime/persistence rollback, visible errors, tests/docs | 73-test Debug/Release/ASan suites; rejected video/system/input/assignment/history workflows | Failed worker/store operations preserve the last committed UI and runtime snapshot | `41ddd20` |
+| 55 Runtime failure and shutdown integrity | COMPLETE | Resolve live service failure visibly and make incomplete cleanup machine-detectable | runtime service dispatch, shutdown report, UI/tests/docs | 74-test Debug/Release/ASan suites; runtime dialog, cleanup aggregation, real-process smoke | No pending workflow stays busy after service loss; final save/service failure cannot return success | pending |
 
 ## Execution policy
 
@@ -3219,5 +3220,54 @@ commit it, and restore the prior keyboard/controller/core mapping on either fail
 Controller hot-unplug assignment races return a visible typed error. Recent add/clear
 operations commit a copied model before replacing the live menu. Apply/OK cannot close
 an editor after its result-bearing callback rejects the staged value.
+
+**Commit SHA:** `41ddd20`
+
+## Milestone 55 detail
+
+**Status:** COMPLETE
+
+**Goal:** Close the remaining log-only post-load failure paths and make the executable
+report unsuccessful final persistence or service cleanup to its caller.
+
+**Files changed:**
+
+- `desktop/app/CMakeLists.txt`
+- `desktop/app/include/genplusgx/app/shutdown_report.h`
+- `desktop/app/main.cpp`
+- `desktop/app/shutdown_report.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `tests/gui/main_window_test.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/unit/shutdown_report_test.cpp`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/TEST_MATRIX.md`
+- `docs/USER_GUIDE.md`
+
+**Tests added:** `unit.shutdown_report` covers clean exit, multiple normalized cleanup
+failures, preservation of an existing application exit code, and the aggregate summary.
+MainWindow coverage requires the emulation-runtime error title, detail, and status-bar
+state. The actual-process startup smoke remains the end-to-end proof that the production
+service graph enters Qt's event loop, stops normally, writes its final structured log,
+and returns zero.
+
+**Gate evidence:**
+
+- Focused shutdown-report, MainWindow, and actual-process smoke tests pass 3/3.
+- The complete Debug suite passes 74/74 with no new frontend warning.
+- The complete Release suite passes 74/74.
+- The complete ASan/UBSan suite passes 74/74 with no finding.
+
+**Acceptance criteria:** Initial input/start rejection after a successful core load,
+unclaimed worker command/frame failure, audio pause/resume failure, library-history
+write loss, save-state service failure, and background metadata/scanner termination all
+resolve through visible bounded error paths. Pending metadata work is cleared rather
+than stranded. Unexpected emulation-worker termination closes the unusable process.
+Exit disconnects producers, joins the save-flushing worker, stops audio and auxiliary
+services, releases the display exchange, aggregates every failure in the structured
+log, and cannot return success after incomplete cleanup.
 
 **Commit SHA:** pending (recorded by the following milestone)

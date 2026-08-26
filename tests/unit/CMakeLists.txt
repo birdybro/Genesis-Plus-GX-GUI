@@ -124,6 +124,17 @@ if(TARGET genplusgx_app_support)
   )
   add_test(NAME unit.command_line COMMAND genplusgx_command_line_test)
   set_tests_properties(unit.command_line PROPERTIES LABELS "unit;cli;loading")
+
+  add_executable(genplusgx_shutdown_report_test shutdown_report_test.cpp)
+  target_link_libraries(
+    genplusgx_shutdown_report_test
+    PRIVATE GenesisPlusGX::AppSupport genplusgx_project_warnings
+  )
+  add_test(NAME unit.shutdown_report COMMAND genplusgx_shutdown_report_test)
+  set_tests_properties(
+    unit.shutdown_report
+    PROPERTIES LABELS "unit;lifecycle;shutdown;error-handling"
+  )
 endif()
 
 add_executable(genplusgx_audio_ring_buffer_test audio_ring_buffer_test.cpp)

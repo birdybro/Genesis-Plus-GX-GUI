@@ -82,6 +82,7 @@ private slots:
   void emptyStatusIsDescriptive();
   void runtimeStatusReportsIdentityAndMeasuredFrameRate();
   void startupAndAudioFailuresAreConsolidatedAndVisible();
+  void emulationRuntimeFailuresAreVisible();
   void runtimeConfigurationFailuresAreVisibleAndRejected();
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
@@ -323,6 +324,23 @@ void MainWindowTest::runtimeConfigurationFailuresAreVisibleAndRejected()
   QApplication::processEvents();
   QVERIFY(window.findChild<QMenu*>(QStringLiteral("openRecentMenu"))->isEnabled());
   QVERIFY(dialogs->errors.back().contains(QStringLiteral("Recent Games Error")));
+}
+
+void MainWindowTest::emulationRuntimeFailuresAreVisible()
+{
+  auto dialogs = std::make_shared<FakeDialogService>();
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+
+  window.showEmulationRuntimeError(
+    "The emulation worker stopped after a synthetic frame failure.");
+
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  QVERIFY(dialogs->errors.front().contains(
+    QStringLiteral("Emulation Service Error")));
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("frame failure")));
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("operation failed")));
 }
 
 void MainWindowTest::aboutDialogReportsBuildIdentity()

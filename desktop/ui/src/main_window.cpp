@@ -1405,6 +1405,13 @@ void MainWindow::showAudioOutputError(const std::string& detail)
     this, tr("Audio Output Unavailable"), QString::fromStdString(detail));
 }
 
+void MainWindow::showEmulationRuntimeError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Emulation service operation failed."), 8'000);
+  dialogService_->showError(
+    this, tr("Emulation Service Error"), QString::fromStdString(detail));
+}
+
 void MainWindow::showStartupIssues(std::vector<std::string> issues)
 {
   QStringList uniqueIssues;

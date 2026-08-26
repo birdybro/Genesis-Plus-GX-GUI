@@ -47,6 +47,9 @@ platform documentation.
   audio-device recovery errors, and fatal emulation-worker startup diagnostics.
 - Transactional runtime video, system, input-profile, controller-assignment, and recent
   history updates that preserve prior state and show worker or persistence rejections.
+- Visible, one-shot runtime service failure reporting for emulation, audio, save states,
+  metadata, and library history, plus cleanup aggregation that makes incomplete final
+  save/service shutdown return a failing process status.
 - Runtime-generated Z80 fixtures covering SG-1000, Mark III, Master System, and Game
   Gear execution, plus generated cartridge-firmware activation tests for every BIOS slot.
 - Reproducible CMake presets, three-platform CI, CPack distributions, checksum gates,

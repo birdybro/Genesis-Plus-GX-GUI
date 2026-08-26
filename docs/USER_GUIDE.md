@@ -409,6 +409,14 @@ timing/audio anomalies without per-frame noise. See
 [LOGGING_AND_DIAGNOSTICS.md](LOGGING_AND_DIAGNOSTICS.md) for the schema and support
 workflow.
 
+Recoverable background failures are also shown at the point of use. A stopped metadata
+or save-state service clears the affected busy state and disables only that workflow;
+library-history and audio-control failures identify their subsystem. Repeated failures
+from the same emulation session are consolidated. If the emulation worker itself stops,
+the application reports the failure and closes because continuing would expose a stale
+loaded-game state. Failure to flush final save data or stop a service is recorded as an
+incomplete shutdown and returns a nonzero process status for launchers and automation.
+
 ## In-application help
 
 **Help → User Guide** opens a keyboard-accessible getting-started reference without a

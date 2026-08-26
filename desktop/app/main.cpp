@@ -1,5 +1,6 @@
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/app/command_line.h"
+#include "genplusgx/app/shutdown_report.h"
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
 #include "genplusgx/backup_store.h"
@@ -707,12 +708,13 @@ int main(int argc, char* argv[])
       return refreshGameLibrary();
     };
   const auto flushDeferredLibraryLaunches =
-    [&deferredLibraryLaunches, &recordLibraryLaunch] {
+    [&deferredLibraryLaunches, &recordLibraryLaunch, &window] {
       while (auto launch = deferredLibraryLaunches.pop()) {
         const auto recorded = recordLibraryLaunch(
           launch->first, launch->second);
         if (!recorded) {
           qWarning().noquote() << QString::fromStdString(recorded.message);
+          window.showGameLibraryError(recorded.message);
         }
       }
     };
@@ -1204,8 +1206,18 @@ int main(int argc, char* argv[])
     });
   keyboardInput.attach(*window.displayWidget());
   std::uint64_t inputOperationId = 1'000'000U;
+  bool runtimeFailureReported = false;
+  const auto reportRuntimeFailure = [&runtimeFailureReported, &window](
+                                      const std::string& detail) {
+    qWarning().noquote() << QString::fromStdString(detail);
+    if (!runtimeFailureReported) {
+      runtimeFailureReported = true;
+      window.showEmulationRuntimeError(detail);
+    }
+  };
   inputAggregator.setSnapshotSink(
-    [&inputOperationId, &worker](const genplusgx::InputSnapshot& snapshot) {
+    [&inputOperationId, &reportRuntimeFailure, &worker](
+      const genplusgx::InputSnapshot& snapshot) {
       const auto state = worker.state();
       if (state != genplusgx::EmulationWorkerState::paused &&
           state != genplusgx::EmulationWorkerState::running) {
@@ -1214,7 +1226,9 @@ int main(int argc, char* argv[])
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateInput(++inputOperationId, snapshot));
       if (!submitted) {
-        qWarning().noquote() << QString::fromStdString(submitted.message);
+        reportRuntimeFailure(
+          "Controller input could not reach the emulation service: " +
+          submitted.message);
       }
     });
   keyboardInput.setSnapshotSink(
@@ -1703,6 +1717,8 @@ int main(int argc, char* argv[])
   std::uint64_t loggedAudioOverruns = 0U;
   std::uint64_t loggedLateFrames = 0U;
   std::uint64_t loggedPacingResynchronizations = 0U;
+  bool audioControlFailureReported = false;
+  bool stateServiceFailureReported = false;
   genplusgx::FrameRateSampler frameRateSampler;
   auto nextFrameRateSample = std::chrono::steady_clock::now();
   QTimer eventPump;
@@ -1712,7 +1728,8 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
-     &applyEffectiveSettings, &audioOutput, &controllerInput,
+     &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
+     &controllerInput,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
      &loggedPacingResynchronizations, &nextInstrumentationLog,
      &frameRateSampler, &nextFrameRateSample,
@@ -1731,7 +1748,8 @@ int main(int argc, char* argv[])
      &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
      &stateOperationId,
-     &stateSessionAvailable, &stateStorage, &worker, &window] {
+     &stateServiceFailureReported, &stateSessionAvailable, &stateStorage,
+     &reportRuntimeFailure, &runtimeFailureReported, &worker, &window] {
     static_cast<void>(controllerInput.pollEvents());
     const auto audioDeviceEvents = audioOutput.pollDeviceEvents();
     if (audioDeviceEvents.playbackDevicesChanged) {
@@ -1875,6 +1893,8 @@ int main(int argc, char* argv[])
         const auto loadedPath = completedLoad.path;
         pendingLoad.reset();
         if (event->succeeded()) {
+          runtimeFailureReported = false;
+          audioControlFailureReported = false;
           window.clearCheatSession();
           window.clearPerGameSettingsSession();
           activeCheatIdentity.reset();
@@ -1950,23 +1970,31 @@ int main(int argc, char* argv[])
             const auto recorded = recordLibraryLaunch(loadedPath, now);
             if (!recorded) {
               qWarning().noquote() << QString::fromStdString(recorded.message);
+              window.showGameLibraryError(recorded.message);
             }
           } else {
             if (!deferredLibraryLaunches.tryPush({loadedPath, now})) {
-              qWarning() << "The bounded deferred library-history queue is full; "
-                            "one launch will not be counted.";
+              const std::string detail =
+                "The bounded library-history queue is full; this launch "
+                "could not be recorded.";
+              qWarning().noquote() << QString::fromStdString(detail);
+              window.showGameLibraryError(detail);
             }
           }
           const auto inputSubmitted = worker.submit(
             genplusgx::EmulationCommand::updateInput(
               ++inputOperationId, inputAggregator.snapshot()));
           if (!inputSubmitted) {
-            qWarning().noquote() << QString::fromStdString(inputSubmitted.message);
+            reportRuntimeFailure(
+              "The game loaded, but its initial input state could not reach "
+              "the emulation service: " + inputSubmitted.message);
           }
           const auto started = worker.submit(genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::start, ++lifecycleOperationId));
           if (!started) {
-            qWarning().noquote() << QString::fromStdString(started.message);
+            reportRuntimeFailure(
+              "The game loaded, but emulation could not start: " +
+              started.message);
           }
           const auto cheatMetadataId = ++cheatMetadataOperationId;
           pendingCheatMetadata = PendingCheatMetadata{
@@ -1996,6 +2024,9 @@ int main(int argc, char* argv[])
               completedLoad.previousEffective);
             if (!restored) {
               qWarning().noquote() << QString::fromStdString(restored.message);
+              window.showPerGameSettingsError(
+                "The previous game's runtime settings could not be restored: " +
+                restored.message);
             }
             activePerGameIdentity = completedLoad.previousIdentity;
             activePerGameSettings = completedLoad.previousOverrides;
@@ -2034,6 +2065,9 @@ int main(int argc, char* argv[])
             const auto restored = applyEffectiveSettings(globalEffective);
             if (!restored) {
               qWarning().noquote() << QString::fromStdString(restored.message);
+              window.showPerGameSettingsError(
+                "Global runtime settings could not be restored after the "
+                "failed load: " + restored.message);
             }
             activePerGameIdentity.reset();
             activePerGameSettings = {};
@@ -2067,6 +2101,9 @@ int main(int argc, char* argv[])
           const auto restored = applyEffectiveSettings(globalEffective);
           if (!restored) {
             qWarning().noquote() << QString::fromStdString(restored.message);
+            window.showPerGameSettingsError(
+              "Global runtime settings could not be restored after closing "
+              "the game: " + restored.message);
           }
           activePerGameIdentity.reset();
           activePerGameSettings = {};
@@ -2111,6 +2148,33 @@ int main(int argc, char* argv[])
           window.showDiscOperationError(operation, event->message);
         }
       }
+      if (event->type == genplusgx::EmulationEventType::workerStopped) {
+        const auto detail = event->message.empty()
+          ? std::string{
+              "The emulation worker stopped unexpectedly. The application "
+              "will close to avoid exposing an unusable session."}
+          : "The emulation worker stopped unexpectedly: " + event->message;
+        reportRuntimeFailure(detail);
+        window.setNoGameLoaded();
+        window.setStateSessionReady(false);
+        QCoreApplication::exit(1);
+      } else if (event->type ==
+                   genplusgx::EmulationEventType::commandFailed) {
+        const bool hasWorkflowSpecificError = event->command &&
+          (*event->command == genplusgx::EmulationCommandType::loadGame ||
+           *event->command == genplusgx::EmulationCommandType::unloadGame ||
+           *event->command == genplusgx::EmulationCommandType::setDiscEjected ||
+           *event->command == genplusgx::EmulationCommandType::changeDisc ||
+           *event->command == genplusgx::EmulationCommandType::cheats ||
+           *event->command == genplusgx::EmulationCommandType::captureState ||
+           *event->command == genplusgx::EmulationCommandType::restoreState);
+        if (!hasWorkflowSpecificError) {
+          reportRuntimeFailure(
+            event->message.empty()
+              ? "An emulation command failed without diagnostic detail."
+              : event->message);
+        }
+      }
       if (!audioOutput.isInitialized()) {
         continue;
       }
@@ -2122,11 +2186,21 @@ int main(int argc, char* argv[])
         const auto resumed = audioOutput.resume();
         if (!resumed) {
           qWarning().noquote() << QString::fromStdString(resumed.message);
+          if (!audioControlFailureReported) {
+            audioControlFailureReported = true;
+            window.showAudioOutputError(
+              "Audio playback could not resume: " + resumed.message);
+          }
         }
       } else if (!audioShouldRun && !audioOutput.isPaused()) {
         const auto paused = audioOutput.pause();
         if (!paused) {
           qWarning().noquote() << QString::fromStdString(paused.message);
+          if (!audioControlFailureReported) {
+            audioControlFailureReported = true;
+            window.showAudioOutputError(
+              "Audio playback could not pause: " + paused.message);
+          }
         }
       }
     }
@@ -2164,6 +2238,17 @@ int main(int argc, char* argv[])
           window.showStateOperationError(operation, event->message);
         } else if (event->operationId == 0U) {
           qWarning().noquote() << QString::fromStdString(event->message);
+          stateSessionAvailable = false;
+          stateActivationOperation.reset();
+          pendingState.reset();
+          window.setStateOperationBusy(false);
+          window.setStateSessionReady(false);
+          if (!stateServiceFailureReported) {
+            stateServiceFailureReported = true;
+            window.showStateOperationError(
+              genplusgx::ui::StateUiOperation::load,
+              "The save-state service is unavailable: " + event->message);
+          }
         }
         continue;
       }
@@ -2247,6 +2332,29 @@ int main(int argc, char* argv[])
       }
       if (event->type ==
           genplusgx::library::GameMetadataEventType::serviceStopped) {
+        constexpr auto stoppedDetail =
+          "The game metadata service stopped before completing the request.";
+        if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata) {
+          const auto path = pendingLoad->path;
+          const auto previous = pendingLoad->previousEffective;
+          pendingLoad.reset();
+          const auto restored = applyEffectiveSettings(previous);
+          std::string detail{stoppedDetail};
+          if (!restored) {
+            detail += " The previous runtime settings also could not be "
+              "restored: " + restored.message;
+          }
+          window.showGameLoadError(path, detail, false);
+        }
+        if (pendingCheatMetadata) {
+          pendingCheatMetadata.reset();
+          window.showCheatError(stoppedDetail);
+        }
+        if (pendingMetadata) {
+          pendingMetadata.reset();
+          window.setGameInformationBusy(false);
+          window.showGameInformationError(stoppedDetail);
+        }
         continue;
       }
       if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata &&
@@ -2435,6 +2543,17 @@ int main(int argc, char* argv[])
           }
           break;
         case EventType::serviceStopped:
+          libraryScansInFlight.clear();
+          deferredLibraryLaunches.clear();
+          window.setGameLibraryAvailable(false,
+            event->status.message.empty()
+              ? "The background game-library scanner stopped unexpectedly."
+              : event->status.message);
+          if (!event->status) {
+            qWarning().noquote()
+              << QString::fromStdString(event->status.message);
+            window.showGameLibraryError(event->status.message);
+          }
           break;
       }
     }
@@ -2475,7 +2594,6 @@ int main(int argc, char* argv[])
   controllerInput.setSnapshotSink({});
   controllerInput.setConnectionSink({});
   controllerInput.setCaptureSink({});
-  static_cast<void>(controllerInput.shutdown());
   window.setInputConfigurationSink({});
   window.setControllerAssignmentSink({});
   window.setGameLoadSink({});
@@ -2495,31 +2613,37 @@ int main(int argc, char* argv[])
   window.setSystemSettingsSink({});
   window.setBiosConfigurationSink({});
   inputAggregator.setSnapshotSink({});
+  genplusgx::app::ShutdownReport shutdownReport{result};
+  const auto recordCleanup = [&shutdownReport](
+                               const char* service, const auto& status) {
+    if (status) {
+      return;
+    }
+    qWarning().noquote() << service << '-'
+                         << QString::fromStdString(status.message);
+    shutdownReport.addFailure(service, status.message);
+  };
   const auto workerStopped = worker.stop();
-  if (!workerStopped) {
-    qWarning().noquote() << QString::fromStdString(workerStopped.message);
-  }
+  recordCleanup("Emulation worker", workerStopped);
+  const auto audioOutputStopped = audioOutput.shutdown();
+  recordCleanup("Audio output", audioOutputStopped);
+  const auto controllerInputStopped = controllerInput.shutdown();
+  recordCleanup("Controller input", controllerInputStopped);
   const auto stateStorageStopped = stateStorage.stop();
-  if (!stateStorageStopped) {
-    qWarning().noquote() << QString::fromStdString(stateStorageStopped.message);
-  }
+  recordCleanup("Save-state storage", stateStorageStopped);
   const auto metadataServiceStopped = metadataService.stop();
-  if (!metadataServiceStopped) {
-    qWarning().noquote() << QString::fromStdString(
-      metadataServiceStopped.message);
-  }
+  recordCleanup("Game metadata service", metadataServiceStopped);
   const auto screenshotServiceStopped = screenshotService.stop();
-  if (!screenshotServiceStopped) {
-    qWarning().noquote() << QString::fromStdString(
-      screenshotServiceStopped.message);
-  }
+  recordCleanup("Screenshot service", screenshotServiceStopped);
   const auto gameLibraryScannerStopped = gameLibraryScanner.stop();
-  if (!gameLibraryScannerStopped) {
-    qWarning().noquote() << QString::fromStdString(
-      gameLibraryScannerStopped.message);
+  recordCleanup("Game-library scanner", gameLibraryScannerStopped);
+  window.displayWidget()->setFrameExchange({});
+  if (shutdownReport.succeeded()) {
+    qInfo() << "Application shutdown complete.";
+  } else {
+    qCritical().noquote() << "Application shutdown incomplete:"
+                           << QString::fromStdString(shutdownReport.summary());
   }
-  static_cast<void>(audioOutput.shutdown());
-  qInfo() << "Application shutdown complete.";
   frontendLogger.shutdown();
-  return result;
+  return shutdownReport.exitCode();
 }

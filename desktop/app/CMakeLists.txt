@@ -1,7 +1,9 @@
 add_library(
   genplusgx_app_support STATIC
   include/genplusgx/app/command_line.h
+  include/genplusgx/app/shutdown_report.h
   command_line.cpp
+  shutdown_report.cpp
 )
 add_library(GenesisPlusGX::AppSupport ALIAS genplusgx_app_support)
 target_include_directories(

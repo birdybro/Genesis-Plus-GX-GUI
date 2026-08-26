@@ -856,6 +856,23 @@ default-device recovery produces an immediate audio dialog, and failure to start
 emulation worker is fatal and visibly reported after auxiliary workers are stopped.
 Full diagnostic detail remains in the structured log when logging is available.
 
+After startup, accepted asynchronous work remains correlated by operation ID and active
+game generation. A stopped metadata service resolves any waiting load, cheat, or game
+information request with a visible error instead of leaving a busy latch set. A failed
+save-state service disables state actions. Library-history writes and scanner failure,
+audio device control, rejected worker commands, and an unexpected emulation-worker stop
+all reach bounded user-visible error paths; repeated frame/input failures are collapsed
+to one emulation-service report per game session. An unexpected core-worker stop is
+fatal because the single controlled core context cannot be reconstructed safely from
+the GUI thread.
+
+Normal exit first disconnects GUI producers, synchronously stops the emulation worker
+so dirty backup memory is flushed and the core is released, then stops audio,
+controllers, state storage, metadata, screenshots, and the library scanner. The display
+releases its frame exchange last. `ShutdownReport` retains every service failure, keeps
+an existing nonzero application result, upgrades an otherwise-success result when any
+cleanup fails, and emits the aggregate before structured logging is removed.
+
 The composition root installs `FrontendLogger` after platform application directories
 exist and removes it after the final service shutdown record. The Qt message handler
 redacts before serializing one compact JSON object per line; its mutex covers rotation
