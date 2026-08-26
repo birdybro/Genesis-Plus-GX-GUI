@@ -35,6 +35,14 @@ presentation force the deterministic software display path. Native widget chrome
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
 window layer.
 
+`gui.desktop_startup_smoke` launches the actual desktop executable rather than a test
+facsimile. Its CMake harness creates a configuration-specific root below the build tree,
+uses Qt offscreen and SDL dummy audio, and supplies a bounded test-only auto-quit delay.
+The process must initialize its directory tree and SQLite library, select a renderer,
+enter the event loop, and emit the final clean-shutdown record. The hook is ignored in
+normal launches unless the explicit test sentinel is present; malformed, relative, or
+overly long-lived test requests fail before services are constructed.
+
 ## Sanitizers
 
 Linux and compatible Clang/GCC hosts can run AddressSanitizer and

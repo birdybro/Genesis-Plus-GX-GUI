@@ -321,3 +321,19 @@ set_tests_properties(
     PASS_REGULAR_EXPRESSION "${PROJECT_VERSION}"
     LABELS "gui;smoke"
 )
+
+add_test(
+  NAME gui.desktop_startup_smoke
+  COMMAND
+    "${CMAKE_COMMAND}"
+    "-DGENPLUSGX_SMOKE_EXECUTABLE=$<TARGET_FILE:genplusgx_desktop>"
+    "-DGENPLUSGX_SMOKE_BASE=${CMAKE_CURRENT_BINARY_DIR}"
+    "-DGENPLUSGX_SMOKE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/desktop-smoke-$<CONFIG>"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/desktop_startup_smoke.cmake"
+)
+set_tests_properties(
+  gui.desktop_startup_smoke
+  PROPERTIES
+    LABELS "gui;integration;smoke;lifecycle;filesystem;logging"
+    TIMEOUT 40
+)

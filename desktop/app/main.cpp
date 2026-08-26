@@ -211,10 +211,34 @@ int main(int argc, char* argv[])
     return 0;
   }
 
-  const auto applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
+  const bool automatedTestMode =
+    qEnvironmentVariable("GENPLUSGX_TEST_MODE") == QStringLiteral("1");
+  std::optional<int> automatedQuitMilliseconds;
+  genplusgx::ApplicationPaths applicationPaths;
+  if (automatedTestMode) {
+    const auto testRoot = qEnvironmentVariable("GENPLUSGX_TEST_DATA_ROOT");
+    bool quitDelayValid = false;
+    const int quitDelay = qEnvironmentVariableIntValue(
+      "GENPLUSGX_TEST_AUTO_QUIT_MS", &quitDelayValid);
+    const auto root = genplusgx::ui::pathFromQString(testRoot);
+    if (testRoot.isEmpty() || !root.is_absolute() || !quitDelayValid ||
+        quitDelay < 1 || quitDelay > 10'000) {
+      QTextStream{stderr}
+        << "Invalid automated startup-test environment. The data root must be "
+           "absolute and the quit delay must be between 1 and 10000 ms.\n";
+      return 2;
+    }
+    applicationPaths = genplusgx::ApplicationPaths{root};
+    automatedQuitMilliseconds = quitDelay;
+  } else {
+    applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
+  }
   const auto pathsInitialized = applicationPaths.initialize();
   if (!pathsInitialized) {
     qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
+    if (automatedTestMode) {
+      return 2;
+    }
   }
   genplusgx::diagnostics::FrontendLogger frontendLogger;
   const auto loggerInitialized = frontendLogger.initialize(
@@ -2304,6 +2328,11 @@ int main(int argc, char* argv[])
     QTimer::singleShot(0, &window, [&window, startupGame] {
       static_cast<void>(window.requestGameLoad(startupGame));
     });
+  }
+  if (automatedQuitMilliseconds) {
+    qInfo().noquote() << "Automated startup smoke test entered the event loop.";
+    QTimer::singleShot(
+      *automatedQuitMilliseconds, &application, &QCoreApplication::quit);
   }
   const int result = application.exec();
   eventPump.stop();

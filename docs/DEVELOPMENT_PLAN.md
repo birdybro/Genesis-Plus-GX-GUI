@@ -61,7 +61,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | `fc19566` |
 | 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | `1e9d58e` |
 | 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | `14cb507` |
-| 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | pending |
+| 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | `b62a1c7` |
+| 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | pending |
 
 ## Execution policy
 
@@ -3029,5 +3030,46 @@ Unknown fallback) for every console family, with the core's detected Sega CD reg
 taking precedence. A monotonic counter/time sampler reports actual normal and
 fast-forward cadence, returns to zero on pause, and re-baselines safely after lifecycle
 counter resets. The GUI observes at 500 ms intervals and never drives frame execution.
+
+**Commit SHA:** `b62a1c7`
+
+## Milestone 51 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace command-line-only executable smoke coverage with a hermetic process
+test that constructs the real MainWindow, initializes frontend services, enters the Qt
+event loop, and follows the production shutdown order.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/desktop_startup_smoke.cmake`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/TESTING.md`
+- `docs/TEST_MATRIX.md`
+
+**Tests added:** `gui.desktop_startup_smoke` launches the built desktop executable on
+Qt's offscreen platform with SDL's dummy audio driver and an absolute build-local data
+root. It requires every application-data directory, the initialized SQLite library, and
+structured evidence for startup, renderer selection, event-loop entry, and completed
+shutdown. Its cleanup target is rejected unless it is a strict child of the configured
+test build directory.
+
+**Gate evidence:**
+
+- Focused executable help/version/full-startup smoke tests pass 3/3.
+- The complete Debug suite passes 72/72 with no new frontend warning.
+- The complete Release suite passes 72/72.
+- The complete ASan/UBSan suite passes 72/72 with no finding.
+
+**Acceptance criteria:** Normal users cannot trigger the hook accidentally: it requires
+an explicit test-mode sentinel, absolute data root, and bounded 1–10,000 ms delay. The
+test writes only below its build tree, proves that it entered the real event loop, and
+reaches the log statement emitted only after controller, emulation, state, metadata,
+screenshot, library, and audio services have shut down.
 
 **Commit SHA:** pending (recorded by the following milestone)

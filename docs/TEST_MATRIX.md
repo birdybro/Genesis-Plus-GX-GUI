@@ -34,7 +34,7 @@ ctest --preset debug -L gui --output-on-failure
 | Per-game settings | Sparse overrides, nested editors, Use Global Settings, persistence failure, game-session gating | `gui.per_game_settings` |
 | Appearance/accessibility | Settings-center routing, system/light/dark themes, Apply/OK/Cancel/defaults, live summary refresh, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility`, `gui.settings` |
 | Diagnostics | Live snapshot refresh, privacy filtering, read-only report, clipboard equality, one-dialog ownership | `gui.diagnostics` |
-| CLI smoke | `--help` and `--version` without constructing a window | `gui.desktop_help`, `gui.desktop_version` |
+| Executable smoke | `--help`, `--version`, plus isolated full MainWindow/service startup, event-loop entry, persistent-path creation, SQLite initialization, and graceful shutdown | `gui.desktop_help`, `gui.desktop_version`, `gui.desktop_startup_smoke` |
 
 Core system coverage uses original runtime-generated Z80 programs rather than metadata
 placeholders. `core.eight_bit_systems` loads and executes SG-1000, forced Mark III,

@@ -91,8 +91,12 @@ window direct core access.
 Help hierarchy, a central accessible display surface, and separate game/system/region,
 FPS, and state-slot status fields. Controls and dialogs have stable Qt `objectName`
 values. Modal-looking dialogs use asynchronous `QDialog::open()` so neither production
-coordination nor GUI tests require a nested blocking event loop. The empty shell and its
-real executable are tested using Qt's offscreen platform.
+coordination nor GUI tests require a nested blocking event loop. The empty shell is
+tested directly using Qt's offscreen platform. A separate hermetic process test launches
+the real executable with a build-local application-data root and dummy audio, requires
+MainWindow renderer selection and event-loop entry in the structured log, then verifies
+that the production shutdown sequence completed and initialized artifacts stayed inside
+that root.
 
 ## Core adapter
 
