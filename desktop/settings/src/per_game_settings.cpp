@@ -322,6 +322,26 @@ EffectiveGameSettings resolvePerGameSettings(
   return effective;
 }
 
+AudioSettingsLayerUpdate planAudioSettingsLayerUpdate(
+  const AudioSettings& global,
+  const std::optional<AudioSettings>& currentPerGame,
+  const AudioSettings& requested) noexcept
+{
+  if (!currentPerGame) {
+    return {.global = requested, .perGame = std::nullopt};
+  }
+  auto updatedGlobal = global;
+  updatedGlobal.latencyMilliseconds = requested.latencyMilliseconds;
+  updatedGlobal.outputDeviceName = requested.outputDeviceName;
+  auto updatedPerGame = requested;
+  updatedPerGame.latencyMilliseconds = currentPerGame->latencyMilliseconds;
+  updatedPerGame.outputDeviceName = currentPerGame->outputDeviceName;
+  return {
+    .global = std::move(updatedGlobal),
+    .perGame = std::move(updatedPerGame),
+  };
+}
+
 PerGameSettingsStore::PerGameSettingsStore(std::filesystem::path root)
     : root_(std::move(root))
 {

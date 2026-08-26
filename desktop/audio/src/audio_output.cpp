@@ -25,6 +25,9 @@ constexpr std::size_t callbackScratchFrames = 1'024U;
 constexpr int minimumVolumePercent = 0;
 constexpr int maximumVolumePercent = 100;
 constexpr std::size_t maximumDeviceEventsPerPoll = 64U;
+constexpr std::size_t maximumRingCapacityFrames =
+  static_cast<std::size_t>(maximumSampleRate) *
+  static_cast<std::size_t>(maximumLatency.count()) / 1'000U;
 
 AudioOutputStatus success()
 {
@@ -123,7 +126,8 @@ public:
   explicit Private(AudioOutputConfig config)
     : config_(config),
       ring_(std::make_shared<StereoAudioRingBuffer>(
-        std::max<std::size_t>(audioRingCapacityFrames(config), 1U))),
+        std::max<std::size_t>(audioRingCapacityFrames(config), 1U),
+        maximumRingCapacityFrames)),
       volumePercent_(config.volumePercent), muted_(config.muted)
   {
   }
@@ -136,6 +140,11 @@ public:
   AudioOutputStatus initialize()
   {
     std::scoped_lock lock{controlMutex_};
+    return initializeLocked();
+  }
+
+  AudioOutputStatus initializeLocked()
+  {
     if (initialized_.load(std::memory_order_acquire)) {
       return failure(
         AudioOutputError::alreadyInitialized,
@@ -179,6 +188,143 @@ public:
     resetCallbackMetrics();
     paused_.store(true, std::memory_order_release);
     initialized_.store(true, std::memory_order_release);
+    return success();
+  }
+
+  AudioOutputStatus reconfigure(AudioOutputConfig requested)
+  {
+    std::scoped_lock lock{controlMutex_};
+    const auto requestedCapacity = audioRingCapacityFrames(requested);
+    if (requestedCapacity == 0U ||
+        requestedCapacity > ring_->maximumCapacityFrames()) {
+      return failure(AudioOutputError::invalidConfiguration,
+        "Audio sample rate must be 8000-192000 Hz, latency must be 10-500 ms, "
+        "and volume must be 0-100 percent.");
+    }
+
+    auto previous = config_;
+    previous.volumePercent = volumePercent_.load(std::memory_order_acquire);
+    previous.muted = muted_.load(std::memory_order_acquire);
+    const auto previousCapacity = ring_->capacityFrames();
+    if (!initialized_.load(std::memory_order_acquire) || stream_ == nullptr) {
+      config_ = requested;
+      volumePercent_.store(requested.volumePercent, std::memory_order_release);
+      muted_.store(requested.muted, std::memory_order_release);
+      if (!ring_->setCapacityFrames(requestedCapacity)) {
+        config_ = previous;
+        volumePercent_.store(previous.volumePercent, std::memory_order_release);
+        muted_.store(previous.muted, std::memory_order_release);
+        return failure(AudioOutputError::invalidConfiguration,
+          "The requested audio latency exceeds the bounded ring storage.");
+      }
+      const auto initialized = initializeLocked();
+      if (!initialized) {
+        config_ = previous;
+        volumePercent_.store(previous.volumePercent, std::memory_order_release);
+        muted_.store(previous.muted, std::memory_order_release);
+        static_cast<void>(ring_->setCapacityFrames(previousCapacity));
+      }
+      return initialized;
+    }
+
+    const bool wasPaused = paused_.load(std::memory_order_acquire);
+    const bool reopenStream = requested.sampleRate != config_.sampleRate ||
+      requested.deviceId != config_.deviceId;
+    if (!reopenStream) {
+      if (!SDL_PauseAudioStreamDevice(stream_)) {
+        return failure(AudioOutputError::deviceControlFailed,
+          sdlFailureMessage("SDL could not pause audio for live reconfiguration"));
+      }
+      paused_.store(true, std::memory_order_release);
+      if (!SDL_ClearAudioStream(stream_)) {
+        if (!wasPaused) {
+          static_cast<void>(SDL_ResumeAudioStreamDevice(stream_));
+          paused_.store(false, std::memory_order_release);
+        }
+        return failure(AudioOutputError::deviceControlFailed,
+          sdlFailureMessage("SDL could not clear audio for live reconfiguration"));
+      }
+      if (!ring_->setCapacityFrames(requestedCapacity)) {
+        if (!wasPaused) {
+          static_cast<void>(SDL_ResumeAudioStreamDevice(stream_));
+          paused_.store(false, std::memory_order_release);
+        }
+        return failure(AudioOutputError::invalidConfiguration,
+          "The requested audio latency exceeds the bounded ring storage.");
+      }
+      config_ = requested;
+      volumePercent_.store(requested.volumePercent, std::memory_order_release);
+      muted_.store(requested.muted, std::memory_order_release);
+      if (!wasPaused && !SDL_ResumeAudioStreamDevice(stream_)) {
+        config_ = previous;
+        volumePercent_.store(previous.volumePercent, std::memory_order_release);
+        muted_.store(previous.muted, std::memory_order_release);
+        static_cast<void>(ring_->setCapacityFrames(previousCapacity));
+        const bool restored = SDL_ResumeAudioStreamDevice(stream_);
+        paused_.store(!restored, std::memory_order_release);
+        return failure(AudioOutputError::deviceControlFailed,
+          sdlFailureMessage("SDL could not resume reconfigured audio output"));
+      }
+      paused_.store(wasPaused, std::memory_order_release);
+      ring_->resetMetrics();
+      return success();
+    }
+
+    SDL_AudioSpec sourceSpec{};
+    sourceSpec.format = SDL_AUDIO_S16;
+    sourceSpec.channels = 2;
+    sourceSpec.freq = requested.sampleRate;
+    const auto device = requested.deviceId == 0U
+      ? SDL_AUDIO_DEVICE_DEFAULT_PLAYBACK
+      : static_cast<SDL_AudioDeviceID>(requested.deviceId);
+    auto* replacement = SDL_OpenAudioDeviceStream(
+      device, &sourceSpec, &Private::audioCallback, this);
+    if (replacement == nullptr) {
+      return failure(AudioOutputError::deviceOpenFailed,
+        sdlFailureMessage("SDL could not open the requested audio output"));
+    }
+    const auto openedDevice = SDL_GetAudioStreamDevice(replacement);
+    const char* openedName = openedDevice == 0U
+      ? nullptr : SDL_GetAudioDeviceName(openedDevice);
+    const std::string replacementName = openedName == nullptr
+      ? "Default playback device" : openedName;
+
+    if (!SDL_PauseAudioStreamDevice(stream_)) {
+      SDL_DestroyAudioStream(replacement);
+      return failure(AudioOutputError::deviceControlFailed,
+        sdlFailureMessage("SDL could not pause the previous audio output"));
+    }
+    paused_.store(true, std::memory_order_release);
+    if (!ring_->setCapacityFrames(requestedCapacity)) {
+      if (!wasPaused) {
+        static_cast<void>(SDL_ResumeAudioStreamDevice(stream_));
+        paused_.store(false, std::memory_order_release);
+      }
+      SDL_DestroyAudioStream(replacement);
+      return failure(AudioOutputError::invalidConfiguration,
+        "The requested audio latency exceeds the bounded ring storage.");
+    }
+    config_ = requested;
+    volumePercent_.store(requested.volumePercent, std::memory_order_release);
+    muted_.store(requested.muted, std::memory_order_release);
+    if (!wasPaused && !SDL_ResumeAudioStreamDevice(replacement)) {
+      config_ = previous;
+      volumePercent_.store(previous.volumePercent, std::memory_order_release);
+      muted_.store(previous.muted, std::memory_order_release);
+      static_cast<void>(ring_->setCapacityFrames(previousCapacity));
+      const bool restored = SDL_ResumeAudioStreamDevice(stream_);
+      paused_.store(!restored, std::memory_order_release);
+      SDL_DestroyAudioStream(replacement);
+      return failure(AudioOutputError::deviceControlFailed,
+        sdlFailureMessage("SDL could not resume the requested audio output"));
+    }
+    auto* previousStream = stream_;
+    stream_ = replacement;
+    deviceName_ = replacementName;
+    paused_.store(wasPaused, std::memory_order_release);
+    SDL_DestroyAudioStream(previousStream);
+    ring_->resetMetrics();
+    resetCallbackMetrics();
     return success();
   }
 
@@ -243,13 +389,24 @@ public:
 
   AudioOutputStatus setVolumePercent(int volumePercent)
   {
+    std::scoped_lock lock{controlMutex_};
     if (volumePercent < minimumVolumePercent ||
         volumePercent > maximumVolumePercent) {
       return failure(AudioOutputError::invalidConfiguration,
         "Audio volume must be between 0 and 100 percent.");
     }
+    config_.volumePercent = volumePercent;
     volumePercent_.store(volumePercent, std::memory_order_release);
     return success();
+  }
+
+  AudioOutputConfig config() const
+  {
+    std::scoped_lock lock{controlMutex_};
+    auto snapshot = config_;
+    snapshot.volumePercent = volumePercent_.load(std::memory_order_acquire);
+    snapshot.muted = muted_.load(std::memory_order_acquire);
+    return snapshot;
   }
 
   AudioDeviceEventSummary pollDeviceEvents()
@@ -469,6 +626,11 @@ AudioOutputStatus AudioOutput::shutdown()
   return private_->shutdown();
 }
 
+AudioOutputStatus AudioOutput::reconfigure(AudioOutputConfig config)
+{
+  return private_->reconfigure(config);
+}
+
 AudioOutputStatus AudioOutput::setVolumePercent(int volumePercent)
 {
   return private_->setVolumePercent(volumePercent);
@@ -494,9 +656,9 @@ bool AudioOutput::isPaused() const noexcept
   return private_->paused_.load(std::memory_order_acquire);
 }
 
-AudioOutputConfig AudioOutput::config() const noexcept
+AudioOutputConfig AudioOutput::config() const
 {
-  return private_->config_;
+  return private_->config();
 }
 
 std::string AudioOutput::deviceName() const

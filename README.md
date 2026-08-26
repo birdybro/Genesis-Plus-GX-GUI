@@ -34,8 +34,9 @@ region-appropriate BIOS supplied by the user.
 - Dedicated emulation thread with bounded video, audio, input, and command exchanges
 - Dynamic viewport rendering, aspect/integer scaling, overscan, interlace modes,
   nearest/bilinear filtering, fullscreen, high-DPI support, and native PNG screenshots
-- SDL3 stereo audio and hot-pluggable controller support with profiles, deadzones,
-  assignments, capture-based remapping, and specialized Genesis Plus GX device choices
+- SDL3 stereo audio with live output-device/latency changes, plus hot-pluggable
+  controller profiles, deadzones, assignments, capture-based remapping, and specialized
+  Genesis Plus GX device choices
 - Keyboard play controls plus capture-configurable, conflict-checked emulator hotkeys
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
 - Ten metadata-wrapped save-state slots with game-identity validation

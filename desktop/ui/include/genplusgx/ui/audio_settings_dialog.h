@@ -28,6 +28,7 @@ public:
   void setSettingsSink(SettingsSink sink);
   [[nodiscard]] settings::AudioSettings settings() const;
   void setSettings(const settings::AudioSettings& settings);
+  void setAvailableDevices(std::vector<std::string> devices);
 
 private:
   void apply();

@@ -317,11 +317,15 @@ Master System FM detection, and high-quality FM/PSG resampling. Relevant low-pas
 controls are enabled only for the selected filter mode. Apply, OK, Cancel, and Restore
 Defaults follow the same staging behavior as Video Settings.
 
-Mute, volume, and core mixing/chip settings affect a running game immediately at a
-frame boundary. Playback device and latency define the SDL stream and bounded ring, so
-the dialog marks them as taking effect after restarting. If a configured device is no
-longer available, the application logs the condition and safely opens the system
-default. SDL audio hot-plug events are drained in bounded batches; if an explicitly
+Mute, volume, core mixing/chip settings, playback device, and latency all affect a
+running game immediately. A device or latency change briefly pauses the SDL stream,
+clears stale samples, and reconfigures the logical capacity of the same worker-owned
+ring; it does not stop the emulation thread or require an application restart. Failure
+to open a newly selected device leaves the previous stream, capacity, and pause state
+active and produces an error dialog. If a configured device is no longer available at
+startup, the application logs the condition and safely opens the system default. SDL
+audio hot-plug events are drained in bounded batches and refresh an already-open Audio
+Settings device list; if an explicitly
 selected device disconnects while running, playback automatically reopens on the
 current default device without replacing the saved preference. Settings are atomically
 stored as `config/audio-settings.json`; malformed or

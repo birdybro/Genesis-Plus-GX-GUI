@@ -35,6 +35,8 @@ platform documentation.
   privacy-filtered diagnostics.
 - Bounded audio-device hot-plug handling with automatic default-device recovery after
   an explicitly selected playback device disconnects.
+- Transactional live audio-device and latency changes that retain the worker-owned ring,
+  preserve pause/running state, refresh open device lists, and roll back on failure.
 - Generated CC0 fixtures and unit, core, integration, GUI, property, stress, and
   ASan/UBSan coverage through CTest.
 - Runtime-generated Z80 fixtures covering SG-1000, Mark III, Master System, and Game

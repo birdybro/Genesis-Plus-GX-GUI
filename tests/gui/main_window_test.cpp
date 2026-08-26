@@ -354,6 +354,8 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
 void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
 {
   genplusgx::ui::MainWindow window;
+  auto dialogs = std::make_shared<FakeDialogService>();
+  window.setDialogService(dialogs);
   genplusgx::settings::AudioSettings initial;
   initial.masterVolumePercent = 70;
   initial.latencyMilliseconds = 45;
@@ -387,6 +389,8 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
     QStringLiteral("audioOutputDeviceCombo"));
   auto* latency = dialog->findChild<QSpinBox*>(
     QStringLiteral("audioLatencySpinBox"));
+  auto* liveApplyInformation = dialog->findChild<QLabel*>(
+    QStringLiteral("audioLiveApplyInformationLabel"));
   auto* volume = dialog->findChild<QSpinBox*>(
     QStringLiteral("masterVolumeSpinBox"));
   auto* filter = dialog->findChild<QComboBox*>(
@@ -401,10 +405,19 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
   auto* restore = dialog->findChild<QPushButton*>(
     QStringLiteral("restoreAudioDefaultsButton"));
   QVERIFY(device != nullptr && latency != nullptr && volume != nullptr);
+  QVERIFY(liveApplyInformation != nullptr);
+  QVERIFY(liveApplyInformation->text().contains(QStringLiteral("immediately")));
+  QVERIFY(dialog->findChild<QLabel*>(
+    QStringLiteral("audioRestartRequiredLabel")) == nullptr);
   QVERIFY(filter != nullptr && lowPass != nullptr && eqLow != nullptr);
   QVERIFY(psg != nullptr && apply != nullptr && restore != nullptr);
   QCOMPARE(device->currentData().toString(),
     QStringLiteral("Configured test output"));
+  window.setAvailableAudioDevices({"Other output", "Hot-plugged output"});
+  QCOMPARE(device->currentData().toString(),
+    QStringLiteral("Configured test output"));
+  QVERIFY(device->currentText().contains(QStringLiteral("unavailable")));
+  QVERIFY(device->findData(QStringLiteral("Hot-plugged output")) >= 0);
   QCOMPARE(latency->value(), 45);
   QCOMPARE(psg->value(), 125);
 
@@ -441,6 +454,9 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
   QTest::mouseClick(apply, Qt::LeftButton);
   QCOMPARE(updates.size(), std::size_t{5});
   QCOMPARE(window.audioSettings(), genplusgx::settings::defaultAudioSettings());
+  window.showAudioSettingsError("Injected device-open failure.");
+  QCOMPARE(dialogs->errors.size(), std::size_t{1U});
+  QVERIFY(dialogs->errors.front().contains(QStringLiteral("device-open")));
   dialog->close();
 }
 

@@ -798,49 +798,119 @@ int main(int argc, char* argv[])
      &worker](
       const genplusgx::settings::AudioSettings& settings) {
       const auto previous = activeEffectiveSettings.audio;
+      const auto previousOutputConfig = audioOutput.config();
+      const auto restoreRuntime = [&](const std::string& detail) {
+        static_cast<void>(worker.submit(
+          genplusgx::EmulationCommand::updateAudioSettings(
+            ++audioSettingsOperationId, previous.core)));
+        if (audioOutput.config().latency != previousOutputConfig.latency ||
+            audioOutput.config().deviceId != previousOutputConfig.deviceId) {
+          const auto restored = audioOutput.reconfigure(previousOutputConfig);
+          if (!restored) {
+            qWarning().noquote() << "Audio rollback failed:"
+                                 << QString::fromStdString(restored.message);
+          }
+        }
+        static_cast<void>(audioOutput.setVolumePercent(
+          previous.masterVolumePercent));
+        audioOutput.setMuted(previous.muted);
+        window.setAudioSettings(previous);
+        window.showAudioSettingsError(detail);
+      };
       const auto submitted = worker.submit(
         genplusgx::EmulationCommand::updateAudioSettings(
           ++audioSettingsOperationId, settings.core));
       if (!submitted) {
         qWarning().noquote() << QString::fromStdString(submitted.message);
-        return;
-      }
-      const auto volume = audioOutput.setVolumePercent(
-        settings.masterVolumePercent);
-      if (!volume) {
-        qWarning().noquote() << QString::fromStdString(volume.message);
         window.setAudioSettings(previous);
+        window.showAudioSettingsError(submitted.message);
         return;
       }
-      audioOutput.setMuted(settings.muted);
+
+      const bool hostPreferenceChanged =
+        settings.latencyMilliseconds != previous.latencyMilliseconds ||
+        settings.outputDeviceName != previous.outputDeviceName;
+      if (hostPreferenceChanged) {
+        auto requestedOutputConfig = previousOutputConfig;
+        requestedOutputConfig.latency =
+          std::chrono::milliseconds{settings.latencyMilliseconds};
+        requestedOutputConfig.volumePercent = settings.masterVolumePercent;
+        requestedOutputConfig.muted = settings.muted;
+        if (settings.outputDeviceName != previous.outputDeviceName) {
+          requestedOutputConfig.deviceId = 0U;
+          if (!settings.outputDeviceName.empty()) {
+            const auto devices = genplusgx::availableAudioOutputDevices();
+            const auto selected = std::ranges::find_if(devices,
+              [&settings](const auto& device) {
+                return device.name == settings.outputDeviceName;
+              });
+            if (selected == devices.end()) {
+              restoreRuntime("The selected audio output is no longer available.");
+              return;
+            }
+            requestedOutputConfig.deviceId = selected->id;
+          }
+        }
+        const auto reconfigured = audioOutput.reconfigure(requestedOutputConfig);
+        if (!reconfigured) {
+          qWarning().noquote() << QString::fromStdString(reconfigured.message);
+          restoreRuntime(reconfigured.message);
+          return;
+        }
+        qInfo().noquote() << "Audio output reconfigured live:"
+                          << QString::fromStdString(audioOutput.deviceName())
+                          << settings.latencyMilliseconds << "ms";
+      } else {
+        const auto volume = audioOutput.setVolumePercent(
+          settings.masterVolumePercent);
+        if (!volume) {
+          qWarning().noquote() << QString::fromStdString(volume.message);
+          restoreRuntime(volume.message);
+          return;
+        }
+        audioOutput.setMuted(settings.muted);
+      }
+
       const bool overridesActiveGame =
         activePerGameIdentity && activePerGameSettings.audio;
       auto saved = genplusgx::PersistenceStatus{};
+      auto candidate = activePerGameSettings;
+      const auto layerUpdate = genplusgx::settings::planAudioSettingsLayerUpdate(
+        audioSettings,
+        overridesActiveGame ? activePerGameSettings.audio : std::nullopt,
+        settings);
+      auto globalCandidate = layerUpdate.global;
       if (overridesActiveGame) {
-        auto candidate = activePerGameSettings;
-        candidate.audio = settings;
+        candidate.audio = layerUpdate.perGame;
         saved = perGameSettingsStore.save(*activePerGameIdentity, candidate);
-        if (saved) {
-          activePerGameSettings = std::move(candidate);
-          activeEffectiveSettings.audio = settings;
+        if (saved && globalCandidate != audioSettings) {
+          saved = audioSettingsStore.save(globalCandidate);
+          if (!saved) {
+            const auto rolledBack = perGameSettingsStore.save(
+              *activePerGameIdentity, activePerGameSettings);
+            if (!rolledBack) {
+              saved.message += " The per-game audio rollback also failed: " +
+                rolledBack.message;
+            }
+          }
         }
       } else {
-        saved = audioSettingsStore.save(settings);
-        if (saved) {
-          audioSettings = settings;
-          activeEffectiveSettings.audio = settings;
-        }
+        globalCandidate = settings;
+        saved = audioSettingsStore.save(globalCandidate);
       }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
-        static_cast<void>(worker.submit(
-          genplusgx::EmulationCommand::updateAudioSettings(
-            ++audioSettingsOperationId, previous.core)));
-        static_cast<void>(audioOutput.setVolumePercent(
-          previous.masterVolumePercent));
-        audioOutput.setMuted(previous.muted);
-        window.setAudioSettings(previous);
-      } else if (activePerGameIdentity) {
+        restoreRuntime(saved.message);
+        return;
+      }
+      audioSettings = std::move(globalCandidate);
+      if (overridesActiveGame) {
+        activePerGameSettings = std::move(candidate);
+      }
+      activeEffectiveSettings = genplusgx::settings::resolvePerGameSettings(
+        globalGameSettings(), activePerGameSettings);
+      window.setAudioSettings(activeEffectiveSettings.audio);
+      if (activePerGameIdentity) {
         window.setPerGameSettingsSession(
           activePerGameSettings, globalGameSettings());
       }

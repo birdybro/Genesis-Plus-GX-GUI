@@ -374,11 +374,18 @@ only Genesis Plus GX mixer, channel, filter, equalizer, sound-chip, and resampli
 choices. It travels as a coalescing worker command and is applied between frames by
 `CoreAdapter`; switching chip implementations invokes the core's own sound-layer
 reinitialization without changing synthesis algorithms. The host snapshot owns device
-name, ring latency, master gain, and mute. Device and latency establish resources at
-startup, while gain and mute are lock-free atomics consumed by the SDL callback.
+name, ring latency, master gain, and mute. Gain and mute are lock-free atomics consumed
+by the SDL callback. Device and latency changes are transactional live operations: the
+old stream remains available until a replacement opens, and the worker keeps the same
+shared ring object.
 
-The ring capacity derives from configured latency and is always bounded. The producer
-and consumer track underruns, overruns, peak occupancy, and dropped samples. Normal
+The ring's logical capacity derives from configured latency and is always bounded by a
+fixed maximum backing allocation. Live capacity changes set a short reconfiguration
+gate, wait for in-flight producer/consumer operations, reset sequence counters, and
+publish the new bound without reallocating or replacing the shared object. Producer
+writes during the gate are explicitly counted as dropped and callback reads become
+instrumented silence. The producer and consumer track underruns, overruns, peak
+occupancy, and dropped samples. Normal
 pacing uses audio occupancy plus a monotonic frame deadline without low-resolution GUI
 timers. Pausing stops production and silences/pauses the host stream. Fast-forward may
 mute or drain samples according to settings, but cannot accumulate backlog.
@@ -408,6 +415,10 @@ with a diagnostic. The GUI event pump drains at most 64 audio hot-plug events pe
 SDL automatically migrates streams opened on the default logical device; removal of an
 explicitly selected device destroys its stream and reopens the default while retaining
 the shared bounded ring and pause state. The device list and diagnostics then refresh.
+An explicit user device change opens the requested stream before retiring the old one;
+latency-only changes pause and clear the existing stream. Either path restores the old
+configuration if a control step fails, and a stopped output can be retried from the
+Audio Settings workflow.
 The callback applies bounded integer master gain after filling
 shortages; mute writes silence while continuing to drain the ring, preventing muted
 sessions from building a backlog. Neither operation locks or allocates on the audio

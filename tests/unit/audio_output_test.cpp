@@ -64,6 +64,7 @@ int main()
   }
 
   genplusgx::AudioOutput output{config};
+  const auto sharedRing = output.ringBuffer();
   if (!check(output.pollDeviceEvents().processedEvents == 0U,
         "Uninitialized audio output consumed SDL events") ||
       !check(output.pause().error == genplusgx::AudioOutputError::notInitialized,
@@ -87,6 +88,51 @@ int main()
           genplusgx::AudioOutputError::invalidConfiguration &&
           output.volumePercent() == 55,
         "Invalid live volume changed the host setting")) {
+    return 3;
+  }
+  auto invalidLiveConfig = output.config();
+  invalidLiveConfig.latency = 501ms;
+  const auto beforeInvalidLiveConfig = output.config();
+  if (!check(output.reconfigure(invalidLiveConfig).error ==
+        genplusgx::AudioOutputError::invalidConfiguration,
+      "Invalid live output configuration was accepted") ||
+      !check(output.config().latency == beforeInvalidLiveConfig.latency &&
+          output.ringBuffer() == sharedRing &&
+          output.ringBuffer()->capacityFrames() == 1'920U,
+        "Rejected live output configuration changed active resources")) {
+    return 3;
+  }
+  auto missingDevice = output.config();
+  missingDevice.deviceId = 0x7F00'0001U;
+  const auto missingDeviceStatus = output.reconfigure(missingDevice);
+  if (!check(missingDeviceStatus.error ==
+        genplusgx::AudioOutputError::deviceOpenFailed,
+      "Unavailable live output device did not fail transactionally") ||
+      !check(output.isInitialized() && output.isPaused() &&
+          output.config().deviceId == beforeInvalidLiveConfig.deviceId &&
+          output.ringBuffer() == sharedRing,
+        "Unavailable live device replaced or stopped the active output")) {
+    return 3;
+  }
+  auto enlarged = output.config();
+  enlarged.latency = 120ms;
+  if (!check(output.reconfigure(enlarged) && output.isPaused(),
+        "Paused output could not change latency live") ||
+      !check(output.ringBuffer() == sharedRing &&
+          output.ringBuffer()->capacityFrames() == 5'760U &&
+          output.config().latency == 120ms,
+        "Live latency change replaced the shared ring or used the wrong bound") ||
+      !check(output.resume(), "Reconfigured output could not resume")) {
+    return 3;
+  }
+  auto reduced = output.config();
+  reduced.latency = 30ms;
+  if (!check(output.reconfigure(reduced) && !output.isPaused(),
+        "Running output did not preserve its state across live latency change") ||
+      !check(output.ringBuffer() == sharedRing &&
+          output.ringBuffer()->capacityFrames() == 1'440U,
+        "Running live latency change broke ring ownership or capacity") ||
+      !check(output.pause(), "Live-reconfigured output could not pause")) {
     return 3;
   }
   output.setMuted(true);
@@ -178,6 +224,20 @@ int main()
         "Shutdown audio output accepted resume")) {
     return 6;
   }
+  auto reconnect = config;
+  reconnect.latency = 65ms;
+  reconnect.volumePercent = 42;
+  reconnect.muted = true;
+  if (!check(output.reconfigure(reconnect) && output.isInitialized() &&
+        output.isPaused(),
+      "Live configuration could not retry a stopped audio output") ||
+      !check(output.ringBuffer() == sharedRing &&
+          output.ringBuffer()->capacityFrames() == 3'120U &&
+          output.volumePercent() == 42 && output.isMuted(),
+        "Stopped-output retry lost ring ownership or requested settings") ||
+      !check(output.shutdown(), "Retried audio output did not shut down")) {
+    return 6;
+  }
 
   if (!check(SDL_InitSubSystem(SDL_INIT_AUDIO),
         "Could not initialize SDL for selected-device recovery")) {
@@ -193,6 +253,24 @@ int main()
   genplusgx::AudioOutput selected{selectedConfig};
   if (!check(selected.initialize(), "Selected SDL dummy output did not initialize")) {
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    return 7;
+  }
+  const auto selectedRing = selected.ringBuffer();
+  auto defaultConfig = selected.config();
+  defaultConfig.deviceId = 0U;
+  defaultConfig.latency = 55ms;
+  if (!check(selected.reconfigure(defaultConfig) && selected.isPaused() &&
+        selected.config().deviceId == 0U,
+      "Selected output could not switch to the default device live") ||
+      !check(selected.ringBuffer() == selectedRing &&
+          selectedRing->capacityFrames() == 2'640U,
+        "Live device change replaced the worker-owned audio ring")) {
+    return 7;
+  }
+  selectedConfig = selected.config();
+  selectedConfig.deviceId = devices.front().id;
+  if (!check(selected.reconfigure(selectedConfig),
+        "Default output could not switch back to the selected device live")) {
     return 7;
   }
   static_cast<void>(selected.pollDeviceEvents());

@@ -8,6 +8,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSignalBlocker>
 #include <QSpinBox>
 #include <QVBoxLayout>
 
@@ -80,19 +81,9 @@ AudioSettingsDialog::AudioSettingsDialog(
   outputGroup->setObjectName(QStringLiteral("hostAudioOutputGroup"));
   auto* outputForm = new QFormLayout(outputGroup);
   device_ = combo(*outputGroup, "audioOutputDeviceCombo");
-  device_->addItem(tr("System default"), QString{});
-  for (const auto& name : availableDevices) {
-    const auto qName = QString::fromStdString(name);
-    if (device_->findData(qName) < 0) {
-      device_->addItem(qName, qName);
-    }
-  }
-  if (!current.outputDeviceName.empty()) {
-    const auto configured = QString::fromStdString(current.outputDeviceName);
-    if (device_->findData(configured) < 0) {
-      device_->addItem(tr("%1 (currently unavailable)").arg(configured), configured);
-    }
-  }
+  device_->setProperty(
+    "configuredDeviceName", QString::fromStdString(current.outputDeviceName));
+  setAvailableDevices(std::move(availableDevices));
   outputForm->addRow(tr("Playback device:"), device_);
   latency_ = new QSpinBox(outputGroup);
   latency_->setObjectName(QStringLiteral("audioLatencySpinBox"));
@@ -100,9 +91,10 @@ AudioSettingsDialog::AudioSettingsDialog(
   latency_->setSuffix(tr(" ms"));
   outputForm->addRow(tr("Buffer latency:"), latency_);
   auto* restartNote = new QLabel(
-    tr("Playback device and latency changes take effect after restarting the application."),
+    tr("Playback device and latency changes apply immediately. The audio stream is "
+       "briefly paused and the bounded ring is cleared to avoid stale samples."),
     outputGroup);
-  restartNote->setObjectName(QStringLiteral("audioRestartRequiredLabel"));
+  restartNote->setObjectName(QStringLiteral("audioLiveApplyInformationLabel"));
   restartNote->setWordWrap(true);
   outputForm->addRow(QString{}, restartNote);
   volume_ = percent(*outputGroup, "masterVolumeSpinBox", 100);
@@ -254,6 +246,11 @@ void AudioSettingsDialog::setSettings(const settings::AudioSettings& value)
   muted_->setChecked(value.muted);
   latency_->setValue(value.latencyMilliseconds);
   const auto deviceName = QString::fromStdString(value.outputDeviceName);
+  device_->setProperty("configuredDeviceName", deviceName);
+  if (!deviceName.isEmpty() && device_->findData(deviceName) < 0) {
+    device_->addItem(
+      tr("%1 (currently unavailable)").arg(deviceName), deviceName);
+  }
   const auto deviceIndex = device_->findData(deviceName);
   device_->setCurrentIndex(deviceIndex < 0 ? 0 : deviceIndex);
   select(*output_, value.core.output);
@@ -272,6 +269,28 @@ void AudioSettingsDialog::setSettings(const settings::AudioSettings& value)
   highQualityFm_->setChecked(value.core.highQualityFm);
   highQualityPsg_->setChecked(value.core.highQualityPsg);
   updateFilterControls();
+}
+
+void AudioSettingsDialog::setAvailableDevices(std::vector<std::string> devices)
+{
+  const QSignalBlocker blocker{device_};
+  const auto selected = device_->count() == 0
+    ? device_->property("configuredDeviceName").toString()
+    : device_->currentData().toString();
+  device_->clear();
+  device_->addItem(tr("System default"), QString{});
+  for (const auto& name : devices) {
+    const auto qName = QString::fromStdString(name);
+    if (!qName.isEmpty() && device_->findData(qName) < 0) {
+      device_->addItem(qName, qName);
+    }
+  }
+  if (!selected.isEmpty() && device_->findData(selected) < 0) {
+    device_->addItem(
+      tr("%1 (currently unavailable)").arg(selected), selected);
+  }
+  const auto index = device_->findData(selected);
+  device_->setCurrentIndex(index < 0 ? 0 : index);
 }
 
 void AudioSettingsDialog::apply()

@@ -70,6 +70,15 @@ int main()
   overrides.bios = overrideBios;
 
   const auto effective = resolvePerGameSettings(global, overrides);
+  auto requestedAudio = effective.audio;
+  requestedAudio.masterVolumePercent = 55;
+  requestedAudio.latencyMilliseconds = 135;
+  requestedAudio.outputDeviceName = "New global output";
+  requestedAudio.core.psgLevelPercent = 140;
+  const auto layeredAudio = planAudioSettingsLayerUpdate(
+    global.audio, overrides.audio, requestedAudio);
+  const auto globalOnlyAudio = planAudioSettingsLayerUpdate(
+    global.audio, std::nullopt, requestedAudio);
   if (!check(
         effective.video == overrideVideo, "Video override did not win precedence") ||
       !check(
@@ -85,6 +94,22 @@ int main()
       !check(effective.bios == overrideBios, "BIOS override did not win precedence") ||
       !check(
         validatePerGameSettings(overrides), "Valid sparse overrides were rejected")) {
+    return 1;
+  }
+  if (!check(layeredAudio.global.latencyMilliseconds == 135 &&
+        layeredAudio.global.outputDeviceName == "New global output" &&
+        layeredAudio.global.masterVolumePercent == global.audio.masterVolumePercent &&
+        layeredAudio.perGame &&
+        layeredAudio.perGame->masterVolumePercent == 55 &&
+        layeredAudio.perGame->core.psgLevelPercent == 140 &&
+        layeredAudio.perGame->latencyMilliseconds ==
+          overrides.audio->latencyMilliseconds &&
+        layeredAudio.perGame->outputDeviceName ==
+          overrides.audio->outputDeviceName,
+      "Audio layer update did not isolate global host resources") ||
+      !check(globalOnlyAudio.global == requestedAudio &&
+          !globalOnlyAudio.perGame,
+        "Global audio update unexpectedly created a per-game layer")) {
     return 1;
   }
 

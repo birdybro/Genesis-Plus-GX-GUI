@@ -5,6 +5,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <mutex>
 #include <span>
 #include <vector>
 
@@ -30,7 +31,9 @@ struct AudioRingMetrics final {
 
 class StereoAudioRingBuffer final {
 public:
-  explicit StereoAudioRingBuffer(std::size_t capacityFrames);
+  explicit StereoAudioRingBuffer(
+    std::size_t capacityFrames,
+    std::size_t maximumCapacityFrames = 0U);
 
   StereoAudioRingBuffer(const StereoAudioRingBuffer&) = delete;
   StereoAudioRingBuffer& operator=(const StereoAudioRingBuffer&) = delete;
@@ -41,16 +44,24 @@ public:
     std::span<StereoAudioFrame> destination) noexcept;
 
   [[nodiscard]] std::size_t capacityFrames() const noexcept;
+  [[nodiscard]] std::size_t maximumCapacityFrames() const noexcept;
   [[nodiscard]] std::size_t occupancyFrames() const noexcept;
   [[nodiscard]] AudioRingMetrics metrics() const noexcept;
 
   void clear() noexcept;
   void resetMetrics() noexcept;
+  [[nodiscard]] bool setCapacityFrames(std::size_t capacityFrames) noexcept;
 
 private:
+  [[nodiscard]] bool beginOperation() const noexcept;
+  void endOperation() const noexcept;
   void updatePeak(std::size_t occupancy) noexcept;
 
   std::vector<StereoAudioFrame> storage_;
+  std::atomic<std::size_t> capacityFrames_{0U};
+  mutable std::atomic<bool> reconfiguring_{false};
+  mutable std::atomic<std::uint32_t> activeOperations_{0U};
+  std::mutex reconfigurationMutex_;
   alignas(64) std::atomic<std::uint64_t> readSequence_{0};
   alignas(64) std::atomic<std::uint64_t> writeSequence_{0};
   std::atomic<std::uint64_t> overrunCount_{0};

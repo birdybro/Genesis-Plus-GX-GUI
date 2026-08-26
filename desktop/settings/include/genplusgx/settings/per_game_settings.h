@@ -43,9 +43,18 @@ struct EffectiveGameSettings final {
   [[nodiscard]] bool operator==(const EffectiveGameSettings&) const = default;
 };
 
+struct AudioSettingsLayerUpdate final {
+  AudioSettings global;
+  std::optional<AudioSettings> perGame;
+};
+
 [[nodiscard]] bool validatePerGameSettings(const PerGameSettings& settings) noexcept;
 [[nodiscard]] EffectiveGameSettings resolvePerGameSettings(
   const GlobalGameSettings& global, const PerGameSettings& overrides) noexcept;
+[[nodiscard]] AudioSettingsLayerUpdate planAudioSettingsLayerUpdate(
+  const AudioSettings& global,
+  const std::optional<AudioSettings>& currentPerGame,
+  const AudioSettings& requested) noexcept;
 
 struct PerGameSettingsLoadResult final {
   PersistenceStatus status;

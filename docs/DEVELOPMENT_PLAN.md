@@ -59,7 +59,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | `8691134` |
 | 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | `ed001e3` |
 | 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | `fc19566` |
-| 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | pending |
+| 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | `1e9d58e` |
+| 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | pending |
 
 ## Execution policy
 
@@ -1422,7 +1423,8 @@ Apply, Cancel, and Restore Defaults.
 writes and explicit schema 0 migration. Master volume and mute are lock-free atomics
 read by the SDL callback. Devices are enumerated through SDL and matched by persisted
 name; unavailable devices fall back to the default with a diagnostic. Device and
-latency changes are marked restart-required because they define stream/ring ownership.
+latency changes were initially deferred because they defined stream/ring ownership;
+milestone 49 supersedes that historical limitation with transactional live changes.
 Mono, filter/low-pass/EQ, PSG/FM/CDDA/PCM levels, MAME/Nuked YM2612 and YM2413 cores,
 YM2413 mode, and HQ resampling form a validated core-neutral snapshot. Commands
 coalesce in the bounded worker queue and apply between frames. Chip implementation
@@ -2904,8 +2906,8 @@ boundary.
 - `docs/DEVELOPMENT_PLAN.md`
 
 **Tests added:** `gui.settings` asserts the exact eight category pages and stable object
-names, keyboard category selection, active theme/profile/controller summaries, injected platform
-paths, typed action dispatch, per-game gating, MainWindow Preferences routing, nested
+names, keyboard category selection, active theme/profile/controller summaries, injected
+platform paths, typed action dispatch, per-game gating, MainWindow Preferences routing, nested
 Appearance/Video editors, and single settings-window ownership. Appearance coverage
 also proves a successfully applied theme immediately refreshes the center's summary.
 
@@ -2921,5 +2923,65 @@ current values and stable accessible controls leading to the existing full edito
 shows the platform application-data layout; Advanced gates per-game overrides to active
 sessions. Category-specific Apply/OK/Cancel/Restore Defaults and persistence behavior
 remain authoritative and failures cannot partially apply an unrelated category.
+
+**Commit SHA:** `1e9d58e`
+
+## Milestone 49 detail
+
+**Status:** COMPLETE
+
+**Goal:** Make the persisted SDL playback device and latency controls affect the running
+application immediately while retaining the bounded ring shared with the emulation
+worker and preserving recoverable state on failure.
+
+**Files changed:**
+
+- `desktop/audio/include/genplusgx/audio_ring_buffer.h`
+- `desktop/audio/include/genplusgx/audio_output.h`
+- `desktop/audio/src/audio_ring_buffer.cpp`
+- `desktop/audio/src/audio_output.cpp`
+- `desktop/settings/include/genplusgx/settings/per_game_settings.h`
+- `desktop/settings/src/per_game_settings.cpp`
+- `desktop/ui/include/genplusgx/ui/audio_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/audio_settings_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/audio_ring_buffer_test.cpp`
+- `tests/unit/audio_output_test.cpp`
+- `tests/unit/per_game_settings_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `README.md`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/TEST_MATRIX.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** Ring coverage grows and shrinks a logical capacity inside fixed backing
+storage, rejects out-of-bound changes, clears stale frames, and performs 1,000 capacity
+changes while producer and consumer threads remain active. SDL dummy-output coverage
+changes latency while paused and running, changes explicit/default devices, proves the
+shared ring pointer never changes, rejects invalid and unavailable configurations
+transactionally, and retries a stopped output. GUI coverage requires the live-apply
+explanation, refreshes an open device combo after hot-plug, retains an unavailable
+selection visibly, and exercises user-visible failure reporting.
+Per-game settings coverage proves host device/latency changes update only the global
+layer while gain, mute, and core sound changes remain in the active game override.
+
+**Gate evidence:**
+
+- Focused ring, SDL output, and MainWindow tests pass 3/3.
+- The complete Debug suite passes 71/71 with no new frontend warning.
+- The complete Release suite passes 71/71.
+- The complete ASan/UBSan suite passes 71/71 with no finding.
+
+**Acceptance criteria:** Device and latency Apply briefly pauses/clears audio but neither
+stops the worker nor replaces its shared ring. Logical capacity changes allocate no
+frame-sized storage and are safe against concurrent producer/callback access. Stream
+replacement is committed only after the requested device opens, running/paused state is
+preserved, failures restore the previous core/host/UI snapshot and are visible, stopped
+output can be retried, host-only fields persist globally even during a per-game audio
+override, and hot-plug updates reach an already-open settings dialog.
 
 **Commit SHA:** pending (recorded by the following milestone)

@@ -99,6 +99,25 @@ int main()
     return 8;
   }
 
+  StereoAudioRingBuffer resizableRing{4U, 8U};
+  if (!check(resizableRing.maximumCapacityFrames() == 8U,
+        "Resizable ring did not expose its fixed storage bound") ||
+      !check(resizableRing.write(firstWrite).acceptedFrames == firstWrite.size(),
+        "Resizable ring fixture write failed") ||
+      !check(resizableRing.setCapacityFrames(7U) &&
+          resizableRing.capacityFrames() == 7U &&
+          resizableRing.occupancyFrames() == 0U,
+        "Live ring growth did not clear and publish the logical capacity") ||
+      !check(resizableRing.setCapacityFrames(2U) &&
+          resizableRing.capacityFrames() == 2U,
+        "Live ring shrink failed") ||
+      !check(!resizableRing.setCapacityFrames(0U) &&
+          !resizableRing.setCapacityFrames(9U) &&
+          resizableRing.capacityFrames() == 2U,
+        "Invalid live ring capacity changed the active bound")) {
+    return 9;
+  }
+
   constexpr std::size_t concurrentFrameCount = 20'000U;
   StereoAudioRingBuffer concurrentRing{1'024};
   std::atomic<bool> failed{false};
@@ -157,7 +176,40 @@ int main()
       !check(concurrentRing.metrics().overrunCount == 0U &&
           concurrentRing.metrics().underrunCount == 0U,
         "Concurrent bounded transfer reported an avoidable buffer fault")) {
-    return 9;
+    return 10;
+  }
+
+  StereoAudioRingBuffer reconfiguredConcurrentRing{256U, 2'048U};
+  std::atomic<bool> stopReconfigurationWork{false};
+  std::thread reconfigurationProducer{[&] {
+    const std::array batch{numberedFrame(1), numberedFrame(2), numberedFrame(3)};
+    while (!stopReconfigurationWork.load(std::memory_order_acquire)) {
+      static_cast<void>(reconfiguredConcurrentRing.write(batch));
+    }
+  }};
+  std::thread reconfigurationConsumer{[&] {
+    std::array<StereoAudioFrame, 5> batch{};
+    while (!stopReconfigurationWork.load(std::memory_order_acquire)) {
+      static_cast<void>(reconfiguredConcurrentRing.read(batch));
+    }
+  }};
+  for (std::size_t iteration = 0U; iteration < 1'000U; ++iteration) {
+    const auto capacity = (iteration % 2U) == 0U ? 384U : 1'536U;
+    if (!check(reconfiguredConcurrentRing.setCapacityFrames(capacity),
+          "Concurrent ring reconfiguration was rejected")) {
+      stopReconfigurationWork.store(true, std::memory_order_release);
+      reconfigurationProducer.join();
+      reconfigurationConsumer.join();
+      return 11;
+    }
+  }
+  stopReconfigurationWork.store(true, std::memory_order_release);
+  reconfigurationProducer.join();
+  reconfigurationConsumer.join();
+  if (!check(reconfiguredConcurrentRing.capacityFrames() == 1'536U &&
+        reconfiguredConcurrentRing.occupancyFrames() <= 1'536U,
+      "Concurrent reconfiguration violated the final logical bound")) {
+    return 11;
   }
 
   return 0;

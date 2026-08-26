@@ -83,13 +83,14 @@ public:
   [[nodiscard]] AudioOutputStatus pause();
   [[nodiscard]] AudioOutputStatus resume();
   [[nodiscard]] AudioOutputStatus shutdown();
+  [[nodiscard]] AudioOutputStatus reconfigure(AudioOutputConfig config);
   [[nodiscard]] AudioOutputStatus setVolumePercent(int volumePercent);
   [[nodiscard]] AudioDeviceEventSummary pollDeviceEvents();
   void setMuted(bool muted) noexcept;
 
   [[nodiscard]] bool isInitialized() const noexcept;
   [[nodiscard]] bool isPaused() const noexcept;
-  [[nodiscard]] AudioOutputConfig config() const noexcept;
+  [[nodiscard]] AudioOutputConfig config() const;
   [[nodiscard]] std::string deviceName() const;
   [[nodiscard]] int volumePercent() const noexcept;
   [[nodiscard]] bool isMuted() const noexcept;

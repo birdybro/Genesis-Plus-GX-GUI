@@ -1373,6 +1373,13 @@ void MainWindow::showAudioSettings()
   dialog->open();
 }
 
+void MainWindow::showAudioSettingsError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Audio settings could not be applied."), 5'000);
+  dialogService_->showError(
+    this, tr("Audio Settings Error"), QString::fromStdString(detail));
+}
+
 void MainWindow::showSystemSettings()
 {
   if (auto* existing = findChild<SystemSettingsDialog*>(
@@ -1467,6 +1474,10 @@ MainWindow::appearanceSettings() const noexcept
 void MainWindow::setAvailableAudioDevices(std::vector<std::string> devices)
 {
   availableAudioDevices_ = std::move(devices);
+  if (auto* dialog = findChild<AudioSettingsDialog*>(
+        QStringLiteral("audioSettingsDialog"))) {
+    dialog->setAvailableDevices(availableAudioDevices_);
+  }
   refreshSettingsDialog();
 }
 
