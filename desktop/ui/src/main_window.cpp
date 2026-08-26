@@ -465,7 +465,7 @@ void MainWindow::buildMenus()
   auto* settings = addAction(
     *tools, tr("&Settings…"), "settingsAction", QKeySequence::Preferences);
   connect(settings, &QAction::triggered,
-    this, &MainWindow::showAppearanceSettings);
+    this, [this] { showSettings(); });
   auto* systemSettings = addAction(
     *tools, tr("&System Settings…"), "systemSettingsAction");
   connect(systemSettings, &QAction::triggered,
@@ -1107,6 +1107,7 @@ void MainWindow::setScreenshotSettings(
         QStringLiteral("screenshotSettingsDialog"))) {
     dialog->setSettings(screenshotSettings_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::setScreenshotSettingsSink(ScreenshotSettingsSink sink)
@@ -1147,6 +1148,7 @@ void MainWindow::showScreenshotSettings()
         }
       }
       screenshotSettings_ = settings;
+      refreshSettingsDialog();
       statusBar()->showMessage(tr("Screenshot settings saved."), 3'000);
       return true;
     });
@@ -1214,6 +1216,7 @@ void MainWindow::showInputConfiguration(InputConfigurationTab tab)
     [this](const input::InputConfiguration& configuration) {
       inputConfiguration_ = configuration;
       applyHotkeyShortcuts();
+      refreshSettingsDialog();
       if (inputConfigurationSink_) {
         inputConfigurationSink_(configuration);
       }
@@ -1247,9 +1250,70 @@ void MainWindow::showAppearanceSettings()
         }
       }
       appearanceSettings_ = settings;
+      refreshSettingsDialog();
       statusBar()->showMessage(tr("Appearance settings applied."), 3'000);
       return PersistenceStatus{};
     });
+  dialog->open();
+}
+
+void MainWindow::setApplicationPaths(ApplicationPaths paths)
+{
+  applicationPathsAvailable_ = !paths.root().empty();
+  applicationPaths_ = std::move(paths);
+  refreshSettingsDialog();
+}
+
+void MainWindow::showSettings(SettingsPage page)
+{
+  if (auto* existing = findChild<SettingsDialog*>(
+        QStringLiteral("settingsDialog"))) {
+    existing->setOverview(settingsOverview());
+    existing->openPage(page);
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new SettingsDialog(settingsOverview(), this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setActionSink([this](SettingsPageAction action) {
+    switch (action) {
+      case SettingsPageAction::appearance:
+        showAppearanceSettings();
+        break;
+      case SettingsPageAction::video:
+        showVideoSettings();
+        break;
+      case SettingsPageAction::audio:
+        showAudioSettings();
+        break;
+      case SettingsPageAction::inputBindings:
+        showInputConfiguration(InputConfigurationTab::bindings);
+        break;
+      case SettingsPageAction::playerAssignments:
+        showInputConfiguration(InputConfigurationTab::assignments);
+        break;
+      case SettingsPageAction::system:
+        showSystemSettings();
+        break;
+      case SettingsPageAction::bios:
+        showBiosSettings();
+        break;
+      case SettingsPageAction::screenshotPath:
+        showScreenshotSettings();
+        break;
+      case SettingsPageAction::gameLibrary:
+        showGameLibrary();
+        break;
+      case SettingsPageAction::diagnostics:
+        showDiagnostics();
+        break;
+      case SettingsPageAction::perGame:
+        showPerGameSettings();
+        break;
+    }
+  });
+  dialog->openPage(page);
   dialog->open();
 }
 
@@ -1386,6 +1450,7 @@ void MainWindow::setAppearanceSettings(settings::AppearanceSettings value)
         QStringLiteral("appearanceSettingsDialog"))) {
     dialog->setSettings(appearanceSettings_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::setAppearanceSettingsSink(AppearanceSettingsSink sink)
@@ -1402,6 +1467,7 @@ MainWindow::appearanceSettings() const noexcept
 void MainWindow::setAvailableAudioDevices(std::vector<std::string> devices)
 {
   availableAudioDevices_ = std::move(devices);
+  refreshSettingsDialog();
 }
 
 void MainWindow::setAudioSettingsSink(AudioSettingsSink sink)
@@ -1424,6 +1490,7 @@ void MainWindow::setSystemSettings(CoreSystemSettings settings)
         QStringLiteral("systemSettingsDialog"))) {
     dialog->setSettings(systemSettings_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::setSystemSettingsSink(SystemSettingsSink sink)
@@ -1443,6 +1510,7 @@ void MainWindow::setBiosSnapshot(platform::BiosSnapshot snapshot)
         QStringLiteral("biosSettingsDialog"))) {
     dialog->setSnapshot(biosSnapshot_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::setBiosConfigurationSink(BiosConfigurationSink sink)
@@ -1532,6 +1600,7 @@ void MainWindow::applyVideoSettings(
   if (notifySink && videoSettingsSink_) {
     videoSettingsSink_(videoSettings_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::updateVideoActionChecks()
@@ -1600,6 +1669,7 @@ void MainWindow::applyAudioSettings(
   if (notifySink && audioSettingsSink_) {
     audioSettingsSink_(audioSettings_);
   }
+  refreshSettingsDialog();
   statusBar()->showMessage(
     tr("Volume: %1%2").arg(audioSettings_.masterVolumePercent)
       .arg(audioSettings_.muted ? tr(" (muted)") : QString{}),
@@ -1614,12 +1684,38 @@ void MainWindow::updateAudioActionChecks()
     audioSettings_.muted);
 }
 
+SettingsOverview MainWindow::settingsOverview() const
+{
+  return {
+    .appearance = appearanceSettings_,
+    .video = videoSettings_,
+    .audio = audioSettings_,
+    .input = inputConfiguration_,
+    .system = systemSettings_,
+    .bios = biosSnapshot_,
+    .screenshots = screenshotSettings_,
+    .paths = applicationPaths_,
+    .connectedControllerCount = controllers_.size(),
+    .pathsAvailable = applicationPathsAvailable_,
+    .gameLoaded = isGameLoaded(),
+  };
+}
+
+void MainWindow::refreshSettingsDialog()
+{
+  if (auto* dialog = findChild<SettingsDialog*>(
+        QStringLiteral("settingsDialog"))) {
+    dialog->setOverview(settingsOverview());
+  }
+}
+
 void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
 {
   if (input::validateInputConfiguration(configuration)) {
     setFastForwardHeld(false);
     inputConfiguration_ = std::move(configuration);
     applyHotkeyShortcuts();
+    refreshSettingsDialog();
   }
 }
 
@@ -1631,6 +1727,7 @@ void MainWindow::setConnectedControllers(
         QStringLiteral("inputConfigurationDialog"))) {
     dialog->setControllers(controllers_);
   }
+  refreshSettingsDialog();
 }
 
 void MainWindow::setInputConfigurationSink(InputConfigurationSink sink)
@@ -1844,6 +1941,7 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   gameStatus_->setText(
     tr("Loading %1…").arg(pathToQString(path.filename())));
   statusBar()->showMessage(tr("Loading game…"));
+  refreshSettingsDialog();
 }
 
 void MainWindow::setGameLoaded(const std::filesystem::path& path)
@@ -1866,6 +1964,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   updateStateSlotPresentation();
   gameStatus_->setText(pathToQString(path.filename()));
   statusBar()->showMessage(tr("Game loaded"), 3000);
+  refreshSettingsDialog();
 }
 
 void MainWindow::setNoGameLoaded()
@@ -1905,6 +2004,7 @@ void MainWindow::setNoGameLoaded()
   fpsStatus_->setText(tr("0.0 FPS"));
   displayWidget_->clearFrame();
   updateStateSlotPresentation();
+  refreshSettingsDialog();
 }
 
 void MainWindow::chooseDisc()

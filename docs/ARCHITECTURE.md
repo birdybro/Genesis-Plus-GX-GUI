@@ -854,6 +854,23 @@ screen-reader integration in device-independent coordinates. `DisplayWidget` con
 to calculate emulated pixels from its physical render target and the independent
 fit/integer-scale policy. This prevents UI scaling from changing emulator geometry.
 
+`SettingsDialog` is the single Preferences entry point and an observation/navigation
+layer rather than another persistence owner. It renders eight live category summaries
+from immutable copies of the MainWindow snapshots, including the resolved
+`ApplicationPaths`, then dispatches typed actions back to MainWindow:
+
+```text
+Settings center (General / Video / Audio / Input / System / BIOS / Paths / Advanced)
+          |                         ^
+          | typed page action       | refreshed live snapshot
+          v                         |
+existing validated category dialog + category-specific persistence callback
+```
+
+The category dialogs retain Apply/OK/Cancel/Restore Defaults semantics and their
+existing stores. This keeps a failed BIOS, path, input, or appearance write isolated
+instead of creating a second cross-file transaction format in the settings center.
+
 ## Shutdown order
 
 Shutdown is an explicit, idempotent workflow:

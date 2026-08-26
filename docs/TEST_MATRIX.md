@@ -16,6 +16,7 @@ ctest --preset debug -L gui --output-on-failure
 | Product area | Automated behavior | Primary CTest |
 | --- | --- | --- |
 | Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, status fields, About, exit | `gui.main_window` |
+| Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, platform paths, typed editor routing, one-dialog ownership, loaded-game gating | `gui.settings`, `gui.appearance_accessibility` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
 | Loading | Injected Open dialog, invalid input errors, drag/drop, recent history, replace/close, live generated-ROM frame | `gui.game_loading` |
 | Emulation controls | Live Pause/Resume, hard/soft reset, independent fast-forward hold/toggle composition, focus-safe hold release, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
@@ -31,7 +32,7 @@ ctest --preset debug -L gui --output-on-failure
 | Screenshots | Native frame capture request, busy/error/success states, directory chooser and settings | `gui.main_window` |
 | Cheats | Valid/invalid code behavior, enable/remove, persistence failure, game-session gating | `gui.cheats` |
 | Per-game settings | Sparse overrides, nested editors, Use Global Settings, persistence failure, game-session gating | `gui.per_game_settings` |
-| Appearance/accessibility | System/light/dark themes, Apply/OK/Cancel/defaults, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility` |
+| Appearance/accessibility | Settings-center routing, system/light/dark themes, Apply/OK/Cancel/defaults, live summary refresh, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility`, `gui.settings` |
 | Diagnostics | Live snapshot refresh, privacy filtering, read-only report, clipboard equality, one-dialog ownership | `gui.diagnostics` |
 | CLI smoke | `--help` and `--version` without constructing a window | `gui.desktop_help`, `gui.desktop_version` |
 

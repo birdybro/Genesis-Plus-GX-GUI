@@ -14,6 +14,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/main_window.h
   include/genplusgx/ui/per_game_settings_dialog.h
   include/genplusgx/ui/screenshot_settings_dialog.h
+  include/genplusgx/ui/settings_dialog.h
   include/genplusgx/ui/system_settings_dialog.h
   include/genplusgx/ui/theme_controller.h
   include/genplusgx/ui/video_settings_dialog.h
@@ -32,6 +33,7 @@ add_library(genplusgx_ui STATIC
   src/main_window.cpp
   src/per_game_settings_dialog.cpp
   src/screenshot_settings_dialog.cpp
+  src/settings_dialog.cpp
   src/system_settings_dialog.cpp
   src/theme_controller.cpp
   src/video_settings_dialog.cpp

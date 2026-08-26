@@ -1,5 +1,6 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/theme_controller.h"
 
 #include <QAction>
@@ -19,7 +20,7 @@ class AppearanceAccessibilityTest final : public QObject {
 private slots:
   void themesApplyApplicationWideAndRestoreSystemPalette();
   void dialogSupportsKeyboardApplyRestoreAndFailure();
-  void preferencesActionUsesTheAppearanceWorkflow();
+  void preferencesActionUsesTheSettingsCenterAppearanceWorkflow();
 };
 
 void AppearanceAccessibilityTest::themesApplyApplicationWideAndRestoreSystemPalette()
@@ -106,7 +107,7 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   dialog.reject();
 }
 
-void AppearanceAccessibilityTest::preferencesActionUsesTheAppearanceWorkflow()
+void AppearanceAccessibilityTest::preferencesActionUsesTheSettingsCenterAppearanceWorkflow()
 {
   genplusgx::ui::MainWindow window;
   window.setAppearanceSettings({.theme = genplusgx::settings::ThemeMode::light});
@@ -118,6 +119,13 @@ void AppearanceAccessibilityTest::preferencesActionUsesTheAppearanceWorkflow()
     });
   window.show();
   window.findChild<QAction*>(QStringLiteral("settingsAction"))->trigger();
+  QApplication::processEvents();
+
+  auto* settingsDialog = window.findChild<genplusgx::ui::SettingsDialog*>(
+    QStringLiteral("settingsDialog"));
+  QVERIFY(settingsDialog != nullptr);
+  QTest::mouseClick(settingsDialog->findChild<QPushButton*>(
+    QStringLiteral("configureAppearanceButton")), Qt::LeftButton);
   QApplication::processEvents();
 
   auto* dialog = window.findChild<genplusgx::ui::AppearanceSettingsDialog*>(
@@ -132,6 +140,9 @@ void AppearanceAccessibilityTest::preferencesActionUsesTheAppearanceWorkflow()
   QVERIFY(applied.has_value());
   QCOMPARE(applied->theme, genplusgx::settings::ThemeMode::dark);
   QCOMPARE(window.appearanceSettings().theme, genplusgx::settings::ThemeMode::dark);
+  QVERIFY(settingsDialog->findChild<QLabel*>(
+    QStringLiteral("generalSettingsSummary"))->text().contains(
+      QStringLiteral("Dark")));
   dialog->reject();
 }
 

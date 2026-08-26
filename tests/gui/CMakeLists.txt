@@ -33,6 +33,25 @@ set_tests_properties(
     LABELS "gui;unit;regression;navigation;accessibility;hotkeys"
     TIMEOUT 30
 )
+
+qt_add_executable(genplusgx_settings_dialog_test settings_dialog_test.cpp)
+set_target_properties(genplusgx_settings_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_settings_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.settings COMMAND genplusgx_settings_dialog_test)
+set_tests_properties(
+  gui.settings
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;settings;accessibility;filesystem"
+    TIMEOUT 30
+)
 add_test(NAME gui.emulation_controls COMMAND genplusgx_emulation_controls_test)
 set_tests_properties(
   gui.emulation_controls

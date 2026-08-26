@@ -274,13 +274,26 @@ advanced page subject to the loaded system and port restrictions. See
 
 ## Appearance and accessibility
 
-Choose **Tools → Settings…** (the platform Preferences shortcut) to select **System
-default**, **Light**, or **Dark**. System default restores the Qt platform style and
+Choose **Tools → Settings…** (the platform Preferences shortcut) to open the unified
+settings center. Its stable categories are **General**, **Video**, **Audio**, **Input**,
+**System**, **BIOS**, **Paths**, and **Advanced**. Each page summarizes the live values
+and opens the corresponding complete editor; the Paths page also shows the resolved
+platform directories for configuration, saves, states, screenshots, library data, and
+logs. Existing category menu entries remain direct shortcuts to those same editors.
+
+From General, open **Appearance Settings…** to select **System default**, **Light**, or
+**Dark**. System default restores the Qt platform style and
 colors captured at application startup. Light and dark use standard Qt Widgets with
 high-contrast palettes; they do not replace native controls with a custom skin. Changes
 apply to every open application window. The selection is atomically stored in
 `config/appearance-settings.json`; unreadable, malformed, or newer unsupported files
 fall back to the system theme without being overwritten.
+
+The settings center is a navigation and status surface, so transactional **Apply**,
+**OK**, **Cancel**, and **Restore Defaults** stay in each typed editor. This prevents a
+failure in one persistence domain from partially applying unrelated categories.
+Per-game overrides are enabled on Advanced only while a game is loaded; diagnostics
+remain available at all times.
 
 Qt 6 sizes the interface in device-independent units. Fractional desktop scaling and
 Retina displays use pass-through scale-factor rounding, while emulated-image integer

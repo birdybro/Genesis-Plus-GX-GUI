@@ -58,7 +58,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 44 Release candidate | COMPLETE | Adversarial review, complete clean regressions and report | hotkeys, audio recovery, final report and release gates | 67-test clean Debug/Release/ASan suites; four-host CI; package and adversarial audits | Clean tree and all required gates green | `d84f7eb` |
 | 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | `8691134` |
 | 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | `ed001e3` |
-| 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | pending |
+| 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | `fc19566` |
+| 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | pending |
 
 ## Execution policy
 
@@ -2871,5 +2872,54 @@ no-game gating, and no duplicate release.
 backquote toggle remains checked until explicitly disabled; the effective worker state
 is their logical OR; deactivation, hiding, closing, or changing configuration releases
 only the momentary state; all shortcuts remain configurable and conflict-validated.
+
+**Commit SHA:** `fc19566`
+
+## Milestone 48 detail
+
+**Status:** COMPLETE
+
+**Goal:** Turn the platform Preferences action into a complete, discoverable settings
+surface while preserving each established category's tested transaction and persistence
+boundary.
+
+**Files changed:**
+
+- `desktop/ui/include/genplusgx/ui/settings_dialog.h`
+- `desktop/ui/src/settings_dialog.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/help_dialog.cpp`
+- `desktop/ui/CMakeLists.txt`
+- `desktop/app/main.cpp`
+- `tests/gui/settings_dialog_test.cpp`
+- `tests/gui/appearance_accessibility_test.cpp`
+- `tests/gui/CMakeLists.txt`
+- `README.md`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/APPEARANCE_AND_ACCESSIBILITY.md`
+- `docs/USER_GUIDE.md`
+- `docs/TEST_MATRIX.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `gui.settings` asserts the exact eight category pages and stable object
+names, keyboard category selection, active theme/profile/controller summaries, injected platform
+paths, typed action dispatch, per-game gating, MainWindow Preferences routing, nested
+Appearance/Video editors, and single settings-window ownership. Appearance coverage
+also proves a successfully applied theme immediately refreshes the center's summary.
+
+**Gate evidence:**
+
+- Focused settings, appearance, navigation, and MainWindow GUI tests pass 4/4.
+- The complete Debug suite passes 71/71 with no new frontend warning.
+- The complete Release suite passes 71/71.
+
+**Acceptance criteria:** **Tools → Settings…** opens one modeless native window with
+General, Video, Audio, Input, System, BIOS, Paths, and Advanced pages. Every page exposes
+current values and stable accessible controls leading to the existing full editor; Paths
+shows the platform application-data layout; Advanced gates per-game overrides to active
+sessions. Category-specific Apply/OK/Cancel/Restore Defaults and persistence behavior
+remain authoritative and failures cannot partially apply an unrelated category.
 
 **Commit SHA:** pending (recorded by the following milestone)

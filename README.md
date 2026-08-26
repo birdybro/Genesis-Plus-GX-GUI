@@ -46,6 +46,8 @@ region-appropriate BIOS supplied by the user.
   per-game setting overrides
 - System/light/dark themes, structured rotating logs, and copyable privacy-filtered
   diagnostics
+- Unified General/Video/Audio/Input/System/BIOS/Paths/Advanced settings center with
+  live summaries and direct access to each validated category editor
 - Headless unit, core, integration, GUI, stress, property, and sanitizer tests
 
 ## Installing

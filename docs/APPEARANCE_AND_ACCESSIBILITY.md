@@ -6,7 +6,7 @@ custom skinned control toolkit.
 
 ## Themes
 
-Open **Tools → Settings…** and choose one of:
+Open **Tools → Settings… → General → Appearance Settings…** and choose one of:
 
 - **System default** restores the platform style and palette captured when the
   application started.
@@ -23,7 +23,10 @@ The schema-1 setting is stored atomically in
 
 ## Keyboard access
 
-Menu titles and significant dialog labels include mnemonics. On platforms that show
+The Settings window exposes a keyboard-navigable category list for General, Video,
+Audio, Input, System, BIOS, Paths, and Advanced, and every category action is an
+ordinary accessible Qt button. Menu titles and significant dialog labels include
+mnemonics. On platforms that show
 mnemonic underlines only while Alt is held, press Alt first. In Appearance Settings,
 `Alt+A` focuses Application theme. Tab then visits Restore Defaults, Apply, OK, and
 Cancel in a stable order. Enter activates the focused/default button and Escape closes

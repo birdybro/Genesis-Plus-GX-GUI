@@ -24,6 +24,8 @@ platform documentation.
   Sega Team Player, and Master Tap layouts selected by input profiles.
 - Independently configurable fast-forward hold and toggle hotkeys, with focus-safe
   momentary release and migration that preserves existing toggle bindings.
+- Unified eight-page Settings center with live category summaries, resolved platform
+  data paths, loaded-game gating, and typed routes to transactional category editors.
 - Per-game SRAM, Sega CD BRAM/RAM-cartridge persistence and identity-checked save-state
   slots with atomic files.
 - Sega CD BIOS validation, CUE/BIN, ISO, CHD, CDDA, disc-change, and eject workflows.

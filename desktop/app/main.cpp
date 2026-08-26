@@ -638,6 +638,7 @@ int main(int argc, char* argv[])
       }
     };
   window.displayWidget()->setFrameExchange(videoFrames);
+  window.setApplicationPaths(applicationPaths);
   window.setAppearanceSettings(appearanceSettings);
   window.setAppearanceSettingsSink(
     [&appearanceSettings, &appearanceSettingsStore, &themeController](

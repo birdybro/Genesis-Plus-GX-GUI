@@ -17,6 +17,7 @@
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
+#include "genplusgx/ui/settings_dialog.h"
 
 #include <QMainWindow>
 
@@ -133,6 +134,8 @@ public:
   [[nodiscard]] const settings::AppearanceSettings&
     appearanceSettings() const noexcept;
   void showAppearanceSettings();
+  void setApplicationPaths(ApplicationPaths paths);
+  void showSettings(SettingsPage page = SettingsPage::general);
   void setDiagnosticsSnapshotProvider(DiagnosticsSnapshotProvider provider);
   void showDiagnostics();
   void setGameLoadSink(GameLoadSink sink);
@@ -289,6 +292,8 @@ private:
     const settings::AudioSettings& settings,
     bool notifySink);
   void updateAudioActionChecks();
+  [[nodiscard]] SettingsOverview settingsOverview() const;
+  void refreshSettingsDialog();
 
   QLabel* gameStatus_{nullptr};
   QLabel* systemStatus_{nullptr};
@@ -330,6 +335,7 @@ private:
   settings::AppearanceSettings appearanceSettings_;
   settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
+  ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
   std::vector<library::LibraryGame> gameLibraryGames_;
@@ -353,6 +359,7 @@ private:
   bool screenshotBusy_{false};
   bool cheatSessionReady_{false};
   bool perGameSettingsSessionReady_{false};
+  bool applicationPathsAvailable_{false};
   std::string gameLibraryUnavailableDetail_;
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;
