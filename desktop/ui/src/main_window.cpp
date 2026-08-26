@@ -26,6 +26,7 @@
 #include <QDateTime>
 #include <QDropEvent>
 #include <QKeyCombination>
+#include <QKeyEvent>
 #include <QKeySequence>
 #include <QLabel>
 #include <QMenu>
@@ -84,6 +85,7 @@ MainWindow::MainWindow(QWidget* parent)
   setGameActionsEnabled(false);
   applyVideoSettings(videoSettings_, false);
   applyAudioSettings(audioSettings_, false);
+  qApp->installEventFilter(this);
 }
 
 QAction* MainWindow::addAction(
@@ -157,10 +159,18 @@ void MainWindow::buildMenus()
     requestEmulationControl(EmulationUiOperation::softReset);
   });
   auto* fastForward = addAction(
-    *emulation, tr("&Fast Forward"), "fastForwardAction", QKeySequence{tr("Tab")});
+    *emulation, tr("Fast Forward &Toggle"), "fastForwardAction",
+    QKeySequence{tr("`")});
   fastForward->setCheckable(true);
   connect(fastForward, &QAction::toggled, this, [this](bool enabled) {
-    requestEmulationControl(EmulationUiOperation::setFastForward, enabled);
+    const bool previous = fastForwardToggled_;
+    fastForwardToggled_ = enabled;
+    if (!requestEmulationControl(
+          EmulationUiOperation::setFastForward,
+          fastForwardToggled_ || fastForwardHeld_)) {
+      fastForwardToggled_ = previous;
+      updateEmulationControls();
+    }
   });
   auto* frameAdvance = addAction(
     *emulation, tr("Frame &Advance"), "frameAdvanceAction", QKeySequence{tr("N")});
@@ -493,7 +503,8 @@ void MainWindow::applyHotkeyShortcuts()
     std::pair{input::EmulatorHotkeyAction::hardReset, "resetAction"},
     std::pair{input::EmulatorHotkeyAction::softReset, "softResetAction"},
     std::pair{input::EmulatorHotkeyAction::fullscreen, "fullscreenAction"},
-    std::pair{input::EmulatorHotkeyAction::fastForward, "fastForwardAction"},
+    std::pair{input::EmulatorHotkeyAction::fastForwardToggle,
+      "fastForwardAction"},
     std::pair{input::EmulatorHotkeyAction::frameAdvance, "frameAdvanceAction"},
     std::pair{input::EmulatorHotkeyAction::saveState, "saveStateAction"},
     std::pair{input::EmulatorHotkeyAction::loadState, "loadStateAction"},
@@ -604,10 +615,16 @@ void MainWindow::setEmulationControlState(bool paused, bool fastForward)
 {
   emulationPaused_ = isGameLoaded() && paused;
   fastForwardActive_ = isGameLoaded() && fastForward;
+  if (!isGameLoaded()) {
+    fastForwardHeld_ = false;
+    fastForwardToggled_ = false;
+  } else if (!fastForwardHeld_) {
+    fastForwardToggled_ = fastForwardActive_;
+  }
   updateEmulationControls();
 }
 
-void MainWindow::requestEmulationControl(
+bool MainWindow::requestEmulationControl(
   EmulationUiOperation operation,
   bool enabled)
 {
@@ -615,7 +632,7 @@ void MainWindow::requestEmulationControl(
       !emulationControlSink_(operation, enabled)) {
     updateEmulationControls();
     statusBar()->showMessage(tr("The emulation command could not be queued."), 5'000);
-    return;
+    return false;
   }
 
   if (operation == EmulationUiOperation::pause) {
@@ -626,6 +643,64 @@ void MainWindow::requestEmulationControl(
     fastForwardActive_ = enabled;
   }
   updateEmulationControls();
+  return true;
+}
+
+void MainWindow::setFastForwardHeld(bool held)
+{
+  if (held == fastForwardHeld_) {
+    return;
+  }
+  const bool previous = fastForwardHeld_;
+  fastForwardHeld_ = held;
+  const bool effective = fastForwardToggled_ || fastForwardHeld_;
+  if (effective != fastForwardActive_ &&
+      !requestEmulationControl(
+        EmulationUiOperation::setFastForward, effective)) {
+    fastForwardHeld_ = previous;
+  }
+}
+
+bool MainWindow::eventFilter(QObject* watched, QEvent* event)
+{
+  if (event->type() == QEvent::ApplicationDeactivate ||
+      (event->type() == QEvent::WindowDeactivate && watched == this) ||
+      (event->type() == QEvent::Hide && watched == this)) {
+    setFastForwardHeld(false);
+  }
+
+  if (event->type() != QEvent::KeyPress &&
+      event->type() != QEvent::KeyRelease) {
+    return QMainWindow::eventFilter(watched, event);
+  }
+  const auto combination = input::hotkeyCombination(
+    inputConfiguration_, input::EmulatorHotkeyAction::fastForwardHold);
+  if (!combination) {
+    return QMainWindow::eventFilter(watched, event);
+  }
+
+  auto* keyEvent = static_cast<QKeyEvent*>(event);
+  const auto configured = QKeyCombination::fromCombined(*combination);
+  const bool releaseOfHeldKey = fastForwardHeld_ &&
+    event->type() == QEvent::KeyRelease && keyEvent->key() == configured.key();
+  const bool exactPress = event->type() == QEvent::KeyPress &&
+    keyEvent->keyCombination() == configured;
+  if (!exactPress && !releaseOfHeldKey) {
+    return QMainWindow::eventFilter(watched, event);
+  }
+
+  auto* widget = qobject_cast<QWidget*>(watched);
+  const bool belongsToWindow = widget != nullptr && widget->window() == this;
+  const auto* active = QApplication::activeWindow();
+  if (exactPress &&
+      (!belongsToWindow || (active != nullptr && active != this) ||
+       !isGameLoaded() || gameLoading_)) {
+    return QMainWindow::eventFilter(watched, event);
+  }
+  if (!keyEvent->isAutoRepeat()) {
+    setFastForwardHeld(exactPress);
+  }
+  return true;
 }
 
 void MainWindow::updateEmulationControls()
@@ -651,7 +726,7 @@ void MainWindow::updateEmulationControls()
   }
   if (fastForward != nullptr) {
     const QSignalBlocker blocker{fastForward};
-    fastForward->setChecked(available && fastForwardActive_);
+    fastForward->setChecked(available && fastForwardToggled_);
     fastForward->setEnabled(available);
   }
   if (frameAdvance != nullptr) {
@@ -1542,6 +1617,7 @@ void MainWindow::updateAudioActionChecks()
 void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
 {
   if (input::validateInputConfiguration(configuration)) {
+    setFastForwardHeld(false);
     inputConfiguration_ = std::move(configuration);
     applyHotkeyShortcuts();
   }
@@ -1757,6 +1833,8 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   gameLoading_ = true;
   emulationPaused_ = false;
   fastForwardActive_ = false;
+  fastForwardHeld_ = false;
+  fastForwardToggled_ = false;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
   displayWidget_->clearFrame();
@@ -1806,6 +1884,8 @@ void MainWindow::setNoGameLoaded()
   stateOperationBusy_ = false;
   emulationPaused_ = false;
   fastForwardActive_ = false;
+  fastForwardHeld_ = false;
+  fastForwardToggled_ = false;
   segaCdSession_ = false;
   discEjected_ = false;
   discPresent_ = false;

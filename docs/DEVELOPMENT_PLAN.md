@@ -57,7 +57,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | `98137f7` |
 | 44 Release candidate | COMPLETE | Adversarial review, complete clean regressions and report | hotkeys, audio recovery, final report and release gates | 67-test clean Debug/Release/ASan suites; four-host CI; package and adversarial audits | Clean tree and all required gates green | `d84f7eb` |
 | 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | `8691134` |
-| 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | pending |
+| 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | `ed001e3` |
+| 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | pending |
 
 ## Execution policy
 
@@ -2824,5 +2825,51 @@ selection publish a bounded `CoreInputSettings` command. Only the core-owning th
 touches port/device globals, live changes reinitialize handlers, 3–8 pads select the
 appropriate multitap family, and unsupported layouts fail validation rather than being
 silently ignored.
+
+**Commit SHA:** `ed001e3`
+
+## Milestone 47 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace the single mislabeled fast-forward toggle with separate configurable
+momentary-hold and toggle actions whose effective state remains safe across focus and
+configuration changes.
+
+**Files changed:**
+
+- `desktop/input/include/genplusgx/input/input_profile.h`
+- `desktop/input/src/input_profile.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/input_configuration_dialog.cpp`
+- `desktop/ui/src/help_dialog.cpp`
+- `tests/unit/input_profile_test.cpp`
+- `tests/gui/input_configuration_dialog_test.cpp`
+- `tests/gui/emulation_controls_test.cpp`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/INPUT_CONFIGURATION.md`
+- `docs/USER_GUIDE.md`
+- `docs/ARCHITECTURE.md`
+- `docs/TEST_MATRIX.md`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** Input profile coverage asserts the distinct defaults and migrates a
+representative schema-2 Tab toggle without changing its behavior while selecting a
+unique hold binding. GUI coverage verifies the stable capture controls, momentary
+press/release, toggle-and-hold composition, deactivation release, custom live binding,
+no-game gating, and no duplicate release.
+
+**Gate evidence:**
+
+- Focused input profile/configuration and live emulation-control tests pass 3/3.
+- The complete Debug suite passes 70/70 with no new frontend warning.
+- The complete Release suite passes 70/70.
+
+**Acceptance criteria:** The default Tab hold is active only while down; the independent
+backquote toggle remains checked until explicitly disabled; the effective worker state
+is their logical OR; deactivation, hiding, closing, or changing configuration releases
+only the momentary state; all shortcuts remain configurable and conflict-validated.
 
 **Commit SHA:** pending (recorded by the following milestone)

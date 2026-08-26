@@ -61,9 +61,12 @@ the window; trigger it again to resume. **Reset** (`Ctrl+R`) performs the consol
 reset path, while **Soft Reset** uses the supported reset-button behavior. Neither action
 unloads the image or disc, and both are disabled until a game is ready.
 
-**Fast Forward** (`Tab`) is a checkable toggle. While enabled, the worker uses its bounded
-high-rate pacing path and suppresses host audio so samples cannot accumulate. Turn it off
-to return to the loaded system's exact PAL, NTSC, or Sega CD target. **Frame Advance**
+Hold `Tab` for momentary fast-forward, or use **Emulation → Fast Forward Toggle** (`` ` ``)
+to latch it. The two controls compose safely, and releasing the hold—or moving focus away
+from the application—cannot cancel an independently enabled toggle. While active, the
+worker uses its bounded high-rate pacing path and suppresses host audio so samples cannot
+accumulate. Disable the toggle and release the hold to return to the loaded system's exact
+PAL, NTSC, or Sega CD target. **Frame Advance**
 (`N`) is available while paused and executes exactly one frame before returning to the
 paused state. The status bar reports measured FPS without using a GUI timer to drive
 emulation.

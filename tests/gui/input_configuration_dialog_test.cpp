@@ -49,6 +49,10 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
     QStringLiteral("hotkeyPauseButton"));
   auto* softResetHotkey = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
     QStringLiteral("hotkeySoftResetButton"));
+  auto* fastForwardHold = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeyFastForwardHoldButton"));
+  auto* fastForwardToggle = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeyFastForwardToggleButton"));
   auto* conflict = dialog.findChild<QLabel*>(QStringLiteral("inputConflictLabel"));
   QVERIFY(keyboardA != nullptr);
   QVERIFY(keyboardB != nullptr);
@@ -56,6 +60,14 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
   QVERIFY(controllerC != nullptr);
   QVERIFY(pauseHotkey != nullptr);
   QVERIFY(softResetHotkey != nullptr);
+  QVERIFY(fastForwardHold != nullptr);
+  QVERIFY(fastForwardToggle != nullptr);
+  const auto tab =
+    QKeyCombination{Qt::NoModifier, Qt::Key_Tab}.toCombined();
+  const auto quoteLeft =
+    QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined();
+  QCOMPARE(fastForwardHold->bindingCode(), tab);
+  QCOMPARE(fastForwardToggle->bindingCode(), quoteLeft);
   QVERIFY(conflict != nullptr);
 
   QTest::mouseClick(keyboardA, Qt::LeftButton);

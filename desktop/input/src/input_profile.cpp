@@ -59,7 +59,8 @@ constexpr std::array hotkeyActions{
   EmulatorHotkeyAction::hardReset,
   EmulatorHotkeyAction::softReset,
   EmulatorHotkeyAction::fullscreen,
-  EmulatorHotkeyAction::fastForward,
+  EmulatorHotkeyAction::fastForwardHold,
+  EmulatorHotkeyAction::fastForwardToggle,
   EmulatorHotkeyAction::frameAdvance,
   EmulatorHotkeyAction::saveState,
   EmulatorHotkeyAction::loadState,
@@ -187,7 +188,9 @@ int combined(Qt::KeyboardModifiers modifiers, Qt::Key key) noexcept
   return QKeyCombination{modifiers, key}.toCombined();
 }
 
-std::optional<std::vector<HotkeyBinding>> hotkeysFromJson(const QJsonValue& value)
+std::optional<std::vector<HotkeyBinding>> hotkeysFromJson(
+  const QJsonValue& value,
+  int schema)
 {
   if (!value.isArray()) {
     return std::nullopt;
@@ -200,8 +203,10 @@ std::optional<std::vector<HotkeyBinding>> hotkeysFromJson(const QJsonValue& valu
       return std::nullopt;
     }
     const auto object = entry.toObject();
-    const auto action = parseHotkeyAction(
-      object.value(QStringLiteral("action")).toString());
+    const auto actionName = object.value(QStringLiteral("action")).toString();
+    const auto action = schema < 3 && actionName == QStringLiteral("fast-forward")
+      ? std::optional{EmulatorHotkeyAction::fastForwardToggle}
+      : parseHotkeyAction(actionName);
     const auto sequenceText = object.value(QStringLiteral("sequence"));
     if (!action || !sequenceText.isString()) {
       return std::nullopt;
@@ -212,6 +217,22 @@ std::optional<std::vector<HotkeyBinding>> hotkeysFromJson(const QJsonValue& valu
       return std::nullopt;
     }
     hotkeys.push_back({*action, sequence[0].toCombined()});
+  }
+  if (schema < 3) {
+    const std::array candidates{
+      combined(Qt::NoModifier, Qt::Key_Tab),
+      combined(Qt::NoModifier, Qt::Key_QuoteLeft),
+      combined(Qt::NoModifier, Qt::Key_Backslash),
+    };
+    const auto available = std::ranges::find_if(candidates, [&hotkeys](int candidate) {
+      return std::ranges::none_of(hotkeys, [candidate](const HotkeyBinding& binding) {
+        return binding.keyCombination == candidate;
+      });
+    });
+    if (available == candidates.end()) {
+      return std::nullopt;
+    }
+    hotkeys.push_back({EmulatorHotkeyAction::fastForwardHold, *available});
   }
   return hotkeys;
 }
@@ -413,7 +434,8 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
   if (schema < 2) {
     configuration.hotkeys = defaultEmulatorHotkeys();
   } else {
-    const auto hotkeys = hotkeysFromJson(root.value(QStringLiteral("hotkeys")));
+    const auto hotkeys = hotkeysFromJson(
+      root.value(QStringLiteral("hotkeys")), schema);
     if (!hotkeys) {
       return {
         .status = failure(InputProfileError::parseFailed,
@@ -479,8 +501,10 @@ std::string_view emulatorHotkeyActionName(EmulatorHotkeyAction action) noexcept
     return "soft-reset";
   case EmulatorHotkeyAction::fullscreen:
     return "fullscreen";
-  case EmulatorHotkeyAction::fastForward:
-    return "fast-forward";
+  case EmulatorHotkeyAction::fastForwardHold:
+    return "fast-forward-hold";
+  case EmulatorHotkeyAction::fastForwardToggle:
+    return "fast-forward-toggle";
   case EmulatorHotkeyAction::frameAdvance:
     return "frame-advance";
   case EmulatorHotkeyAction::saveState:
@@ -654,7 +678,10 @@ std::vector<HotkeyBinding> defaultEmulatorHotkeys()
     {EmulatorHotkeyAction::softReset,
       combined(control | Qt::ShiftModifier, Qt::Key_R)},
     {EmulatorHotkeyAction::fullscreen, combined(Qt::AltModifier, Qt::Key_Return)},
-    {EmulatorHotkeyAction::fastForward, combined(Qt::NoModifier, Qt::Key_Tab)},
+    {EmulatorHotkeyAction::fastForwardHold,
+      combined(Qt::NoModifier, Qt::Key_Tab)},
+    {EmulatorHotkeyAction::fastForwardToggle,
+      combined(Qt::NoModifier, Qt::Key_QuoteLeft)},
     {EmulatorHotkeyAction::frameAdvance, combined(Qt::NoModifier, Qt::Key_N)},
     {EmulatorHotkeyAction::saveState, combined(Qt::NoModifier, Qt::Key_F5)},
     {EmulatorHotkeyAction::loadState, combined(Qt::NoModifier, Qt::Key_F8)},

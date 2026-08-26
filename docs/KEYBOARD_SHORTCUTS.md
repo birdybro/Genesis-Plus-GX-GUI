@@ -42,7 +42,8 @@ shortcuts.
 | Pause/resume | Space |
 | Hard reset | Ctrl+R |
 | Soft reset | Ctrl+Shift+R |
-| Fast forward | Tab |
+| Fast forward (hold) | Tab |
+| Fast forward (toggle) | ` |
 | Frame advance | N |
 | Save selected state slot | F5 |
 | Load selected state slot | F8 |
@@ -62,3 +63,8 @@ Shift-only chords where either physical key is a gameplay control—are rejected
 they would shadow a gameplay binding in any profile. Ctrl, Alt, or Command/Meta chords
 remain separate from gameplay input. **Restore Defaults** on the Hotkeys tab resets all
 emulator shortcuts without changing controller profiles.
+
+The hold shortcut enables fast-forward only while the combination is down. Releasing
+it, deactivating the application, hiding the main window, or closing the game releases
+the hold so focus changes cannot leave acceleration stuck on. The toggle is an
+independent latch: releasing a temporary hold does not cancel an enabled toggle.

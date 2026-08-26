@@ -44,6 +44,7 @@ class EmulationControlsTest final : public QObject {
 
 private slots:
   void actionsDriveLiveWorkerAndTrackCanonicalState();
+  void holdHotkeyIsMomentaryAndFocusSafe();
   void rejectedCommandsRollBackOptimisticActionState();
 };
 
@@ -191,6 +192,79 @@ void EmulationControlsTest::actionsDriveLiveWorkerAndTrackCanonicalState()
   completed = waitForOperation(worker, nextOperation);
   QVERIFY(completed && completed->succeeded());
   QVERIFY(worker.stop());
+}
+
+void EmulationControlsTest::holdHotkeyIsMomentaryAndFocusSafe()
+{
+  using Operation = genplusgx::ui::EmulationUiOperation;
+  genplusgx::ui::MainWindow window;
+  std::vector<std::pair<Operation, bool>> requests;
+  window.setEmulationControlSink(
+    [&requests](Operation operation, bool enabled) {
+      requests.emplace_back(operation, enabled);
+      return true;
+    });
+  window.setGameLoaded(std::filesystem::path{"synthetic.md"});
+  window.setEmulationControlState(false, false);
+  window.show();
+  window.activateWindow();
+  QApplication::processEvents();
+
+  auto* toggle = window.findChild<QAction*>(QStringLiteral("fastForwardAction"));
+  QVERIFY(toggle != nullptr);
+  QCOMPARE(toggle->shortcut(), QKeySequence{Qt::Key_QuoteLeft});
+
+  QTest::keyPress(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{1U});
+  QCOMPARE(requests.back(), std::make_pair(Operation::setFastForward, true));
+  QVERIFY(!toggle->isChecked());
+  QTest::keyRelease(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{2U});
+  QCOMPARE(requests.back(), std::make_pair(Operation::setFastForward, false));
+
+  toggle->trigger();
+  QCOMPARE(requests.size(), std::size_t{3U});
+  QCOMPARE(requests.back(), std::make_pair(Operation::setFastForward, true));
+  QVERIFY(toggle->isChecked());
+  QTest::keyPress(&window, Qt::Key_Tab);
+  QTest::keyRelease(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{3U});
+  QVERIFY(toggle->isChecked());
+  toggle->trigger();
+  QCOMPARE(requests.size(), std::size_t{4U});
+  QCOMPARE(requests.back(), std::make_pair(Operation::setFastForward, false));
+
+  QTest::keyPress(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{5U});
+  QEvent deactivate{QEvent::WindowDeactivate};
+  QApplication::sendEvent(&window, &deactivate);
+  QCOMPARE(requests.size(), std::size_t{6U});
+  QCOMPARE(requests.back(), std::make_pair(Operation::setFastForward, false));
+  QTest::keyRelease(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{6U});
+
+  auto custom = genplusgx::input::defaultInputConfiguration();
+  auto hold = std::ranges::find_if(custom.hotkeys, [](const auto& binding) {
+    return binding.action ==
+      genplusgx::input::EmulatorHotkeyAction::fastForwardHold;
+  });
+  QVERIFY(hold != custom.hotkeys.end());
+  hold->keyCombination = QKeyCombination{
+    Qt::ControlModifier, Qt::Key_G}.toCombined();
+  window.setInputConfiguration(custom);
+  QTest::keyPress(&window, Qt::Key_Tab);
+  QTest::keyRelease(&window, Qt::Key_Tab);
+  QCOMPARE(requests.size(), std::size_t{6U});
+  QTest::keyPress(&window, Qt::Key_G, Qt::ControlModifier);
+  QTest::keyRelease(&window, Qt::Key_G, Qt::ControlModifier);
+  QCOMPARE(requests.size(), std::size_t{8U});
+  QCOMPARE(requests[6U], std::make_pair(Operation::setFastForward, true));
+  QCOMPARE(requests[7U], std::make_pair(Operation::setFastForward, false));
+
+  window.setNoGameLoaded();
+  QTest::keyPress(&window, Qt::Key_G, Qt::ControlModifier);
+  QTest::keyRelease(&window, Qt::Key_G, Qt::ControlModifier);
+  QCOMPARE(requests.size(), std::size_t{8U});
 }
 
 void EmulationControlsTest::rejectedCommandsRollBackOptimisticActionState()

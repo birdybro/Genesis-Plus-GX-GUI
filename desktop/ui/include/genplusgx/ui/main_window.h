@@ -33,8 +33,10 @@
 class QAction;
 class QDragEnterEvent;
 class QDropEvent;
+class QEvent;
 class QLabel;
 class QMenu;
+class QObject;
 
 namespace genplusgx::video {
 class DisplayWidget;
@@ -242,6 +244,7 @@ public:
   [[nodiscard]] video::DisplayWidget* displayWidget() const noexcept;
 
 protected:
+  [[nodiscard]] bool eventFilter(QObject* watched, QEvent* event) override;
   void dragEnterEvent(QDragEnterEvent* event) override;
   void dropEvent(QDropEvent* event) override;
 
@@ -264,7 +267,10 @@ private:
   void requestGameInformation();
   void updateGameInformationAction();
   void requestStateOperation(StateUiOperation operation);
-  void requestEmulationControl(EmulationUiOperation operation, bool enabled = false);
+  bool requestEmulationControl(
+    EmulationUiOperation operation,
+    bool enabled = false);
+  void setFastForwardHeld(bool held);
   void updateEmulationControls();
   void updateStateActions();
   void updateStateSlotPresentation();
@@ -336,6 +342,8 @@ private:
   bool stateOperationBusy_{false};
   bool emulationPaused_{false};
   bool fastForwardActive_{false};
+  bool fastForwardHeld_{false};
+  bool fastForwardToggled_{false};
   bool segaCdSession_{false};
   bool discEjected_{false};
   bool discPresent_{false};

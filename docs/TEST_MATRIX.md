@@ -18,12 +18,12 @@ ctest --preset debug -L gui --output-on-failure
 | Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, status fields, About, exit | `gui.main_window` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
 | Loading | Injected Open dialog, invalid input errors, drag/drop, recent history, replace/close, live generated-ROM frame | `gui.game_loading` |
-| Emulation controls | Live Pause/Resume, hard/soft reset, fast-forward on/off, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
+| Emulation controls | Live Pause/Resume, hard/soft reset, independent fast-forward hold/toggle composition, focus-safe hold release, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
 | Save states | Slots 0–9, save/load/delete, timestamps, changed execution, deterministic restore, wrong-game rejection | `gui.save_state_workflow`, `gui.main_window` |
 | Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, Apply/Cancel/defaults | `gui.main_window`, `gui.display_widget` |
 | Audio | Mute, volume, output/latency and core audio controls, bounded hot-plug events, selected-device recovery, Apply/Cancel/defaults | `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
-| Controller/input UI | Gameplay/hotkey capture, duplicate and cross-domain conflicts, schema migration/persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
+| Controller/input UI | Gameplay/hotkey capture, separate fast-forward hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
 | BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
 | Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state | `gui.main_window` |
 | Game library | Directory add/remove, async scan, search/system filter, favorite, sorting, local art, launch | `gui.game_library` |

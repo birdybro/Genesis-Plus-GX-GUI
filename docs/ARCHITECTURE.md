@@ -139,6 +139,13 @@ search does not move from the command that is subsequently queued. Lifecycle,
 persistence, and disc commands retain ordering. The queue has a fixed capacity and
 reports saturation rather than growing without bound.
 
+The GUI keeps fast-forward's configurable momentary hold and toggle latch as distinct
+states, then sends only their effective logical OR through the bounded command path.
+The application-wide Qt event filter consumes the hold combination for widgets owned by
+the main window and forces its release on focus loss, hide, game close, or configuration
+replacement. The core and worker continue to receive only the single canonical
+fast-forward boolean.
+
 The core adapter exposes observation-only capacities for its fixed framebuffer, audio,
 save-state, and state-load scratch buffers. Worker metrics likewise expose command/event
 queue depths together with configured capacities. The long-running regression samples

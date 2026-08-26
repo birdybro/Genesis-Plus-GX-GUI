@@ -55,12 +55,20 @@ volume shortcuts. Restore Defaults resets the selected profile; Cancel leaves th
 configuration unchanged; Apply and OK validate before publishing changes.
 
 The Hotkeys tab captures a single keyboard combination for Open/Close, library,
-pause/reset, fullscreen, fast forward, frame advance, save-state operations and slots,
-screenshot, mute, and volume. Shortcuts must be unique. A shortcut that would consume a
+pause/reset, fullscreen, separate fast-forward hold and toggle controls, frame advance,
+save-state operations and slots, screenshot, mute, and volume. Shortcuts must be unique.
+A shortcut that would consume a
 gameplay key in any stored profile is rejected, while Ctrl, Alt, and Command/Meta chords
 remain available because gameplay input deliberately ignores those modifiers. Apply or
 OK changes the live menu shortcuts immediately. Restore Defaults while this tab is
 selected resets the hotkeys rather than the active gameplay profile.
+
+The momentary fast-forward binding is handled on press and release. Application/window
+deactivation and hiding the main window synthesize a release so acceleration cannot be
+left active after a focus transition. It composes with the menu toggle: the effective
+state stays enabled until both the held key and the independent toggle latch are off.
+Schema-2 profiles keep their existing fast-forward binding as the toggle and receive a
+non-conflicting default hold binding during the schema-3 migration.
 
 The Advanced Devices tab configures the analog deadzone, the logical device selected
 for each of eight frontend players, and the emulated action produced by each left-stick

@@ -67,6 +67,13 @@ int main()
         QKeyCombination{Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_R}
           .toCombined(),
         "Soft-reset hotkey default is incorrect") ||
+      !check(hotkeyCombination(
+          configuration, EmulatorHotkeyAction::fastForwardHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Tab}.toCombined() &&
+        hotkeyCombination(
+          configuration, EmulatorHotkeyAction::fastForwardToggle) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined(),
+        "Fast-forward hold/toggle defaults are incorrect") ||
       !check(std::ranges::find(reservedDefaults, Qt::Key_M) !=
         reservedDefaults.end(),
         "Unmodified emulator hotkeys were not reserved from gameplay")) {
@@ -202,6 +209,37 @@ int main()
   auto legacyRoot = QJsonDocument::fromJson(QByteArray{
     reinterpret_cast<const char*>(persisted.data.data()),
     static_cast<qsizetype>(persisted.data.size())}).object();
+  auto schemaTwoRoot = legacyRoot;
+  schemaTwoRoot.insert(QStringLiteral("schemaVersion"), 2);
+  auto schemaTwoHotkeys = schemaTwoRoot.value(QStringLiteral("hotkeys")).toArray();
+  for (qsizetype index = schemaTwoHotkeys.size() - 1; index >= 0; --index) {
+    auto binding = schemaTwoHotkeys[index].toObject();
+    const auto action = binding.value(QStringLiteral("action")).toString();
+    if (action == QStringLiteral("fast-forward-hold")) {
+      schemaTwoHotkeys.removeAt(index);
+    } else if (action == QStringLiteral("fast-forward-toggle")) {
+      binding.insert(QStringLiteral("action"), QStringLiteral("fast-forward"));
+      binding.insert(QStringLiteral("sequence"), QStringLiteral("Tab"));
+      schemaTwoHotkeys[index] = binding;
+    }
+  }
+  schemaTwoRoot.insert(QStringLiteral("hotkeys"), schemaTwoHotkeys);
+  if (!check(writeBytes(path, QJsonDocument{schemaTwoRoot}.toJson()),
+        "Could not create the schema-2 fast-forward migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto schemaTwo = store.load();
+  if (!check(schemaTwo.status && schemaTwo.migrated &&
+        hotkeyCombination(schemaTwo.configuration,
+          EmulatorHotkeyAction::fastForwardToggle) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Tab}.toCombined() &&
+        hotkeyCombination(schemaTwo.configuration,
+          EmulatorHotkeyAction::fastForwardHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined(),
+        "Schema 2 did not preserve toggle behavior and add a unique hold binding")) {
+    return EXIT_FAILURE;
+  }
+
   legacyRoot.insert(QStringLiteral("schemaVersion"), 1);
   legacyRoot.remove(QStringLiteral("hotkeys"));
   if (!check(writeBytes(path, QJsonDocument{legacyRoot}.toJson()),

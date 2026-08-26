@@ -22,6 +22,8 @@ platform documentation.
   device selection.
 - Emulation-thread propagation for three-/six-button pads, specialized peripherals,
   Sega Team Player, and Master Tap layouts selected by input profiles.
+- Independently configurable fast-forward hold and toggle hotkeys, with focus-safe
+  momentary release and migration that preserves existing toggle bindings.
 - Per-game SRAM, Sega CD BRAM/RAM-cartridge persistence and identity-checked save-state
   slots with atomic files.
 - Sega CD BIOS validation, CUE/BIN, ISO, CHD, CDDA, disc-change, and eject workflows.
