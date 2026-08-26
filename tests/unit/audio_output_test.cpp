@@ -108,6 +108,14 @@ int main()
          output.metrics().suppliedFrames < source.size()) {
     std::this_thread::sleep_for(5ms);
   }
+  for (int snapshotIndex = 0; snapshotIndex < 10'000; ++snapshotIndex) {
+    const auto snapshot = output.metrics();
+    if (!check(snapshot.requestedFrames ==
+          snapshot.suppliedFrames + snapshot.silenceFrames,
+        "Concurrent audio metrics snapshot did not balance")) {
+      return 5;
+    }
+  }
   const auto runningMetrics = output.metrics();
   if (!check(runningMetrics.callbackCount > 0U,
         "SDL dummy device did not invoke the demand callback") ||

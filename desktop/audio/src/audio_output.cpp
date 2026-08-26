@@ -252,14 +252,25 @@ public:
 
   AudioOutputMetrics metrics() const noexcept
   {
-    return {
-      .callbackCount = callbackCount_.load(std::memory_order_relaxed),
-      .requestedFrames = requestedFrames_.load(std::memory_order_relaxed),
-      .suppliedFrames = suppliedFrames_.load(std::memory_order_relaxed),
-      .silenceFrames = silenceFrames_.load(std::memory_order_relaxed),
-      .submissionFailures = submissionFailures_.load(std::memory_order_relaxed),
-      .ring = ring_->metrics(),
-    };
+    AudioOutputMetrics snapshot;
+    for (;;) {
+      const auto before = metricsGeneration_.load(std::memory_order_acquire);
+      if ((before & 1U) != 0U) {
+        continue;
+      }
+      snapshot.callbackCount = callbackCount_.load(std::memory_order_relaxed);
+      snapshot.requestedFrames = requestedFrames_.load(std::memory_order_relaxed);
+      snapshot.suppliedFrames = suppliedFrames_.load(std::memory_order_relaxed);
+      snapshot.silenceFrames = silenceFrames_.load(std::memory_order_relaxed);
+      snapshot.submissionFailures =
+        submissionFailures_.load(std::memory_order_relaxed);
+      const auto after = metricsGeneration_.load(std::memory_order_acquire);
+      if (before == after) {
+        break;
+      }
+    }
+    snapshot.ring = ring_->metrics();
+    return snapshot;
   }
 
   std::string deviceName() const
@@ -286,6 +297,7 @@ public:
     auto framesRemaining =
       (static_cast<std::size_t>(additionalAmount) + bytesPerFrame - 1U) /
       bytesPerFrame;
+    metricsGeneration_.fetch_add(1U, std::memory_order_acq_rel);
     callbackCount_.fetch_add(1U, std::memory_order_relaxed);
     requestedFrames_.fetch_add(framesRemaining, std::memory_order_relaxed);
 
@@ -303,19 +315,23 @@ public:
       const auto byteCount = static_cast<int>(chunkFrames * bytesPerFrame);
       if (!SDL_PutAudioStreamData(stream, chunk.data(), byteCount)) {
         submissionFailures_.fetch_add(1U, std::memory_order_relaxed);
+        metricsGeneration_.fetch_add(1U, std::memory_order_release);
         return;
       }
       framesRemaining -= chunkFrames;
     }
+    metricsGeneration_.fetch_add(1U, std::memory_order_release);
   }
 
   void resetCallbackMetrics() noexcept
   {
+    metricsGeneration_.fetch_add(1U, std::memory_order_acq_rel);
     callbackCount_.store(0U, std::memory_order_relaxed);
     requestedFrames_.store(0U, std::memory_order_relaxed);
     suppliedFrames_.store(0U, std::memory_order_relaxed);
     silenceFrames_.store(0U, std::memory_order_relaxed);
     submissionFailures_.store(0U, std::memory_order_relaxed);
+    metricsGeneration_.fetch_add(1U, std::memory_order_release);
   }
 
   AudioOutputConfig config_;
@@ -328,6 +344,7 @@ public:
   std::atomic<bool> paused_{true};
   std::atomic<int> volumePercent_{100};
   std::atomic<bool> muted_{false};
+  std::atomic<std::uint64_t> metricsGeneration_{0};
   std::atomic<std::uint64_t> callbackCount_{0};
   std::atomic<std::uint64_t> requestedFrames_{0};
   std::atomic<std::uint64_t> suppliedFrames_{0};

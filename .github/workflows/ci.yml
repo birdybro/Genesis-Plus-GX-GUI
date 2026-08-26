@@ -221,7 +221,8 @@ jobs:
       - name: Install and package portable Windows application
         if: matrix.build_type == 'Release'
         run: |
-          cmake --install build/ci-windows --config Release --prefix build/package-root
+          cmake --install build/ci-windows --config Release `
+            --prefix "$pwd/build/package-root"
           cmake "-DPACKAGE_ROOT=$pwd/build/package-root" `
             -DVERIFY_PLATFORM=windows -P cmake/VerifyPackage.cmake
           & ./build/package-root/bin/genesis-plus-gx-gui.exe --version

@@ -2469,8 +2469,20 @@ platform plugin, runs `--version` from that staged application, then invokes CPa
 - Complete local Debug, Release, and ASan/UBSan suites pass (62/62 each), including the
   new package metadata test. The inherited libretro target still builds and cleans with
   only its two documented qualifier warnings.
-- Hosted Windows/macOS package construction and artifact upload remain pending this
-  workflow-bearing commit.
+- The first packaging workflow inherited a macOS-only intermittent diagnostics failure:
+  the SDL callback updated five atomic counters independently while the GUI test sampled
+  them. Callback metrics now use a generation-protected coherent snapshot without adding
+  a mutex to the real-time audio path, and 100 consecutive dummy-device runs preserve the
+  requested = supplied + silence accounting invariant.
+- Hosted run `32914798914` then reached all three Release deployment paths after their
+  complete 62-test suites passed. It identified three environmental assumptions: Linux
+  runtime discovery did not search the action-installed Qt/SDL library roots, Qt's
+  Windows deploy helper requires an absolute install prefix, and the macOS framework
+  verifier used a recursive glob form that does not match nested framework paths. The
+  deployment script now records both imported-package library roots, Windows stages to
+  an absolute path, and the macOS gate checks the canonical QtCore framework path
+  directly. Local staged Linux and synthetic macOS layout probes pass those corrected
+  checks; a corrective hosted run remains pending.
 
 **Acceptance criteria:** Packages derive the application/package version from the root
 CMake project, carry a platform and normalized architecture in every filename, and

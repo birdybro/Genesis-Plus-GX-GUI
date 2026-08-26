@@ -36,7 +36,9 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
   require_file(
     "${bundle}/Contents/MacOS/genesis-plus-gx-gui"
     "macOS bundle executable")
-  require_match("*QtCore.framework/Versions/A/QtCore" "deployed Qt Core framework")
+  require_file(
+    "${bundle}/Contents/Frameworks/QtCore.framework/Versions/A/QtCore"
+    "deployed Qt Core framework")
   require_match("*SDL3*.dylib" "deployed SDL3 runtime")
   require_match("*libqcocoa.dylib" "deployed Qt Cocoa platform plugin")
 elseif(VERIFY_PLATFORM STREQUAL "linux")

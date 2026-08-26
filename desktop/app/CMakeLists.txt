@@ -91,6 +91,13 @@ if(UNIX AND NOT APPLE)
     )
   endforeach()
 
+  get_filename_component(genplusgx_qt_library_directory
+    "${Qt6_DIR}/../.." ABSOLUTE)
+  get_filename_component(genplusgx_sdl_library_directory
+    "${SDL3_DIR}/../.." ABSOLUTE)
+  set(genplusgx_dependency_search_directories
+    "${genplusgx_qt_library_directory};${genplusgx_sdl_library_directory}")
+
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/LinuxDeploy.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/LinuxDeploy.cmake"
