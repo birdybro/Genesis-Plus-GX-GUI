@@ -52,7 +52,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
-| 41 Packaging | IN PROGRESS | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
+| 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
@@ -2423,7 +2423,7 @@ retain bounded failure diagnostics without proprietary fixtures or signing crede
 
 ## Milestone 41 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Produce self-contained, versioned Windows x64 ZIP, Linux x86-64 tarball, and
 native macOS arm64/x86-64 ZIP and DMG artifacts from one CMake install graph, with a
@@ -2496,8 +2496,13 @@ platform plugin, runs `--version` from that staged application, then invokes CPa
   macOS hosts. GitHub's uploader then recursively included CPack's `_CPack_Packages`
   scratch tree through the broad `build/packages/*` pattern and exhausted its Node heap
   on arm64. Artifact patterns now select only final archives and checksum files, exclude
-  CPack scratch data, and disable redundant compression of ZIP/DMG/TGZ payloads. A final
-  upload verification run remains pending.
+  CPack scratch data, and disable redundant compression of ZIP/DMG/TGZ payloads.
+- Hosted run `32918267812` passed all ten jobs. The four Release package jobs each passed
+  all 62 tests, staged and verified Qt/SDL/native platform runtimes, ran the installed
+  executable's version smoke check, generated checksummed CPack output, and uploaded only
+  final artifacts. GitHub recorded Linux x86-64 (19,580,556 bytes), Windows x86-64
+  (25,077,278 bytes), macOS arm64 (48,114,248 bytes), and macOS x86-64 (48,591,131 bytes)
+  artifact bundles. Both macOS artifacts contain ZIP and unsigned DMG outputs.
 
 **Acceptance criteria:** Packages derive the application/package version from the root
 CMake project, carry a platform and normalized architecture in every filename, and
@@ -2506,4 +2511,4 @@ artifact with a missing runtime or failed executable smoke check. Windows is por
 Linux is relocatable against the CI distribution's base system, and each macOS host
 produces an unsigned native `.app` in both ZIP and DMG forms.
 
-**Commit SHA:** recorded by milestone 42
+**Commit SHA:** `432c71a`
