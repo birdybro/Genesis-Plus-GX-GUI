@@ -54,7 +54,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
 | 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
 | 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
-| 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | pending |
+| 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | `98137f7` |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
 
 ## Execution policy
@@ -2641,4 +2641,4 @@ package, release, contribution, licensing, and upstream-sync procedures are acti
 packages contain the complete maintained guides and notices; no proprietary ROM,
 firmware, artwork, credential, or generated user data is added.
 
-**Commit SHA:** pending
+**Commit SHA:** `98137f7`
