@@ -36,9 +36,11 @@ shortcuts.
 | --- | --- |
 | Open game | Ctrl+O (Command+O on macOS) |
 | Close game | Ctrl+W (Command+W on macOS) |
+| Game library | Ctrl+L (Command+L on macOS) |
 | Fullscreen | Alt+Return |
 | Pause/resume | Space |
 | Hard reset | Ctrl+R |
+| Soft reset | No default shortcut; use Emulation menu |
 | Fast forward | Tab |
 | Frame advance | N |
 | Save selected state slot | F5 |
@@ -49,7 +51,9 @@ shortcuts.
 | Screenshot | F12 |
 | Mute | M |
 | Volume up / down | + / - |
+| Preferences | Platform standard shortcut |
+| Quit | Platform standard shortcut |
 
-Shortcuts whose runtime service is not yet connected remain disabled; their menu text
-still documents the intended binding. Configurable emulator hotkeys are introduced by
-the later settings milestone without changing gameplay mappings silently.
+Game-dependent shortcuts stay disabled until a game or first video frame makes the
+operation valid. Application hotkeys and gameplay bindings are conflict-checked; input
+capture rejects an unmodified key reserved by one of these emulator actions.

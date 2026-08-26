@@ -27,3 +27,20 @@ if(NOT EXISTS "@PROJECT_SOURCE_DIR@/desktop/resources/org.genesisplusgx.gui.desk
    NOT EXISTS "@PROJECT_SOURCE_DIR@/desktop/resources/org.genesisplusgx.gui.svg")
   message(FATAL_ERROR "Linux desktop integration resources are missing")
 endif()
+
+file(READ "@CMAKE_BINARY_DIR@/cmake_install.cmake" install_script)
+foreach(document IN ITEMS
+    LICENSE.txt
+    README.md
+    CHANGELOG.md
+    THIRD_PARTY_NOTICES.md
+    USER_GUIDE.md
+    BUILDING.md
+    BIOS.md
+    INPUT_CONFIGURATION.md
+    SAVE_STATES.md)
+  string(FIND "${install_script}" "${document}" position)
+  if(position EQUAL -1)
+    message(FATAL_ERROR "Install graph does not include ${document}")
+  endif()
+endforeach()

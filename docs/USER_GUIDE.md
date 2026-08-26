@@ -1,8 +1,8 @@
 # User Guide
 
-This guide tracks the working standalone desktop frontend as it is built. The complete
-end-user guide will expand through the remaining milestones; it does not describe
-planned controls as if they already work.
+This is the complete operating reference for the standalone desktop frontend. It
+describes shipped behavior; build, test, packaging, and contributor workflows are linked
+from the final section.
 
 ## Starting the application
 
@@ -49,6 +49,24 @@ Missing files, directories, unsupported extensions, unreadable files, overlong p
 and core-rejected images produce a concise error dialog instead of crashing. Selecting
 an invalid file while a game is running leaves that game alone. Proprietary ROMs and
 Sega CD BIOS files are never included with the application.
+
+Choose **File → Exit** or the platform window-close control to quit. If a game is active,
+the application first stops accepting new work, flushes save memory, stops and joins the
+emulation thread, stops audio, finishes storage/scanner workers, and then closes the GUI.
+
+## Emulation controls
+
+**Emulation → Pause** (`Space`) stops frame production and host audio without blocking
+the window; trigger it again to resume. **Reset** (`Ctrl+R`) performs the console's hard
+reset path, while **Soft Reset** uses the supported reset-button behavior. Neither action
+unloads the image or disc, and both are disabled until a game is ready.
+
+**Fast Forward** (`Tab`) is a checkable toggle. While enabled, the worker uses its bounded
+high-rate pacing path and suppresses host audio so samples cannot accumulate. Turn it off
+to return to the loaded system's exact PAL, NTSC, or Sega CD target. **Frame Advance**
+(`N`) is available while paused and executes exactly one frame before returning to the
+paused state. The status bar reports measured FPS without using a GUI timer to drive
+emulation.
 
 ## Sega CD and Mega CD discs
 
@@ -202,7 +220,7 @@ effective settings and editor session are restored. Corrupt, oversized, future-s
 or wrong-identity files are reported and ignored without modifying them. See
 [PER_GAME_SETTINGS.md](PER_GAME_SETTINGS.md) for the precedence and storage contract.
 
-## Display and input
+## Display and video
 
 Use **Video → Fullscreen** (`Alt+Return`) to enter or leave fullscreen. The Video menu
 also provides fit/integer scale, native/4:3/stretch aspect, and nearest/bilinear texture
@@ -224,8 +242,26 @@ destroyed.
 The presentation filter controls GPU/Qt scaling. The NTSC filter is separate: it runs
 inside Genesis Plus GX and changes the native framebuffer geometry. Overscan and Game
 Gear viewport changes likewise come from the core rather than cropping the final
-window image. Region and VDP system selection are intentionally handled by the later
-System settings page instead of being conflated with display scaling.
+window image. Region and VDP system selection are handled by the separate System
+Settings dialog instead of being conflated with display scaling.
+
+## Input configuration
+
+Choose **Input → Controller Configuration…** to edit named keyboard/controller profiles,
+capture Genesis three-/six-button bindings, reset mappings, set the SDL analog deadzone,
+and select advanced emulated devices. Activate a binding and press a key or standardized
+controller button; Escape cancels capture. Duplicate bindings and unmodified keys reserved
+by emulator actions are rejected before Apply or OK can publish the profile.
+
+Choose **Input → Player Assignments…** to open the assignments page directly. Controllers
+are discovered at startup and hot-plugged while the application runs. Assigning a device
+to an occupied player swaps the assignments, and removing a controller releases its
+active state. The keyboard remains available for Player 1. Profiles are versioned and
+written atomically, and Restore Defaults never changes a running session until changes
+are accepted. Specialized core devices—including Sega Mouse, light gun, paddle, Sports
+Pad, XE-1AP, Pico, Terebi Oekaki, Graphic Board, and Activator—are available through the
+advanced page subject to the loaded system and port restrictions. See
+[INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md) for mapping semantics and defaults.
 
 ## Appearance and accessibility
 
@@ -333,4 +369,8 @@ workflow.
 
 **Help → User Guide** opens a keyboard-accessible getting-started reference without a
 browser or network connection. **Help → Keyboard Shortcuts** lists the active default
-application shortcuts. The complete source-build guide remains this document.
+application shortcuts. **Help → About Genesis Plus GX GUI** shows the frontend version,
+Git commit, upstream relationship, and non-commercial license notice; **About Qt** shows
+the deployed Qt notice. Source builds are documented in [BUILDING.md](BUILDING.md),
+automated gates in [TESTING.md](TESTING.md), and contributor workflow in
+[DEVELOPMENT.md](DEVELOPMENT.md).

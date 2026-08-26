@@ -17,12 +17,18 @@ ctest --preset release
 ```
 
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
-`filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, and `stress`:
+`filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
+`packaging`, `release`, and `documentation`:
 
 ```bash
 ctest --preset debug -L gui --output-on-failure
 ctest --preset debug -L stress --output-on-failure
+ctest --preset debug -L documentation --output-on-failure
 ```
+
+The documentation gate requires every published guide, checks the release-facing README
+sections and dependency inventory, rejects stale milestone language, and resolves local
+Markdown links. It never follows external links or requires network access.
 
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not

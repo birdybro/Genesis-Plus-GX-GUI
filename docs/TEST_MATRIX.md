@@ -50,3 +50,7 @@ CI and are never counted as required.
 The required `core.long_running_stability` test adds accelerated 20,000-frame core
 execution, bounded queue/audio/video saturation, and repeated worker lifecycle coverage.
 Detailed sanitizer and stress commands are in [TESTING.md](TESTING.md).
+
+`infrastructure.documentation` separately checks the required document manifest,
+desktop/version/license feature text, stale milestone wording, and every local Markdown
+link. Packaging and release metadata have their own `packaging` and `release` labels.

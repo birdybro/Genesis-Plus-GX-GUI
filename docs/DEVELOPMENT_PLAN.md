@@ -54,7 +54,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
 | 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
 | 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
-| 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
+| 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | pending |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
 
 ## Execution policy
@@ -2572,3 +2572,73 @@ the complete path without creating a tag or release; only an authorized tag even
 publish the six archives and verified checksums.
 
 **Commit SHA:** `12f66c1`
+
+## Milestone 43 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace the inherited console-centric landing page with a complete standalone
+desktop manual set, preserve licensing/upstream context, document every shipped menu and
+workflow, and ensure native packages carry the guides and notices needed by users.
+
+**Files changed:**
+
+- `README.md`
+- `CHANGELOG.md`
+- `CONTRIBUTING.md`
+- `THIRD_PARTY_NOTICES.md`
+- `cmake/Packaging.cmake`
+- `cmake/ValidateDocumentation.cmake`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/package_metadata_test.cmake.in`
+- `docs/ARCHITECTURE.md`
+- `docs/BUILDING.md`
+- `docs/DEVELOPMENT.md`
+- `docs/UPSTREAM_MAINTENANCE.md`
+- `docs/USER_GUIDE.md`
+- `docs/KEYBOARD_SHORTCUTS.md`
+- `docs/PACKAGING.md`
+- `docs/TESTING.md`
+- `docs/TEST_MATRIX.md`
+- `docs/screenshots/README.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `infrastructure.documentation` requires all 19 release publications,
+checks the README's platform/install/build/test/license sections against the CMake
+version, requires every direct dependency notice, checks significant menu coverage,
+rejects stale implementation-phase wording, and resolves local Markdown links without a
+network dependency. `infrastructure.package_metadata` now requires the generated install
+graph to carry the root license/notices and essential user/build guides.
+
+**Gate evidence:**
+
+- Direct menu/action and settings-dialog audit found and corrected missing user-guide
+  coverage for pause/reset/fast-forward/frame-advance, input profiles/assignments, clean
+  exit, and About; stale planned persistence filenames in Architecture were corrected to
+  the implemented JSON/SQLite/log layout.
+- The root README now identifies this as an independent GUI-enhanced desktop fork,
+  documents supported systems and formats, all three platform installs, command-line and
+  controller/BIOS startup, platform saves, builds/tests, upstream relationship, and the
+  Genesis Plus GX non-commercial redistribution terms. Original screenshot provenance
+  rules provide a safe placeholder without committing commercial game imagery.
+- `THIRD_PARTY_NOTICES.md` inventories Qt, SDL, Genesis Plus GX, libchdr, zlib, zstd,
+  LZMA SDK, dr_flac, Tremor, minimp3, Nuked OPN2, SQLite, and the core NTSC filter with
+  bundled locations/licenses. Current primary Qt and SDL licensing documentation was
+  reviewed; the repository's existing `LICENSE.txt` remains authoritative and no source
+  was relicensed.
+- The documentation validator passes with 19 required files and 63 resolved local links.
+  Debug, Release, and ASan/UBSan builds each pass all 67 CTest registrations. The
+  inherited libretro target builds and cleans with only its two documented qualifier
+  warnings.
+- A fresh Linux Release install passed runtime dependency verification and `--version`,
+  then exposed 24 root/user/developer/legal documents in its documentation directory.
+  CPack generated a 17,029,048-byte versioned x86-64 TGZ plus SHA-256 file in a temporary
+  output directory.
+
+**Acceptance criteria:** Every required source document exists and cross-links cleanly;
+every significant shipped UI workflow and failure boundary is documented; build, test,
+package, release, contribution, licensing, and upstream-sync procedures are actionable;
+packages contain the complete maintained guides and notices; no proprietary ROM,
+firmware, artwork, credential, or generated user data is added.
+
+**Commit SHA:** pending

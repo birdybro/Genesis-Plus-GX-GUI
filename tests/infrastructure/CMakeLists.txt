@@ -81,3 +81,16 @@ set_tests_properties(
   infrastructure.release_assets
   PROPERTIES LABELS "unit;infrastructure;packaging;release"
 )
+
+add_test(
+  NAME infrastructure.documentation
+  COMMAND
+    "${CMAKE_COMMAND}"
+    "-DSOURCE_ROOT=${PROJECT_SOURCE_DIR}"
+    "-DEXPECTED_VERSION=${PROJECT_VERSION}"
+    -P "${PROJECT_SOURCE_DIR}/cmake/ValidateDocumentation.cmake"
+)
+set_tests_properties(
+  infrastructure.documentation
+  PROPERTIES LABELS "unit;infrastructure;documentation"
+)

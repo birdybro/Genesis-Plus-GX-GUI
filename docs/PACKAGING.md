@@ -62,7 +62,16 @@ Qt and SDL application libraries, but intentionally relies on base-system graphi
 window-system, C/C++ runtime, and libc libraries for ABI compatibility. Building on the
 oldest supported Linux distribution gives the broadest compatibility.
 
-Packages contain no games, firmware, save data, or downloaded artwork.
+Packages contain the root license/notices plus the complete user, BIOS, input, save,
+build, test, packaging, and maintenance guides under the platform documentation
+directory. They contain no games, firmware, save data, or downloaded artwork.
+
+The repository license requires source availability for modified redistribution. Keep
+an official binary release attached to its matching immutable tag and the source archive
+GitHub exposes for that tag; do not mirror a binary without the corresponding complete
+project source and applicable dependency source/license obligations. Qt and SDL remain
+dynamically deployed and replaceable, with their exact versions and official source/
+license references recorded in `THIRD_PARTY_NOTICES.md`.
 
 See `docs/RELEASES.md` for tag validation, the non-publishing workflow rehearsal, final
 checksum assembly, and authorized GitHub release publication.

@@ -489,8 +489,8 @@ persistence failure while retaining the requested live behavior.
 ## Persistence and settings
 
 Platform services resolve data locations using Qt standard paths. Tests inject a
-temporary root and never touch real user data. Within the application root, the planned
-layout is:
+temporary root and never touch real user data. Within the application root, the
+implemented layout is:
 
 ```text
 config/video-settings.json
@@ -498,14 +498,18 @@ config/audio-settings.json
 config/system-settings.json
 config/input-profiles.json
 config/recent-games.json
-config/games/<game-id>.json
+config/appearance-settings.json
+config/screenshot-settings.json
+config/bios.json
+config/per-game-settings/<game-id>.json
+config/cheats/<game-id>.json
 saves/<game-id>/cartridge.srm
 saves/<game-id>/scd-internal.brm
 saves/<game-id>/scd-cartridge.brm
 states/<game-id>/slot-0.gpgxstate ... slot-9.gpgxstate
 screenshots/
-library/library.sqlite3
-logs/frontend.log
+library/game-library.sqlite3
+logs/frontend.jsonl
 ```
 
 `game-id` is a content-derived cryptographic identifier with sanitized title used only

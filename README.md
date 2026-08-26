@@ -1,35 +1,197 @@
-Genesis Plus GX is an open-source Sega 8/16 bit emulator focused on accuracy and portability. Initially ported and developped on Gamecube / Wii consoles through [libogc / devkitPPC](http://sourceforge.net/projects/devkitpro/), this emulator is now available on many other platforms through various frontends such as:
+# Genesis Plus GX GUI
 
-* [Retroarch (libretro)](http://www.libretro.com)
+Genesis Plus GX GUI is a native Qt 6 desktop frontend for the Genesis Plus GX
+emulation core. It turns this fork into a standalone application for Windows, Linux,
+and macOS while keeping the emulator core isolated and authoritative. It is not an
+official upstream Genesis Plus GX project and is not endorsed by Sega.
 
-* [Bizhawk](http://tasvideos.org/Bizhawk.html)
+The application is currently version 0.1.0. It does not include games, Sega firmware,
+or box art.
 
-* [OpenEmu](http://openemu.org/)
+## Screenshots
 
-----
+Release screenshots have not been committed yet. Maintainers can add original captures
+under `docs/screenshots/` and link them here; never use commercial game images or scraped
+box art. The main window is a conventional menu-driven desktop interface with an
+OpenGL-backed emulator display, game/status fields, native dialogs, and keyboard access
+to all essential actions.
 
-The source code, initially based on Genesis Plus 1.2a by [Charles MacDonald](http://www.techno-junk.org/ ) has been heavily modified & enhanced, with respect to original goals and design, in order to improve emulation accuracy as well as adding support for new peripherals, cartridge or console hardware and many other exciting [features](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/wiki/Features.md).
+## Supported systems
 
-The result is that Genesis Plus GX is now more a continuation of the original project than a simple port, providing very accurate emulation and [100% compatibility](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/wiki/Compatibility.md) with Genesis / Mega Drive, Sega/Mega CD, Master System, Game Gear & SG-1000 released software (including all unlicensed or pirate known dumps), also emulating backwards compatibility modes when available. All the people who contributed (directly or indirectly) to this project are listed on the [Credits](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/wiki/Credits.md) page.
+- Sega SG-1000 and Mark III
+- Sega Master System
+- Sega Game Gear
+- Sega Genesis / Mega Drive
+- Sega CD / Mega CD
 
-----
+The desktop file picker recognizes `.68k`, `.bin`, `.bms`, `.cue`, `.gen`, `.gg`,
+`.iso`, `.md`, `.mdx`, `.sg`, `.sgd`, `.smd`, and `.sms`. CMake builds enable `.chd`
+by default through the bundled libchdr decoder. A Sega CD game needs a legally obtained,
+region-appropriate BIOS supplied by the user.
 
-Multi-platform sourcecode (core), which is made available for use under a specific non-commercial [license](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/LICENSE.txt), is maintained on [Bitbucket](https://bitbucket.org/eke/genesis-plus-gx/src/) / [Github](https://github.com/ekeeke/Genesis-Plus-GX) so that other Genesis Plus ports can benefit of it, as I really wish this emulator becomes a reference for _portable_ and _accurate_ Sega 8/16-bit emulation. If you ported this emulator to other platforms or need help porting it, feel free to contact me.
+## Features
 
-----
+- Dedicated emulation thread with bounded video, audio, input, and command exchanges
+- Dynamic viewport rendering, aspect/integer scaling, overscan, interlace modes,
+  nearest/bilinear filtering, fullscreen, high-DPI support, and native PNG screenshots
+- SDL3 stereo audio and hot-pluggable controller support with profiles, deadzones,
+  assignments, capture-based remapping, and specialized Genesis Plus GX device choices
+- Keyboard play controls plus conflict-checked emulator hotkeys
+- Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
+- Ten metadata-wrapped save-state slots with game-identity validation
+- BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
+- Recent games, searchable asynchronous SQLite library, favorites, play history, and
+  user-provided local artwork
+- Header metadata and SHA-256 game information, Game Genie/PAR cheats, and sparse
+  per-game setting overrides
+- System/light/dark themes, structured rotating logs, and copyable privacy-filtered
+  diagnostics
+- Headless unit, core, integration, GUI, stress, property, and sanitizer tests
 
-Latest official Gamecube / Wii standalone port (screenshots below) is available [here](https://github.com/ekeeke/Genesis-Plus-GX/tree/master/builds). Be sure to check the included [user manual](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/gx/docs/README.pdf) first. A [startup guide](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/wiki/Getting%20Started.md) and a [FAQ](https://github.com/ekeeke/Genesis-Plus-GX/blob/master/wiki/Frequently%20Asked%20Questions.md) are also available.
+## Installing
 
-![MainMenu.png](https://bitbucket.org/repo/7AjE6M/images/3565283297-MainMenu.png)
-![menu_load.png](https://bitbucket.org/repo/7AjE6M/images/164055790-menu_load.png)
+Tagged releases produce six versioned packages plus SHA-256 checksum files. Until a
+release is authorized, equivalent packages are available as successful workflow
+artifacts or can be built from source.
 
-![RomBrowser.png](https://bitbucket.org/repo/7AjE6M/images/1972035547-RomBrowser.png)
-![CtrlMenu.png](https://bitbucket.org/repo/7AjE6M/images/2283464354-CtrlMenu.png)
+### Windows 10/11 x64
 
-----
+Download `Genesis-Plus-GX-GUI-<version>-windows-x86_64.zip`, verify its checksum,
+extract the entire archive, and run `bin/genesis-plus-gx-gui.exe`. The portable package
+contains the required Qt and SDL runtimes and does not modify the registry.
 
-You can also test latest compiled builds for Gamecube / Wii and Retroarch (Windows 32-bit version only) by downloading them from [here](https://github.com/ekeeke/Genesis-Plus-GX/tree/master/builds).
+### Linux x86-64
 
-----
+Download `Genesis-Plus-GX-GUI-<version>-linux-x86_64.tar.gz`, verify and extract it,
+then run `bin/genesis-plus-gx-gui`. The archive includes private Qt/SDL application
+libraries but relies on the host's standard graphics, window-system, C/C++ runtime, and
+libc libraries. It is built against Ubuntu 24.04; a local source build is the fallback
+for incompatible distributions.
 
-[![btn_donate_LG.gif](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=2966212) If you like this project and want to show your appreciation, Paypal donations are always welcomed.
+### macOS Apple Silicon and Intel
+
+Choose the matching `macos-arm64` or `macos-x86_64` ZIP/DMG and copy
+`genesis-plus-gx-gui.app` to Applications. Development packages are unsigned, so macOS
+may require explicit approval in Privacy & Security. Official distribution signing and
+notarization are documented in [PACKAGING.md](docs/PACKAGING.md).
+
+## Quick start
+
+Open a cartridge or disc with **File → Open Game**, drag a supported file onto the
+window, launch it from the game library, or pass it on the command line:
+
+```bash
+genesis-plus-gx-gui [--fullscreen] path/to/game.bin
+genesis-plus-gx-gui --help
+genesis-plus-gx-gui --version
+```
+
+Use **Input → Controller Configuration** to assign or remap keyboard and SDL controllers.
+Default keyboard controls and application hotkeys are listed in
+[KEYBOARD_SHORTCUTS.md](docs/KEYBOARD_SHORTCUTS.md).
+
+For Sega CD, configure your own USA, Europe, and/or Japan firmware under
+**Tools → BIOS Settings** before opening a disc. Firmware is validated locally and is
+never downloaded by the application. See [BIOS.md](docs/BIOS.md).
+
+The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
+cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),
+[the game library](docs/GAME_LIBRARY.md), [cheats](docs/CHEATS.md), and
+[appearance/accessibility](docs/APPEARANCE_AND_ACCESSIBILITY.md).
+
+## User data and saves
+
+Qt selects the platform application-data root. Typical locations are
+`%APPDATA%/Genesis Plus GX GUI` on Windows,
+`~/.local/share/Genesis Plus GX GUI` on Linux (subject to `XDG_DATA_HOME`), and
+`~/Library/Application Support/Genesis Plus GX GUI` on macOS. Beneath it, the
+application creates:
+
+```text
+config/       Versioned global and per-game settings
+saves/        Cartridge SRAM and Sega CD BRAM/RAM-cartridge data
+states/       Per-game save-state slots
+screenshots/  Native PNG captures, unless overridden
+library/      SQLite game-library index and local metadata
+logs/         Rotating JSON Lines frontend logs
+```
+
+Games and state files are keyed by SHA-256 identity to avoid same-title collisions.
+Tests always inject temporary roots and never touch this real directory.
+
+## Building from source
+
+The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.5+ with Core,
+Gui, Widgets, OpenGLWidgets, Sql, and Test modules, and SDL 3.2+. Once CMake can locate
+the Qt and SDL config packages:
+
+```bash
+cmake --preset debug
+cmake --build --preset debug
+ctest --preset debug
+```
+
+Release and combined ASan/UBSan presets are also provided:
+
+```bash
+cmake --preset release
+cmake --build --preset release
+ctest --preset release
+
+cmake --preset asan
+cmake --build --preset asan
+ctest --preset asan
+```
+
+Platform dependency setup, package creation, and troubleshooting are in
+[BUILDING.md](docs/BUILDING.md). Development boundaries and workflow are described in
+[DEVELOPMENT.md](docs/DEVELOPMENT.md) and [ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+## Testing
+
+CTest is the common runner. The complete suite uses generated CC0 cartridge, disc, and
+firmware fixtures plus temporary directories; it never downloads commercial ROMs or
+proprietary Sega BIOS images. GUI tests run headlessly on all CI platforms.
+
+```bash
+ctest --preset debug --output-on-failure
+ctest --preset debug -L gui --output-on-failure
+ctest --preset asan --output-on-failure
+```
+
+See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), and the fixture
+[provenance record](tests/fixtures/README.md).
+
+## Documentation
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Building](docs/BUILDING.md)
+- [Development](docs/DEVELOPMENT.md)
+- [User guide](docs/USER_GUIDE.md)
+- [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
+- [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
+- [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)
+- [Changelog](CHANGELOG.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
+
+## Contributing
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before submitting changes. Core changes should
+be exceptional, narrowly scoped, and backed by deterministic regression tests so future
+upstream synchronization remains practical.
+
+## License and upstream relationship
+
+Genesis Plus GX and this modified source tree are distributed under the repository's
+specific non-commercial terms in [LICENSE.txt](LICENSE.txt). In particular,
+redistributions may not be sold or used in a commercial product or activity, and source
+distribution obligations apply. Newly authored desktop/frontend code remains under
+those repository terms unless its file explicitly says otherwise. This is not a generic
+OSI open-source license; review it before redistributing binaries.
+
+Qt, SDL, libchdr, zlib, zstd, Tremor, Nuked OPN2, minimp3, LZMA SDK, and other bundled
+components retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+and the complete notices in [LICENSE.txt](LICENSE.txt).
+
+The authoritative emulator project is
+[ekeeke/Genesis-Plus-GX](https://github.com/ekeeke/Genesis-Plus-GX). This repository is
+a community GUI-enhanced fork/frontend and does not imply official upstream endorsement.

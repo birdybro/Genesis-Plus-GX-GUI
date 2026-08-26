@@ -40,6 +40,28 @@ foreach(document IN ITEMS
     list(APPEND genplusgx_documentation "${PROJECT_SOURCE_DIR}/${document}")
   endif()
 endforeach()
+foreach(document IN ITEMS
+    APPEARANCE_AND_ACCESSIBILITY.md
+    ARCHITECTURE.md
+    BIOS.md
+    BUILDING.md
+    CHEATS.md
+    DEVELOPMENT.md
+    GAME_INFORMATION.md
+    GAME_LIBRARY.md
+    INPUT_CONFIGURATION.md
+    KEYBOARD_SHORTCUTS.md
+    LOGGING_AND_DIAGNOSTICS.md
+    PACKAGING.md
+    PER_GAME_SETTINGS.md
+    RELEASES.md
+    SAVE_STATES.md
+    TESTING.md
+    TEST_MATRIX.md
+    UPSTREAM_MAINTENANCE.md
+    USER_GUIDE.md)
+  list(APPEND genplusgx_documentation "${PROJECT_SOURCE_DIR}/docs/${document}")
+endforeach()
 
 if(APPLE)
   install(
