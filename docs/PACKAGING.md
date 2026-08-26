@@ -63,3 +63,6 @@ window-system, C/C++ runtime, and libc libraries for ABI compatibility. Building
 oldest supported Linux distribution gives the broadest compatibility.
 
 Packages contain no games, firmware, save data, or downloaded artwork.
+
+See `docs/RELEASES.md` for tag validation, the non-publishing workflow rehearsal, final
+checksum assembly, and authorized GitHub release publication.

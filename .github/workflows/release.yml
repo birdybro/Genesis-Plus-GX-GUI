@@ -1,0 +1,353 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Version to validate in a non-publishing release rehearsal
+        required: true
+        default: v0.1.0
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.event_name }}-${{ github.ref_name }}-${{ inputs.release_tag }}
+  cancel-in-progress: false
+
+env:
+  QT_VERSION: 6.8.3
+  SDL_VERSION: 3.4.14
+  QT_QPA_PLATFORM: offscreen
+  SDL_AUDIODRIVER: dummy
+  RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.release_tag || github.ref_name }}
+
+jobs:
+  validate-release:
+    name: Validate release identity
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Require tag to match project version
+        run: >-
+          cmake -DRELEASE_TAG="$RELEASE_TAG" -DSOURCE_ROOT="$PWD"
+          -P cmake/ValidateReleaseTag.cmake
+
+  linux-release:
+    name: Linux x86-64 Release package
+    needs: validate-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: qt-linux-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          install-linux-dependencies: true
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure Release
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: cmake --build build/release --parallel 2
+
+      - name: Run complete test suite
+        run: >-
+          ctest --test-dir build/release
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Verify installed application and create package
+        run: |
+          cmake --install build/release --prefix "$PWD/build/package-root"
+          cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
+            -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
+          build/package-root/bin/genesis-plus-gx-gui --version
+          cpack --config build/release/CPackConfig.cmake \
+            -G TGZ -B build/packages
+
+      - name: Upload Linux package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: Genesis-Plus-GX-GUI-linux-x86_64
+          path: |
+            build/packages/*.tar.gz
+            build/packages/*.tar.gz.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  windows-release:
+    name: Windows MSVC x64 Release package
+    needs: validate-release
+    runs-on: windows-2022
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          arch: win64_msvc2022_64
+          cache: true
+          cache-key-prefix: qt-windows-msvc2022-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          add-to-environment: true
+          build-type: Release
+          discriminator: release-windows-msvc-x64
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure Release
+        run: >-
+          cmake -S . -B build/release -A x64
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: cmake --build build/release --config Release --parallel 2
+
+      - name: Run complete test suite
+        run: >-
+          ctest --test-dir build/release -C Release
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Verify installed application and create package
+        run: |
+          cmake --install build/release --config Release `
+            --prefix "$pwd/build/package-root"
+          cmake "-DPACKAGE_ROOT=$pwd/build/package-root" `
+            -DVERIFY_PLATFORM=windows -P cmake/VerifyPackage.cmake
+          & ./build/package-root/bin/genesis-plus-gx-gui.exe --version
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cpack --config build/release/CPackConfig.cmake `
+            -C Release -G ZIP -B build/packages
+
+      - name: Upload Windows package
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: Genesis-Plus-GX-GUI-windows-x86_64
+          path: |
+            build/packages/*.zip
+            build/packages/*.zip.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  macos-release:
+    name: macOS ${{ matrix.host.architecture }} Release package
+    needs: validate-release
+    runs-on: ${{ matrix.host.runner }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        host:
+          - runner: macos-15
+            architecture: arm64
+          - runner: macos-15-intel
+            architecture: x86_64
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: >-
+            qt-macos-${{ matrix.host.architecture }}-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          add-to-environment: true
+          build-type: Release
+          discriminator: release-macos-${{ matrix.host.architecture }}
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure Release
+        run: >-
+          cmake -S . -B build/release -G Ninja
+          -DCMAKE_BUILD_TYPE=Release
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+
+      - name: Build
+        run: cmake --build build/release --parallel 2
+
+      - name: Run complete test suite
+        run: >-
+          ctest --test-dir build/release
+          --output-on-failure --no-tests=error --timeout 120
+
+      - name: Verify installed application and create packages
+        run: |
+          cmake --install build/release --prefix "$PWD/build/package-root"
+          cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
+            -DVERIFY_PLATFORM=macos -P cmake/VerifyPackage.cmake
+          build/package-root/genesis-plus-gx-gui.app/Contents/MacOS/genesis-plus-gx-gui \
+            --version
+          cpack --config build/release/CPackConfig.cmake \
+            -G ZIP -B build/packages
+          cpack --config build/release/CPackConfig.cmake \
+            -G DragNDrop -B build/packages
+
+      - name: Upload macOS packages
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: Genesis-Plus-GX-GUI-macos-${{ matrix.host.architecture }}
+          path: |
+            build/packages/*.zip
+            build/packages/*.zip.sha256
+            build/packages/*.dmg
+            build/packages/*.dmg.sha256
+          if-no-files-found: error
+          compression-level: 0
+
+  linux-sanitizers:
+    name: Linux ASan and UBSan release gate
+    needs: validate-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    env:
+      ASAN_OPTIONS: detect_leaks=1:halt_on_error=1
+      UBSAN_OPTIONS: halt_on_error=1:print_stacktrace=1
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install native build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
+        with:
+          version: ${{ env.QT_VERSION }}
+          cache: true
+          cache-key-prefix: qt-linux-${{ env.QT_VERSION }}
+
+      - name: Build SDL
+        uses: libsdl-org/setup-sdl@afd98199e97f9c2aa739474be7e0886d149a5e47
+        with:
+          install-linux-dependencies: true
+          version: ${{ env.SDL_VERSION }}
+
+      - name: Configure sanitizers
+        run: >-
+          cmake -S . -B build/asan -G Ninja
+          -DCMAKE_BUILD_TYPE=Debug
+          -DBUILD_TESTING=ON
+          -DGENPLUSGX_BUILD_DESKTOP=ON
+          -DGENPLUSGX_ENABLE_SANITIZERS=ON
+
+      - name: Build
+        run: cmake --build build/asan --parallel 2
+
+      - name: Run complete sanitizer suite
+        run: >-
+          ctest --test-dir build/asan
+          --output-on-failure --no-tests=error --timeout 120
+
+  legacy-regression:
+    name: Legacy libretro regression
+    needs: validate-release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Build inherited libretro target
+        run: make -f Makefile.libretro platform=unix -j2
+
+      - name: Clean inherited libretro target
+        if: always()
+        run: make -f Makefile.libretro platform=unix clean
+
+  assemble-release:
+    name: Verify and assemble release assets
+    needs:
+      - linux-release
+      - windows-release
+      - macos-release
+      - linux-sanitizers
+      - legacy-regression
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Download package artifacts
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          pattern: Genesis-Plus-GX-GUI-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: Verify package set and assemble checksums
+        run: |
+          release_version="${RELEASE_TAG#v}"
+          cmake -DASSET_DIRECTORY="$PWD/release-assets" \
+            -DRELEASE_VERSION="$release_version" \
+            -P cmake/VerifyReleaseAssets.cmake
+
+      - name: Upload verified release candidate
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
+        with:
+          name: release-candidate-${{ env.RELEASE_TAG }}
+          path: |
+            release-assets/*.tar.gz
+            release-assets/*.zip
+            release-assets/*.dmg
+            release-assets/*.sha256
+            release-assets/SHA256SUMS.txt
+          if-no-files-found: error
+          compression-level: 0
+
+      - name: Publish GitHub release from version tag
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$RELEASE_TAG" \
+            release-assets/*.tar.gz \
+            release-assets/*.zip \
+            release-assets/*.dmg \
+            release-assets/*.sha256 \
+            release-assets/SHA256SUMS.txt \
+            --verify-tag \
+            --title "Genesis Plus GX GUI ${RELEASE_TAG#v}" \
+            --generate-notes

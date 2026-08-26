@@ -1,0 +1,58 @@
+set(fixture_directory "@CMAKE_CURRENT_BINARY_DIR@/release-assets-fixture")
+file(REMOVE_RECURSE "${fixture_directory}")
+file(MAKE_DIRECTORY "${fixture_directory}")
+
+set(package_prefix "Genesis-Plus-GX-GUI-@PROJECT_VERSION@")
+set(archives
+  "${package_prefix}-linux-x86_64.tar.gz"
+  "${package_prefix}-windows-x86_64.zip"
+  "${package_prefix}-macos-arm64.zip"
+  "${package_prefix}-macos-arm64.dmg"
+  "${package_prefix}-macos-x86_64.zip"
+  "${package_prefix}-macos-x86_64.dmg"
+)
+
+foreach(archive IN LISTS archives)
+  set(archive_path "${fixture_directory}/${archive}")
+  file(WRITE "${archive_path}" "generated release asset fixture: ${archive}\n")
+  file(SHA256 "${archive_path}" hash)
+  file(WRITE "${archive_path}.sha256" "${hash}  ${archive}\n")
+endforeach()
+
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DASSET_DIRECTORY=${fixture_directory}"
+    "-DRELEASE_VERSION=@PROJECT_VERSION@"
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyReleaseAssets.cmake"
+  RESULT_VARIABLE valid_result
+  OUTPUT_VARIABLE valid_output
+  ERROR_VARIABLE valid_error
+)
+if(NOT valid_result EQUAL 0)
+  message(FATAL_ERROR
+    "Valid generated release assets were rejected:\n${valid_output}${valid_error}")
+endif()
+
+file(STRINGS "${fixture_directory}/SHA256SUMS.txt" aggregate_lines)
+list(LENGTH aggregate_lines aggregate_count)
+list(LENGTH archives expected_count)
+if(NOT aggregate_count EQUAL expected_count)
+  message(FATAL_ERROR "Aggregate checksum file has the wrong entry count")
+endif()
+
+list(GET archives 0 corrupt_archive)
+file(APPEND "${fixture_directory}/${corrupt_archive}" "corruption")
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DASSET_DIRECTORY=${fixture_directory}"
+    "-DRELEASE_VERSION=@PROJECT_VERSION@"
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyReleaseAssets.cmake"
+  RESULT_VARIABLE corrupt_result
+  OUTPUT_QUIET
+  ERROR_QUIET
+)
+if(corrupt_result EQUAL 0)
+  message(FATAL_ERROR "Corrupt release asset unexpectedly passed verification")
+endif()

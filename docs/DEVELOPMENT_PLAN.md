@@ -53,7 +53,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
 | 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
 | 41 Packaging | COMPLETE | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | `432c71a` |
-| 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
+| 42 Release automation | IN PROGRESS | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
 | 44 Release candidate | PLANNED | Adversarial review, complete clean regressions and report | fixes plus `FINAL_TEST_REPORT.md` | Debug, Release, all tests, sanitizers, packages, docs | Clean tree and all required gates green | pending |
 
@@ -2512,3 +2512,53 @@ Linux is relocatable against the CI distribution's base system, and each macOS h
 produces an unsigned native `.app` in both ZIP and DMG forms.
 
 **Commit SHA:** `432c71a`
+
+## Milestone 42 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Turn an authorized version tag into the already verified native packages only
+after matching project identity, complete platform tests, sanitizer coverage, legacy
+regression, package smoke checks, and independent checksum assembly all succeed. Provide
+the same path as a manual rehearsal that is structurally unable to publish.
+
+**Files changed:**
+
+- `.github/workflows/release.yml`
+- `cmake/ValidateReleaseTag.cmake`
+- `cmake/VerifyReleaseAssets.cmake`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/release_assets_test.cmake.in`
+- `docs/RELEASES.md`
+- `docs/PACKAGING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `infrastructure.release_tag` accepts exactly the root project version;
+the mismatch and malformed-tag tests prove both invalid identity classes stop the gate;
+`infrastructure.release_assets` generates all six legal placeholder packages and
+checksums, verifies aggregate creation, corrupts one archive, and requires rejection.
+
+**Gate evidence:**
+
+- The workflow responds to `v*` tag pushes and a manual rehearsal input. Its final GitHub
+  release step has an explicit tag-push-only condition; manual runs can build and upload a
+  release candidate but cannot publish a release.
+- Package jobs reproduce the hosted Milestone 41 Release builds on Linux x86-64, Windows
+  MSVC x64, macOS arm64, and macOS x86-64. Linux ASan/UBSan and the inherited libretro
+  build are independent prerequisites of final assembly.
+- All third-party actions are immutable commit pins. Only the final assembly job receives
+  `contents: write`; build jobs retain read-only repository access.
+- The final verifier requires exact architecture/version filenames, validates every
+  individual CPack digest, and emits a deterministic aggregate checksum list before either
+  dry-run upload or tag-driven publication.
+- Debug, Release, and ASan/UBSan each pass all 66 tests locally; the inherited libretro
+  target builds and cleans with only its two documented qualifier warnings. Actionlint
+  1.7.7 reports no findings. The non-publishing hosted rehearsal remains pending.
+
+**Acceptance criteria:** A malformed or mismatched tag fails before building; a missing or
+corrupt package prevents publication; every supported host passes its complete Release
+suite and package smoke gate; sanitizers and legacy regression pass; a manual run proves
+the complete path without creating a tag or release; only an authorized tag event may
+publish the six archives and verified checksums.
+
+**Commit SHA:** recorded by milestone 43
