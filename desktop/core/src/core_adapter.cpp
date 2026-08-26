@@ -968,10 +968,10 @@ CoreResult CoreAdapter::applyAudioSettings(const CoreAudioSettings& settings)
 
   config.mono = settings.output == CoreSoundOutput::mono ? 1U : 0U;
   config.filter = static_cast<uint8>(settings.filter);
-  config.psg_preamp = static_cast<uint16>(settings.psgLevelPercent);
-  config.fm_preamp = static_cast<uint16>(settings.fmLevelPercent);
-  config.cdda_volume = static_cast<uint16>(settings.cddaLevelPercent);
-  config.pcm_volume = static_cast<uint16>(settings.pcmLevelPercent);
+  config.psg_preamp = static_cast<int16>(settings.psgLevelPercent);
+  config.fm_preamp = static_cast<int16>(settings.fmLevelPercent);
+  config.cdda_volume = static_cast<int16>(settings.cddaLevelPercent);
+  config.pcm_volume = static_cast<int16>(settings.pcmLevelPercent);
   config.lp_range = static_cast<uint32>(
     (static_cast<std::uint64_t>(settings.lowPassPercent) * 65'536U) / 100U);
   config.lg = static_cast<uint16>(settings.equalizerLowPercent);

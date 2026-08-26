@@ -111,12 +111,28 @@ int main()
   pacer.frameExecuted(origin + 50ms);
   const auto lateMetrics = pacer.metrics();
   if (!check(lateMetrics.lateFrames == 1U &&
-          lateMetrics.resynchronizations == 1U &&
+          lateMetrics.resynchronizations == 0U &&
           lateMetrics.maximumLateness == 50ms,
         "Late-frame instrumentation or bounded catch-up changed") ||
-      !check(*pacer.nextDeadline() > origin + 50ms,
-        "Severely late scheduler retained a past deadline")) {
+      !check(*pacer.nextDeadline() < origin + 50ms,
+        "Bounded catch-up discarded a recoverable scheduling delay")) {
     return 9;
+  }
+
+  if (!check(pacer.configure({60U, 1U}),
+        "Gross-stall pacer reconfiguration failed")) {
+    return 10;
+  }
+  pacer.resume(origin);
+  pacer.frameExecuted(origin + 500ms);
+  const auto stalledMetrics = pacer.metrics();
+  if (!check(stalledMetrics.lateFrames == 1U &&
+          stalledMetrics.resynchronizations == 1U &&
+          stalledMetrics.maximumLateness == 500ms,
+        "Gross-stall resynchronization metrics changed") ||
+      !check(*pacer.nextDeadline() > origin + 500ms,
+        "Grossly late scheduler retained an unbounded frame debt")) {
+    return 11;
   }
 
   pacer.resetMetrics();
@@ -125,7 +141,7 @@ int main()
           pacer.metrics().resynchronizations == 0U &&
           pacer.metrics().targetFramesPerSecond == 60.0,
         "Metric reset changed configuration or retained counters")) {
-    return 10;
+    return 12;
   }
 
   const auto sleepStart = std::chrono::steady_clock::now();
@@ -133,7 +149,7 @@ int main()
   const auto sleepElapsed = std::chrono::steady_clock::now() - sleepStart;
   if (!check(sleepElapsed >= 4ms && sleepElapsed < 250ms,
         "Host deadline wait returned early or overslept wildly")) {
-    return 11;
+    return 13;
   }
   return 0;
 }

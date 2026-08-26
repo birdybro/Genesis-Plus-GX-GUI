@@ -819,7 +819,8 @@ semantics, and a controlled fast-forward rate.
 
 **Tests added:** `unit.frame_pacer` validates input/overflow bounds, exact NTSC and PAL
 rates, 600-frame nanosecond remainder accumulation, pause, resume, a rational 4x mode,
-late-frame instrumentation, single-interval catch-up limits, and metric reset. Core
+late-frame instrumentation, bounded eight-frame catch-up, gross-stall resynchronization,
+and metric reset. Core
 lifecycle tests verify generated NTSC and PAL headers expose the expected master clocks,
 line counts, and cadence. `core.timing_pacing` measures live worker behavior: 30 normal
 frames remain within rate tolerance, pause schedules none, frame advance does not restart
@@ -840,8 +841,9 @@ continuous pacing, and 40 fast frames materially accelerate without an unbounded
 and 3,420 master cycles per line used by the upstream libretro timing calculation. The
 frontend retains the ratio rather than rounding it to a millisecond/microsecond timer.
 `FramePacer` distributes fractional nanoseconds across deadlines, waits through the
-worker's interruptible condition variable, permits at most a bounded catch-up before
-resynchronizing, and exposes target rate, late frames, maximum lateness, and resyncs.
+worker's host-deadline service, retains at most eight missed intervals for bounded
+catch-up before resynchronizing, and exposes target rate, late frames, maximum lateness,
+and resyncs.
 Pause removes the deadline, resume begins immediately from a fresh monotonic origin,
 frame advance executes without enabling the scheduler, and fast-forward is exactly 4x.
 Fast-forward still drains the core batch but does not enqueue impossible real-time host
@@ -2390,6 +2392,11 @@ filesystem, timing, generated-fixture, and stability suites.
   now requests `QOS_CLASS_USER_INTERACTIVE`, matching its latency-sensitive desktop
   workload; pacing failures also emit measured duration, rate, and scheduled-frame
   counts for objective follow-up.
+- Run `32912649370` demonstrated that hosted Apple Silicon still coalesces repeated
+  short waits despite the interactive QoS request. The pacer previously discarded all
+  schedule debt after only one missed interval, permanently converting that temporary
+  host delay into emulation drift. It now retains a strict eight-frame catch-up window
+  and resynchronizes only after gross stalls; focused tests cover both paths.
 - Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
   timing portability fix. Static workflow validation and hosted verification are
   pending this workflow-bearing commit.

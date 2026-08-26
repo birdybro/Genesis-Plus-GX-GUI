@@ -8,6 +8,7 @@ namespace {
 
 constexpr std::uint64_t nanosecondsPerSecond = 1'000'000'000U;
 constexpr std::uint64_t fastForwardMultiplier = 4U;
+constexpr std::uint64_t maximumCatchUpFrames = 8U;
 
 } // namespace
 
@@ -99,7 +100,8 @@ void FramePacer::frameExecuted(TimePoint now) noexcept
   const auto intervalCeiling = std::chrono::nanoseconds{
     static_cast<std::chrono::nanoseconds::rep>(
       intervalWholeNanoseconds_ + (intervalRemainder_ == 0U ? 0U : 1U))};
-  if (deadline_ < now && now - deadline_ > intervalCeiling) {
+  if (deadline_ < now &&
+      now - deadline_ > intervalCeiling * maximumCatchUpFrames) {
     ++metrics_.resynchronizations;
     deadline_ = now;
     accumulatedRemainder_ = 0U;
