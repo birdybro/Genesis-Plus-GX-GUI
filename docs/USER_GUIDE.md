@@ -69,7 +69,10 @@ accumulate. Disable the toggle and release the hold to return to the loaded syst
 PAL, NTSC, or Sega CD target. **Frame Advance**
 (`N`) is available while paused and executes exactly one frame before returning to the
 paused state. The status bar reports measured FPS without using a GUI timer to drive
-emulation.
+emulation. It observes the worker's completed-frame counter twice per second, displays
+one decimal place, falls to `0.0 FPS` while paused, and reflects the faster cadence during
+fast-forward. The adjacent System and Region fields describe the loaded image; missing
+header data is shown explicitly as Unknown instead of leaving a stale prior-game value.
 
 ## Sega CD and Mega CD discs
 

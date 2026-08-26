@@ -281,6 +281,14 @@ queued because a real-time device cannot consume it at 4x; the composition root 
 and clears SDL until normal speed resumes. Metrics expose scheduled/late frames,
 resynchronizations, maximum lateness, effective target rate, and fast-forward state.
 
+The composition root samples the worker's monotonic scheduled-frame counter every
+500 ms with `FrameRateSampler` and publishes the observed rate to the status bar. The
+sampler re-baselines on pause, resume, lifecycle counter reset, or a backward test clock,
+so it cannot display a reset spike. This observer only reads metrics; the emulation
+thread's absolute deadline remains the sole frame clock. Loaded system/region text comes
+from the bounded metadata preflight, with the core's detected Sega CD region taking
+precedence.
+
 ## Video data flow
 
 ```text

@@ -37,6 +37,8 @@ platform documentation.
   an explicitly selected playback device disconnects.
 - Transactional live audio-device and latency changes that retain the worker-owned ring,
   preserve pause/running state, refresh open device lists, and roll back on failure.
+- Live status-bar system/region identity and bounded monotonic measurement of actual
+  normal-speed, paused, and fast-forward frame cadence.
 - Generated CC0 fixtures and unit, core, integration, GUI, property, stress, and
   ASan/UBSan coverage through CTest.
 - Runtime-generated Z80 fixtures covering SG-1000, Mark III, Master System, and Game

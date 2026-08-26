@@ -15,7 +15,7 @@ ctest --preset debug -L gui --output-on-failure
 
 | Product area | Automated behavior | Primary CTest |
 | --- | --- | --- |
-| Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, status fields, About, exit | `gui.main_window` |
+| Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, loaded system/region, measured/invalid FPS, About, exit | `gui.main_window`, `unit.frame_pacer` |
 | Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, platform paths, typed editor routing, one-dialog ownership, loaded-game gating | `gui.settings`, `gui.appearance_accessibility` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
 | Loading | Injected Open dialog, invalid input errors, drag/drop, recent history, replace/close, live generated-ROM frame | `gui.game_loading` |

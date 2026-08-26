@@ -1,4 +1,5 @@
 #include "genplusgx/timing/frame_pacer.h"
+#include "genplusgx/timing/frame_rate_sampler.h"
 #include "genplusgx/timing/host_timer_resolution.h"
 
 #include <chrono>
@@ -150,6 +151,40 @@ int main()
   if (!check(sleepElapsed >= 4ms && sleepElapsed < 250ms,
         "Host deadline wait returned early or overslept wildly")) {
     return 13;
+  }
+
+  genplusgx::FrameRateSampler sampler{500ms};
+  if (!check(!sampler.observe(100U, true, origin).has_value() &&
+          !sampler.observe(129U, true, origin + 499ms).has_value(),
+        "Frame-rate sampler did not establish a bounded baseline")) {
+    return 14;
+  }
+  const auto ntscSample = sampler.observe(160U, true, origin + 1s);
+  if (!check(ntscSample.has_value() && std::abs(*ntscSample - 60.0) < 0.000001,
+        "Frame-rate sampler did not measure an irregular polling interval")) {
+    return 15;
+  }
+  const auto pausedSample = sampler.observe(160U, false, origin + 1100ms);
+  if (!check(pausedSample == 0.0 &&
+          !sampler.observe(160U, false, origin + 2s).has_value() &&
+          !sampler.observe(160U, true, origin + 3s).has_value(),
+        "Frame-rate sampler did not report or leave pause cleanly")) {
+    return 16;
+  }
+  if (!check(!sampler.observe(2U, true, origin + 4s).has_value(),
+        "Frame counter reset produced a false rate spike")) {
+    return 17;
+  }
+  const auto resumedSample = sampler.observe(32U, true, origin + 4500ms);
+  if (!check(resumedSample.has_value() &&
+          std::abs(*resumedSample - 60.0) < 0.000001,
+        "Frame-rate sampler did not recover after a counter reset")) {
+    return 18;
+  }
+  sampler.reset();
+  if (!check(!sampler.observe(500U, true, origin + 5s).has_value(),
+        "Frame-rate sampler reset retained a stale baseline")) {
+    return 19;
   }
   return 0;
 }

@@ -60,7 +60,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | `ed001e3` |
 | 47 Fast-forward hotkeys | COMPLETE | Provide independent configurable hold and toggle controls | input schema/defaults/migration, MainWindow focus-safe event handling, help/tests/docs | 70-test Debug/Release suites; press/release, focus loss, latch composition, migration | Hold is momentary; toggle is persistent; neither can strand or cancel the other | `fc19566` |
 | 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | `1e9d58e` |
-| 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | pending |
+| 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | `14cb507` |
+| 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | pending |
 
 ## Execution policy
 
@@ -2983,5 +2984,50 @@ replacement is committed only after the requested device opens, running/paused s
 preserved, failures restore the previous core/host/UI snapshot and are visible, stopped
 output can be retried, host-only fields persist globally even during a per-game audio
 override, and hot-plug updates reach an already-open settings dialog.
+
+**Commit SHA:** `14cb507`
+
+## Milestone 50 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace the shell's permanently blank non-CD system/region fields and static
+`0.0 FPS` field with loaded-session identity and a stable measurement of frames the
+emulation worker actually schedules.
+
+**Files changed:**
+
+- `desktop/timing/include/genplusgx/timing/frame_rate_sampler.h`
+- `desktop/timing/src/frame_rate_sampler.cpp`
+- `desktop/timing/CMakeLists.txt`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- `tests/unit/frame_pacer_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/USER_GUIDE.md`
+- `docs/TEST_MATRIX.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** Deterministic timing coverage measures a known cadence across irregular
+polling, waits for a bounded sampling interval, reports pause once, re-baselines on
+resume, rejects counter-reset spikes, and resets without stale state. MainWindow coverage
+requires loaded system/region text, one-decimal measured FPS, safe unknown/invalid-value
+fallbacks, no-game gating, and reset on unload.
+
+**Gate evidence:**
+
+- Focused timing and MainWindow tests pass 2/2.
+- The complete Debug suite passes 71/71 with no new frontend warning.
+- The complete Release suite passes 71/71.
+- The complete ASan/UBSan suite passes 71/71 with no finding.
+
+**Acceptance criteria:** A successful load publishes preflight metadata (or an explicit
+Unknown fallback) for every console family, with the core's detected Sega CD region
+taking precedence. A monotonic counter/time sampler reports actual normal and
+fast-forward cadence, returns to zero on pause, and re-baselines safely after lifecycle
+counter resets. The GUI observes at 500 ms intervals and never drives frame execution.
 
 **Commit SHA:** pending (recorded by the following milestone)

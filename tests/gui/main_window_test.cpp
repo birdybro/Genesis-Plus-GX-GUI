@@ -80,6 +80,7 @@ private slots:
   void shellIsVisibleAndIdentified();
   void menusAndActionsHaveStableSemantics();
   void emptyStatusIsDescriptive();
+  void runtimeStatusReportsIdentityAndMeasuredFrameRate();
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
@@ -171,6 +172,45 @@ void MainWindowTest::emptyStatusIsDescriptive()
     QStringLiteral("0.0 FPS"));
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("stateSlotStatusLabel"))->text(),
     QStringLiteral("Slot 0"));
+}
+
+void MainWindowTest::runtimeStatusReportsIdentityAndMeasuredFrameRate()
+{
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  genplusgx::ui::MainWindow window;
+
+  window.setGameRuntimeIdentity("Ignored", "Ignored");
+  window.setMeasuredFrameRate(60.0);
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: —"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("fpsStatusLabel"))->text(),
+    QStringLiteral("0.0 FPS"));
+
+  window.setGameLoaded(game.path());
+  window.setGameRuntimeIdentity("Genesis / Mega Drive", "USA");
+  window.setMeasuredFrameRate(59.9227);
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: Genesis / Mega Drive"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("regionStatusLabel"))->text(),
+    QStringLiteral("Region: USA"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("fpsStatusLabel"))->text(),
+    QStringLiteral("59.9 FPS"));
+
+  window.setGameRuntimeIdentity({}, {});
+  window.setMeasuredFrameRate(-1.0);
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: Unknown"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("regionStatusLabel"))->text(),
+    QStringLiteral("Region: Unknown"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("fpsStatusLabel"))->text(),
+    QStringLiteral("0.0 FPS"));
+
+  window.setNoGameLoaded();
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),
+    QStringLiteral("System: —"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("fpsStatusLabel"))->text(),
+    QStringLiteral("0.0 FPS"));
 }
 
 void MainWindowTest::aboutDialogReportsBuildIdentity()

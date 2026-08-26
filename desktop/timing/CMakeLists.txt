@@ -1,6 +1,8 @@
 add_library(
   genplusgx_timing STATIC
+  include/genplusgx/timing/frame_rate_sampler.h
   include/genplusgx/timing/host_timer_resolution.h
+  src/frame_rate_sampler.cpp
   src/frame_pacer.cpp
   src/host_timer_resolution.cpp
 )

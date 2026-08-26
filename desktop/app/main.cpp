@@ -19,6 +19,7 @@
 #include "genplusgx/recent_games.h"
 #include "genplusgx/screenshots/screenshot_service.h"
 #include "genplusgx/state_storage_service.h"
+#include "genplusgx/timing/frame_rate_sampler.h"
 #include "genplusgx/settings/appearance_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
@@ -1558,6 +1559,8 @@ int main(int argc, char* argv[])
   std::uint64_t loggedAudioOverruns = 0U;
   std::uint64_t loggedLateFrames = 0U;
   std::uint64_t loggedPacingResynchronizations = 0U;
+  genplusgx::FrameRateSampler frameRateSampler;
+  auto nextFrameRateSample = std::chrono::steady_clock::now();
   QTimer eventPump;
   eventPump.setInterval(8);
   QObject::connect(
@@ -1568,6 +1571,7 @@ int main(int argc, char* argv[])
      &applyEffectiveSettings, &audioOutput, &controllerInput,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
      &loggedPacingResynchronizations, &nextInstrumentationLog,
+     &frameRateSampler, &nextFrameRateSample,
      &deferredLibraryLaunches, &flushDeferredLibraryLaunches, &gameGeneration,
      &gameLibraryScanner, &globalGameSettings,
      &diagnosticLoadedGame, &diagnosticLoadedRegion, &diagnosticLoadedSystem,
@@ -1608,6 +1612,19 @@ int main(int argc, char* argv[])
       qInfo() << "Audio device format changed; SDL stream conversion remains active.";
     }
     const auto instrumentationNow = std::chrono::steady_clock::now();
+    std::optional<genplusgx::EmulationWorkerMetrics> runtimeMetrics;
+    if (instrumentationNow >= nextFrameRateSample) {
+      runtimeMetrics = worker.metrics();
+      const bool emulationRunning = window.isGameLoaded() &&
+        worker.state() == genplusgx::EmulationWorkerState::running;
+      if (const auto measured = frameRateSampler.observe(
+            runtimeMetrics->pacedFrameCount,
+            emulationRunning,
+            instrumentationNow)) {
+        window.setMeasuredFrameRate(*measured);
+      }
+      nextFrameRateSample = instrumentationNow + std::chrono::milliseconds{500};
+    }
     if (instrumentationNow >= nextInstrumentationLog) {
       const auto audioMetrics = audioOutput.metrics().ring;
       if (audioMetrics.underrunCount > loggedAudioUnderruns ||
@@ -1620,7 +1637,10 @@ int main(int argc, char* argv[])
       }
       loggedAudioUnderruns = audioMetrics.underrunCount;
       loggedAudioOverruns = audioMetrics.overrunCount;
-      const auto timingMetrics = worker.metrics();
+      if (!runtimeMetrics) {
+        runtimeMetrics = worker.metrics();
+      }
+      const auto& timingMetrics = *runtimeMetrics;
       if (timingMetrics.lateFrameCount > loggedLateFrames ||
           timingMetrics.pacingResynchronizations >
             loggedPacingResynchronizations) {
@@ -1742,6 +1762,8 @@ int main(int argc, char* argv[])
             event->disc.path,
             event->disc.trayOpen,
             event->disc.discPresent);
+          window.setGameRuntimeIdentity(
+            diagnosticLoadedSystem, diagnosticLoadedRegion);
           qInfo().noquote() << "Game loaded:"
                             << QString::fromStdString(
                                  diagnosticLoadedGame.empty()
@@ -1840,6 +1862,8 @@ int main(int argc, char* argv[])
               event->disc.path,
               event->disc.trayOpen,
               event->disc.discPresent);
+            window.setGameRuntimeIdentity(
+              diagnosticLoadedSystem, diagnosticLoadedRegion);
           }
           if (!previousGameRemainsLoaded && gameGeneration != 0U) {
             static_cast<void>(stateStorage.submit(
@@ -1915,6 +1939,8 @@ int main(int argc, char* argv[])
             event->disc.path,
             event->disc.trayOpen,
             event->disc.discPresent);
+          window.setGameRuntimeIdentity(
+            diagnosticLoadedSystem, diagnosticLoadedRegion);
           window.showGameCloseError(event->message);
           qWarning().noquote() << QString::fromStdString(event->message);
         }

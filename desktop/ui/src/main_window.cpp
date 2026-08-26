@@ -39,6 +39,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 
 namespace genplusgx::ui {
 namespace {
@@ -1926,6 +1927,7 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
 
 void MainWindow::setGameLoading(const std::filesystem::path& path)
 {
+  const bool replacingLoadedGame = !loadedGamePath_.empty();
   if (auto* information = findChild<GameInformationDialog*>(
         QStringLiteral("gameInformationDialog"))) {
     information->close();
@@ -1951,6 +1953,11 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   setGameActionsEnabled(false);
   gameStatus_->setText(
     tr("Loading %1…").arg(pathToQString(path.filename())));
+  if (!replacingLoadedGame) {
+    systemStatus_->setText(tr("System: —"));
+    regionStatus_->setText(tr("Region: —"));
+  }
+  fpsStatus_->setText(tr("0.0 FPS"));
   statusBar()->showMessage(tr("Loading game…"));
   refreshSettingsDialog();
 }
@@ -1976,6 +1983,34 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   gameStatus_->setText(pathToQString(path.filename()));
   statusBar()->showMessage(tr("Game loaded"), 3000);
   refreshSettingsDialog();
+}
+
+void MainWindow::setGameRuntimeIdentity(std::string system, std::string region)
+{
+  if (!isGameLoaded()) {
+    return;
+  }
+  if (system.empty()) {
+    system = "Unknown";
+  }
+  if (region.empty()) {
+    region = "Unknown";
+  }
+  systemStatus_->setText(
+    tr("System: %1").arg(QString::fromStdString(system)));
+  regionStatus_->setText(
+    tr("Region: %1").arg(QString::fromStdString(region)));
+}
+
+void MainWindow::setMeasuredFrameRate(double framesPerSecond)
+{
+  if (!isGameLoaded()) {
+    return;
+  }
+  if (!std::isfinite(framesPerSecond) || framesPerSecond < 0.0) {
+    framesPerSecond = 0.0;
+  }
+  fpsStatus_->setText(tr("%1 FPS").arg(framesPerSecond, 0, 'f', 1));
 }
 
 void MainWindow::setNoGameLoaded()

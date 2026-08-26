@@ -233,6 +233,8 @@ public:
   [[nodiscard]] bool requestGameLoad(const std::filesystem::path& path);
   void setGameLoading(const std::filesystem::path& path);
   void setGameLoaded(const std::filesystem::path& path);
+  void setGameRuntimeIdentity(std::string system, std::string region);
+  void setMeasuredFrameRate(double framesPerSecond);
   void setNoGameLoaded();
   void showGameLoadError(
     const std::filesystem::path& path,
