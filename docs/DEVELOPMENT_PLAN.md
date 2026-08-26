@@ -67,7 +67,9 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | `a0c7b6a` |
 | 54 Runtime configuration transactions | COMPLETE | Prevent silent or partial settings/history mutations after startup | result-bearing UI callbacks, runtime/persistence rollback, visible errors, tests/docs | 73-test Debug/Release/ASan suites; rejected video/system/input/assignment/history workflows | Failed worker/store operations preserve the last committed UI and runtime snapshot | `41ddd20` |
 | 55 Runtime failure and shutdown integrity | COMPLETE | Resolve live service failure visibly and make incomplete cleanup machine-detectable | runtime service dispatch, shutdown report, UI/tests/docs | 74-test Debug/Release/ASan suites; runtime dialog, cleanup aggregation, real-process smoke | No pending workflow stays busy after service loss; final save/service failure cannot return success | `55135e0` |
-| 56 Final release-candidate evidence | COMPLETE | Rebuild every local configuration and refresh exact hosted/package/report evidence | Linux deploy policy, final report, architecture shutdown order, milestone ledger | clean 74-test Debug/Release/ASan suites; libretro; ten-job hosted matrix; warning-free staged install and CPack | Final documentation describes the tested candidate and current behavior; tree and package remain clean | pending |
+| 56 Final release-candidate evidence | COMPLETE | Rebuild every local configuration and refresh exact hosted/package/report evidence | Linux deploy policy, final report, architecture shutdown order, milestone ledger | clean 74-test Debug/Release/ASan suites; libretro; ten-job hosted matrix; warning-free staged install and CPack | Final documentation describes the tested candidate and current behavior; tree and package remain clean | `2f53681` |
+| 57 Composite-disc release hardening | COMPLETE | Unify multi-file disc identity, library ownership, and shutdown cancellation after a full requirements audit | game-file/content hash, persistence, metadata/library scanner, worker cancellation, audit/tests/docs | clean 74-test Debug/Release/ASan suites; libretro; package; exact ten-job hosted matrix | CUE identity covers every track, library avoids track duplicates, and no large hash blocks shutdown | `4d2e7d0` |
+| 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | pending |
 
 ## Execution policy
 
@@ -3318,7 +3320,7 @@ path or accidental proprietary/build artifact.
 
 ## Milestone 57 detail
 
-**Status:** LOCAL GATES COMPLETE — HOSTED CI PENDING
+**Status:** COMPLETE
 
 **Goal:** Re-audit the full standalone specification against production behavior and
 close the cross-feature Sega CD identity, library ownership, and large-file shutdown
@@ -3376,8 +3378,11 @@ Unix libretro target built, linked, and cleaned with only its two previously doc
 `const`-qualifier warnings. A fresh Release install passed runtime-layout verification
 and `--version`, contained 45 files (the additional file is this milestone's required
 audit), and produced the versioned TGZ plus matching neighboring SHA-256 file. Focused
-implementation tests and `git diff --check` also pass. The exact-commit ten-job hosted
-matrix is pending the first non-rewritten push of this implementation.
+implementation tests and `git diff --check` also pass. Exact-commit hosted CI run
+[`32937516898`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32937516898)
+passed all ten jobs: Linux Debug, Release/package, ASan/UBSan, and legacy libretro;
+Windows MSVC x64 Debug and Release/package; and macOS arm64/x86-64 Debug and
+Release/package. The run uploaded all four native artifact families.
 
 **Acceptance criteria:** A CUE identity includes the validated sheet and every
 referenced track without incorporating installation paths; every frontend consumer uses
@@ -3388,4 +3393,41 @@ chunks; ordinary game hashes remain unchanged; the 58-section audit maps every c
 to code/evidence or an explicit limitation; and every final release gate passes before
 the milestone is committed.
 
-**Commit SHA:** pending
+**Commit SHA:** `4d2e7d0`
+
+## Milestone 58 detail
+
+**Status:** COMPLETE
+
+**Goal:** Refresh the final verification record against the exact composite-disc
+hardening commit and its complete hosted matrix, without changing the tested runtime.
+
+**Files changed:**
+
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+- `docs/REQUIREMENTS_AUDIT.md`
+
+**Tests added:** None. This evidence-only closure does not change production or test
+code; the documentation validator requires every report and audit link, and the common
+regression suite ensures the published record remains compatible with the build graph.
+
+**Gate evidence:** Implementation commit
+`4d2e7d086d6dd0c0a1adb8aa5efbcd8783dca42f` passed clean local Debug, Release, and
+ASan/UBSan builds with 74/74 tests in each configuration, the inherited Unix libretro
+build/clean gate, staged runtime verification, CPack creation/checksum verification,
+and the adversarial source/artifact review. Exact implementation CI run
+[`32937516898`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32937516898)
+passed all ten jobs and uploaded Linux x86-64, Windows x86-64, macOS arm64, and macOS
+x86-64 artifact families. This documentation-only commit receives the same hosted
+regression after its non-rewritten push; its exact result is reported in the final
+handoff because a commit cannot embed the ID of a workflow that starts after it exists.
+
+**Acceptance criteria:** The final report identifies the exact tested implementation
+and hosted run, records current test/package totals and limitations, the requirements
+audit has no unresolved implementation finding, documentation/package validation
+passes, every milestone commit is pushed, and the final branch is clean and synchronized
+with `origin` after the closure workflow succeeds.
+
+**Commit SHA:** pending (resolve with
+`git log -1 -- docs/FINAL_TEST_REPORT.md`; a commit cannot contain its own SHA)

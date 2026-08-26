@@ -60,9 +60,9 @@ or final test report.
 | 51. Clean shutdown | Implemented | Producer disconnection, cancellation of live-backup/state/metadata/library hashes, core/save flush, audio/controllers, auxiliary worker joins, display release, and aggregate process status are ordered and tested. |
 | 52. Scope exclusions | Observed | Netplay, achievements, cloud, downloading/scraping, commercial databases, TAS/debugger, streaming, and core rewrites were not introduced. |
 | 53. Milestones | Complete | Granular milestone records include status, goal, files, tests, acceptance criteria, and commit evidence in [DEVELOPMENT_PLAN.md](DEVELOPMENT_PLAN.md). |
-| 54. Definition of done | Satisfied subject to final exact-SHA gate | The product feature checklist is in [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md); the current audit closes composite-disc identity, library duplication, and hash-shutdown findings before the final rerun. |
+| 54. Definition of done | Satisfied | The product feature checklist is in [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md); composite-disc identity, library duplication, and hash-shutdown findings are closed and the exact implementation passed every local and hosted gate. |
 | 55. Adversarial review | Repeated | Unfinished markers, disabled/skipped tests, queue growth, action wiring, path assumptions, artifacts, licenses, CI exclusions, runtime propagation, and shutdown were re-audited. |
-| 56. Final test report | Closure gate | [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) is refreshed only after clean Debug/Release/sanitizer/package gates and exact-commit hosted CI. |
+| 56. Final test report | Complete | [FINAL_TEST_REPORT.md](FINAL_TEST_REPORT.md) records the exact hardened implementation after clean Debug/Release/sanitizer/package gates and its successful ten-job hosted CI run. |
 | 57. Final README | Implemented | [README.md](../README.md) covers product identity, systems/features, all platform installs, source builds, input/BIOS/saves/tests, licensing, upstream relationship, and screenshot policy. |
 | 58. Final response | Deferred correctly | The concise branch/SHA/commit/platform/test/CI/package/feature/limitation/push report is issued only after the closure gate succeeds. |
 

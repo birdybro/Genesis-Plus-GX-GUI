@@ -1,11 +1,11 @@
 # Final Test Report
 
 This report records the Genesis Plus GX GUI 0.1.0 release-candidate verification
-performed on 2026-08-25 (America/Denver).
+performed on 2026-08-26 (America/Denver).
 
 ## Candidate identity
 
-- Tested implementation commit: `55135e039876dbaf992b60393f7d74723239ebd0`
+- Tested implementation commit: `4d2e7d086d6dd0c0a1adb8aa5efbcd8783dca42f`
 - Branch: `master`
 - Application/package version: `0.1.0`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -14,11 +14,12 @@ performed on 2026-08-25 (America/Denver).
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA in that commit
 
-No golden reference changed during final verification. The final hardening pass closed
-the remaining post-load failures that could previously be confined to logs: runtime
-worker, audio, state, metadata, scanner, and library-history failures now reach bounded
-user-visible paths. Final save or service cleanup failure is aggregated and cannot
-silently return a successful process status.
+No golden reference changed during final verification. The final hardening pass made
+multi-file CUE identity cover the validated sheet and every referenced track, reused
+that identity for metadata, saves, states, cheats, overrides, and library records,
+suppressed library rows for owned raw tracks, and made live backup/state/metadata/library
+hashing cooperatively cancellable during shutdown. Earlier bounded user-visible runtime
+failure and aggregate shutdown-status guarantees remain intact.
 
 ## Build configurations tested
 
@@ -59,7 +60,7 @@ packaging (2).
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`32932307724`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32932307724)
+[`32937516898`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32937516898)
 completed successfully against the exact tested implementation SHA:
 
 | Hosted job | Configuration | Result |
@@ -85,7 +86,7 @@ created neither a tag nor a GitHub release.
 
 The local Release install was staged without a deployment warning in a fresh temporary
 root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
-`--version` process smoke. The tree contains 44 files and no cartridge, disc, firmware,
+`--version` process smoke. The tree contains 45 files and no cartridge, disc, firmware,
 SRAM, BRAM, or state payload. CPack produces the versioned
 `Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
 closure archive's digest is intentionally not embedded in this packaged report because
@@ -111,7 +112,8 @@ matching `v0.1.0` tag and was not performed.
 - [x] Open/replace/close, drag/drop, command line, strict bounded CUE preflight,
   descriptive malformed-file errors, and persistent recent-game history.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
-  automatic load/flush, and platform-standard application-data paths.
+  automatic load/flush, platform-standard application-data paths, and composite CUE
+  identities covering the sheet plus every validated track without path dependence.
 - [x] State slots 0-9, quick operations, timestamps, delete, corruption/wrong-game
   rejection, thumbnails, and deterministic restoration.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
@@ -119,8 +121,9 @@ matching `v0.1.0` tag and was not performed.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,
   sparse per-game overrides, themes, accessibility, metadata, cheats, diagnostics, and
   privacy-filtered structured logs.
-- [x] Recoverable asynchronous SQLite game library with scanning, search/filter/sort,
-  favorites, play history, launch, and user-provided local artwork.
+- [x] Recoverable asynchronous SQLite game library with scanning, CUE-owned track
+  suppression, search/filter/sort, favorites, play history, launch, and user-provided
+  local artwork.
 - [x] Visible bounded runtime failures and deterministic shutdown ordering that flushes
   core-owned saves, joins every worker, releases bounded exchanges, and reports cleanup
   failure through logs and process status.
@@ -132,12 +135,14 @@ matching `v0.1.0` tag and was not performed.
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
 `TODO`, `FIXME`, `XXX`, `HACK`, `stub`, `placeholder`, `not implemented`, `abort()`, and
-`assert(false)`. Remaining legacy `gcw0` TODOs are outside the desktop target, and
-frontend placeholder/disabled matches describe generated negative fixtures, deliberate
-test states, or the no-commercial-screenshot policy; none is an unfinished production
-path. There are no skipped or disabled CTest/Qt tests. The two `WILL_FAIL`
-registrations are negative tests proving malformed and mismatched release tags are
-rejected. Every production menu action has a connection and stable object name.
+`assert(false)`. Authored-production matches are Qt/API identifiers or normal UI search
+placeholder text; test/documentation matches describe generated negative fixtures,
+deliberate states, the marker audit itself, or the no-commercial-screenshot policy.
+Inherited core, legacy-platform, and vendored-library markers remain outside the desktop
+frontend boundary and were not altered merely to cosmetically clear the search. There
+are no skipped or disabled CTest/Qt tests. The two `WILL_FAIL` registrations are negative
+tests proving malformed and mismatched release tags are rejected. Every production menu
+action has a connection and stable object name.
 
 The tree was also checked for unbounded command/video/audio storage, current-directory
 save names, workstation paths, proprietary game/firmware files, accidental build
