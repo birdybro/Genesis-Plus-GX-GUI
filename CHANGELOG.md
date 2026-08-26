@@ -20,6 +20,8 @@ platform documentation.
 - Keyboard/controller profiles, hot-plug, player assignments, capture-based mappings,
   configurable emulator hotkeys, deadzones, conflict validation, and advanced emulated
   device selection.
+- Emulation-thread propagation for three-/six-button pads, specialized peripherals,
+  Sega Team Player, and Master Tap layouts selected by input profiles.
 - Per-game SRAM, Sega CD BRAM/RAM-cartridge persistence and identity-checked save-state
   slots with atomic files.
 - Sega CD BIOS validation, CUE/BIN, ISO, CHD, CDDA, disc-change, and eject workflows.

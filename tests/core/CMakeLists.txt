@@ -230,6 +230,20 @@ set_tests_properties(
   core.input_snapshot PROPERTIES LABELS "core;integration;input;fixture" TIMEOUT 30
 )
 
+add_executable(genplusgx_core_input_devices_test core_input_devices_test.cpp)
+target_link_libraries(
+  genplusgx_core_input_devices_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME core.input_devices COMMAND genplusgx_core_input_devices_test)
+set_tests_properties(
+  core.input_devices
+  PROPERTIES LABELS "core;integration;input;controller;multitap;fixture" TIMEOUT 30
+)
+
 add_executable(genplusgx_core_state_test core_state_test.cpp)
 target_link_libraries(
   genplusgx_core_state_test

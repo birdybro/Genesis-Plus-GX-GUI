@@ -262,6 +262,34 @@ int main()
     return 7;
   }
 
+  genplusgx::CoreInputSettings mouseInput;
+  mouseInput.devices.fill(genplusgx::CoreInputDevice::none);
+  mouseInput.devices[0] = genplusgx::CoreInputDevice::segaMouse;
+  if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateInputSettings(601U, mouseInput),
+          event),
+        "Worker emulated-device update failed")) {
+    return 7;
+  }
+  auto invalidInput = mouseInput;
+  invalidInput.devices[2] = genplusgx::CoreInputDevice::pad6Button;
+  if (!check(worker.submit(
+          genplusgx::EmulationCommand::updateInputSettings(602U, invalidInput)),
+        "Invalid emulated-device command could not be queued")) {
+    return 7;
+  }
+  const auto rejectedInput = waitForOperation(worker, 602U);
+  if (!check(rejectedInput &&
+          rejectedInput->type == genplusgx::EmulationEventType::commandFailed &&
+          rejectedInput->coreError == genplusgx::CoreError::invalidSettings,
+        "Worker did not report a rejected emulated-device layout") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateInputSettings(
+            603U, genplusgx::CoreInputSettings{}), event),
+        "Worker could not restore default emulated devices")) {
+    return 7;
+  }
+
   genplusgx::InputSnapshot input;
   input.sequence = 22U;
   input.players[0].connected = true;

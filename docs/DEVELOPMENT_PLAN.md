@@ -56,7 +56,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 42 Release automation | COMPLETE | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | `12f66c1` |
 | 43 User documentation | COMPLETE | Complete build, test, usage, BIOS, input, save, release docs | README, notices, required guides, documentation/package gates | 67-test Debug/Release/ASan suites; link/content and staged-package review | Every shipped UI feature documented and packaged | `98137f7` |
 | 44 Release candidate | COMPLETE | Adversarial review, complete clean regressions and report | hotkeys, audio recovery, final report and release gates | 67-test clean Debug/Release/ASan suites; four-host CI; package and adversarial audits | Clean tree and all required gates green | `d84f7eb` |
-| 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | pending |
+| 45 Core support audit | COMPLETE | Replace inferred 8-bit/BIOS claims with live core behavior | core firmware bridge, generated Z80/boot fixtures, core tests, docs | 69-test Debug/Release suites; SG/Mark III/SMS/GG execution and all BIOS slots | Every advertised system executes; no configured BIOS slot is inert | `8691134` |
+| 46 Emulated input devices | COMPLETE | Make profile device selections configure the live core | core input model/adapter/worker, profile bridge, app composition, tests/docs | 70-test Debug/Release suites; specialized ports and two multitap families | Every valid profile device affects core state on its owner thread | pending |
 
 ## Execution policy
 
@@ -2771,5 +2772,57 @@ by the core. Existing Sega CD coverage continues to verify all three CD slots.
 demonstrated by real instruction execution rather than metadata parsing or extensions.
 Every optional cartridge BIOS chosen in the manager reaches the core and is either
 activated by the appropriate hardware loader or cleanly disabled when cleared.
+
+**Commit SHA:** `8691134`
+
+## Milestone 46 detail
+
+**Status:** COMPLETE
+
+**Goal:** Replace persisted-only logical device choices with an immutable core input
+configuration that safely changes real Genesis Plus GX ports and devices on the
+emulation thread, including multi-controller adapters.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/core_input_settings.h`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/core/CMakeLists.txt`
+- `desktop/input/include/genplusgx/input/input_profile.h`
+- `desktop/input/src/input_profile.cpp`
+- `desktop/app/main.cpp`
+- `tests/core/core_input_devices_test.cpp`
+- `tests/core/core_input_test.cpp`
+- `tests/core/emulation_worker_test.cpp`
+- `tests/core/CMakeLists.txt`
+- `tests/unit/input_profile_test.cpp`
+- `docs/INPUT_CONFIGURATION.md`
+- `docs/ARCHITECTURE.md`
+- `docs/TEST_MATRIX.md`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** `core.input_devices` verifies invalid layout rejection, default and
+live pad types, mouse, port-B Menacer mapping, frame-boundary player compression,
+three-pad Team Player with a disconnected fourth position, two eight-player Master
+Taps with native two-button devices, Pico/Terebi slots, and exposed settings. Worker
+coverage checks successful and rejected device commands; profile tests check every
+logical-to-core mapping and multitap continuity rules.
+
+**Gate evidence:**
+
+- Six focused core/unit/GUI input tests pass, including live worker and generated-ROM
+  integration.
+- The complete Debug suite passes 70/70 with no new frontend warning.
+- The complete Release suite passes 70/70.
+
+**Acceptance criteria:** Profile Apply, global profile changes, and per-game profile
+selection publish a bounded `CoreInputSettings` command. Only the core-owning thread
+touches port/device globals, live changes reinitialize handlers, 3–8 pads select the
+appropriate multitap family, and unsupported layouts fail validation rather than being
+silently ignored.
 
 **Commit SHA:** pending (recorded by the following milestone)

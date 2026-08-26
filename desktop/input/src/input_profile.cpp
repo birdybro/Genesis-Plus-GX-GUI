@@ -556,6 +556,52 @@ std::string_view logicalDeviceTypeName(LogicalDeviceType type) noexcept
   return "none";
 }
 
+CoreInputSettings coreInputSettings(const InputProfile& profile) noexcept
+{
+  CoreInputSettings settings;
+  for (std::size_t index = 0U; index < profile.devices.size(); ++index) {
+    switch (profile.devices[index]) {
+      case LogicalDeviceType::none:
+        settings.devices[index] = CoreInputDevice::none;
+        break;
+      case LogicalDeviceType::pad3Button:
+        settings.devices[index] = CoreInputDevice::pad3Button;
+        break;
+      case LogicalDeviceType::pad6Button:
+        settings.devices[index] = CoreInputDevice::pad6Button;
+        break;
+      case LogicalDeviceType::segaMouse:
+        settings.devices[index] = CoreInputDevice::segaMouse;
+        break;
+      case LogicalDeviceType::lightGun:
+        settings.devices[index] = CoreInputDevice::lightGun;
+        break;
+      case LogicalDeviceType::paddle:
+        settings.devices[index] = CoreInputDevice::paddle;
+        break;
+      case LogicalDeviceType::sportsPad:
+        settings.devices[index] = CoreInputDevice::sportsPad;
+        break;
+      case LogicalDeviceType::xe1Ap:
+        settings.devices[index] = CoreInputDevice::xe1Ap;
+        break;
+      case LogicalDeviceType::pico:
+        settings.devices[index] = CoreInputDevice::pico;
+        break;
+      case LogicalDeviceType::terebiOekaki:
+        settings.devices[index] = CoreInputDevice::terebiOekaki;
+        break;
+      case LogicalDeviceType::graphicBoard:
+        settings.devices[index] = CoreInputDevice::graphicBoard;
+        break;
+      case LogicalDeviceType::activator:
+        settings.devices[index] = CoreInputDevice::activator;
+        break;
+    }
+  }
+  return settings;
+}
+
 InputProfile* InputConfiguration::active() noexcept
 {
   const auto found = std::find_if(profiles.begin(), profiles.end(),
@@ -723,6 +769,10 @@ InputProfileStatus validateInputProfileWithHotkeys(
       return failure(InputProfileError::invalidConfiguration,
         "Input profile contains an unknown logical device type.");
     }
+  }
+  if (!validateCoreInputSettings(coreInputSettings(profile))) {
+    return failure(InputProfileError::invalidConfiguration,
+      "Emulated devices must be contiguous; 3-8 players require pads, and Pico or Terebi must be the only device.");
   }
   return success();
 }

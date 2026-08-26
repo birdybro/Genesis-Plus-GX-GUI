@@ -29,8 +29,8 @@ int main()
   genplusgx::CoreAdapter adapter;
   if (!check(adapter.initialize(), "Input test could not initialize the adapter") ||
       !check(adapter.loadGame(fixture.path()), "Input test could not load the fixture") ||
-      !check(input.dev[0] == DEVICE_PAD3B && input.dev[4] == DEVICE_PAD3B,
-        "Desktop defaults did not configure two standard gamepads")) {
+      !check(input.dev[0] == DEVICE_PAD6B && input.dev[4] == DEVICE_PAD6B,
+        "Desktop defaults did not configure two six-button gamepads")) {
     return 1;
   }
 
@@ -45,7 +45,7 @@ int main()
       !check(adapter.appliedInputSequence() == 1U,
         "Neutral snapshot sequence was not applied") ||
       !check(input.pad[0] == 0U && work_ram[9] == 0x7FU,
-        "Controller-test ROM did not observe a released 3-button pad")) {
+        "Controller-test ROM did not observe a released gamepad")) {
     return 2;
   }
 

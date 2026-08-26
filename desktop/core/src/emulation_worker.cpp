@@ -89,6 +89,15 @@ EmulationCommand EmulationCommand::updateInput(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateInputSettings(
+  std::uint64_t operationId,
+  CoreInputSettings settings)
+{
+  auto command = simple(EmulationCommandType::inputSettings, operationId);
+  command.coreInputSettings = settings;
+  return command;
+}
+
 EmulationCommand EmulationCommand::updateVideoSettings(
   std::uint64_t operationId,
   CoreVideoSettings settings)
@@ -236,6 +245,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::inputSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::inputSettings;
+          },
+          std::move(command))) {
+      ++coalescedInputSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (command.type == EmulationCommandType::videoSettings &&
         commands_.replaceNewestMatching(
           [](const EmulationCommand& queued) {
@@ -339,6 +358,7 @@ public:
       .eventQueueDepth = events_.size() + (latestFrame_.has_value() ? 1U : 0U),
       .eventQueueCapacity = events_.capacity() + 1U,
       .coalescedInputCommands = coalescedInputCommands_,
+      .coalescedInputSettingsCommands = coalescedInputSettingsCommands_,
       .coalescedVideoSettingsCommands = coalescedVideoSettingsCommands_,
       .coalescedAudioSettingsCommands = coalescedAudioSettingsCommands_,
       .coalescedSystemSettingsCommands = coalescedSystemSettingsCommands_,
@@ -663,6 +683,9 @@ private:
       case EmulationCommandType::inputSnapshot:
         coreResult = adapter.setInputSnapshot(command.input);
         break;
+      case EmulationCommandType::inputSettings:
+        coreResult = adapter.applyInputSettings(command.coreInputSettings);
+        break;
       case EmulationCommandType::videoSettings:
         discardLatestFrame();
         coreResult = adapter.applyVideoSettings(command.coreVideoSettings);
@@ -930,6 +953,7 @@ private:
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
+  std::uint64_t coalescedInputSettingsCommands_{0};
   std::uint64_t coalescedVideoSettingsCommands_{0};
   std::uint64_t coalescedAudioSettingsCommands_{0};
   std::uint64_t coalescedSystemSettingsCommands_{0};

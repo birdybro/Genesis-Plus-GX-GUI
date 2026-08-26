@@ -915,9 +915,11 @@ int main(int argc, char* argv[])
   genplusgx::input::InputAggregator inputAggregator;
   genplusgx::input::KeyboardInput keyboardInput{&window};
   genplusgx::input::ControllerInput controllerInput;
+  std::uint64_t inputSettingsOperationId = 900'000U;
   window.setInputConfiguration(inputConfiguration);
   const auto applyInputProfile =
-    [&inputConfiguration, &keyboardInput, &controllerInput](
+    [&inputConfiguration, &inputSettingsOperationId, &keyboardInput,
+     &controllerInput, &worker](
       const std::string& name) {
       const auto found = std::ranges::find_if(inputConfiguration.profiles,
         [&name](const auto& profile) { return profile.name == name; });
@@ -939,6 +941,16 @@ int main(int argc, char* argv[])
         applied = false;
       }
       controllerInput.setDeadzone(profile->deadzone);
+      if (applied) {
+        const auto submitted = worker.submit(
+          genplusgx::EmulationCommand::updateInputSettings(
+            ++inputSettingsOperationId,
+            genplusgx::input::coreInputSettings(*profile)));
+        if (!submitted) {
+          qWarning().noquote() << QString::fromStdString(submitted.message);
+          applied = false;
+        }
+      }
       return applied;
     };
   const auto applyActiveInputProfile =

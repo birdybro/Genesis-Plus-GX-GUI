@@ -56,6 +56,11 @@ int main()
       !check(configuration.active()->devices[0] == LogicalDeviceType::pad6Button &&
         configuration.active()->devices[1] == LogicalDeviceType::pad6Button,
         "Default logical devices are incorrect") ||
+      !check(coreInputSettings(*configuration.active()).devices[0] ==
+          CoreInputDevice::pad6Button &&
+        coreInputSettings(*configuration.active()).devices[1] ==
+          CoreInputDevice::pad6Button,
+        "Default logical devices did not map to core-neutral settings") ||
       !check(configuration.hotkeys.size() == emulatorHotkeyActionCount,
         "Default emulator hotkeys are incomplete") ||
       !check(hotkeyCombination(configuration, EmulatorHotkeyAction::softReset) ==
@@ -109,7 +114,12 @@ int main()
   mute->keyCombination = QKeyCombination{
     Qt::ControlModifier | Qt::AltModifier, Qt::Key_M}.toCombined();
   if (!check(validateInputConfiguration(configuration),
-        "A unique customized hotkey was rejected")) {
+        "A unique customized hotkey was rejected") ||
+      !check(coreInputSettings(*profile).devices[0] ==
+          CoreInputDevice::segaMouse &&
+        coreInputSettings(*profile).devices[1] ==
+          CoreInputDevice::pad6Button,
+        "Specialized input devices did not map to the core model")) {
     return EXIT_FAILURE;
   }
 
@@ -149,6 +159,20 @@ int main()
   if (!check(validateInputConfiguration(invalidHotkey).error ==
         InputProfileError::invalidConfiguration,
       "A persisted application-hotkey conflict was accepted")) {
+    return EXIT_FAILURE;
+  }
+  auto gappedDevices = defaultInputConfiguration();
+  gappedDevices.active()->devices[1] = LogicalDeviceType::none;
+  gappedDevices.active()->devices[2] = LogicalDeviceType::pad6Button;
+  auto invalidMultitapDevices = defaultInputConfiguration();
+  invalidMultitapDevices.active()->devices[0] = LogicalDeviceType::segaMouse;
+  invalidMultitapDevices.active()->devices[2] = LogicalDeviceType::pad6Button;
+  if (!check(validateInputConfiguration(gappedDevices).error ==
+        InputProfileError::invalidConfiguration,
+        "A gapped player-device layout was accepted") ||
+      !check(validateInputConfiguration(invalidMultitapDevices).error ==
+        InputProfileError::invalidConfiguration,
+        "A non-pad multitap layout was accepted")) {
     return EXIT_FAILURE;
   }
   auto duplicateHotkey = defaultInputConfiguration();

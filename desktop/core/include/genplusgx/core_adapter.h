@@ -5,6 +5,7 @@
 #include "genplusgx/core_audio_settings.h"
 #include "genplusgx/core_cheat.h"
 #include "genplusgx/core_firmware_settings.h"
+#include "genplusgx/core_input_settings.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/core_video_settings.h"
 #include "genplusgx/input_snapshot.h"
@@ -197,6 +198,9 @@ public:
   [[nodiscard]] CoreResult systemSettings(CoreSystemSettings& output) const;
   [[nodiscard]] CoreResult applyFirmwareSettings(
     const CoreFirmwareSettings& settings);
+  [[nodiscard]] CoreResult applyInputSettings(
+    const CoreInputSettings& settings);
+  [[nodiscard]] CoreResult inputSettings(CoreInputSettings& output) const;
   [[nodiscard]] CoreResult applyCheats(
     std::span<const CoreCheatPatch> patches);
   [[nodiscard]] CoreResult firmwareSettings(

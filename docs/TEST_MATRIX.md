@@ -23,7 +23,7 @@ ctest --preset debug -L gui --output-on-failure
 | Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, Apply/Cancel/defaults | `gui.main_window`, `gui.display_widget` |
 | Audio | Mute, volume, output/latency and core audio controls, bounded hot-plug events, selected-device recovery, Apply/Cancel/defaults | `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
-| Controller/input UI | Gameplay/hotkey capture, duplicate and cross-domain conflicts, schema migration/persistence, assignments, stable tabs | `unit.input_profile`, `gui.input_configuration` |
+| Controller/input UI | Gameplay/hotkey capture, duplicate and cross-domain conflicts, schema migration/persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
 | BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
 | Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state | `gui.main_window` |
 | Game library | Directory add/remove, async scan, search/system filter, favorite, sorting, local art, launch | `gui.game_library` |

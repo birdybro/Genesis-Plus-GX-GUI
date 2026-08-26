@@ -2,6 +2,7 @@
 
 #include "genplusgx/input/controller_input.h"
 #include "genplusgx/input/keyboard_input.h"
+#include "genplusgx/core_input_settings.h"
 
 #include <array>
 #include <cstdint>
@@ -72,6 +73,10 @@ struct HotkeyBinding final {
   EmulatorHotkeyAction action) noexcept;
 
 [[nodiscard]] std::string_view logicalDeviceTypeName(LogicalDeviceType type) noexcept;
+
+struct InputProfile;
+[[nodiscard]] CoreInputSettings coreInputSettings(
+  const InputProfile& profile) noexcept;
 
 struct InputProfile final {
   std::string name;

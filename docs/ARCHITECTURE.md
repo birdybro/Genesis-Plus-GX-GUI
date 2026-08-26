@@ -440,6 +440,14 @@ assigned in order to active core device slots, which correctly maps a normal sec
 to slot four while naturally covering Team Player, Master Tap, and J-Cart slot layouts.
 Every unused/disconnected core slot is cleared at the same boundary.
 
+The profile's separate `CoreInputSettings` snapshot follows the same bounded command
+path and is applied only by the core-owning thread. It configures `input.system[]`, exact
+three-/six-button pad types, specialized device ports, and live `io_init`/`input_reset`
+before subsequent snapshots are consumed. Contiguous 3–8 pad layouts select Team Player
+on 16-bit hardware or Master Tap on 8-bit hardware; unconfigured multitap slots are
+changed back to `NO_DEVICE`. Pico and Terebi remain subject to the core's hardware/game
+detection while retaining explicit device-slot propagation.
+
 The implemented `KeyboardInput` service installs an event filter on the emulator
 display and maps Qt keys to Player 1 without referencing core constants. Its default
 layout is arrows, Z/X/C for A/B/C, A/S/D for X/Y/Z, Return for Start, and Shift for
@@ -476,7 +484,8 @@ Input configuration is a versioned value model rather than widget state. Each na
 profile owns keyboard bindings, SDL-standard button bindings, explicit signed axis
 mappings, deadzone, and eight logical device selections. The model rejects duplicate
 physical controls, invalid enum values, duplicate profile names, unknown schemas, and
-unmodified application-hotkey collisions. `InputProfileStore` serializes bounded JSON
+unmodified application-hotkey collisions. It also rejects gapped devices, non-pad
+multitap layouts, and multi-device tablet layouts. `InputProfileStore` serializes bounded JSON
 through the persistence layer's atomic writer. Legacy schema 0 is parsed into a current
 in-memory value and then rewritten by the composition root; malformed data falls back
 to defaults without overwriting the source automatically.
@@ -488,7 +497,9 @@ events are consumed before gameplay state changes. The assignment page updates i
 when hot-plug changes the device list. Assignment requests are copied before callbacks,
 making a callback-triggered device-list refresh safe. The composition root persists an
 accepted configuration, applies bindings/deadzone to live input services, and logs a
-persistence failure while retaining the requested live behavior.
+persistence failure while retaining the requested live behavior. The same operation
+publishes the emulated-device snapshot; per-game profile selection publishes it before
+the queued game-load command.
 
 ## Persistence and settings
 

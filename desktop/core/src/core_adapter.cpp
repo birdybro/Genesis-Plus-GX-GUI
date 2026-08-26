@@ -108,6 +108,113 @@ void configureSystem(const CoreSystemSettings& settings) noexcept
   config.addr_error = settings.enableAddressErrors ? 1U : 0U;
 }
 
+std::size_t configuredDeviceCount(const CoreInputSettings& settings) noexcept
+{
+  return static_cast<std::size_t>(std::distance(
+    settings.devices.begin(),
+    std::ranges::find(settings.devices, CoreInputDevice::none)));
+}
+
+uint8 padType(CoreInputDevice device) noexcept
+{
+  if ((system_hw & SYSTEM_MD) == 0U) {
+    return DEVICE_PAD2B;
+  }
+  return device == CoreInputDevice::pad3Button
+    ? DEVICE_PAD3B : DEVICE_PAD6B;
+}
+
+uint8 portSystem(CoreInputDevice device, std::size_t port) noexcept
+{
+  switch (device) {
+    case CoreInputDevice::none:
+      return NO_SYSTEM;
+    case CoreInputDevice::pad3Button:
+    case CoreInputDevice::pad6Button:
+    case CoreInputDevice::pico:
+    case CoreInputDevice::terebiOekaki:
+      return SYSTEM_GAMEPAD;
+    case CoreInputDevice::segaMouse:
+      return SYSTEM_MOUSE;
+    case CoreInputDevice::lightGun:
+      return (system_hw & SYSTEM_MD) != 0U && port == 1U
+        ? SYSTEM_MENACER : SYSTEM_LIGHTPHASER;
+    case CoreInputDevice::paddle:
+      return SYSTEM_PADDLE;
+    case CoreInputDevice::sportsPad:
+      return SYSTEM_SPORTSPAD;
+    case CoreInputDevice::xe1Ap:
+      return SYSTEM_XE_1AP;
+    case CoreInputDevice::graphicBoard:
+      return SYSTEM_GRAPHIC_BOARD;
+    case CoreInputDevice::activator:
+      return SYSTEM_ACTIVATOR;
+  }
+  return NO_SYSTEM;
+}
+
+void configureInputPorts(const CoreInputSettings& settings) noexcept
+{
+  old_system[0] = -1;
+  old_system[1] = -1;
+  input.system[0] = NO_SYSTEM;
+  input.system[1] = NO_SYSTEM;
+  for (std::size_t player = 0U; player < MAX_INPUTS; ++player) {
+    config.input[player].padtype =
+      DEVICE_PAD2B | DEVICE_PAD3B | DEVICE_PAD6B;
+  }
+
+  const auto count = configuredDeviceCount(settings);
+  for (std::size_t player = 0U; player < count; ++player) {
+    if (isCorePad(settings.devices[player])) {
+      config.input[player].padtype = padType(settings.devices[player]);
+    }
+  }
+
+  if (count > 2U) {
+    const uint8 multitap = (system_hw & SYSTEM_MD) != 0U
+      ? SYSTEM_TEAMPLAYER : SYSTEM_MASTERTAP;
+    input.system[0] = multitap;
+    input.system[1] = count > 4U ? multitap : NO_SYSTEM;
+    return;
+  }
+
+  if (count > 0U) {
+    const bool genesisPortBLightGun =
+      settings.devices[0] == CoreInputDevice::lightGun &&
+      (system_hw & SYSTEM_MD) != 0U;
+    if (genesisPortBLightGun) {
+      input.system[1] = SYSTEM_MENACER;
+    } else {
+      input.system[0] = portSystem(settings.devices[0], 0U);
+    }
+  }
+  if (count > 1U) {
+    input.system[1] = portSystem(settings.devices[1], 1U);
+  }
+}
+
+void trimUnusedMultitapDevices(const CoreInputSettings& settings) noexcept
+{
+  const auto count = configuredDeviceCount(settings);
+  if (count == 1U) {
+    if (settings.devices[0] == CoreInputDevice::pico) {
+      input.dev[0] = DEVICE_PICO;
+    } else if (settings.devices[0] == CoreInputDevice::terebiOekaki) {
+      input.dev[0] = DEVICE_TEREBI;
+    }
+  }
+  if (count <= 2U) {
+    return;
+  }
+  for (std::size_t slot = count; slot < MAX_DEVICES; ++slot) {
+    input.dev[slot] = NO_DEVICE;
+    input.pad[slot] = 0U;
+    input.analog[slot][0] = 0;
+    input.analog[slot][1] = 0;
+  }
+}
+
 bool copyHostPath(
   const std::filesystem::path& path,
   char* destination,
@@ -306,6 +413,7 @@ public:
   CoreAudioSettings audioSettings;
   CoreSystemSettings systemSettings;
   CoreFirmwareSettings firmwareSettings;
+  CoreInputSettings inputSettings;
   std::filesystem::path discPath;
 };
 
@@ -430,7 +538,9 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
     return failure(CoreError::audioInitializationFailed, "Genesis Plus GX could not initialize its audio resamplers.");
   }
 
+  configureInputPorts(private_->inputSettings);
   system_init();
+  trimUnusedMultitapDevices(private_->inputSettings);
   system_reset();
   if (system_hw == SYSTEM_MCD) {
     formatBram(backupMemory(BackupMemoryKind::scdInternalBram));
@@ -834,6 +944,39 @@ CoreResult CoreAdapter::firmwareSettings(CoreFirmwareSettings& output) const
     return owner;
   }
   output = private_->firmwareSettings;
+  return success();
+}
+
+CoreResult CoreAdapter::applyInputSettings(const CoreInputSettings& settings)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    return owner;
+  }
+  if (!validateCoreInputSettings(settings)) {
+    return failure(CoreError::invalidSettings,
+      "The requested emulated input-device layout is invalid.");
+  }
+  private_->inputSettings = settings;
+  if (state_ == CoreLifecycleState::loaded) {
+    configureInputPorts(private_->inputSettings);
+    io_init();
+    trimUnusedMultitapDevices(private_->inputSettings);
+    input_reset();
+    private_->pendingInput = {};
+    private_->hasPendingInput = false;
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::inputSettings(CoreInputSettings& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(false); !owner) {
+    output = {};
+    return owner;
+  }
+  output = private_->inputSettings;
   return success();
 }
 

@@ -68,6 +68,23 @@ axis direction. It includes standard pads, Sega Mouse, light gun, paddle, Sports
 XE-1AP, Pico, Terebi Oekaki, Graphic Board, and Activator choices. Availability remains
 subject to the loaded system and the core's port restrictions.
 
+Accepted device changes are converted to a core-neutral device snapshot and sent
+through the bounded emulation command queue. They reinitialize port handlers on the
+emulation thread, so a running session can switch between compatible pads and
+peripherals without any GUI-thread core access. Player devices must be contiguous from
+Player 1. Three through eight simultaneous devices must all be pads: Genesis/Sega CD
+uses one or two Sega Team Players, while SG-1000/Mark III/Master System/Game Gear uses
+one or two Master Taps. Unused positions on a partial multitap are explicitly exposed
+as disconnected. Eight-bit systems always receive native two-button pads even when the
+shared profile names a Genesis three- or six-button pad.
+
+A generic light gun is assigned to the Menacer-compatible port B on Genesis hardware
+and to Light Phaser ports on 8-bit hardware. Pico and Terebi tablet selections must be
+the sole device and become functional only with compatible core-detected software or
+hardware; the selection still reaches the corresponding core device slot. Invalid
+gaps, mixed-peripheral multitaps, and incompatible multi-tablet layouts are rejected
+before persistence.
+
 ## Profiles and persistence
 
 New Profile copies the current profile under a unique local name. Profiles may be
