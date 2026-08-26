@@ -2488,7 +2488,11 @@ platform plugin, runs `--version` from that staged application, then invokes CPa
   now an explicit Windows/macOS install dependency rather than relying on Qt's deploy
   tools to discover a non-Qt library. The macOS install also selects only Cocoa, SQLite,
   and supported image plugins, avoiding unrelated database drivers with absent vendor
-  libraries. A final corrective hosted run remains pending.
+  libraries. Run `32916040359` validated the complete Windows package and artifact upload,
+  but all macOS jobs stopped at configure because Qt 6.8 exposes plugin suppression only
+  through `DEPLOY_TOOL_OPTIONS` (the direct `NO_PLUGINS` convenience flag was added later).
+  The deployment request now uses the Qt 6.8-compatible `macdeployqt -no-plugins` path; a
+  final corrective hosted run remains pending.
 
 **Acceptance criteria:** Packages derive the application/package version from the root
 CMake project, carry a platform and normalized architecture in every filename, and

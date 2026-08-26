@@ -148,7 +148,7 @@ else()
     qt_generate_deploy_app_script(
       TARGET genplusgx_desktop
       OUTPUT_SCRIPT genplusgx_deploy_script
-      NO_PLUGINS
+      DEPLOY_TOOL_OPTIONS -no-plugins
       NO_TRANSLATIONS
       NO_UNSUPPORTED_PLATFORM_ERROR
     )
