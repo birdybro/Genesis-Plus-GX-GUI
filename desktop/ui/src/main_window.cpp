@@ -1217,18 +1217,33 @@ void MainWindow::showInputConfiguration(InputConfigurationTab tab)
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setConfigurationSink(
     [this](const input::InputConfiguration& configuration) {
-      inputConfiguration_ = configuration;
-      applyHotkeyShortcuts();
-      refreshSettingsDialog();
       if (inputConfigurationSink_) {
-        inputConfigurationSink_(configuration);
+        const auto status = inputConfigurationSink_(configuration);
+        if (!status) {
+          statusBar()->showMessage(
+            tr("Input configuration could not be saved."), 5'000);
+          dialogService_->showError(this, tr("Input Configuration Error"),
+            QString::fromStdString(status.message));
+          return false;
+        }
       }
+      setInputConfiguration(configuration);
+      statusBar()->showMessage(tr("Input configuration saved."), 3'000);
+      return true;
     });
   dialog->setAssignmentSink(
     [this](std::uint32_t instanceId, std::size_t player) {
       if (controllerAssignmentSink_) {
-        controllerAssignmentSink_(instanceId, player);
+        const auto status = controllerAssignmentSink_(instanceId, player);
+        if (!status) {
+          statusBar()->showMessage(
+            tr("Controller assignment could not be applied."), 5'000);
+          dialogService_->showError(this, tr("Controller Assignment Error"),
+            QString::fromStdString(status.message));
+          return false;
+        }
       }
+      return true;
     });
   dialog->openTab(tab);
   dialog->open();
@@ -1354,7 +1369,7 @@ void MainWindow::showVideoSettings()
   auto* dialog = new VideoSettingsDialog(videoSettings_, this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setSettingsSink([this](const settings::VideoSettings& settings) {
-    applyVideoSettings(settings, true);
+    return applyVideoSettings(settings, true);
   });
   dialog->open();
 }
@@ -1435,12 +1450,20 @@ void MainWindow::showSystemSettings()
   auto* dialog = new SystemSettingsDialog(systemSettings_, this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setSettingsSink([this](const CoreSystemSettings& settings) {
-    setSystemSettings(settings);
     if (systemSettingsSink_) {
-      systemSettingsSink_(systemSettings_);
+      const auto status = systemSettingsSink_(settings);
+      if (!status) {
+        statusBar()->showMessage(
+          tr("System settings could not be saved."), 5'000);
+        dialogService_->showError(this, tr("System Settings Error"),
+          QString::fromStdString(status.message));
+        return false;
+      }
     }
+    setSystemSettings(settings);
     statusBar()->showMessage(
       tr("System settings will apply when the next game is loaded."), 3'000);
+    return true;
   });
   dialog->open();
 }
@@ -1636,12 +1659,22 @@ const platform::BiosSnapshot& MainWindow::biosSnapshot() const noexcept
   return biosSnapshot_;
 }
 
-void MainWindow::applyVideoSettings(
+bool MainWindow::applyVideoSettings(
   const settings::VideoSettings& settings,
   bool notifySink)
 {
   if (!settings::validateVideoSettings(settings)) {
-    return;
+    return false;
+  }
+  if (notifySink && videoSettingsSink_) {
+    const auto status = videoSettingsSink_(settings);
+    if (!status) {
+      updateVideoActionChecks();
+      statusBar()->showMessage(tr("Video settings could not be saved."), 5'000);
+      dialogService_->showError(this, tr("Video Settings Error"),
+        QString::fromStdString(status.message));
+      return false;
+    }
   }
   videoSettings_ = settings;
   displayWidget_->setAspectMode(settings.aspect);
@@ -1652,10 +1685,8 @@ void MainWindow::applyVideoSettings(
         QStringLiteral("videoSettingsDialog"))) {
     dialog->setSettings(videoSettings_);
   }
-  if (notifySink && videoSettingsSink_) {
-    videoSettingsSink_(videoSettings_);
-  }
   refreshSettingsDialog();
+  return true;
 }
 
 void MainWindow::updateVideoActionChecks()
@@ -1940,12 +1971,30 @@ void MainWindow::setRecentGames(std::vector<std::filesystem::path> paths)
     connect(clear, &QAction::triggered, this, [this] {
       if (clearRecentGamesSink_) {
         const auto sink = clearRecentGamesSink_;
-        QTimer::singleShot(0, this, [sink] { sink(); });
+        QTimer::singleShot(0, this, [this, sink] {
+          const auto status = sink();
+          if (!status) {
+            statusBar()->showMessage(
+              tr("Recent game history could not be cleared."), 5'000);
+            dialogService_->showError(this, tr("Recent Games Error"),
+              QString::fromStdString(status.message));
+          } else {
+            statusBar()->showMessage(tr("Recent game history cleared."), 3'000);
+          }
+        });
       }
     });
   }
   hasRecentGames_ = !paths.empty();
   menu->setEnabled(hasRecentGames_ && !gameLoading_);
+}
+
+void MainWindow::showRecentGamesError(const std::string& detail)
+{
+  statusBar()->showMessage(
+    tr("Recent game history could not be updated."), 5'000);
+  dialogService_->showError(
+    this, tr("Recent Games Error"), QString::fromStdString(detail));
 }
 
 bool MainWindow::requestGameLoad(const std::filesystem::path& path)

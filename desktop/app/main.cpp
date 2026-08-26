@@ -834,8 +834,11 @@ int main(int argc, char* argv[])
           ++videoSettingsOperationId, settings.core));
       if (!submitted) {
         qWarning().noquote() << QString::fromStdString(submitted.message);
-        window.setVideoSettings(previous);
-        return;
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = "Video settings could not reach the emulation worker: " +
+            submitted.message,
+        };
       }
       const bool overridesActiveGame =
         activePerGameIdentity && activePerGameSettings.video;
@@ -857,14 +860,18 @@ int main(int argc, char* argv[])
       }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
-        static_cast<void>(worker.submit(
+        const auto rolledBack = worker.submit(
           genplusgx::EmulationCommand::updateVideoSettings(
-            ++videoSettingsOperationId, previous.core)));
-        window.setVideoSettings(previous);
+            ++videoSettingsOperationId, previous.core));
+        if (!rolledBack) {
+          saved.message += " The runtime rollback also failed: " +
+            rolledBack.message;
+        }
       } else if (activePerGameIdentity) {
         window.setPerGameSettingsSession(
           activePerGameSettings, globalGameSettings());
       }
+      return saved;
     });
   std::uint64_t audioSettingsOperationId = 600'000U;
   const auto initialAudioSettings = worker.submit(
@@ -1017,8 +1024,11 @@ int main(int argc, char* argv[])
           ++systemSettingsOperationId, settings));
       if (!submitted) {
         qWarning().noquote() << QString::fromStdString(submitted.message);
-        window.setSystemSettings(previous);
-        return;
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = "System settings could not reach the emulation worker: " +
+            submitted.message,
+        };
       }
       const bool overridesActiveGame =
         activePerGameIdentity && activePerGameSettings.system;
@@ -1040,14 +1050,18 @@ int main(int argc, char* argv[])
       }
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
-        static_cast<void>(worker.submit(
+        const auto rolledBack = worker.submit(
           genplusgx::EmulationCommand::updateSystemSettings(
-            ++systemSettingsOperationId, previous)));
-        window.setSystemSettings(previous);
+            ++systemSettingsOperationId, previous));
+        if (!rolledBack) {
+          saved.message += " The runtime rollback also failed: " +
+            rolledBack.message;
+        }
       } else if (activePerGameIdentity) {
         window.setPerGameSettingsSession(
           activePerGameSettings, globalGameSettings());
       }
+      return saved;
     });
   const auto refreshRecentGamesMenu = [&recentGames, &window] {
     std::vector<std::filesystem::path> paths;
@@ -1060,12 +1074,16 @@ int main(int argc, char* argv[])
   refreshRecentGamesMenu();
   window.setClearRecentGamesSink(
     [&recentGames, &recentGamesStore, &refreshRecentGamesMenu] {
-      recentGames.clear();
-      refreshRecentGamesMenu();
-      const auto saved = recentGamesStore.save(recentGames);
-      if (!saved) {
+      auto candidate = recentGames;
+      candidate.clear();
+      const auto saved = recentGamesStore.save(candidate);
+      if (saved) {
+        recentGames = std::move(candidate);
+        refreshRecentGamesMenu();
+      } else {
         qWarning().noquote() << QString::fromStdString(saved.message);
       }
+      return saved;
     });
   genplusgx::input::InputAggregator inputAggregator;
   genplusgx::input::KeyboardInput keyboardInput{&window};
@@ -1073,12 +1091,12 @@ int main(int argc, char* argv[])
   std::uint64_t inputSettingsOperationId = 900'000U;
   window.setInputConfiguration(inputConfiguration);
   const auto applyInputProfile =
-    [&inputConfiguration, &inputSettingsOperationId, &keyboardInput,
-     &controllerInput, &worker](
+    [&inputSettingsOperationId, &keyboardInput, &controllerInput, &worker](
+      const genplusgx::input::InputConfiguration& source,
       const std::string& name) {
-      const auto found = std::ranges::find_if(inputConfiguration.profiles,
+      const auto found = std::ranges::find_if(source.profiles,
         [&name](const auto& profile) { return profile.name == name; });
-      if (found == inputConfiguration.profiles.end()) {
+      if (found == source.profiles.end()) {
         return false;
       }
       const auto* profile = &*found;
@@ -1110,7 +1128,8 @@ int main(int argc, char* argv[])
     };
   const auto applyActiveInputProfile =
     [&applyInputProfile, &inputConfiguration] {
-      return applyInputProfile(inputConfiguration.activeProfile);
+      return applyInputProfile(
+        inputConfiguration, inputConfiguration.activeProfile);
     };
   if (!applyActiveInputProfile()) {
     recordStartupIssue(
@@ -1120,31 +1139,68 @@ int main(int argc, char* argv[])
   window.setInputConfigurationSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &globalGameSettings, &inputConfiguration, &inputProfileStore,
-     &applyActiveInputProfile, &applyInputProfile, &window](
+     &applyInputProfile, &window](
       const genplusgx::input::InputConfiguration& configuration) {
-      inputConfiguration = configuration;
-      bool appliedOverride = false;
+      auto requestedProfile = configuration.activeProfile;
       if (activePerGameIdentity && activePerGameSettings.inputProfile) {
-        appliedOverride = applyInputProfile(*activePerGameSettings.inputProfile);
+        const auto overrideExists = std::ranges::any_of(
+          configuration.profiles, [&activePerGameSettings](const auto& profile) {
+            return profile.name == *activePerGameSettings.inputProfile;
+          });
+        if (overrideExists) {
+          requestedProfile = *activePerGameSettings.inputProfile;
+        }
       }
-      if (!appliedOverride) {
-        static_cast<void>(applyActiveInputProfile());
-        activeEffectiveSettings.inputProfile = inputConfiguration.activeProfile;
+      const auto rollbackProfile = activeEffectiveSettings.inputProfile.empty()
+        ? inputConfiguration.activeProfile
+        : activeEffectiveSettings.inputProfile;
+      const auto rollback = [&applyInputProfile, &inputConfiguration,
+                             &rollbackProfile] {
+        return applyInputProfile(inputConfiguration, rollbackProfile) ||
+          (rollbackProfile != inputConfiguration.activeProfile &&
+            applyInputProfile(
+              inputConfiguration, inputConfiguration.activeProfile));
+      };
+      if (!applyInputProfile(configuration, requestedProfile)) {
+        const bool rolledBack = rollback();
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = std::string{
+            "The selected input profile could not be applied to the runtime."} +
+            (rolledBack ? "" : " The previous runtime profile could not be restored."),
+        };
       }
       const auto saved = inputProfileStore.save(configuration);
       if (!saved) {
         qWarning().noquote() << QString::fromStdString(saved.message);
-      } else if (activePerGameIdentity) {
+        auto failure = genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::fileWriteFailed,
+          .message = saved.message,
+        };
+        if (!rollback()) {
+          failure.message += " The previous runtime profile could not be restored.";
+        }
+        return failure;
+      }
+      inputConfiguration = configuration;
+      activeEffectiveSettings.inputProfile = requestedProfile;
+      if (activePerGameIdentity) {
         window.setPerGameSettingsSession(
           activePerGameSettings, globalGameSettings());
       }
+      return genplusgx::PersistenceStatus{};
     });
   window.setControllerAssignmentSink(
     [&controllerInput, &window](std::uint32_t instanceId, std::size_t player) {
       if (!controllerInput.assignPlayer(instanceId, player)) {
         qWarning() << "A controller player assignment was rejected.";
+        return genplusgx::PersistenceStatus{
+          .error = genplusgx::PersistenceError::invalidData,
+          .message = "The selected controller or player slot is no longer available.",
+        };
       }
       window.setConnectedControllers(controllerInput.controllers());
+      return genplusgx::PersistenceStatus{};
     });
   keyboardInput.attach(*window.displayWidget());
   std::uint64_t inputOperationId = 1'000'000U;
@@ -1225,7 +1281,7 @@ int main(int argc, char* argv[])
         return workerPersistenceFailure(volume.message);
       }
       audioOutput.setMuted(settings.audio.muted);
-      if (!applyInputProfile(settings.inputProfile)) {
+      if (!applyInputProfile(inputConfiguration, settings.inputProfile)) {
         return workerPersistenceFailure(
           "The selected input profile could not be applied safely.");
       }
@@ -1879,11 +1935,15 @@ int main(int argc, char* argv[])
           }
           const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-          if (recentGames.add(loadedPath, now)) {
-            refreshRecentGamesMenu();
-            const auto saved = recentGamesStore.save(recentGames);
+          auto recentCandidate = recentGames;
+          if (recentCandidate.add(loadedPath, now)) {
+            const auto saved = recentGamesStore.save(recentCandidate);
             if (!saved) {
               qWarning().noquote() << QString::fromStdString(saved.message);
+              window.showRecentGamesError(saved.message);
+            } else {
+              recentGames = std::move(recentCandidate);
+              refreshRecentGamesMenu();
             }
           }
           if (libraryScansInFlight.empty()) {

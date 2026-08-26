@@ -567,7 +567,12 @@ the unchanged raw core state payload. Wrong-game states are rejected before core
 Settings have a versioned schema with migrations. Global settings are loaded first;
 an existing per-game override is applied only for fields explicitly marked overridden.
 Defaults and validation are pure, testable logic. UI Apply sends a complete validated
-snapshot rather than mutating core globals piecemeal.
+snapshot rather than mutating core globals piecemeal. Video, system, and input changes
+cross a result-bearing composition callback before MainWindow publishes the new snapshot.
+The composition root stages the worker/runtime change, commits the appropriate global or
+per-game store, and rolls runtime state back on commit failure. A rejection keeps the
+editor open, restores menu checks, and reaches a concise dialog while the log retains the
+low-level detail. Controller assignment uses the same typed rejection path.
 
 The screenshot directory is stored independently in
 `config/screenshot-settings.json`. F12 takes one immutable RGB565 copy on the GUI
@@ -688,7 +693,9 @@ entries. `RecentGamesStore` persists schema 1 JSON through the common bounded at
 writer at `config/recent-games.json` and explicitly migrates the legacy schema 0 path
 array. Invalid/future data falls back to an empty in-memory list without rewriting the
 source. Open Recent entries retain full-path tooltips; stale paths are visible but
-disabled, and a clear operation only changes history.
+disabled. Add and clear operations first commit a copied model, then publish it to the
+menu, so an unwritable history file leaves the prior in-memory list intact and produces
+a visible error.
 
 ## Firmware management
 
@@ -906,8 +913,10 @@ existing validated category dialog + category-specific persistence callback
 ```
 
 The category dialogs retain Apply/OK/Cancel/Restore Defaults semantics and their
-existing stores. This keeps a failed BIOS, path, input, or appearance write isolated
-instead of creating a second cross-file transaction format in the settings center.
+existing stores. Failed video, system, and input operations keep the editor open and do
+not publish the staged snapshot; other category stores return the same typed failure to
+their existing dialog. This keeps a failed write isolated instead of creating a second
+cross-file transaction format in the settings center.
 
 ## Shutdown order
 

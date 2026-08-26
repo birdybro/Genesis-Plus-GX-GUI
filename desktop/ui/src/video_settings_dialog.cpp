@@ -117,8 +117,9 @@ VideoSettingsDialog::VideoSettingsDialog(
   connect(buttons->button(QDialogButtonBox::RestoreDefaults), &QPushButton::clicked,
     this, &VideoSettingsDialog::restoreDefaults);
   connect(buttons, &QDialogButtonBox::accepted, this, [this] {
-    apply();
-    accept();
+    if (apply()) {
+      accept();
+    }
   });
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   root->addWidget(buttons);
@@ -161,12 +162,13 @@ void VideoSettingsDialog::setSettings(const settings::VideoSettings& value)
   gameGearExtended_->setChecked(value.core.gameGearExtendedScreen);
 }
 
-void VideoSettingsDialog::apply()
+bool VideoSettingsDialog::apply()
 {
   const auto value = settings();
-  if (settings::validateVideoSettings(value) && settingsSink_) {
-    settingsSink_(value);
+  if (!settings::validateVideoSettings(value)) {
+    return false;
   }
+  return !settingsSink_ || settingsSink_(value);
 }
 
 void VideoSettingsDialog::restoreDefaults()

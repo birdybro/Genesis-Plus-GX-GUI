@@ -15,7 +15,7 @@ class SystemSettingsDialog final : public QDialog {
   Q_OBJECT
 
 public:
-  using SettingsSink = std::function<void(const CoreSystemSettings&)>;
+  using SettingsSink = std::function<bool(const CoreSystemSettings&)>;
 
   explicit SystemSettingsDialog(
     CoreSystemSettings settings,
@@ -26,7 +26,7 @@ public:
   void setSettings(const CoreSystemSettings& settings);
 
 private:
-  void apply();
+  [[nodiscard]] bool apply();
   void restoreDefaults();
 
   QComboBox* hardware_{nullptr};

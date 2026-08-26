@@ -32,7 +32,8 @@ Every successfully loaded game moves to the top of **File → Open Recent**. The
 stores at most 12 absolute paths in the platform application-data directory. A missing
 file remains listed with a **(Missing)** marker but cannot be launched. Choose **Clear
 Recent Games** at the bottom of the submenu to erase the list; doing so does not close
-the game currently running.
+the game currently running. If the history file cannot be committed, the existing menu
+is retained and a Recent Games Error explains the filesystem failure.
 
 The desktop host currently opens these files directly:
 
@@ -243,7 +244,9 @@ disabled. Every quick menu item and dialog control reflects the same active snap
 Settings are saved atomically as `config/video-settings.json` beneath the platform
 application-data directory and restored on the next launch. A malformed or unsupported
 settings file is ignored with a diagnostic and safe defaults; it is not silently
-destroyed.
+destroyed. If a runtime command or settings write fails, the previous display policy and
+menu checks remain active, an error dialog explains the rejection, and **OK** leaves the
+editor open for correction or retry.
 
 The presentation filter controls GPU/Qt scaling. The NTSC filter is separate: it runs
 inside Genesis Plus GX and changes the native framebuffer geometry. Overscan and Game
@@ -274,6 +277,10 @@ are accepted. Specialized core devices—including Sega Mouse, light gun, paddle
 Pad, XE-1AP, Pico, Terebi Oekaki, Graphic Board, and Activator—are available through the
 advanced page subject to the loaded system and port restrictions. See
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md) for mapping semantics and defaults.
+Profile edits are published only after the runtime accepts the complete profile and its
+atomic file commit succeeds. A failure restores the prior keyboard/controller/core
+mapping, keeps the editor open, and reports the cause. A controller assignment rejected
+after hot-unplug is likewise shown instead of being accepted silently.
 
 ## Appearance and accessibility
 
@@ -354,7 +361,9 @@ System choices define machine initialization, so applying them never rewrites a 
 that is already running. The dialog and status bar state that the complete snapshot
 takes effect on the next game load. Closing and reopening the game is sufficient; the
 application itself does not need to restart. This boundary also ensures save data is
-flushed before a different emulated hardware model is created.
+flushed before a different emulated hardware model is created. A worker or persistence
+failure keeps the prior system snapshot, leaves the dialog open, and presents a System
+Settings Error.
 
 ## BIOS settings
 

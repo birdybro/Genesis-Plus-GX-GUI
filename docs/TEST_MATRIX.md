@@ -16,9 +16,9 @@ ctest --preset debug -L gui --output-on-failure
 | Product area | Automated behavior | Primary CTest |
 | --- | --- | --- |
 | Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, loaded system/region, measured/invalid FPS, bounded/deduplicated startup issues, audio recovery errors, About, exit | `gui.main_window`, `unit.frame_pacer` |
-| Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, platform paths, typed editor routing, one-dialog ownership, loaded-game gating | `gui.settings`, `gui.appearance_accessibility` |
+| Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, typed editor routing, loaded-game gating, visible rejection with prior snapshot/menu preservation | `gui.settings`, `gui.main_window`, `gui.input_configuration`, `gui.appearance_accessibility` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
-| Loading | Injected Open dialog, invalid input errors, drag/drop, recent history, replace/close, live generated-ROM frame | `gui.game_loading` |
+| Loading | Injected Open dialog, invalid input errors, drag/drop, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `gui.game_loading`, `gui.main_window` |
 | Emulation controls | Live Pause/Resume, hard/soft reset, independent fast-forward hold/toggle composition, focus-safe hold release, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
 | Save states | Slots 0–9, save/load/delete, timestamps, changed execution, deterministic restore, wrong-game rejection | `gui.save_state_workflow`, `gui.main_window` |
 | Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, Apply/Cancel/defaults | `gui.main_window`, `gui.display_widget` |

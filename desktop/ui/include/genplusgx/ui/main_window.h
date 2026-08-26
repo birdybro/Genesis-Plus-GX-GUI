@@ -82,21 +82,22 @@ enum class EmulationUiOperation {
 class MainWindow final : public QMainWindow {
 public:
   using InputConfigurationSink =
-    std::function<void(const input::InputConfiguration&)>;
+    std::function<PersistenceStatus(const input::InputConfiguration&)>;
   using ControllerAssignmentSink =
-    std::function<void(std::uint32_t, std::size_t)>;
+    std::function<PersistenceStatus(std::uint32_t, std::size_t)>;
   using GameLoadSink = std::function<void(const std::filesystem::path&)>;
   using GameCloseSink = std::function<void()>;
-  using ClearRecentGamesSink = std::function<void()>;
+  using ClearRecentGamesSink = std::function<PersistenceStatus()>;
   using StateOperationSink =
     std::function<void(StateUiOperation, std::uint32_t)>;
   using EmulationControlSink =
     std::function<bool(EmulationUiOperation, bool)>;
   using VideoSettingsSink =
-    std::function<void(const settings::VideoSettings&)>;
+    std::function<PersistenceStatus(const settings::VideoSettings&)>;
   using AudioSettingsSink =
     std::function<void(const settings::AudioSettings&)>;
-  using SystemSettingsSink = std::function<void(const CoreSystemSettings&)>;
+  using SystemSettingsSink =
+    std::function<PersistenceStatus(const CoreSystemSettings&)>;
   using BiosConfigurationSink = std::function<PersistenceStatus(
     const platform::BiosConfiguration&)>;
   using DiscOperationSink = std::function<void(
@@ -225,6 +226,7 @@ public:
   void showPerGameSettings();
   void showPerGameSettingsError(const std::string& detail);
   void setRecentGames(std::vector<std::filesystem::path> paths);
+  void showRecentGamesError(const std::string& detail);
   void setStateSessionReady(bool ready);
   void setStateOperationBusy(bool busy);
   void setStateSlotViews(std::array<StateSlotView, 10> views);
@@ -289,7 +291,7 @@ private:
   void presentGameLoadError(
     const std::filesystem::path& path,
     const std::string& detail);
-  void applyVideoSettings(
+  bool applyVideoSettings(
     const settings::VideoSettings& settings,
     bool notifySink);
   void updateVideoActionChecks();

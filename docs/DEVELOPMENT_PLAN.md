@@ -64,7 +64,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | `b62a1c7` |
 | 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | `63b5a46` |
 | 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | `bcda084` |
-| 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | pending |
+| 53 CUE preflight hardening | COMPLETE | Validate untrusted CUE structure and referenced files before inherited parsing | bounded CUE parser, canonical containment, adapter load/swap gates, tests/docs | 73-test Debug/Release/ASan suites; parser corpus and live mounted-disc preservation | Malformed, oversized, missing, traversal, absolute, and symlink-escaping references never reach the core | `a0c7b6a` |
+| 54 Runtime configuration transactions | COMPLETE | Prevent silent or partial settings/history mutations after startup | result-bearing UI callbacks, runtime/persistence rollback, visible errors, tests/docs | 73-test Debug/Release/ASan suites; rejected video/system/input/assignment/history workflows | Failed worker/store operations preserve the last committed UI and runtime snapshot | pending |
 
 ## Execution policy
 
@@ -3167,5 +3168,56 @@ tracks with sequential indexes, and returns typed errors. Each relative FILE ref
 must canonically remain in the CUE directory and identify a readable non-empty regular
 file within the core's path limit. Both initial load and disc swap invoke this validation
 before changing core state; upstream sector/CDDA decoding remains untouched.
+
+**Commit SHA:** `a0c7b6a`
+
+## Milestone 54 detail
+
+**Status:** COMPLETE
+
+**Goal:** Make post-startup settings and recent-history changes result-bearing,
+visible, and transactional across UI state, runtime state, and persistent storage.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `desktop/ui/include/genplusgx/ui/input_configuration_dialog.h`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/include/genplusgx/ui/system_settings_dialog.h`
+- `desktop/ui/include/genplusgx/ui/video_settings_dialog.h`
+- `desktop/ui/src/input_configuration_dialog.cpp`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/ui/src/per_game_settings_dialog.cpp`
+- `desktop/ui/src/system_settings_dialog.cpp`
+- `desktop/ui/src/video_settings_dialog.cpp`
+- `tests/gui/game_loading_test.cpp`
+- `tests/gui/input_configuration_dialog_test.cpp`
+- `tests/gui/main_window_test.cpp`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/TEST_MATRIX.md`
+- `docs/USER_GUIDE.md`
+
+**Tests added:** MainWindow injects rejected video, system, input-profile, and recent
+history callbacks and requires a subsystem-specific dialog, unchanged committed
+snapshot, restored video menu checks, retained recent menu, and editors that remain open
+after OK fails. Input dialog coverage also requires external profile and controller
+assignment rejection to prevent acceptance and expose an inline validation message.
+
+**Gate evidence:**
+
+- Focused MainWindow, game-loading, input-configuration, and per-game tests pass 4/4.
+- The complete Debug suite passes 73/73 with no new frontend warning.
+- The complete Release suite passes 73/73.
+- The complete ASan/UBSan suite passes 73/73 with no finding.
+
+**Acceptance criteria:** Video and system updates reach the worker and atomically commit
+their global or active per-game layer before MainWindow publishes them; a failed commit
+submits the previous runtime snapshot. Input updates apply a complete candidate profile,
+commit it, and restore the prior keyboard/controller/core mapping on either failure.
+Controller hot-unplug assignment races return a visible typed error. Recent add/clear
+operations commit a copied model before replacing the live menu. Apply/OK cannot close
+an editor after its result-bearing callback rejects the staged value.
 
 **Commit SHA:** pending (recorded by the following milestone)

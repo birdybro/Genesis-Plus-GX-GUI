@@ -82,6 +82,7 @@ private slots:
   void emptyStatusIsDescriptive();
   void runtimeStatusReportsIdentityAndMeasuredFrameRate();
   void startupAndAudioFailuresAreConsolidatedAndVisible();
+  void runtimeConfigurationFailuresAreVisibleAndRejected();
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
@@ -251,6 +252,79 @@ void MainWindowTest::startupAndAudioFailuresAreConsolidatedAndVisible()
     QStringLiteral("unavailable")));
 }
 
+void MainWindowTest::runtimeConfigurationFailuresAreVisibleAndRejected()
+{
+  auto dialogs = std::make_shared<FakeDialogService>();
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+
+  const auto initialVideo = window.videoSettings();
+  window.setVideoSettingsSink([](const auto&) {
+    return genplusgx::PersistenceStatus{
+      .error = genplusgx::PersistenceError::fileWriteFailed,
+      .message = "Injected read-only video settings file.",
+    };
+  });
+  window.findChild<QAction*>(QStringLiteral("integerScaleAction"))->trigger();
+  QCOMPARE(window.videoSettings(), initialVideo);
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("fitScaleAction"))->isChecked());
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("Video Settings Error")));
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("read-only")));
+
+  const auto initialSystem = window.systemSettings();
+  window.setSystemSettingsSink([](const auto&) {
+    return genplusgx::PersistenceStatus{
+      .error = genplusgx::PersistenceError::fileWriteFailed,
+      .message = "Injected system persistence failure.",
+    };
+  });
+  window.showSystemSettings();
+  auto* systemDialog = window.findChild<genplusgx::ui::SystemSettingsDialog*>(
+    QStringLiteral("systemSettingsDialog"));
+  QVERIFY(systemDialog != nullptr);
+  auto* hardware = systemDialog->findChild<QComboBox*>(
+    QStringLiteral("systemHardwareCombo"));
+  hardware->setCurrentIndex(hardware->findData(
+    static_cast<int>(genplusgx::CoreSystemHardware::gameGear)));
+  QTest::mouseClick(systemDialog->findChild<QPushButton*>(
+    QStringLiteral("okSystemSettingsButton")), Qt::LeftButton);
+  QVERIFY(systemDialog->isVisible());
+  QCOMPARE(window.systemSettings(), initialSystem);
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("System Settings Error")));
+  systemDialog->reject();
+
+  window.setInputConfigurationSink([](const auto&) {
+    return genplusgx::PersistenceStatus{
+      .error = genplusgx::PersistenceError::fileWriteFailed,
+      .message = "Injected input profile persistence failure.",
+    };
+  });
+  window.showInputConfiguration();
+  auto* inputDialog = window.findChild<genplusgx::ui::InputConfigurationDialog*>(
+    QStringLiteral("inputConfigurationDialog"));
+  QVERIFY(inputDialog != nullptr);
+  QTest::mouseClick(inputDialog->findChild<QPushButton*>(
+    QStringLiteral("inputOkButton")), Qt::LeftButton);
+  QVERIFY(inputDialog->isVisible());
+  QVERIFY(dialogs->errors.back().contains(
+    QStringLiteral("Input Configuration Error")));
+  inputDialog->reject();
+
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  window.setRecentGames({game.path()});
+  window.setClearRecentGamesSink([] {
+    return genplusgx::PersistenceStatus{
+      .error = genplusgx::PersistenceError::fileWriteFailed,
+      .message = "Injected recent-history persistence failure.",
+    };
+  });
+  window.findChild<QAction*>(QStringLiteral("clearRecentGamesAction"))->trigger();
+  QApplication::processEvents();
+  QVERIFY(window.findChild<QMenu*>(QStringLiteral("openRecentMenu"))->isEnabled());
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("Recent Games Error")));
+}
+
 void MainWindowTest::aboutDialogReportsBuildIdentity()
 {
   genplusgx::ui::MainWindow window;
@@ -287,6 +361,7 @@ void MainWindowTest::videoActionsDriveDisplayPolicy()
   std::vector<genplusgx::settings::VideoSettings> updates;
   window.setVideoSettingsSink([&updates](const auto& settings) {
     updates.push_back(settings);
+    return genplusgx::PersistenceStatus{};
   });
   window.show();
   QApplication::processEvents();
@@ -344,6 +419,7 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   std::vector<genplusgx::settings::VideoSettings> updates;
   window.setVideoSettingsSink([&updates](const auto& settings) {
     updates.push_back(settings);
+    return genplusgx::PersistenceStatus{};
   });
   window.show();
 
@@ -548,6 +624,7 @@ void MainWindowTest::systemSettingsWorkflowIsValidatedAndDeferred()
   std::vector<genplusgx::CoreSystemSettings> updates;
   window.setSystemSettingsSink([&updates](const auto& settings) {
     updates.push_back(settings);
+    return genplusgx::PersistenceStatus{};
   });
 
   window.findChild<QAction*>(QStringLiteral("systemSettingsAction"))->trigger();

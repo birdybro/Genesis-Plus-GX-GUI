@@ -142,6 +142,7 @@ void InputConfigurationDialogTest::profilesDefaultsAndApplySemantics()
     [&applyCount, &applied](const auto& configuration) {
       ++applyCount;
       applied = configuration;
+      return true;
     });
   dialog.show();
 
@@ -203,6 +204,11 @@ void InputConfigurationDialogTest::profilesDefaultsAndApplySemantics()
   QTest::mouseClick(remove, Qt::LeftButton);
   QCOMPARE(profileCombo->count(), 1);
   QCOMPARE(profileCombo->currentText(), QStringLiteral("Default"));
+
+  dialog.setConfigurationSink([](const auto&) { return false; });
+  QVERIFY(!dialog.applyChanges());
+  QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("inputConflictLabel"))->text()
+    .contains(QStringLiteral("could not be applied")));
 }
 
 void InputConfigurationDialogTest::assignmentsAreValidated()
@@ -217,6 +223,7 @@ void InputConfigurationDialogTest::assignmentsAreValidated()
   dialog.setAssignmentSink(
     [&assignments](std::uint32_t id, std::size_t player) {
       assignments.emplace_back(id, player);
+      return true;
     });
   dialog.show();
 
@@ -239,6 +246,10 @@ void InputConfigurationDialogTest::assignmentsAreValidated()
   QCOMPARE(assignments.size(), 2U);
   QCOMPARE(assignments[0], std::make_pair(11U, std::size_t{2U}));
   QCOMPARE(assignments[1], std::make_pair(22U, std::size_t{3U}));
+
+  dialog.setAssignmentSink([](std::uint32_t, std::size_t) { return false; });
+  QVERIFY(!dialog.applyChanges());
+  QVERIFY(conflict->text().contains(QStringLiteral("could not be applied")));
 }
 
 void InputConfigurationDialogTest::mainWindowActionsOpenStablePages()

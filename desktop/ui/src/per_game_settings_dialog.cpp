@@ -275,7 +275,10 @@ void PerGameSettingsDialog::editVideo()
   auto* dialog = new VideoSettingsDialog(video_, this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setSettingsSink(
-    [this](const settings::VideoSettings& value) { video_ = value; });
+    [this](const settings::VideoSettings& value) {
+      video_ = value;
+      return true;
+    });
   dialog->open();
 }
 
@@ -317,7 +320,10 @@ void PerGameSettingsDialog::editSystem()
   }
   auto* dialog = new SystemSettingsDialog(system_, this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
-  dialog->setSettingsSink([this](const CoreSystemSettings& value) { system_ = value; });
+  dialog->setSettingsSink([this](const CoreSystemSettings& value) {
+    system_ = value;
+    return true;
+  });
   dialog->open();
 }
 

@@ -33,8 +33,8 @@ class InputConfigurationDialog final : public QDialog {
   Q_OBJECT
 
 public:
-  using ConfigurationSink = std::function<void(const input::InputConfiguration&)>;
-  using AssignmentSink = std::function<void(std::uint32_t, std::size_t)>;
+  using ConfigurationSink = std::function<bool(const input::InputConfiguration&)>;
+  using AssignmentSink = std::function<bool(std::uint32_t, std::size_t)>;
 
   explicit InputConfigurationDialog(
     input::InputConfiguration configuration,

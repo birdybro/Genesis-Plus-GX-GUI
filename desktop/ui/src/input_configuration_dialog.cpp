@@ -267,11 +267,17 @@ bool InputConfigurationDialog::applyChanges()
       static_cast<std::size_t>(assignmentCombos_[index]->currentData().toUInt()));
   }
   if (configurationSink_) {
-    configurationSink_(configuration_);
+    if (!configurationSink_(configuration_)) {
+      showConflict(tr("The input configuration could not be applied."));
+      return false;
+    }
   }
   if (assignmentSink_) {
     for (const auto& [instanceId, player] : requestedAssignments) {
-      assignmentSink_(instanceId, player);
+      if (!assignmentSink_(instanceId, player)) {
+        showConflict(tr("A controller assignment could not be applied."));
+        return false;
+      }
     }
   }
   return true;

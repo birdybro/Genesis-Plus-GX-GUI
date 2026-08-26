@@ -140,8 +140,9 @@ SystemSettingsDialog::SystemSettingsDialog(
   connect(buttons->button(QDialogButtonBox::RestoreDefaults), &QPushButton::clicked,
     this, &SystemSettingsDialog::restoreDefaults);
   connect(buttons, &QDialogButtonBox::accepted, this, [this] {
-    apply();
-    accept();
+    if (apply()) {
+      accept();
+    }
   });
   connect(buttons, &QDialogButtonBox::rejected, this, &QDialog::reject);
   root->addWidget(buttons);
@@ -178,12 +179,13 @@ void SystemSettingsDialog::setSettings(const CoreSystemSettings& value)
   addressErrors_->setChecked(value.enableAddressErrors);
 }
 
-void SystemSettingsDialog::apply()
+bool SystemSettingsDialog::apply()
 {
   const auto value = settings();
-  if (validateCoreSystemSettings(value) && settingsSink_) {
-    settingsSink_(value);
+  if (!validateCoreSystemSettings(value)) {
+    return false;
   }
+  return !settingsSink_ || settingsSink_(value);
 }
 
 void SystemSettingsDialog::restoreDefaults()

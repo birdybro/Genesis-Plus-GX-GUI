@@ -15,7 +15,7 @@ class VideoSettingsDialog final : public QDialog {
   Q_OBJECT
 
 public:
-  using SettingsSink = std::function<void(const settings::VideoSettings&)>;
+  using SettingsSink = std::function<bool(const settings::VideoSettings&)>;
 
   explicit VideoSettingsDialog(
     settings::VideoSettings settings,
@@ -26,7 +26,7 @@ public:
   void setSettings(const settings::VideoSettings& settings);
 
 private:
-  void apply();
+  [[nodiscard]] bool apply();
   void restoreDefaults();
 
   QComboBox* aspect_{nullptr};

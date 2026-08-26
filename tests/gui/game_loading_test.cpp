@@ -192,6 +192,7 @@ void GameLoadingTest::recentMenuLaunchesValidEntriesAndClears()
   window.setClearRecentGamesSink([&window, &clearCount] {
     ++clearCount;
     window.setRecentGames({});
+    return genplusgx::PersistenceStatus{};
   });
   window.setRecentGames({fixture.path(), missing});
 
