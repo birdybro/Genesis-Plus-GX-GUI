@@ -1,7 +1,8 @@
 # Final Test Report
 
-This report records the Genesis Plus GX GUI 0.1.0 release-candidate verification and
-Linux startup correction performed on 2026-08-26 (America/Denver).
+This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
+Linux startup correction, and first tagged-release log audit performed on 2026-08-26
+(America/Denver).
 
 ## Candidate identity
 
@@ -9,9 +10,9 @@ Linux startup correction performed on 2026-08-26 (America/Denver).
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA
 - Prior full-matrix implementation baseline:
-  `4d2e7d086d6dd0c0a1adb8aa5efbcd8783dca42f`
+  `94c6e4a7e4f8687c60595092f18f6996612e1d47`
 - Branch: `master`
-- Application/package version: `0.1.0`
+- Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
   Qt 6.11.1, and SDL 3.4.14
 - Final report/ledger closure: the commit containing this file; use
@@ -67,11 +68,9 @@ packaging (2).
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`32937516898`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32937516898)
-completed successfully against the prior full-matrix implementation baseline. The
-Linux startup correction receives the same matrix after its non-rewritten push; that
-result is recorded in the final handoff because a commit cannot contain the ID of the
-workflow run that starts after it exists.
+[`32975156830`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32975156830)
+completed successfully against the prior full-matrix implementation baseline containing
+the Linux startup correction.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -99,7 +98,7 @@ root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
 `--version` process smoke. The tree contains 47 files, including the XCB EGL and GLX
 integration plugins, and no cartridge, disc, firmware, SRAM, BRAM, or state payload.
 CPack produces the versioned
-`Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
 closure archive's digest is intentionally not embedded in this packaged report because
 doing so would recursively change the archive.
 
@@ -107,7 +106,33 @@ Hosted packaging produces a Windows x86-64 portable ZIP, Linux x86-64 TGZ, macOS
 ZIP and unsigned DMG, and macOS x86-64 ZIP and unsigned DMG. Runtime verification
 requires the executable, Qt platform/runtime libraries, SDL3, and relevant plugins
 before any artifact can upload. Release publication remains guarded by an authorized
-matching `v0.1.0` tag and was not performed.
+matching version tag.
+
+## Tagged-release log audit
+
+The authorized `v0.1.0` tag triggered Release workflow run
+[`33019452922`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33019452922).
+Linux x86-64, Windows MSVC x64, macOS arm64, and macOS x86-64 each built, ran all 74
+tests with zero failed/skipped/disabled cases, verified their staged runtimes, and
+uploaded package artifacts. The Linux ASan/UBSan suite passed 74/74 with no finding,
+the legacy libretro regression passed, and the assembly job reverified all six archives
+and individual checksums. Final publication alone failed when GitHub's release-asset
+endpoint returned HTTP 400 after a five-minute upload attempt for the 17 MiB Linux TGZ.
+The verified 136 MiB compressed release candidate remained available as a workflow
+artifact; package size and validation were not the cause.
+
+Successful-job logs were audited in full rather than relying on job conclusions.
+Windows reported frontend/test C4244, C4324, C4459, and C4127 warnings; both macOS
+architectures reported corresponding signedness warnings and duplicate static-library
+link entries. Apple Silicon additionally exposed inherited core/common-symbol alignment
+and bundled decoder diagnostics. The frontend conversions and shadowing were corrected,
+intentional cache-line/MSVC ABI padding was documented and narrowly scoped, redundant
+direct links were removed, and Apple core compilation now uses `-fno-common` with
+target-local handling for understood inherited diagnostics. CI and Release builds now
+enable a warning-as-error option only for authored frontend/test targets. Publication
+now creates a draft, uploads and retries each verified asset independently, and promotes
+the release only after the complete set succeeds. Because the published `v0.1.0` tag is
+immutable, the corrected candidate advances to `v0.1.1` rather than moving that tag.
 
 ## Linux startup correction verification
 

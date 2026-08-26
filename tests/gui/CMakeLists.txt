@@ -226,7 +226,6 @@ target_link_libraries(
   genplusgx_save_state_workflow_test
   PRIVATE
     GenesisPlusGX::CoreAdapter
-    GenesisPlusGX::Persistence
     genplusgx::ui
     genplusgx_project_warnings
     genplusgx_test_utilities

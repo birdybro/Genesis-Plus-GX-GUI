@@ -7,6 +7,8 @@ platform documentation.
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-08-26
+
 ### Added
 
 - Native Qt 6 Widgets application for Windows x64, Linux x86-64, macOS Apple Silicon,
@@ -60,6 +62,8 @@ platform documentation.
 - Cooperative 64 KiB identity-hash cancellation for live backup memory, save states,
   metadata, and library workers, plus CUE payload suppression so a library scan does
   not list one disc twice.
+- A CI-only warning-as-error gate for newly authored desktop/frontend and test targets
+  on GCC, Clang, Apple Clang, and MSVC.
 
 ### Changed
 
@@ -76,6 +80,12 @@ platform documentation.
   widget also preflights an OpenGL context and offscreen surface before it can select
   accelerated rendering, preserving the menu bar, empty-game prompt, and status bar by
   falling back to Qt software rendering when OpenGL is unavailable.
+- Cross-platform Release builds are free of the frontend signedness, shadowing,
+  intentional-alignment, and duplicate-static-library warnings found during the first
+  tagged release log audit.
+- GitHub release publication uploads each verified asset independently with bounded
+  retries and keeps the release in draft state until every archive and checksum is
+  present, preventing a transient upload failure from publishing a partial release.
 
 ### Security
 
@@ -86,3 +96,4 @@ platform documentation.
   track references are rejected before the inherited core parser opens them.
 
 [Unreleased]: https://github.com/birdybro/Genesis-Plus-GX-GUI/commits/master
+[0.1.1]: https://github.com/birdybro/Genesis-Plus-GX-GUI/releases/tag/v0.1.1

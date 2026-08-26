@@ -21,16 +21,8 @@ qt_add_executable(genplusgx_desktop main.cpp)
 target_link_libraries(
   genplusgx_desktop
   PRIVATE
-    GenesisPlusGX::Audio
     GenesisPlusGX::AppSupport
-    GenesisPlusGX::Cheats
-    GenesisPlusGX::Diagnostics
-    GenesisPlusGX::Input
-    GenesisPlusGX::Library
-    GenesisPlusGX::Persistence
-    GenesisPlusGX::Platform
     GenesisPlusGX::Screenshots
-    GenesisPlusGX::Settings
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
     genplusgx_project_options

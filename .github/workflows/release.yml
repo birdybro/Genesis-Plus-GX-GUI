@@ -9,7 +9,7 @@ on:
       release_tag:
         description: Version to validate in a non-publishing release rehearsal
         required: true
-        default: v0.1.0
+        default: v0.1.1
 
 permissions:
   contents: read
@@ -72,6 +72,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_TESTING=ON
           -DGENPLUSGX_BUILD_DESKTOP=ON
+          -DGENPLUSGX_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/release --parallel 2
@@ -130,6 +131,7 @@ jobs:
           cmake -S . -B build/release -A x64
           -DBUILD_TESTING=ON
           -DGENPLUSGX_BUILD_DESKTOP=ON
+          -DGENPLUSGX_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/release --config Release --parallel 2
@@ -199,6 +201,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=Release
           -DBUILD_TESTING=ON
           -DGENPLUSGX_BUILD_DESKTOP=ON
+          -DGENPLUSGX_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/release --parallel 2
@@ -269,6 +272,7 @@ jobs:
           -DBUILD_TESTING=ON
           -DGENPLUSGX_BUILD_DESKTOP=ON
           -DGENPLUSGX_ENABLE_SANITIZERS=ON
+          -DGENPLUSGX_WARNINGS_AS_ERRORS=ON
 
       - name: Build
         run: cmake --build build/asan --parallel 2
@@ -303,7 +307,7 @@ jobs:
       - linux-sanitizers
       - legacy-regression
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 45
     permissions:
       contents: write
     steps:
@@ -342,12 +346,39 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$RELEASE_TAG" \
-            release-assets/*.tar.gz \
-            release-assets/*.zip \
-            release-assets/*.dmg \
-            release-assets/*.sha256 \
-            release-assets/SHA256SUMS.txt \
-            --verify-tag \
-            --title "Genesis Plus GX GUI ${RELEASE_TAG#v}" \
-            --generate-notes
+          set -euo pipefail
+          assets=(
+            release-assets/*.tar.gz
+            release-assets/*.zip
+            release-assets/*.dmg
+            release-assets/*.sha256
+            release-assets/SHA256SUMS.txt
+          )
+
+          if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            gh release create "$RELEASE_TAG" \
+              --draft \
+              --verify-tag \
+              --title "Genesis Plus GX GUI ${RELEASE_TAG#v}" \
+              --generate-notes
+          fi
+
+          for asset in "${assets[@]}"; do
+            uploaded=false
+            for attempt in 1 2 3; do
+              if gh release upload "$RELEASE_TAG" "$asset" --clobber; then
+                uploaded=true
+                break
+              fi
+              if (( attempt < 3 )); then
+                echo "Asset upload failed for ${asset}; retrying (${attempt}/3)."
+                sleep "$((attempt * 10))"
+              fi
+            done
+            if [[ "$uploaded" != true ]]; then
+              echo "::error::Could not upload release asset after three attempts: ${asset}"
+              exit 1
+            fi
+          done
+
+          gh release edit "$RELEASE_TAG" --draft=false --latest

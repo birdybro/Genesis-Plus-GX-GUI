@@ -30,6 +30,10 @@ The documentation gate requires every published guide, checks the release-facing
 sections and dependency inventory, rejects stale milestone language, and resolves local
 Markdown links. It never follows external links or requires network access.
 
+Hosted builds enable `GENPLUSGX_WARNINGS_AS_ERRORS`, so a new frontend/test compiler
+warning fails the relevant platform job before CTest. This is intentionally not applied
+wholesale to inherited core or bundled third-party sources.
+
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the

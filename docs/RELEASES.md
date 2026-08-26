@@ -10,13 +10,13 @@ installing dependencies or building packages.
 The Release workflow supports an explicitly non-publishing manual run:
 
 ```bash
-gh workflow run release.yml --ref master -f release_tag=v0.1.0
+gh workflow run release.yml --ref master -f release_tag=v0.1.1
 ```
 
 This path performs the same version validation, native Release builds, complete tests,
 Linux sanitizer suite, legacy libretro regression, package creation, runtime smoke
 checks, checksum validation, and final asset assembly as a tagged release. It uploads a
-`release-candidate-v0.1.0` workflow artifact but cannot execute the GitHub release step.
+`release-candidate-v0.1.1` workflow artifact but cannot execute the GitHub release step.
 
 ## Publishing a release
 
@@ -33,6 +33,8 @@ The tag push starts `.github/workflows/release.yml`. Publishing is structurally 
 all package, sanitizer, and legacy jobs. The final job downloads the four native artifact
 sets, requires all six platform archives and their individual CPack SHA-256 files,
 recomputes every digest, writes `SHA256SUMS.txt`, and only then creates the GitHub release.
+The release remains a draft while each asset uploads independently; failed uploads are
+retried up to three times, and publication occurs only after the final successful upload.
 
 The workflow uses the scoped GitHub token with `contents: write` only in the final job.
 It requires no repository signing, notarization, firmware, ROM, controller, or hardware
@@ -54,7 +56,7 @@ A complete version publishes:
 Verify a downloaded package on Linux with:
 
 ```bash
-sha256sum -c Genesis-Plus-GX-GUI-0.1.0-linux-x86_64.tar.gz.sha256
+sha256sum -c Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz.sha256
 ```
 
 Use `shasum -a 256 -c` on macOS. PowerShell users can compare

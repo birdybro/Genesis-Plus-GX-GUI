@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 project(
   GenesisPlusGXGUI
-  VERSION 0.1.0
+  VERSION 0.1.1
   DESCRIPTION "Native desktop frontend for Genesis Plus GX"
   HOMEPAGE_URL "https://github.com/birdybro/Genesis-Plus-GX-GUI"
   LANGUAGES C CXX
@@ -15,6 +15,11 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
 option(GENPLUSGX_BUILD_DESKTOP "Build the Qt desktop application" ON)
 option(GENPLUSGX_ENABLE_SANITIZERS "Enable AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+option(
+  GENPLUSGX_WARNINGS_AS_ERRORS
+  "Treat warnings in newly authored desktop/frontend targets as errors"
+  OFF
+)
 option(GENPLUSGX_ENABLE_CHD "Enable CHD disc-image support" ON)
 option(GENPLUSGX_ENABLE_TREMOR "Enable bundled Tremor Ogg/Vorbis decoding" ON)
 option(

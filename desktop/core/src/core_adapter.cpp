@@ -485,10 +485,10 @@ CoreResult CoreAdapter::loadGame(const std::filesystem::path& path)
     return owner;
   }
 
-  if (const auto status = validateGameFile(path); !status) {
+  if (const auto validation = validateGameFile(path); !validation) {
     return failure(requiresDiscImage(path) ? CoreError::invalidDiscImage
                                           : CoreError::invalidPath,
-      status.message);
+      validation.message);
   }
   const std::string nativePath = path.string();
 
@@ -1018,8 +1018,8 @@ CoreResult CoreAdapter::changeDisc(const std::filesystem::path& path)
     return failure(CoreError::notSegaCd,
       "Disc operations require an active Sega CD / Mega CD session.");
   }
-  if (const auto status = validateDiscImageFile(path); !status) {
-    return failure(CoreError::invalidDiscImage, status.message);
+  if (const auto validation = validateDiscImageFile(path); !validation) {
+    return failure(CoreError::invalidDiscImage, validation.message);
   }
   const auto nativePath = path.string();
 
@@ -1133,9 +1133,9 @@ CoreResult CoreAdapter::applyAudioSettings(const CoreAudioSettings& settings)
   config.pcm_volume = static_cast<int16>(settings.pcmLevelPercent);
   config.lp_range = static_cast<uint32>(
     (static_cast<std::uint64_t>(settings.lowPassPercent) * 65'536U) / 100U);
-  config.lg = static_cast<uint16>(settings.equalizerLowPercent);
-  config.mg = static_cast<uint16>(settings.equalizerMidPercent);
-  config.hg = static_cast<uint16>(settings.equalizerHighPercent);
+  config.lg = static_cast<int16>(settings.equalizerLowPercent);
+  config.mg = static_cast<int16>(settings.equalizerMidPercent);
+  config.hg = static_cast<int16>(settings.equalizerHighPercent);
   config.hq_fm = settings.highQualityFm ? 1U : 0U;
   config.hq_psg = settings.highQualityPsg ? 1U : 0U;
   config.ym2612 = mameYm2612Type(settings.ym2612Core);
@@ -1151,8 +1151,10 @@ CoreResult CoreAdapter::applyAudioSettings(const CoreAudioSettings& settings)
   }
 
   audio_set_equalizer();
-  psg_config(0, config.psg_preamp,
-    (system_hw & SYSTEM_PBC) == SYSTEM_MD ? 0xff : io_reg[6]);
+  const auto psgPanning = (system_hw & SYSTEM_PBC) == SYSTEM_MD
+    ? 0xffU : static_cast<unsigned int>(io_reg[6]);
+  psg_config(0U, static_cast<unsigned int>(settings.psgLevelPercent),
+    psgPanning);
 
   const bool genesisAudio = (system_hw & SYSTEM_PBC) == SYSTEM_MD;
   if (!genesisAudio && ym2413ModeChanged &&

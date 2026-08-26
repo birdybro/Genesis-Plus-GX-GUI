@@ -313,7 +313,8 @@ GameFileStatus validateCueSheetText(
       "The CUE sheet exceeds the 1 MiB safety limit.");
   }
 
-  for (const unsigned char character : text) {
+  for (const char rawCharacter : text) {
+    const auto character = static_cast<unsigned char>(rawCharacter);
     if ((character < 0x20U && character != '\r' && character != '\n') ||
         character == 0x7FU) {
       return failure(GameFileError::invalidCueSheet,

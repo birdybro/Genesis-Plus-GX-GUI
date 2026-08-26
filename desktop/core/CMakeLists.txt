@@ -213,6 +213,22 @@ if(MSVC)
   target_compile_definitions(
     genplusgx_core_host PRIVATE _CRT_SECURE_NO_WARNINGS
   )
+  # The inherited Musashi state embeds MSVC's deliberately aligned jmp_buf.
+  # C4324 reports that intentional ABI padding when included by the host shim.
+  target_compile_options(genplusgx_core_host PRIVATE /wd4324)
+endif()
+
+if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+  # Keep inherited core/vendor diagnostics separate from the frontend warning gate.
+  # -fno-common also prevents Apple's linker from inferring oversized alignment for
+  # large tentative core globals on arm64.
+  target_compile_options(
+    genplusgx_core
+    PRIVATE
+      $<$<COMPILE_LANGUAGE:C>:-fno-common>
+      $<$<COMPILE_LANGUAGE:C>:-Wno-absolute-value>
+      $<$<COMPILE_LANGUAGE:C>:-Wno-typedef-redefinition>
+  )
 endif()
 
 if(UNIX)

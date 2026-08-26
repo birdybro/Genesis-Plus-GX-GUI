@@ -18,6 +18,10 @@ Hosted CI and release builds pin Qt 6.8.3 and SDL 3.4.14. A newer compatible loc
 or SDL is acceptable; the exact detected versions are printed during configure and in
 the application's Diagnostics dialog.
 
+CI also configures `GENPLUSGX_WARNINGS_AS_ERRORS=ON`. This applies `/WX` or `-Werror`
+only to newly authored desktop/frontend and test targets; inherited emulator and bundled
+decoder sources retain a separate, target-local warning policy for upstream mergeability.
+
 ## Dependency discovery
 
 Qt and SDL must expose `Qt6Config.cmake` and `SDL3Config.cmake`. If they are outside

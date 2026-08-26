@@ -29,6 +29,12 @@ struct AudioRingMetrics final {
   std::size_t peakOccupancyFrames{0};
 };
 
+#if defined(_MSC_VER)
+#pragma warning(push)
+// The sequence counters intentionally occupy separate cache lines. MSVC's C4324
+// diagnoses the resulting padding even though it is the purpose of alignas here.
+#pragma warning(disable : 4324)
+#endif
 class StereoAudioRingBuffer final {
 public:
   explicit StereoAudioRingBuffer(
@@ -70,5 +76,8 @@ private:
   std::atomic<std::uint64_t> missingFrames_{0};
   std::atomic<std::size_t> peakOccupancyFrames_{0};
 };
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif
 
 } // namespace genplusgx

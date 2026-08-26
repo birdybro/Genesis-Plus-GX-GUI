@@ -63,9 +63,10 @@ QImage rgb565Image(
       const auto red5 = static_cast<unsigned>((pixel >> 11U) & 0x1fU);
       const auto green6 = static_cast<unsigned>((pixel >> 5U) & 0x3fU);
       const auto blue5 = static_cast<unsigned>(pixel & 0x1fU);
-      destination[x] = qRgb((red5 << 3U) | (red5 >> 2U),
-        (green6 << 2U) | (green6 >> 4U),
-        (blue5 << 3U) | (blue5 >> 2U));
+      const auto red8 = static_cast<int>((red5 << 3U) | (red5 >> 2U));
+      const auto green8 = static_cast<int>((green6 << 2U) | (green6 >> 4U));
+      const auto blue8 = static_cast<int>((blue5 << 3U) | (blue5 >> 2U));
+      destination[x] = qRgb(red8, green8, blue8);
     }
   }
   return image;

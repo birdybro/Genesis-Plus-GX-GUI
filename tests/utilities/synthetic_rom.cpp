@@ -165,7 +165,8 @@ std::vector<std::uint8_t> makeGenesisRamMarkerRom()
 std::vector<std::uint8_t> makeGenesisSramWriterRom()
 {
   auto rom = makeGenesisRamMarkerRom();
-  std::fill(rom.begin() + static_cast<std::ptrdiff_t>(programAddress), rom.end(), 0U);
+  std::fill(rom.begin() + static_cast<std::ptrdiff_t>(programAddress), rom.end(),
+    std::uint8_t{0U});
   rom[0x1B0U] = static_cast<std::uint8_t>('R');
   rom[0x1B1U] = static_cast<std::uint8_t>('A');
   rom[0x1B2U] = 0xF8U;

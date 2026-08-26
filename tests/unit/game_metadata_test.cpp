@@ -69,7 +69,8 @@ std::vector<std::uint8_t> makeEightBitRom(
   bytes[header + 0x0cU] = 0x34U;
   bytes[header + 0x0dU] = 0x12U;
   bytes[header + 0x0eU] = 0x02U;
-  bytes[header + 0x0fU] = static_cast<std::uint8_t>((region << 4U) | 0x0cU);
+  bytes[header + 0x0fU] = static_cast<std::uint8_t>(
+    (static_cast<unsigned int>(region) << 4U) | 0x0cU);
   return bytes;
 }
 

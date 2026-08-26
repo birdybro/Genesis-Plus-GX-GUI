@@ -20,10 +20,8 @@ int main()
     return 2;
   }
 
-  if (__cplusplus < 202002L) {
-    std::cerr << "The test target was not compiled as C++20\n";
-    return 3;
-  }
+  static_assert(__cplusplus >= 202002L,
+    "The test target must be compiled as C++20 or newer");
 
   std::cout << applicationName << ' ' << version << " (" << commit << ")\n";
   return 0;

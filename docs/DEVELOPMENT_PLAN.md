@@ -71,6 +71,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 57 Composite-disc release hardening | COMPLETE | Unify multi-file disc identity, library ownership, and shutdown cancellation after a full requirements audit | game-file/content hash, persistence, metadata/library scanner, worker cancellation, audit/tests/docs | clean 74-test Debug/Release/ASan suites; libretro; package; exact ten-job hosted matrix | CUE identity covers every track, library avoids track duplicates, and no large hash blocks shutdown | `4d2e7d0` |
 | 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | `70bfa8b` |
 | 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | pending |
+| 60 Tagged release hardening | COMPLETE | Audit every first-release job log, eliminate authored cross-platform warnings, and make asset publication retry-safe | warning policy/fixes, reduced links, release workflow, version/docs | warning-as-error Debug/Release/ASan; 74-test suites; hosted Windows/Linux/macOS matrix and release retry | No authored warning is hidden by a green job; transient upload failure cannot publish a partial release | pending |
 
 ## Execution policy
 
@@ -3479,3 +3480,70 @@ paths.
 **Commit SHA:** pending (resolve with
 `git log -1 -- desktop/video/src/display_widget.cpp`; a commit cannot contain its own
 SHA)
+
+## Milestone 60 detail
+
+**Status:** COMPLETE
+
+**Goal:** Audit every job log from the first authorized tag run, correct issues hidden
+behind successful job conclusions, and make public asset upload transactional and
+resilient before advancing to a new immutable release tag.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `cmake/CompilerWarnings.cmake`
+- `desktop/app/CMakeLists.txt`
+- `desktop/audio/include/genplusgx/audio_ring_buffer.h`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/game_file.cpp`
+- `desktop/screenshots/src/screenshot_service.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/infrastructure/CMakeLists.txt`
+- `tests/infrastructure/infrastructure_test.cpp`
+- `tests/unit/game_metadata_test.cpp`
+- `tests/utilities/synthetic_rom.cpp`
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `README.md`
+- `CHANGELOG.md`
+- `docs/BUILDING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+- `docs/RELEASES.md`
+- `docs/TESTING.md`
+
+**Tests added:** The common warning interface gains an opt-in warning-as-error mode that
+all hosted CI and Release configurations enable. Existing infrastructure, core, unit,
+integration, GUI, package, sanitizer, and release-identity/asset tests remain the
+behavior regression gate; their compilation now fails on a new authored warning.
+
+**Gate evidence:** Authorized tag workflow run
+[`33019452922`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33019452922)
+was inspected job by job. Windows, Linux, macOS arm64, and macOS x86-64 package builds
+all passed 74/74 tests with no skipped or disabled case; ASan/UBSan passed 74/74 with no
+finding; libretro and six-archive checksum assembly passed. The only failed step was the
+final GitHub asset upload, which returned HTTP 400 after five minutes while sending the
+17 MiB Linux archive. Successful logs nevertheless exposed authored MSVC C4244/C4324/
+C4459/C4127 warnings, Apple Clang signedness warnings, and redundant macOS static-link
+entries. Explicit safe conversions, non-shadowing names, a compile-time language check,
+documented intentional cache-line/ABI alignment, reduced direct dependencies, Apple
+`-fno-common`, and target-local inherited diagnostics handling resolve those findings.
+Local warning-as-error Debug, Release, and ASan/UBSan builds and all 74 tests in each
+configuration pass; hosted confirmation and the retried `v0.1.1` publication are
+reported in the final handoff because those workflows can only start after this commit
+is pushed and tagged. A further core-only configure/build audit found that the desktop
+package-metadata test was incorrectly registered when desktop packaging was disabled;
+that test is now scoped to desktop builds and the resulting 53-test core-only
+infrastructure configuration passes.
+
+**Acceptance criteria:** Every supported hosted compiler treats newly authored warnings
+as errors without imposing that policy blindly on the inherited core; audited tests have
+no hidden skip; redundant macOS link entries are removed; a release stays draft until
+all six archives, six neighboring checksums, and the aggregate manifest upload; each
+asset receives bounded retries; an exhausted upload leaves no partial public release;
+and the immutable failed-attempt tag is not moved or force-rewritten.
+
+**Commit SHA:** pending (resolve with
+`git log -1 -- .github/workflows/release.yml`; a commit cannot contain its own SHA)
