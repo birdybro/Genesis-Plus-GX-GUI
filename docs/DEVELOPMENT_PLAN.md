@@ -51,7 +51,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 37 Sanitizer/stress | COMPLETE | ASan/UBSan, lifecycle and long-frame hardening | resource metrics, accelerated stability workload, testing guide | sanitizers and bounded stability test | No new-code sanitizer defects | `34e709f` |
 | 38 Linux CI | COMPLETE | Debug/Release/unit/core/integration/GUI on Ubuntu | GitHub workflow | local action/schema validation and hosted run | Clean Linux matrix definition | `013af97` |
 | 39 Windows CI | COMPLETE | MSVC x64 Debug/Release build and tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean Windows matrix definition | `043a2ee` |
-| 40 macOS CI | IN PROGRESS | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | pending |
+| 40 macOS CI | COMPLETE | Apple Silicon and Intel Debug/Release build/tests | GitHub workflow/platform review | action/schema validation and hosted run | Clean native macOS matrix | `dad6c48` |
 | 41 Packaging | PLANNED | Windows ZIP, macOS app/ZIP or DMG, Linux portable artifact | CPack/deploy scripts | clean install/package smoke checks | Versioned architecture-named artifacts | pending |
 | 42 Release automation | PLANNED | Tagged build/test/checksum/release workflow | release workflow | syntax and dry-path validation | No unauthorized tag/release created | pending |
 | 43 User documentation | PLANNED | Complete build, test, usage, BIOS, input, save, release docs | README and required docs | link/command/content review | Every shipped UI feature documented | pending |
@@ -2350,7 +2350,7 @@ runs retain only bounded build/test diagnostics, and no proprietary fixtures are
 
 ## Milestone 40 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Build and test the complete desktop application natively with Clang on current
 macOS 15 Apple Silicon and Intel hosts in both Debug and Release configurations.
@@ -2358,6 +2358,17 @@ macOS 15 Apple Silicon and Intel hosts in both Debug and Release configurations.
 **Files changed:**
 
 - `.github/workflows/ci.yml`
+- `desktop/core/CMakeLists.txt`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/timing/include/genplusgx/timing/host_timer_resolution.h`
+- `desktop/timing/src/frame_pacer.cpp`
+- `desktop/timing/src/host_timer_resolution.cpp`
+- `desktop/video/src/frame_exchange.cpp`
+- `tests/core/long_running_stability_test.cpp`
+- `tests/core/timing_pacing_test.cpp`
+- `tests/unit/frame_pacer_test.cpp`
+- `docs/ARCHITECTURE.md`
 - `docs/TESTING.md`
 - `docs/DEVELOPMENT_PLAN.md`
 
@@ -2397,12 +2408,15 @@ filesystem, timing, generated-fixture, and stability suites.
   schedule debt after only one missed interval, permanently converting that temporary
   host delay into emulation drift. It now retains a strict eight-frame catch-up window
   and resynchronizes only after gross stalls; focused tests cover both paths.
-- Local Debug, Release, and ASan/UBSan suites remain green (61/61 each) after the shared
-  timing portability fix. Static workflow validation and hosted verification are
-  pending this workflow-bearing commit.
+- Local Debug, Release, and ASan/UBSan suites are green (61/61 each), the inherited
+  libretro target still builds, and `actionlint` 1.7.7 reports no findings.
+- Hosted run `32913281621` passed all ten jobs. Native Apple Silicon Debug and Release
+  finished 61/61 tests in each configuration; native Intel Debug and Release likewise
+  finished 61/61. Linux Debug/Release, Linux ASan/UBSan, both Windows MSVC modes, and the
+  inherited libretro build remained green in the same run.
 
 **Acceptance criteria:** Apple Silicon and Intel runners configure with Clang/Ninja,
 build the full `.app` target and every test, execute Debug and Release headlessly, and
 retain bounded failure diagnostics without proprietary fixtures or signing credentials.
 
-**Commit SHA:** recorded by milestone 41
+**Commit SHA:** `dad6c48`
