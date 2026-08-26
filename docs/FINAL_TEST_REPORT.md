@@ -1,8 +1,8 @@
 # Final Test Report
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
-Linux startup correction, and first tagged-release log audit performed on 2026-08-26
-(America/Denver).
+Linux startup correction, first tagged-release audit, and subsequent complete native
+log/artifact audits performed on 2026-08-26 (America/Denver).
 
 ## Candidate identity
 
@@ -10,7 +10,7 @@ Linux startup correction, and first tagged-release log audit performed on 2026-0
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA
 - Prior full-matrix implementation baseline:
-  `94c6e4a7e4f8687c60595092f18f6996612e1d47`
+  `466626a37b3ecd57039ff0a861fb784a6b76cbe6`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -39,7 +39,7 @@ code produced no compiler warning.
 | Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 75/75 | Passed |
 | Release | Optimized native x86-64 | 75/75 | Passed |
 | ASan + UBSan | Debug instrumentation, leak detection | 75/75 | Passed; no finding |
-| Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; two inherited `const`-qualifier warnings only |
+| Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
 core lifecycle, adapter, persistence, and save-state paths; bounded parser/property
@@ -68,9 +68,8 @@ packaging (3).
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`32975156830`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/32975156830)
-completed successfully against the prior full-matrix implementation baseline containing
-the Linux startup correction.
+[`33023291621`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33023291621)
+completed successfully against the prior full-matrix package-closure implementation.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -85,11 +84,10 @@ the Linux startup correction.
 | macOS Intel x86-64 | Debug | Passed |
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
-Each hosted Debug/Release job ran all 74 registered tests. Package jobs staged and
-verified native runtimes before uploading artifacts. The completed native packaging
-run `32918267812` and non-publishing release rehearsal `32919521105` independently
-passed all supported hosts; the rehearsal assembled and reverified checksums but
-created neither a tag nor a GitHub release.
+Each hosted CMake job ran all 75 registered tests. Package jobs staged and verified
+native runtimes before uploading artifacts. Full logs were read for all ten jobs; the
+only actionable finding was in the separate inherited libretro build and is corrected
+by this candidate's checked save-path construction and warning gate.
 
 ## Packaging results
 
@@ -145,7 +143,19 @@ neither `vc_redist.x64.exe` nor compiler runtime DLLs. The final package closure
 the understood vendor typedef collision to `genplusgx_chd`, locates and installs the
 official redistributable, suppresses only unused D3D/DXC deployment probes, and adds a
 synthetic package regression that fails if the redistributable is absent. Hosted
-confirmation of those changes is required before tagging.
+confirmation of those changes is provided by the next audited run.
+
+Package-closure CI run
+[`33023291621`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33023291621)
+then passed all ten native jobs and every 75-test CMake suite. The Apple typedef and
+Windows deployment warnings were absent. Downloaded Windows archive inspection
+confirmed its checksum, official redistributable, Qt platform runtime, and SDL3, with
+no unused DirectX compiler DLL. The remaining four GCC diagnostics exposed a real
+legacy libretro risk: per-game Sega CD backup paths could silently truncate into a
+256-byte buffer and collide. The release candidate now formats those paths into a
+larger dedicated buffer, rejects overflow explicitly, fixes the two old qualifier
+diagnostics, and promotes both warning classes to errors in CI and release builds.
+Hosted confirmation of this final source correction is required before tagging.
 
 ## Linux startup correction verification
 

@@ -73,6 +73,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | pending |
 | 60 Tagged release hardening | COMPLETE | Audit every first-release job log, eliminate authored cross-platform warnings, and make asset publication retry-safe | warning policy/fixes, reduced links, release workflow, version/docs | warning-as-error Debug/Release/ASan; 74-test suites; hosted Windows/Linux/macOS matrix and release retry | No authored warning is hidden by a green job; transient upload failure cannot publish a partial release | pending |
 | 61 Cross-platform package closure | COMPLETE | Resolve issues found by the warning-gated hosted-log and artifact audit before tagging | Windows runtime/deploy policy, Apple vendor diagnostic scope, package test/docs | warning-as-error Debug/Release/ASan 75-test suites; hosted matrix and archive inspection | Windows testers receive the official compiler runtime; successful macOS logs have no unresolved vendor warning | pending |
+| 62 Legacy save-path hardening | COMPLETE | Resolve the final actionable warning found in the complete hosted-log audit | checked BRAM path builder, legacy warning gates, release evidence | warning-clean legacy link; 75-test Debug/Release/ASan suites; hosted matrix required before tag | No save identity can be silently truncated; legacy diagnostics cannot hide behind a green job | pending |
 
 ## Execution policy
 
@@ -3604,3 +3605,50 @@ audited before the immutable `v0.1.1` tag is created.
 
 **Commit SHA:** pending (resolve with
 `git log -1 -- cmake/VerifyPackage.cmake`; a commit cannot contain its own SHA)
+
+## Milestone 62 detail
+
+**Status:** COMPLETE
+
+**Goal:** Resolve the remaining actionable legacy-frontend diagnostics found by reading
+the complete cross-platform CI logs after all ten jobs had passed.
+
+**Files changed:**
+
+- `libretro/libretro.c`
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+
+**Tests added:** The Linux legacy build in both CI and tagged-release workflows now
+treats format truncation and discarded qualifiers as errors. This is a compile-time
+regression gate around the inherited frontend; the desktop CTest count remains 75.
+
+**Gate evidence:** Exact milestone 61 CI run
+[`33023291621`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33023291621)
+passed all ten jobs and 75/75 tests in every CMake configuration on Linux, Windows,
+macOS arm64, and macOS x86-64. Full-log inspection found no sanitizer, test, authored,
+Apple vendor, or Windows deployment failure, but did find four GCC diagnostics showing
+that per-game Sega CD BRAM paths could exceed the inherited 256-byte buffers. The
+actual 48.9 MB Windows artifact was downloaded: its neighboring checksum verifies, the
+ZIP contains the official 25.6 MB `vc_redist.x64.exe`, Qt Windows platform runtime, and
+SDL3, and it omits the unused DirectX compiler DLLs. The libretro correction raises the
+dedicated BRAM path capacity, checks every formatted result, clears and logs a rejected
+path instead of using a truncated identity, and also makes `extract_name` const-correct.
+A clean local warning-gated legacy build links without any diagnostic. Clean Debug,
+Release, and ASan/UBSan builds each pass 75/75 tests; the sanitizer run enables leak
+detection and immediate ASan/UBSan failure and reports no finding. A fresh Release
+install passes the Linux package verifier and installed `--version` smoke, while its
+17.2 MB TGZ matches the generated neighboring SHA-256 manifest. Exact hosted
+confirmation of this commit is required before the release tag is created.
+
+**Acceptance criteria:** Legacy Sega CD backup paths never alias because of silent
+truncation; an unsupported path fails visibly; both previously tolerated qualifier
+warnings are gone; CI fails if either diagnostic returns; all 75 desktop tests and the
+native hosted matrix pass; all hosted logs and produced artifacts are audited before
+tagging.
+
+**Commit SHA:** pending (resolve with
+`git log -1 -- libretro/libretro.c`; a commit cannot contain its own SHA)

@@ -67,6 +67,8 @@ platform documentation.
 
 ### Fixed
 
+- The legacy libretro frontend now rejects overlong Sega CD BRAM and RAM-cartridge
+  paths instead of silently truncating them, and its CI regression is warning-clean.
 - Windows release archives include Microsoft's official Visual C++ x64 Redistributable
   installer, and package verification rejects incomplete archives.
 - Windows deployment does not probe for unused DirectX shader compilers, and the final

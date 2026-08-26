@@ -84,6 +84,7 @@
 #define M68K_MAX_CYCLES 1107
 #define Z80_MAX_CYCLES 345
 #define OVERCLOCK_FRAME_DELAY 100
+#define BRAM_PATH_CAPACITY 4096
 
 #ifdef M68K_OVERCLOCK_SHIFT
 #ifndef HAVE_OVERCLOCK
@@ -118,10 +119,10 @@ char MS_BIOS_US[256];
 char CD_BIOS_EU[256];
 char CD_BIOS_US[256];
 char CD_BIOS_JP[256];
-char CD_BRAM_JP[256];
-char CD_BRAM_US[256];
-char CD_BRAM_EU[256];
-char CART_BRAM[256];
+char CD_BRAM_JP[BRAM_PATH_CAPACITY];
+char CD_BRAM_US[BRAM_PATH_CAPACITY];
+char CD_BRAM_EU[BRAM_PATH_CAPACITY];
+char CART_BRAM[BRAM_PATH_CAPACITY];
 
 static int vwidth;
 static int vheight;
@@ -158,6 +159,27 @@ static retro_audio_sample_batch_t audio_cb;
 
 enum RetroLightgunInputModes{RetroLightgun, RetroPointer};
 static enum RetroLightgunInputModes retro_gun_mode = RetroLightgun;
+
+static bool set_bram_path(char *path, size_t path_size, char separator,
+                          const char *stem, const char *suffix)
+{
+   int length;
+
+   if (!path || !path_size || !save_dir || !stem || !suffix)
+      return false;
+
+   length = snprintf(path, path_size, "%s%c%s%s", save_dir, separator, stem, suffix);
+   if ((length < 0) || ((size_t)length >= path_size))
+   {
+      path[0] = '\0';
+      if (log_cb)
+         log_cb(RETRO_LOG_ERROR,
+                "[genplus]: Backup RAM path exceeds the supported length; persistence is disabled.\n");
+      return false;
+   }
+
+   return true;
+}
 
 /* Cheat Support */
 #define MAX_CHEATS (150)
@@ -1271,16 +1293,17 @@ static void bram_save(void)
 
 static void extract_name(char *buf, const char *path, size_t size)
 {
-   char *base = strrchr(path, '/');
+   const char *base = strrchr(path, '/');
    if (!base)
       base = strrchr(path, '\\');
 
    if (base)
    {
+      char *extension;
       snprintf(buf, size, "%s", base);
-      base = strrchr(buf, '.');
-      if (base)
-         *base = '\0';
+      extension = strrchr(buf, '.');
+      if (extension)
+         *extension = '\0';
    }
    else
       buf[0] = '\0';
@@ -1401,15 +1424,15 @@ static void check_variables(bool first_run)
 
    if (!var.value || !strcmp(var.value, "per bios"))
    {
-     snprintf(CD_BRAM_EU, sizeof(CD_BRAM_EU), "%s%cscd_E.brm", save_dir, slash);
-     snprintf(CD_BRAM_US, sizeof(CD_BRAM_US), "%s%cscd_U.brm", save_dir, slash);
-     snprintf(CD_BRAM_JP, sizeof(CD_BRAM_JP), "%s%cscd_J.brm", save_dir, slash);
+     set_bram_path(CD_BRAM_EU, sizeof(CD_BRAM_EU), slash, "scd_E", ".brm");
+     set_bram_path(CD_BRAM_US, sizeof(CD_BRAM_US), slash, "scd_U", ".brm");
+     set_bram_path(CD_BRAM_JP, sizeof(CD_BRAM_JP), slash, "scd_J", ".brm");
    }
    else
    {
-     snprintf(CD_BRAM_EU, sizeof(CD_BRAM_EU), "%s%c%s.brm", save_dir, slash, g_rom_name);
-     snprintf(CD_BRAM_US, sizeof(CD_BRAM_US), "%s%c%s.brm", save_dir, slash, g_rom_name);
-     snprintf(CD_BRAM_JP, sizeof(CD_BRAM_JP), "%s%c%s.brm", save_dir, slash, g_rom_name);
+     set_bram_path(CD_BRAM_EU, sizeof(CD_BRAM_EU), slash, g_rom_name, ".brm");
+     set_bram_path(CD_BRAM_US, sizeof(CD_BRAM_US), slash, g_rom_name, ".brm");
+     set_bram_path(CD_BRAM_JP, sizeof(CD_BRAM_JP), slash, g_rom_name, ".brm");
    }
   }
 
@@ -1424,11 +1447,11 @@ static void check_variables(bool first_run)
 
    if (!var.value || !strcmp(var.value, "per cart"))
    {
-     snprintf(CART_BRAM, sizeof(CART_BRAM), "%s%ccart.brm", save_dir, slash);
+     set_bram_path(CART_BRAM, sizeof(CART_BRAM), slash, "cart", ".brm");
    }
    else
    {
-     snprintf(CART_BRAM, sizeof(CART_BRAM), "%s%c%s_cart.brm", save_dir, slash, g_rom_name);
+     set_bram_path(CART_BRAM, sizeof(CART_BRAM), slash, g_rom_name, "_cart.brm");
    }
   }
 
