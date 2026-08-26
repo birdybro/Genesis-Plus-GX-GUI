@@ -23,6 +23,12 @@ endif()
 
 file(REMOVE_RECURSE "${GENPLUSGX_SMOKE_ROOT}")
 file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}")
+if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
+  file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}/config")
+  file(WRITE
+    "${GENPLUSGX_SMOKE_ROOT}/config/audio-settings.json"
+    "{ this is intentionally invalid startup-test JSON")
+endif()
 
 execute_process(
   COMMAND
@@ -72,6 +78,20 @@ foreach(required_message IN ITEMS
       "Log:\n${frontend_log_text}")
   endif()
 endforeach()
+
+if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
+  foreach(required_error_message IN ITEMS
+      "audio settings file"
+      "Startup issues presented:")
+    string(FIND
+      "${frontend_log_text}" "${required_error_message}" error_message_position)
+    if(error_message_position EQUAL -1)
+      message(FATAL_ERROR
+        "Desktop startup did not surface: ${required_error_message}\n"
+        "Log:\n${frontend_log_text}")
+    endif()
+  endforeach()
+endif()
 
 if(NOT EXISTS "${GENPLUSGX_SMOKE_ROOT}/library/game-library.sqlite3")
   message(FATAL_ERROR "Desktop startup did not initialize the library database")

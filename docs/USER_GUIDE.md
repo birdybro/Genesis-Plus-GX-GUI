@@ -326,13 +326,16 @@ clears stale samples, and reconfigures the logical capacity of the same worker-o
 ring; it does not stop the emulation thread or require an application restart. Failure
 to open a newly selected device leaves the previous stream, capacity, and pause state
 active and produces an error dialog. If a configured device is no longer available at
-startup, the application logs the condition and safely opens the system default. SDL
+startup, the application includes the condition in its Startup Issues dialog and safely
+opens the system default. SDL
 audio hot-plug events are drained in bounded batches and refresh an already-open Audio
 Settings device list; if an explicitly
 selected device disconnects while running, playback automatically reopens on the
-current default device without replacing the saved preference. Settings are atomically
-stored as `config/audio-settings.json`; malformed or
-unsupported files fail closed to defaults.
+current default device without replacing the saved preference. If that recovery also
+fails, an Audio Output Unavailable dialog explains that playback is disabled while
+emulation remains usable. Settings are atomically stored as
+`config/audio-settings.json`; malformed or unsupported files fail closed to defaults
+and appear in the consolidated startup report.
 
 ## System settings
 

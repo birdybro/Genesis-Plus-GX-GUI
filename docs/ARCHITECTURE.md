@@ -834,6 +834,16 @@ and bounded timing/audio anomalies without frame-by-frame noise or secrets.
 Dialogs are routed through an interface so GUI tests can replace native file and
 message boxes. Important widgets and actions have stable `objectName` values.
 
+Startup constructs independent services defensively and collects recoverable failures
+with a short subsystem label. Once MainWindow is ready, empty and duplicate messages are
+removed and at most 12 details plus an overflow summary are shown in one asynchronous
+Startup Issues dialog; unaffected services remain available. The same composition path
+is process-tested with deliberately malformed settings. OpenGL initialization reports
+through a display-owned callback before switching to the software painter, failed SDL
+default-device recovery produces an immediate audio dialog, and failure to start the
+emulation worker is fatal and visibly reported after auxiliary workers are stopped.
+Full diagnostic detail remains in the structured log when logging is available.
+
 The composition root installs `FrontendLogger` after platform application directories
 exist and removes it after the final service shutdown record. The Qt message handler
 redacts before serializing one compact JSON object per line; its mutex covers rotation

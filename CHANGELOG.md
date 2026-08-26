@@ -43,6 +43,8 @@ platform documentation.
   ASan/UBSan coverage through CTest.
 - A hermetic full-process smoke test that constructs the real desktop shell, starts its
   services, enters the event loop, and verifies graceful shutdown from structured logs.
+- Consolidated user-visible startup issue reporting, OpenGL-to-software fallback alerts,
+  audio-device recovery errors, and fatal emulation-worker startup diagnostics.
 - Runtime-generated Z80 fixtures covering SG-1000, Mark III, Master System, and Game
   Gear execution, plus generated cartridge-firmware activation tests for every BIOS slot.
 - Reproducible CMake presets, three-platform CI, CPack distributions, checksum gates,

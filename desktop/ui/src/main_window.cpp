@@ -24,6 +24,7 @@
 #include <QApplication>
 #include <QDragEnterEvent>
 #include <QDateTime>
+#include <QDebug>
 #include <QDropEvent>
 #include <QKeyCombination>
 #include <QKeyEvent>
@@ -34,6 +35,7 @@
 #include <QMimeData>
 #include <QSignalBlocker>
 #include <QStatusBar>
+#include <QStringList>
 #include <QTimer>
 #include <QUrl>
 
@@ -1379,6 +1381,47 @@ void MainWindow::showAudioSettingsError(const std::string& detail)
   statusBar()->showMessage(tr("Audio settings could not be applied."), 5'000);
   dialogService_->showError(
     this, tr("Audio Settings Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::showAudioOutputError(const std::string& detail)
+{
+  statusBar()->showMessage(tr("Audio output is unavailable."), 8'000);
+  dialogService_->showError(
+    this, tr("Audio Output Unavailable"), QString::fromStdString(detail));
+}
+
+void MainWindow::showStartupIssues(std::vector<std::string> issues)
+{
+  QStringList uniqueIssues;
+  for (const auto& issue : issues) {
+    const auto text = QString::fromStdString(issue).trimmed();
+    if (!text.isEmpty() && !uniqueIssues.contains(text)) {
+      uniqueIssues.push_back(text);
+    }
+  }
+  if (uniqueIssues.isEmpty()) {
+    return;
+  }
+
+  constexpr qsizetype maximumVisibleIssues = 12;
+  QStringList bullets;
+  const auto visibleCount = std::min(uniqueIssues.size(), maximumVisibleIssues);
+  bullets.reserve(visibleCount + 1);
+  for (qsizetype index = 0; index < visibleCount; ++index) {
+    bullets.push_back(QStringLiteral("• ") + uniqueIssues.at(index));
+  }
+  if (uniqueIssues.size() > visibleCount) {
+    bullets.push_back(tr("• %1 additional issue(s); see the diagnostics log.")
+      .arg(uniqueIssues.size() - visibleCount));
+  }
+  const auto message = tr(
+    "The application started, but some features are unavailable or using safe "
+    "defaults. You can continue using unaffected features.\n\n%1")
+    .arg(bullets.join(u'\n'));
+  qWarning().noquote() << "Startup issues presented:"
+                       << uniqueIssues.size();
+  statusBar()->showMessage(tr("Startup completed with issues."), 10'000);
+  dialogService_->showError(this, tr("Startup Issues"), message);
 }
 
 void MainWindow::showSystemSettings()

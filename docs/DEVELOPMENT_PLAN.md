@@ -62,7 +62,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 48 Settings center | COMPLETE | Replace appearance-only Preferences with eight discoverable settings pages | settings dialog, live summaries, typed routes, platform paths, GUI tests/docs | 71-test Debug/Release suites; eight-page semantics and nested-editor routing | One native Preferences surface reaches every global settings domain without duplicating persistence | `1e9d58e` |
 | 49 Live audio output | COMPLETE | Apply playback-device and latency changes without restart or ring replacement | reconfigurable bounded ring, transactional SDL output, app persistence/rollback, hot-plug UI, tests/docs | 71-test Debug/Release/ASan suites; live paused/running/device/failure/concurrency coverage | Host audio changes are immediate, bounded, rollback-safe, and keep worker ownership stable | `14cb507` |
 | 50 Runtime status | COMPLETE | Report loaded system/region and measured frame rate from live runtime data | bounded timing sampler, app composition, MainWindow status API, tests/docs | 71-test Debug/Release/ASan suites; deterministic sampler and status semantics | Metadata identity and observed cadence remain accurate across pause, replacement, and counter reset without GUI-driven pacing | `b62a1c7` |
-| 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | pending |
+| 51 Process startup smoke | COMPLETE | Exercise the real desktop process through event-loop entry and graceful service shutdown | isolated app-data test hook, cross-platform CMake process harness, tests/docs | 72-test Debug/Release/ASan suites; structured startup/event-loop/renderer/shutdown evidence | Actual executable initializes persistent services and exits cleanly without touching user data | `63b5a46` |
+| 52 Startup error visibility | COMPLETE | Surface recoverable startup, renderer, audio, and service failures without hiding diagnostics | bounded issue collector/dialog, fatal worker alert, renderer/audio callbacks, corrupt-settings process test, docs | 73-test Debug/Release/ASan suites; direct UI and real-process error coverage | Affected features degrade safely while users receive one concise issue report and logs retain detail | pending |
 
 ## Execution policy
 
@@ -3071,5 +3072,50 @@ an explicit test-mode sentinel, absolute data root, and bounded 1–10,000 ms de
 test writes only below its build tree, proves that it entered the real event loop, and
 reaches the log statement emitted only after controller, emulation, state, metadata,
 screenshot, library, and audio services have shut down.
+
+**Commit SHA:** `63b5a46`
+
+## Milestone 52 detail
+
+**Status:** COMPLETE
+
+**Goal:** Turn startup warnings that were visible only in developer logs into concise,
+user-visible failures without preventing unaffected emulator features from working.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/video/include/genplusgx/video/display_widget.h`
+- `desktop/video/src/display_widget.cpp`
+- `tests/gui/CMakeLists.txt`
+- `tests/gui/desktop_startup_smoke.cmake`
+- `tests/gui/main_window_test.cpp`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/TEST_MATRIX.md`
+- `docs/USER_GUIDE.md`
+
+**Tests added:** MainWindow coverage filters empty entries, de-duplicates repeated
+failures, bounds the visible list to 12 items plus a diagnostics summary, and requires
+separate visible audio-device recovery errors. `gui.desktop_startup_error_smoke` injects
+malformed audio settings into an isolated data root and requires both the parser warning
+and proof that the production startup-issues dialog path ran before clean shutdown.
+
+**Gate evidence:**
+
+- Focused MainWindow, normal startup, and corrupt-settings startup tests pass 3/3.
+- The complete Debug suite passes 73/73 with no new frontend warning.
+- The complete Release suite passes 73/73.
+- The complete ASan/UBSan suite passes 73/73 with no finding.
+
+**Acceptance criteria:** Application-data, logging, setting migration/load, library,
+BIOS, audio, state, metadata, screenshot, controller, and initial core-setting failures
+are collected with subsystem context. Empty/duplicate noise is removed and long reports
+are bounded. OpenGL initialization fallback, unrecoverable audio hot-unplug, and fatal
+emulation-worker startup each reach a visible error path. Structured logs remain the
+detailed source, and the app continues whenever its emulation worker is viable.
 
 **Commit SHA:** pending (recorded by the following milestone)

@@ -6,8 +6,10 @@
 #include <QWidget>
 
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <span>
+#include <string>
 #include <vector>
 
 class QLabel;
@@ -29,6 +31,7 @@ public:
   void setAspectMode(AspectMode mode);
   void setScaleMode(ScaleMode mode);
   void setVideoFilter(VideoFilter filter);
+  void setRendererFailureSink(std::function<void(std::string)> sink);
 
   [[nodiscard]] bool hasFrame() const noexcept;
   [[nodiscard]] const CoreVideoFrameInfo& currentFrameInfo() const noexcept;
@@ -59,6 +62,7 @@ private:
   ScaleMode scaleMode_{ScaleMode::fit};
   VideoFilter videoFilter_{VideoFilter::nearest};
   OpenGLCanvas* openGLCanvas_{nullptr};
+  std::function<void(std::string)> rendererFailureSink_;
 };
 
 } // namespace genplusgx::video

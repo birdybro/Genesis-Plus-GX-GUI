@@ -17,6 +17,7 @@
 
 #include <array>
 #include <cmath>
+#include <utility>
 
 namespace genplusgx::video {
 
@@ -284,6 +285,12 @@ void DisplayWidget::setVideoFilter(VideoFilter filter)
   }
 }
 
+void DisplayWidget::setRendererFailureSink(
+  std::function<void(std::string)> sink)
+{
+  rendererFailureSink_ = std::move(sink);
+}
+
 bool DisplayWidget::hasFrame() const noexcept
 {
   return hasFrame_;
@@ -350,11 +357,16 @@ void DisplayWidget::scheduleSoftwareFallback()
   }
   QTimer::singleShot(0, this, [this] {
     if (openGLCanvas_ != nullptr) {
-      qWarning() << "OpenGL renderer initialization failed; using Qt software rendering.";
+      constexpr auto detail =
+        "OpenGL renderer initialization failed; using Qt software rendering.";
+      qWarning() << detail;
       openGLCanvas_->hide();
       openGLCanvas_->deleteLater();
       openGLCanvas_ = nullptr;
       update();
+      if (rendererFailureSink_) {
+        rendererFailureSink_(detail);
+      }
     }
   });
 }

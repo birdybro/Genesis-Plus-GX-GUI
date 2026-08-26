@@ -81,6 +81,7 @@ private slots:
   void menusAndActionsHaveStableSemantics();
   void emptyStatusIsDescriptive();
   void runtimeStatusReportsIdentityAndMeasuredFrameRate();
+  void startupAndAudioFailuresAreConsolidatedAndVisible();
   void aboutDialogReportsBuildIdentity();
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
@@ -211,6 +212,43 @@ void MainWindowTest::runtimeStatusReportsIdentityAndMeasuredFrameRate()
     QStringLiteral("System: —"));
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("fpsStatusLabel"))->text(),
     QStringLiteral("0.0 FPS"));
+}
+
+void MainWindowTest::startupAndAudioFailuresAreConsolidatedAndVisible()
+{
+  auto dialogs = std::make_shared<FakeDialogService>();
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+
+  window.showStartupIssues({});
+  QCOMPARE(dialogs->errors.size(), std::size_t{0});
+
+  std::vector<std::string> issues{
+    "Audio output: no playback device is available.",
+    "",
+    "Audio output: no playback device is available.",
+    "Save-state service: the state directory is not writable.",
+  };
+  for (int index = 0; index < 12; ++index) {
+    issues.push_back("Additional startup issue " + std::to_string(index));
+  }
+  window.showStartupIssues(std::move(issues));
+  QCOMPARE(dialogs->errors.size(), std::size_t{1});
+  const auto startupError = dialogs->errors.back();
+  QVERIFY(startupError.contains(QStringLiteral("Startup Issues")));
+  QCOMPARE(
+    startupError.count(QStringLiteral("no playback device is available")), 1);
+  QVERIFY(startupError.contains(QStringLiteral("safe defaults")));
+  QVERIFY(startupError.contains(QStringLiteral("additional issue(s)")));
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("issues")));
+
+  window.showAudioOutputError("The selected device disconnected and default recovery failed.");
+  QCOMPARE(dialogs->errors.size(), std::size_t{2});
+  QVERIFY(dialogs->errors.back().contains(
+    QStringLiteral("Audio Output Unavailable")));
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("default recovery failed")));
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("unavailable")));
 }
 
 void MainWindowTest::aboutDialogReportsBuildIdentity()

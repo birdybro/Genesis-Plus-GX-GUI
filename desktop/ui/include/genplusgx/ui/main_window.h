@@ -154,6 +154,8 @@ public:
   [[nodiscard]] const settings::AudioSettings& audioSettings() const noexcept;
   void showAudioSettings();
   void showAudioSettingsError(const std::string& detail);
+  void showAudioOutputError(const std::string& detail);
+  void showStartupIssues(std::vector<std::string> issues);
   void setSystemSettings(CoreSystemSettings settings);
   void setSystemSettingsSink(SystemSettingsSink sink);
   [[nodiscard]] const CoreSystemSettings& systemSettings() const noexcept;

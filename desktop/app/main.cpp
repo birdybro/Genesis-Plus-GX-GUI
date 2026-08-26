@@ -33,6 +33,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QMessageBox>
 #include <QTextStream>
 #include <QTimer>
 
@@ -233,20 +234,31 @@ int main(int argc, char* argv[])
   } else {
     applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
   }
+  std::vector<std::string> startupIssues;
+  const auto recordStartupIssue = [&startupIssues](
+    std::string area, const std::string& detail) {
+    if (!detail.empty()) {
+      area += ": " + detail;
+    }
+    startupIssues.push_back(std::move(area));
+  };
   const auto pathsInitialized = applicationPaths.initialize();
   if (!pathsInitialized) {
     qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
     if (automatedTestMode) {
       return 2;
     }
+    recordStartupIssue("Application data", pathsInitialized.message);
   }
   genplusgx::diagnostics::FrontendLogger frontendLogger;
   const auto loggerInitialized = frontendLogger.initialize(
     applicationPaths.logsDirectory() / "frontend.jsonl");
   if (!loggerInitialized || !frontendLogger.install()) {
-    qWarning().noquote() << QString::fromStdString(loggerInitialized
-        ? "The frontend logger could not install its Qt message handler."
-        : loggerInitialized.message);
+    const auto detail = loggerInitialized
+      ? std::string{"The frontend logger could not install its Qt message handler."}
+      : loggerInitialized.message;
+    qWarning().noquote() << QString::fromStdString(detail);
+    recordStartupIssue("Diagnostics logging", detail);
   }
   qInfo().noquote() << "Application startup:" << GENPLUSGX_APP_NAME
                     << GENPLUSGX_VERSION << '(' << GENPLUSGX_GIT_COMMIT << ')';
@@ -256,6 +268,8 @@ int main(int argc, char* argv[])
   if (!loadedAppearanceSettings.status) {
     qWarning().noquote() << QString::fromStdString(
       loadedAppearanceSettings.status.message);
+    recordStartupIssue(
+      "Appearance settings", loadedAppearanceSettings.status.message);
   }
   auto appearanceSettings = loadedAppearanceSettings.settings;
   if (!themeController.apply(appearanceSettings)) {
@@ -266,6 +280,7 @@ int main(int argc, char* argv[])
     const auto migrated = appearanceSettingsStore.save(appearanceSettings);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Appearance settings migration", migrated.message);
     }
   }
   const auto gameLibraryPath =
@@ -278,10 +293,14 @@ int main(int argc, char* argv[])
   const auto gameLibraryInitialized = gameLibrary.initialize();
   if (!gameLibraryInitialized) {
     qWarning().noquote() << QString::fromStdString(gameLibraryInitialized.message);
+    recordStartupIssue("Game library", gameLibraryInitialized.message);
   } else if (gameLibrary.recoveredCorruption()) {
     qWarning().noquote()
       << "A corrupt game-library database was preserved as"
       << genplusgx::ui::pathToQString(gameLibrary.recoveryBackupPath());
+    recordStartupIssue(
+      "Game library",
+      "A corrupt database was preserved and a new library was created.");
   }
   genplusgx::library::GameLibraryScanner gameLibraryScanner{gameLibraryPath};
   const auto gameLibraryScannerStarted = gameLibraryInitialized
@@ -293,18 +312,23 @@ int main(int argc, char* argv[])
   if (!gameLibraryScannerStarted) {
     qWarning().noquote() << QString::fromStdString(
       gameLibraryScannerStarted.message);
+    recordStartupIssue(
+      "Game-library scanner", gameLibraryScannerStarted.message);
   }
   genplusgx::input::InputProfileStore inputProfileStore{
     applicationPaths.configDirectory() / "input-profiles.json"};
   auto loadedInputProfiles = inputProfileStore.load();
   if (!loadedInputProfiles.status) {
     qWarning().noquote() << QString::fromStdString(loadedInputProfiles.status.message);
+    recordStartupIssue(
+      "Input profiles", loadedInputProfiles.status.message);
   }
   auto inputConfiguration = std::move(loadedInputProfiles.configuration);
   if (loadedInputProfiles.migrated) {
     const auto migrated = inputProfileStore.save(inputConfiguration);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Input profile migration", migrated.message);
     }
   }
   genplusgx::RecentGamesStore recentGamesStore{
@@ -312,12 +336,14 @@ int main(int argc, char* argv[])
   auto loadedRecentGames = recentGamesStore.load();
   if (!loadedRecentGames.status) {
     qWarning().noquote() << QString::fromStdString(loadedRecentGames.status.message);
+    recordStartupIssue("Recent games", loadedRecentGames.status.message);
   }
   auto recentGames = std::move(loadedRecentGames.model);
   if (loadedRecentGames.migrated) {
     const auto migrated = recentGamesStore.save(recentGames);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Recent-games migration", migrated.message);
     }
   }
   genplusgx::settings::VideoSettingsStore videoSettingsStore{
@@ -326,12 +352,14 @@ int main(int argc, char* argv[])
   if (!loadedVideoSettings.status) {
     qWarning().noquote() << QString::fromStdString(
       loadedVideoSettings.status.message);
+    recordStartupIssue("Video settings", loadedVideoSettings.status.message);
   }
   auto videoSettings = loadedVideoSettings.settings;
   if (loadedVideoSettings.migrated) {
     const auto migrated = videoSettingsStore.save(videoSettings);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Video settings migration", migrated.message);
     }
   }
 
@@ -341,12 +369,14 @@ int main(int argc, char* argv[])
   if (!loadedAudioSettings.status) {
     qWarning().noquote() << QString::fromStdString(
       loadedAudioSettings.status.message);
+    recordStartupIssue("Audio settings", loadedAudioSettings.status.message);
   }
   auto audioSettings = loadedAudioSettings.settings;
   if (loadedAudioSettings.migrated) {
     const auto migrated = audioSettingsStore.save(audioSettings);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Audio settings migration", migrated.message);
     }
   }
   genplusgx::settings::SystemSettingsStore systemSettingsStore{
@@ -355,12 +385,14 @@ int main(int argc, char* argv[])
   if (!loadedSystemSettings.status) {
     qWarning().noquote() << QString::fromStdString(
       loadedSystemSettings.status.message);
+    recordStartupIssue("System settings", loadedSystemSettings.status.message);
   }
   auto systemSettings = loadedSystemSettings.settings;
   if (loadedSystemSettings.migrated) {
     const auto migrated = systemSettingsStore.save(systemSettings);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("System settings migration", migrated.message);
     }
   }
   genplusgx::settings::ScreenshotSettingsStore screenshotSettingsStore{
@@ -370,12 +402,15 @@ int main(int argc, char* argv[])
   if (!loadedScreenshotSettings.status) {
     qWarning().noquote() << QString::fromStdString(
       loadedScreenshotSettings.status.message);
+    recordStartupIssue(
+      "Screenshot settings", loadedScreenshotSettings.status.message);
   }
   auto screenshotSettings = loadedScreenshotSettings.settings;
   if (loadedScreenshotSettings.migrated) {
     const auto migrated = screenshotSettingsStore.save(screenshotSettings);
     if (!migrated) {
       qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Screenshot settings migration", migrated.message);
     }
   }
   genplusgx::platform::BiosManager biosManager{
@@ -384,6 +419,7 @@ int main(int argc, char* argv[])
   const auto biosLoaded = biosManager.load();
   if (!biosLoaded) {
     qWarning().noquote() << QString::fromStdString(biosLoaded.message);
+    recordStartupIssue("BIOS configuration", biosLoaded.message);
   }
   for (std::size_t index = 0U;
        index < genplusgx::platform::biosSlotCount;
@@ -416,6 +452,9 @@ int main(int argc, char* argv[])
     } else {
       qWarning().noquote() << "Configured audio device is unavailable; using default:"
         << QString::fromStdString(audioSettings.outputDeviceName);
+      recordStartupIssue(
+        "Audio output",
+        "The configured device is unavailable; the system default is in use.");
     }
   }
 
@@ -423,6 +462,7 @@ int main(int argc, char* argv[])
   const auto audioInitialized = audioOutput.initialize();
   if (!audioInitialized) {
     qWarning().noquote() << QString::fromStdString(audioInitialized.message);
+    recordStartupIssue("Audio output", audioInitialized.message);
   } else {
     qInfo().noquote() << "Audio output:"
                       << QString::fromStdString(audioOutput.deviceName());
@@ -435,17 +475,20 @@ int main(int argc, char* argv[])
   const auto stateStorageStarted = stateStorage.start();
   if (!stateStorageStarted) {
     qWarning().noquote() << QString::fromStdString(stateStorageStarted.message);
+    recordStartupIssue("Save-state service", stateStorageStarted.message);
   }
   genplusgx::library::GameMetadataService metadataService;
   const auto metadataServiceStarted = metadataService.start();
   if (!metadataServiceStarted) {
     qWarning().noquote() << QString::fromStdString(metadataServiceStarted.message);
+    recordStartupIssue("Game metadata service", metadataServiceStarted.message);
   }
   genplusgx::screenshots::ScreenshotService screenshotService;
   const auto screenshotServiceStarted = screenshotService.start();
   if (!screenshotServiceStarted) {
     qWarning().noquote() << QString::fromStdString(
       screenshotServiceStarted.message);
+    recordStartupIssue("Screenshot service", screenshotServiceStarted.message);
   }
   genplusgx::EmulationWorker worker{
     64U,
@@ -462,10 +505,20 @@ int main(int argc, char* argv[])
     static_cast<void>(screenshotService.stop());
     static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
+    QMessageBox::critical(
+      nullptr,
+      QObject::tr("Unable to Start Emulation"),
+      QObject::tr(
+        "The emulation service could not start, so the application must close.\n\n%1")
+        .arg(QString::fromStdString(workerStarted.message)));
     return 1;
   }
 
   genplusgx::ui::MainWindow window;
+  window.displayWidget()->setRendererFailureSink(
+    [&window](std::string detail) {
+      window.showStartupIssues({"Video renderer: " + std::move(detail)});
+    });
   std::set<std::int64_t> libraryScansInFlight;
   std::uint64_t libraryScanOperationId = 5'000'000U;
   genplusgx::BoundedQueue<
@@ -510,6 +563,7 @@ int main(int argc, char* argv[])
     if (!refreshed) {
       qWarning().noquote() << QString::fromStdString(refreshed.message);
       window.setGameLibraryAvailable(false, refreshed.message);
+      recordStartupIssue("Game library", refreshed.message);
     } else {
       window.setGameLibraryAvailable(true);
     }
@@ -719,6 +773,8 @@ int main(int argc, char* argv[])
   if (!initialFirmwareSettings) {
     qWarning().noquote() << QString::fromStdString(
       initialFirmwareSettings.message);
+    recordStartupIssue(
+      "BIOS runtime settings", initialFirmwareSettings.message);
   }
   window.setBiosConfigurationSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
@@ -764,6 +820,7 @@ int main(int argc, char* argv[])
       ++videoSettingsOperationId, videoSettings.core));
   if (!initialVideoSettings) {
     qWarning().noquote() << QString::fromStdString(initialVideoSettings.message);
+    recordStartupIssue("Video runtime settings", initialVideoSettings.message);
   }
   window.setVideoSettingsSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
@@ -815,6 +872,7 @@ int main(int argc, char* argv[])
       ++audioSettingsOperationId, audioSettings.core));
   if (!initialAudioSettings) {
     qWarning().noquote() << QString::fromStdString(initialAudioSettings.message);
+    recordStartupIssue("Audio runtime settings", initialAudioSettings.message);
   }
   window.setAudioSettingsSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
@@ -946,6 +1004,7 @@ int main(int argc, char* argv[])
       ++systemSettingsOperationId, systemSettings));
   if (!initialSystemSettings) {
     qWarning().noquote() << QString::fromStdString(initialSystemSettings.message);
+    recordStartupIssue("System runtime settings", initialSystemSettings.message);
   }
   window.setSystemSettingsSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
@@ -1053,7 +1112,11 @@ int main(int argc, char* argv[])
     [&applyInputProfile, &inputConfiguration] {
       return applyInputProfile(inputConfiguration.activeProfile);
     };
-  static_cast<void>(applyActiveInputProfile());
+  if (!applyActiveInputProfile()) {
+    recordStartupIssue(
+      "Input configuration",
+      "The active input profile could not be applied; some controls may be unavailable.");
+  }
   window.setInputConfigurationSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &globalGameSettings, &inputConfiguration, &inputProfileStore,
@@ -1123,6 +1186,7 @@ int main(int argc, char* argv[])
   const auto controllerInitialized = controllerInput.initialize();
   if (!controllerInitialized) {
     qWarning().noquote() << QString::fromStdString(controllerInitialized.message);
+    recordStartupIssue("Controller service", controllerInitialized.message);
   }
 
   const auto applyEffectiveSettings =
@@ -1629,8 +1693,9 @@ int main(int argc, char* argv[])
           << "Selected audio device disconnected; recovered with:"
           << QString::fromStdString(audioOutput.deviceName());
       } else {
-        qWarning().noquote()
-          << QString::fromStdString(audioDeviceEvents.recoveryStatus.message);
+        const auto& detail = audioDeviceEvents.recoveryStatus.message;
+        qWarning().noquote() << QString::fromStdString(detail);
+        window.showAudioOutputError(detail);
       }
     } else if (audioDeviceEvents.formatChanged) {
       qInfo() << "Audio device format changed; SDL stream conversion remains active.";
@@ -2320,6 +2385,14 @@ int main(int argc, char* argv[])
                     << (window.displayWidget()->usesAcceleratedRenderer()
                           ? "OpenGL texture renderer"
                           : "Qt software painter");
+  if (!startupIssues.empty()) {
+    QTimer::singleShot(
+      0,
+      &window,
+      [&window, issues = std::move(startupIssues)]() mutable {
+        window.showStartupIssues(std::move(issues));
+      });
+  }
   if (commandLine.fullscreen) {
     window.setFullscreen(true);
   }
@@ -2336,6 +2409,7 @@ int main(int argc, char* argv[])
   }
   const int result = application.exec();
   eventPump.stop();
+  window.displayWidget()->setRendererFailureSink({});
   keyboardInput.setSnapshotSink({});
   keyboardInput.detach();
   controllerInput.setSnapshotSink({});
