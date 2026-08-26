@@ -1,8 +1,8 @@
 #include "genplusgx/library/game_metadata.h"
 
 #include "genplusgx/game_file.h"
+#include "genplusgx/persistence.h"
 
-#include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
 #include <QString>
@@ -554,7 +554,9 @@ GameMetadataResult parseGameMetadataBytes(
   return result;
 }
 
-GameMetadataResult readGameMetadata(const std::filesystem::path& path)
+GameMetadataResult readGameMetadata(
+  const std::filesystem::path& path,
+  const std::function<bool()>& cancellationRequested)
 {
   if (path.empty()) {
     return failure(GameMetadataError::invalidPath, "No game file was selected.");
@@ -578,52 +580,45 @@ GameMetadataResult readGameMetadata(const std::filesystem::path& path)
       "The selected file exceeds the 16 GiB metadata safety limit.");
   }
 
-  QFile file{pathToQString(path)};
-  if (!file.open(QIODevice::ReadOnly)) {
-    return failure(GameMetadataError::openFailed, "The selected game file cannot be opened.");
-  }
-
-  QCryptographicHash hash{QCryptographicHash::Sha256};
   std::vector<std::uint8_t> header;
   header.reserve(static_cast<std::size_t>(
     std::min<std::uintmax_t>(fileSize, maximumMetadataHeaderBytes)));
   std::uint16_t checksum = 0U;
   bool checksumHighBytePending = false;
   std::uint8_t checksumHighByte = 0U;
-  std::uintmax_t absoluteOffset = 0U;
-  while (!file.atEnd()) {
-    const auto chunk = file.read(64 * 1024);
-    if (chunk.isEmpty() && file.error() != QFileDevice::NoError) {
-      return failure(GameMetadataError::readFailed, "The selected game file could not be read completely.");
-    }
-    hash.addData(chunk);
-    const auto* bytes = reinterpret_cast<const std::uint8_t*>(chunk.constData());
-    const auto count = static_cast<std::size_t>(chunk.size());
-    const auto headerRemaining = maximumMetadataHeaderBytes - header.size();
-    const auto headerCount = std::min(headerRemaining, count);
-    header.insert(header.end(), bytes, bytes + headerCount);
-    for (std::size_t index = 0U; index < count; ++index, ++absoluteOffset) {
-      if (absoluteOffset < 0x200U) {
-        continue;
+  const auto contentHash = hashGameContent(path,
+    [&](std::span<const std::uint8_t> bytes, std::uintmax_t offset) {
+      const auto headerRemaining = maximumMetadataHeaderBytes - header.size();
+      const auto headerCount = std::min(headerRemaining, bytes.size());
+      header.insert(header.end(), bytes.begin(),
+        bytes.begin() + static_cast<std::ptrdiff_t>(headerCount));
+      for (std::size_t index = 0U; index < bytes.size(); ++index) {
+        const auto absoluteOffset = offset + index;
+        if (absoluteOffset < 0x200U) {
+          continue;
+        }
+        if (!checksumHighBytePending) {
+          checksumHighByte = bytes[index];
+          checksumHighBytePending = true;
+        } else {
+          checksum = static_cast<std::uint16_t>(
+            checksum + (static_cast<std::uint16_t>(checksumHighByte) << 8U) +
+            bytes[index]);
+          checksumHighBytePending = false;
+        }
       }
-      if (!checksumHighBytePending) {
-        checksumHighByte = bytes[index];
-        checksumHighBytePending = true;
-      } else {
-        checksum = static_cast<std::uint16_t>(
-          checksum + (static_cast<std::uint16_t>(checksumHighByte) << 8U) +
-          bytes[index]);
-        checksumHighBytePending = false;
-      }
+    }, cancellationRequested);
+  if (!contentHash.status) {
+    if (contentHash.status.error == PersistenceError::cancelled) {
+      return failure(GameMetadataError::cancelled, contentHash.status.message);
     }
+    const auto error = contentHash.status.error == PersistenceError::fileOpenFailed
+      ? GameMetadataError::openFailed : GameMetadataError::readFailed;
+    return failure(error, contentHash.status.message);
   }
-  if (static_cast<std::uintmax_t>(file.pos()) != fileSize) {
-    return failure(GameMetadataError::readFailed, "The selected game file changed while being read.");
-  }
-
-  const QFileInfo after{pathToQString(path)};
-  if (after.size() != before.size() || after.lastModified() != before.lastModified()) {
-    return failure(GameMetadataError::readFailed, "The selected game file changed while being read.");
+  if (contentHash.primaryFileSize != fileSize) {
+    return failure(GameMetadataError::readFailed,
+      "The selected game file changed while metadata was being read.");
   }
 
   auto result = parseGameMetadataBytes(header, path.extension().string(), fileSize);
@@ -631,7 +626,7 @@ GameMetadataResult readGameMetadata(const std::filesystem::path& path)
     return result;
   }
   result.metadata.path = path;
-  result.metadata.sha256 = hash.result().toHex().toStdString();
+  result.metadata.sha256 = contentHash.sha256;
   const auto extension = normalizedExtension(path.extension().string());
   if (result.metadata.system == GameSystem::genesis &&
       result.metadata.headerRecognized && extension != ".smd" &&

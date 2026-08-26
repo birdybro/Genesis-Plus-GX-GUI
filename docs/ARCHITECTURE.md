@@ -603,10 +603,18 @@ ordered with lifecycle commands.
 data location; every test constructs it with an absolute temporary root. Relative roots
 are rejected so persistence can never silently fall back to the process working
 directory. A per-game directory uses a conservative ASCII title slug plus the complete
-lowercase SHA-256 content identifier. Raw cartridge SRAM, CD internal BRAM, and CD RAM
-cartridge files retain distinct stable names. Writes use `QSaveFile` with direct-write
-fallback disabled, so a failed transaction cannot truncate an existing save; reads are
-regular-file checked and size bounded before allocation.
+lowercase SHA-256 content identifier. A single-file game keeps the conventional raw-file
+SHA-256. A CUE game uses a domain-separated, length-framed stream containing the
+validated sheet and each safely resolved track in directive order. Absolute paths are
+never part of that digest, so identical relocated content stays stable while any changed
+data/audio track selects a different save, state, cheat, and override identity. Raw
+cartridge SRAM, CD internal BRAM, and CD RAM cartridge files retain distinct stable
+names. Writes use `QSaveFile` with direct-write fallback disabled, so a failed
+transaction cannot truncate an existing save; reads are regular-file checked and size
+bounded before allocation. The content stream checks cooperative cancellation between
+64 KiB chunks. The core worker supplies its atomic stop request while establishing live
+backup ownership, so shutdown can interrupt a large disc identity without racing core
+globals.
 
 Live backup-memory ownership remains inside the core worker:
 
@@ -646,7 +654,8 @@ storage and reloads it if the core rejects a candidate, making failed loads tran
 
 Save-state UI file work runs on `StateStorageService`, a dedicated bounded worker that
 owns `SaveStateManager`. Activating a successful game computes its content identity and
-scans slots away from the GUI thread. Each summary is `empty`, fully validated
+scans slots away from the GUI thread; the service's atomic stop request can cancel that
+identity stream between chunks. Each summary is `empty`, fully validated
 `available`, or `invalid`; available summaries carry timestamp and emulated frame
 metadata, while invalid entries retain a safe diagnostic and remain deletable. The GUI
 keeps one state operation in flight:
@@ -790,12 +799,15 @@ bounded metadata request queue --> metadata thread --> streaming file reader
 
 `GameMetadataService` owns one non-core worker thread and fixed-capacity command/event
 queues. It streams files in 64 KiB chunks, retains at most the 64 KiB header window,
-and sends owned results back to the GUI event pump. The composition root matches both
-operation ID and path to the still-visible loaded game; stale results after a load or
-close are discarded. The parser contains no core calls and therefore cannot mutate or
-race Genesis Plus GX globals. Genesis, SMD, 8-bit Sega, raw/cooked Sega CD, CUE, and
-conditional CHD paths remain descriptive only. CUE references are constrained to safe
-relative paths before a small data-header read.
+and sends owned results back to the GUI event pump. The shared content stream produces
+the exact persistence identity: raw SHA-256 for one file or the framed CUE-plus-tracks
+digest. It checks an atomic stop request between chunks, allowing service and scanner
+shutdown to interrupt a large ROM, CHD, or multi-track disc hash. The composition root
+matches both operation ID and path to the still-visible loaded game; stale results after
+a load or close are discarded. The parser contains no core calls and therefore cannot
+mutate or race Genesis Plus GX globals. Genesis, SMD, 8-bit Sega, raw/cooked Sega CD,
+CUE, and conditional CHD paths remain descriptive only. CUE references are constrained
+to safe relative paths before hashing or the small data-header read.
 
 ## Game-library database and scanner
 
@@ -814,10 +826,13 @@ Qt library model <-------- query connection ------ SQLite WAL database
 The scanner owns its `GameLibraryDatabase` connection on the scanner thread. A
 connection records its initializing thread and rejects cross-thread use. Recursive and
 flat walks skip permission-denied entries, never follow symlinks, and stop at a fixed
-100,000-file ceiling. Metadata reaches SQLite in bounded batches while one generation
-transaction ensures that cancelled, incomplete, or failed scans cannot delete the last
-complete index. Rescans update file-owned fields but preserve favorite, play-count,
-last-played, and local-artwork state.
+100,000-file ceiling. The bounded candidate pass validates CUE sheets first and records
+their canonical referenced tracks; supported track payloads are then suppressed as
+duplicate rows while unrelated standalone `.bin`/`.iso` files remain eligible. Metadata
+reaches SQLite in bounded batches while one generation transaction ensures that
+cancelled, incomplete, or failed scans cannot delete the last complete index. Rescans
+update file-owned fields but preserve favorite, play-count, last-played, and
+local-artwork state.
 
 The schema is versioned with SQLite `user_version`, enables foreign keys and WAL, and
 validates both `quick_check` and required tables/columns at startup. Corrupt or
@@ -946,8 +961,10 @@ Shutdown is an explicit, idempotent workflow:
    when a save failed;
 3. stop and close the SDL3 audio stream/device;
 4. stop controller input and close its SDL handles on the GUI/owner thread;
-5. stop and join the state, metadata, screenshot, and library-scanner workers, clearing
-   any pending UI operation rather than leaving it busy;
+5. request cooperative cancellation of any in-flight backup, state, metadata, or
+   library identity hash, then stop and join the state, metadata, screenshot, and
+   library-scanner workers, clearing any pending UI operation rather than leaving it
+   busy;
 6. release the bounded display frame exchange after its producer has joined;
 7. aggregate every cleanup failure without replacing a prior nonzero application exit,
    emit the final structured log, and shut down logging;

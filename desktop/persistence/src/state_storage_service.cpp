@@ -2,6 +2,7 @@
 
 #include "genplusgx/bounded_queue.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <system_error>
@@ -103,7 +104,7 @@ public:
     activeIdentity_.reset();
     activeGeneration_ = 0U;
     activeHardware_ = 0U;
-    stopRequested_ = false;
+    stopRequested_.store(false, std::memory_order_release);
     acceptingCommands_ = true;
     shutdownStatus_ = success();
     owner_.state_.store(StateStorageServiceState::starting, std::memory_order_release);
@@ -142,7 +143,8 @@ public:
     }
 
     std::scoped_lock lock{mutex_};
-    if (!acceptingCommands_ || stopRequested_) {
+    if (!acceptingCommands_ ||
+        stopRequested_.load(std::memory_order_acquire)) {
       return failure(
         StateStorageError::notRunning,
         "The save-state storage service is not accepting commands.");
@@ -166,7 +168,7 @@ public:
         return shutdownStatus_;
       }
       acceptingCommands_ = false;
-      stopRequested_ = true;
+      stopRequested_.store(true, std::memory_order_release);
       owner_.state_.store(StateStorageServiceState::stopping, std::memory_order_release);
       wake_.notify_all();
       eventReady_.notify_all();
@@ -221,8 +223,12 @@ private:
       std::optional<StateStorageCommand> command;
       {
         std::unique_lock lock{mutex_};
-        wake_.wait(lock, [this] { return stopRequested_ || !commands_.empty(); });
-        if (commands_.empty() && stopRequested_) {
+        wake_.wait(lock, [this] {
+          return stopRequested_.load(std::memory_order_acquire) ||
+            !commands_.empty();
+        });
+        if (commands_.empty() &&
+            stopRequested_.load(std::memory_order_acquire)) {
           break;
         }
         command = commands_.pop();
@@ -269,7 +275,9 @@ private:
       activeIdentity_.reset();
       activeGeneration_ = 0U;
       activeHardware_ = 0U;
-      const auto identified = identifyGame(command.path);
+      const auto identified = identifyGame(command.path, {}, [this] {
+        return stopRequested_.load(std::memory_order_acquire);
+      });
       if (!identified.status) {
         event.error = StateStorageError::persistenceFailure;
         event.message = identified.status.message;
@@ -388,7 +396,7 @@ private:
   std::condition_variable eventReady_;
   std::thread thread_;
   bool acceptingCommands_{false};
-  bool stopRequested_{false};
+  std::atomic_bool stopRequested_{false};
   StateStorageStatus shutdownStatus_;
   std::uint64_t droppedEvents_{0};
 };

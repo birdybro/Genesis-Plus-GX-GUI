@@ -54,6 +54,12 @@ platform documentation.
   Gear execution, plus generated cartridge-firmware activation tests for every BIOS slot.
 - Reproducible CMake presets, three-platform CI, CPack distributions, checksum gates,
   and guarded tag-driven release automation.
+- Composite Sega CD identities that hash a validated CUE and all referenced track
+  content, preventing same-text sheets from sharing saves, states, cheats, overrides,
+  or library identifiers while remaining stable after relocation.
+- Cooperative 64 KiB identity-hash cancellation for live backup memory, save states,
+  metadata, and library workers, plus CUE payload suppression so a library scan does
+  not list one disc twice.
 
 ### Changed
 

@@ -13,7 +13,7 @@ target_include_directories(
 target_link_libraries(
   genplusgx_persistence
   PUBLIC GenesisPlusGX::FrontendTypes Qt6::Core
-  PRIVATE genplusgx_project_warnings
+  PRIVATE GenesisPlusGX::GameFiles genplusgx_project_warnings
 )
 set_target_properties(
   genplusgx_persistence PROPERTIES OUTPUT_NAME genplusgx_persistence

@@ -4,6 +4,7 @@
 #include "genplusgx/timing/host_timer_resolution.h"
 
 #include <array>
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <system_error>
@@ -204,7 +205,7 @@ public:
     commands_.clear();
     events_.clear();
     latestFrame_.reset();
-    stopRequested_ = false;
+    stopRequested_.store(false, std::memory_order_release);
     shutdownStatus_ = success();
     acceptingCommands_ = true;
     fastForward_ = false;
@@ -230,7 +231,8 @@ public:
     }
 
     std::scoped_lock lock{mutex_};
-    if (!acceptingCommands_ || stopRequested_) {
+    if (!acceptingCommands_ ||
+        stopRequested_.load(std::memory_order_acquire)) {
       return failure(
         EmulationWorkerError::notRunning,
         "The emulation worker is not accepting commands.");
@@ -324,7 +326,7 @@ public:
         return shutdownStatus_;
       }
       acceptingCommands_ = false;
-      stopRequested_ = true;
+      stopRequested_.store(true, std::memory_order_release);
       owner_.state_.store(EmulationWorkerState::stopping, std::memory_order_release);
       wake_.notify_all();
       eventReady_.notify_all();
@@ -395,7 +397,9 @@ private:
     if (!backupPersistence_) {
       return {};
     }
-    const auto begun = backupPersistence_->beginGame(path);
+    const auto begun = backupPersistence_->beginGame(path, [this] {
+      return stopRequested_.load(std::memory_order_acquire);
+    });
     if (!begun) {
       return persistenceFailure(
         "Unable to establish per-game save storage: " + begun.message);
@@ -496,7 +500,7 @@ private:
       bool executeFrame = false;
       {
         std::unique_lock lock{mutex_};
-        if (stopRequested_) {
+        if (stopRequested_.load(std::memory_order_acquire)) {
           break;
         }
         if (!commands_.empty()) {
@@ -519,7 +523,7 @@ private:
             sleepUntilHostDeadline(*deadline);
             lock.lock();
           }
-          if (stopRequested_) {
+          if (stopRequested_.load(std::memory_order_acquire)) {
             break;
           }
           if (!commands_.empty()) {
@@ -528,8 +532,11 @@ private:
             executeFrame = true;
           }
         } else {
-          wake_.wait(lock, [this] { return stopRequested_ || !commands_.empty(); });
-          if (stopRequested_) {
+          wake_.wait(lock, [this] {
+            return stopRequested_.load(std::memory_order_acquire) ||
+              !commands_.empty();
+          });
+          if (stopRequested_.load(std::memory_order_acquire)) {
             break;
           }
           command = commands_.pop();
@@ -941,7 +948,7 @@ private:
   std::thread thread_;
   int audioSampleRate_;
   bool acceptingCommands_{false};
-  bool stopRequested_{false};
+  std::atomic_bool stopRequested_{false};
   bool fastForward_{false};
   EmulationWorkerStatus shutdownStatus_;
   std::shared_ptr<VideoFrameExchange> videoFrames_;

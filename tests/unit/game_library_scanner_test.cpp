@@ -6,6 +6,7 @@
 #include <QCoreApplication>
 #include <QTemporaryDir>
 
+#include <algorithm>
 #include <chrono>
 #include <cstdint>
 #include <filesystem>
@@ -90,9 +91,17 @@ int main(int argc, char* argv[])
   const auto topGame = root / "top.md";
   const auto nestedGame = nested / "nested.sg";
   const auto ignored = root / "notes.txt";
+  const auto cuePath = root / "disc.cue";
+  const auto cueTrackPath = root / "track.bin";
+  constexpr std::string_view cueText{
+    "FILE \"track.bin\" BINARY\n"
+    "  TRACK 01 MODE1/2048\n"
+    "    INDEX 01 00:00:00\n"};
   const std::array<std::uint8_t, 4> sgBytes{1U, 2U, 3U, 4U};
   if (!check(writeBytes(topGame, genplusgx::test::makeGenesisRamMarkerRom()) &&
-      writeBytes(nestedGame, sgBytes) && writeText(ignored, "not a game"),
+      writeBytes(nestedGame, sgBytes) && writeText(ignored, "not a game") &&
+      writeText(cuePath, cueText) &&
+      writeBytes(cueTrackPath, genplusgx::test::makeSegaCdDiscImage()),
       "Scanner fixtures could not be written")) {
     return 3;
   }
@@ -132,18 +141,26 @@ int main(int argc, char* argv[])
   }
   const auto first = waitForResult(scanner, 10U);
   if (!check(first && first->succeeded() &&
-      first->summary.visitedFiles == 2U &&
-      first->summary.supportedFiles == 1U &&
-      first->summary.indexedGames == 1U,
-      "Non-recursive library scan summary was incorrect")) {
+      first->summary.visitedFiles == 4U &&
+      first->summary.supportedFiles == 2U &&
+      first->summary.indexedGames == 2U,
+      "Non-recursive scan did not suppress a CUE track duplicate")) {
     return 9;
   }
   {
     GameLibraryDatabase database{databasePath};
-    if (!check(database.initialize() && database.games().games.size() == 1U &&
-        database.games().games.front().metadata.path == topGame &&
-        database.updateDirectory(directoryId, true),
-        "Non-recursive scan result or recursive update was incorrect")) {
+    const auto initialized = database.initialize();
+    const auto games = database.games();
+    const bool cueIndexed = std::ranges::any_of(games.games, [&cuePath](const auto& game) {
+      return game.metadata.path == cuePath;
+    });
+    const bool trackIndexed = std::ranges::any_of(
+      games.games, [&cueTrackPath](const auto& game) {
+        return game.metadata.path == cueTrackPath;
+      });
+    if (!check(initialized && games.games.size() == 2U &&
+        cueIndexed && !trackIndexed && database.updateDirectory(directoryId, true),
+        "CUE library ownership or recursive update was incorrect")) {
       return 10;
     }
   }
@@ -154,9 +171,9 @@ int main(int argc, char* argv[])
   }
   const auto second = waitForResult(scanner, 11U);
   if (!check(second && second->succeeded() &&
-      second->summary.visitedFiles == 3U &&
-      second->summary.supportedFiles == 2U &&
-      second->summary.indexedGames == 2U,
+      second->summary.visitedFiles == 5U &&
+      second->summary.supportedFiles == 3U &&
+      second->summary.indexedGames == 3U,
       "Recursive library scan summary was incorrect")) {
     return 12;
   }
@@ -164,8 +181,8 @@ int main(int argc, char* argv[])
     GameLibraryDatabase database{databasePath};
     const auto initialized = database.initialize();
     const auto games = database.games();
-    if (!check(initialized && games.status && games.games.size() == 2U,
-        "Recursive scan did not index both generated games")) {
+    if (!check(initialized && games.status && games.games.size() == 3U,
+        "Recursive scan did not index the launchable generated games")) {
       return 13;
     }
   }
@@ -186,9 +203,17 @@ int main(int argc, char* argv[])
     GameLibraryDatabase database{databasePath};
     const auto initialized = database.initialize();
     const auto games = database.games();
-    if (!check(initialized && games.status && games.games.size() == 1U &&
-        games.games.front().metadata.system == GameSystem::sg1000 &&
-        games.games.front().metadata.path == nestedGame,
+    const bool nestedIndexed = std::ranges::any_of(
+      games.games, [&nestedGame](const auto& game) {
+        return game.metadata.system == GameSystem::sg1000 &&
+          game.metadata.path == nestedGame;
+      });
+    const bool cueStillIndexed = std::ranges::any_of(
+      games.games, [&cuePath](const auto& game) {
+        return game.metadata.path == cuePath;
+      });
+    if (!check(initialized && games.status && games.games.size() == 2U &&
+        nestedIndexed && cueStillIndexed,
         "Final scanner database contents were incorrect")) {
       return 16;
     }
@@ -208,7 +233,7 @@ int main(int argc, char* argv[])
   }
   {
     GameLibraryDatabase database{databasePath};
-    if (!check(database.initialize() && database.games().games.size() == 1U,
+    if (!check(database.initialize() && database.games().games.size() == 2U,
         "Failed scan damaged the previous complete library index")) {
       return 19;
     }

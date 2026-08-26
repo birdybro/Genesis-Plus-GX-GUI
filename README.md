@@ -119,7 +119,9 @@ library/      SQLite game-library index and local metadata
 logs/         Rotating JSON Lines frontend logs
 ```
 
-Games and state files are keyed by SHA-256 identity to avoid same-title collisions.
+Single-file games use their raw SHA-256. CUE games use one domain-separated SHA-256
+over the validated sheet and every referenced track, so matching sheet text cannot
+make different discs share saves, states, cheats, or settings.
 Tests always inject temporary roots and never touch this real directory.
 
 ## Building from source
@@ -175,6 +177,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)
+- [Requirements audit](docs/REQUIREMENTS_AUDIT.md)
 - [Final test report](docs/FINAL_TEST_REPORT.md)
 - [Changelog](CHANGELOG.md) and [third-party notices](THIRD_PARTY_NOTICES.md)
 

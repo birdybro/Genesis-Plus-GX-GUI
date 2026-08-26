@@ -2,6 +2,7 @@
 
 #include "genplusgx/bounded_queue.h"
 
+#include <atomic>
 #include <condition_variable>
 #include <mutex>
 #include <system_error>
@@ -42,7 +43,7 @@ public:
     }
     commands_.clear();
     events_.clear();
-    stopRequested_ = false;
+    stopRequested_.store(false, std::memory_order_release);
     accepting_ = true;
     shutdownStatus_ = {};
     try {
@@ -66,7 +67,7 @@ public:
         "Metadata requests require a nonzero operation ID and game path.");
     }
     std::scoped_lock lock{mutex_};
-    if (!accepting_ || stopRequested_) {
+    if (!accepting_ || stopRequested_.load(std::memory_order_acquire)) {
       return failure(
         GameMetadataServiceError::notRunning,
         "The game metadata service is not accepting requests.");
@@ -102,7 +103,7 @@ public:
         return shutdownStatus_;
       }
       accepting_ = false;
-      stopRequested_ = true;
+      stopRequested_.store(true, std::memory_order_release);
       commands_.clear();
       wake_.notify_all();
       eventReady_.notify_all();
@@ -122,8 +123,11 @@ private:
       std::optional<MetadataCommand> command;
       {
         std::unique_lock lock{mutex_};
-        wake_.wait(lock, [this] { return stopRequested_ || !commands_.empty(); });
-        if (stopRequested_) {
+        wake_.wait(lock, [this] {
+          return stopRequested_.load(std::memory_order_acquire) ||
+            !commands_.empty();
+        });
+        if (stopRequested_.load(std::memory_order_acquire)) {
           break;
         }
         command = commands_.pop();
@@ -131,7 +135,13 @@ private:
       if (!command) {
         continue;
       }
-      auto result = readGameMetadata(command->path);
+      auto result = readGameMetadata(command->path, [this] {
+        return stopRequested_.load(std::memory_order_acquire);
+      });
+      if (result.status.error == GameMetadataError::cancelled &&
+          stopRequested_.load(std::memory_order_acquire)) {
+        break;
+      }
       GameMetadataEvent event;
       event.type = result.status
         ? GameMetadataEventType::metadataReady
@@ -167,7 +177,7 @@ private:
   std::thread thread_;
   GameMetadataServiceStatus shutdownStatus_;
   bool accepting_{false};
-  bool stopRequested_{false};
+  std::atomic_bool stopRequested_{false};
 };
 
 GameMetadataService::GameMetadataService(

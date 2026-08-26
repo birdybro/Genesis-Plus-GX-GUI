@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -22,6 +23,7 @@ enum class PersistenceError {
   dataTooLarge,
   invalidData,
   hashFailed,
+  cancelled,
 };
 
 struct PersistenceStatus final {
@@ -64,12 +66,28 @@ struct GameIdentityResult final {
   GameIdentity identity;
 };
 
+using GameContentObserver = std::function<void(
+  std::span<const std::uint8_t> bytes,
+  std::uintmax_t offset)>;
+using GameContentCancellation = std::function<bool()>;
+
+struct GameContentHashResult final {
+  PersistenceStatus status;
+  std::string sha256;
+  std::uintmax_t primaryFileSize{0U};
+};
+
 [[nodiscard]] std::string sanitizeFilename(
   std::string_view input,
   std::size_t maximumLength = 64U);
 [[nodiscard]] GameIdentityResult identifyGame(
   const std::filesystem::path& path,
-  std::string_view preferredTitle = {});
+  std::string_view preferredTitle = {},
+  const GameContentCancellation& cancellationRequested = {});
+[[nodiscard]] GameContentHashResult hashGameContent(
+  const std::filesystem::path& path,
+  const GameContentObserver& primaryFileObserver = {},
+  const GameContentCancellation& cancellationRequested = {});
 
 enum class SaveRamKind {
   cartridge,

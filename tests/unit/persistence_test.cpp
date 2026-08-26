@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <span>
+#include <string_view>
 #include <vector>
 
 namespace {
@@ -19,6 +21,22 @@ bool check(bool condition, const char* message)
     std::cerr << message << '\n';
   }
   return condition;
+}
+
+bool writeBytes(
+  const std::filesystem::path& path,
+  std::span<const std::uint8_t> bytes)
+{
+  QFile file{QString::fromStdString(path.string())};
+  return file.open(QIODevice::WriteOnly | QIODevice::Truncate) &&
+    file.write(reinterpret_cast<const char*>(bytes.data()),
+      static_cast<qint64>(bytes.size())) == static_cast<qint64>(bytes.size());
+}
+
+bool writeText(const std::filesystem::path& path, std::string_view text)
+{
+  return writeBytes(path, {
+    reinterpret_cast<const std::uint8_t*>(text.data()), text.size()});
 }
 
 } // namespace
@@ -64,6 +82,14 @@ int main()
   const auto firstIdentity = genplusgx::identifyGame(firstFixture.path(), "Persistence: Test");
   const auto repeatedIdentity = genplusgx::identifyGame(firstFixture.path(), "Persistence: Test");
   const auto secondIdentity = genplusgx::identifyGame(secondFixture.path(), "Persistence: Test");
+  std::size_t observedHashBytes = 0U;
+  std::size_t cancellationPolls = 0U;
+  const auto cancelledHash = genplusgx::hashGameContent(
+    firstFixture.path(),
+    [&observedHashBytes](std::span<const std::uint8_t> bytes, std::uintmax_t) {
+      observedHashBytes += bytes.size();
+    },
+    [&cancellationPolls] { return ++cancellationPolls >= 3U; });
   if (!check(firstIdentity.status && firstIdentity.identity.valid(),
         "Generated game identity was invalid") ||
       !check(firstIdentity.identity.sha256 == repeatedIdentity.identity.sha256,
@@ -76,8 +102,62 @@ int main()
         "Identity title was not sanitized") ||
       !check(store.gameSaveDirectory(firstIdentity.identity) !=
           store.gameSaveDirectory(secondIdentity.identity),
-        "Per-game save directories collided")) {
+        "Per-game save directories collided") ||
+      !check(cancelledHash.status.error == genplusgx::PersistenceError::cancelled,
+        "Game-content hashing ignored a cooperative cancellation request") ||
+      !check(observedHashBytes > 0U && observedHashBytes <= 64U * 1024U,
+        "Hash cancellation was not observed at a bounded chunk boundary")) {
     return 4;
+  }
+
+  QTemporaryDir cueRoot;
+  constexpr std::string_view cueText{
+    "FILE \"track.bin\" BINARY\n"
+    "  TRACK 01 MODE1/2048\n"
+    "    INDEX 01 00:00:00\n"
+    "FILE \"audio.bin\" BINARY\n"
+    "  TRACK 02 AUDIO\n"
+    "    INDEX 01 00:00:00\n"};
+  const auto dataTrack = genplusgx::test::makeSegaCdDiscImage();
+  const std::array<std::uint8_t, 8U> audioTrackA{
+    0x00U, 0x11U, 0x22U, 0x33U, 0x44U, 0x55U, 0x66U, 0x77U};
+  auto audioTrackB = audioTrackA;
+  audioTrackB.back() ^= 0x01U;
+  const auto cueBase = std::filesystem::path{cueRoot.path().toStdString()};
+  const auto cueDirectoryA = cueBase / "a";
+  const auto cueDirectoryB = cueBase / "b";
+  const auto cueDirectoryRelocated = cueBase / "relocated";
+  std::error_code cueError;
+  std::filesystem::create_directories(cueDirectoryA, cueError);
+  std::filesystem::create_directories(cueDirectoryB, cueError);
+  std::filesystem::create_directories(cueDirectoryRelocated, cueError);
+  const auto cueA = cueDirectoryA / "disc.cue";
+  const auto cueB = cueDirectoryB / "disc.cue";
+  const auto cueRelocated = cueDirectoryRelocated / "disc.cue";
+  const bool cueFixturesWritten = cueRoot.isValid() && !cueError &&
+    writeText(cueA, cueText) &&
+    writeBytes(cueDirectoryA / "track.bin", dataTrack) &&
+    writeBytes(cueDirectoryA / "audio.bin", audioTrackA) &&
+    writeText(cueB, cueText) &&
+    writeBytes(cueDirectoryB / "track.bin", dataTrack) &&
+    writeBytes(cueDirectoryB / "audio.bin", audioTrackB) &&
+    writeText(cueRelocated, cueText) &&
+    writeBytes(cueDirectoryRelocated / "track.bin", dataTrack) &&
+    writeBytes(cueDirectoryRelocated / "audio.bin", audioTrackA);
+  const auto cueIdentityA = genplusgx::identifyGame(cueA, "Disc");
+  const auto cueIdentityB = genplusgx::identifyGame(cueB, "Disc");
+  const auto relocatedIdentity = genplusgx::identifyGame(cueRelocated, "Disc");
+  if (!check(cueFixturesWritten && cueIdentityA.status && cueIdentityB.status &&
+          relocatedIdentity.status,
+        "Composite CUE identity fixtures could not be prepared") ||
+      !check(cueIdentityA.identity.sha256 != cueIdentityB.identity.sha256,
+        "Different CUE track content collided despite identical sheet text") ||
+      !check(cueIdentityA.identity.sha256 == relocatedIdentity.identity.sha256,
+        "Relocating identical CUE content changed its game identity") ||
+      !check(store.gameSaveDirectory(cueIdentityA.identity) !=
+          store.gameSaveDirectory(cueIdentityB.identity),
+        "Different CUE games shared a persistence directory")) {
+    return 5;
   }
 
   const std::array<std::uint8_t, 8> cartridge{0x01, 0x23, 0x45, 0x67, 0x89, 0xAB, 0xCD, 0xEF};
@@ -96,7 +176,7 @@ int main()
           store.ramPath(firstIdentity.identity, genplusgx::SaveRamKind::scdRamCartridge).filename() ==
           "scd-cartridge.brm",
         "Save-RAM kind paths were incorrect")) {
-    return 5;
+    return 6;
   }
 
   const auto loadedCartridge = store.loadRam(
@@ -118,20 +198,20 @@ int main()
         "Sega CD RAM cartridge round trip failed") ||
       !check(missing.status && !missing.exists && missing.data.empty(),
         "Missing save RAM was not represented as an empty success")) {
-    return 6;
+    return 7;
   }
 
   const std::array<std::uint8_t, 4> replacement{9, 8, 7, 6};
   if (!check(store.saveRam(firstIdentity.identity, genplusgx::SaveRamKind::cartridge, replacement),
         "Atomic slot replacement failed")) {
-    return 7;
+    return 8;
   }
   std::vector<std::uint8_t> oversized(genplusgx::PersistenceStore::maximumRamBytes + 1U, 0xA5U);
   if (!check(store.saveRam(
           firstIdentity.identity, genplusgx::SaveRamKind::cartridge, oversized).error ==
           genplusgx::PersistenceError::dataTooLarge,
         "Oversized RAM payload was accepted")) {
-    return 8;
+    return 9;
   }
   const auto afterRejectedWrite = store.loadRam(
     firstIdentity.identity, genplusgx::SaveRamKind::cartridge);
@@ -143,7 +223,7 @@ int main()
       !check(boundedRejection.exists &&
           boundedRejection.status.error == genplusgx::PersistenceError::dataTooLarge,
         "Bounded corruption guard did not reject an unexpected file size")) {
-    return 9;
+    return 10;
   }
 
   const auto corruptPath = store.ramPath(
@@ -165,26 +245,26 @@ int main()
       !check(store.saveRam(traversalIdentity, genplusgx::SaveRamKind::cartridge, cartridge).error ==
           genplusgx::PersistenceError::invalidGameIdentity,
         "Traversal-bearing game identity reached persistence")) {
-    return 10;
+    return 11;
   }
 
   const auto blockedRoot = std::filesystem::path{temporaryRoot.path().toStdString()} / "blocked";
   QFile blocker{QString::fromStdString(blockedRoot.string())};
   if (!check(blocker.open(QIODevice::WriteOnly) && blocker.write("x", 1) == 1,
         "Could not create directory-failure fixture")) {
-    return 11;
+    return 12;
   }
   blocker.close();
   const genplusgx::ApplicationPaths blockedPaths{blockedRoot};
   if (!check(blockedPaths.initialize().error ==
           genplusgx::PersistenceError::directoryCreationFailed,
         "A file-backed application root was not rejected")) {
-    return 12;
+    return 13;
   }
   const genplusgx::ApplicationPaths relativePaths{"relative-app-data"};
   if (!check(relativePaths.initialize().error == genplusgx::PersistenceError::invalidRoot,
         "A current-directory-relative application root was accepted")) {
-    return 13;
+    return 14;
   }
 
   return 0;

@@ -247,6 +247,18 @@ int main()
       genplusgx::validateGameFile(cuePath) &&
       genplusgx::validateDiscImageFile(cuePath),
     "a local, readable CUE/BIN pair passes game and disc preflight");
+  const auto cueFiles = genplusgx::gameContentFiles(cuePath);
+  std::error_code canonicalError;
+  const auto canonicalDataPath = std::filesystem::weakly_canonical(
+    dataPath, canonicalError);
+  passed &= check(cueFiles.status && !canonicalError &&
+      cueFiles.files.size() == 2U && cueFiles.files.front() == cuePath &&
+      cueFiles.files.back() == canonicalDataPath,
+    "validated CUE content enumeration includes the sheet and resolved tracks");
+  const auto cartridgeFiles = genplusgx::gameContentFiles(fixture.path());
+  passed &= check(cartridgeFiles.status && cartridgeFiles.files.size() == 1U &&
+      cartridgeFiles.files.front() == fixture.path(),
+    "single-file games retain their original content boundary");
 
   const auto missingCuePath = cueDirectory.path() / "missing.cue";
   constexpr std::string_view missingCue{
@@ -255,6 +267,10 @@ int main()
       genplusgx::validateGameFile(missingCuePath).error ==
         genplusgx::GameFileError::missingCueTrackFile,
     "a CUE sheet cannot refer to a missing track file");
+  passed &= check(
+    genplusgx::gameContentFiles(missingCuePath).status.error ==
+      genplusgx::GameFileError::missingCueTrackFile,
+    "content enumeration preserves typed CUE validation failures");
 
   const auto emptyDataPath = cueDirectory.path() / "empty.bin";
   const auto emptyCuePath = cueDirectory.path() / "empty.cue";

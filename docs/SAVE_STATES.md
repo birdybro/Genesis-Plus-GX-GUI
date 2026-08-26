@@ -26,6 +26,13 @@ states/<sanitized-title>-<full-game-sha256>/slot-0.gpgxstate
 states/<sanitized-title>-<full-game-sha256>/slot-9.gpgxstate
 ```
 
+For ordinary cartridge and disc files, the identifier is the raw file SHA-256. For a
+CUE game, it is a framed SHA-256 over the validated CUE plus every referenced track.
+Changing any track therefore selects another state directory even when two sheets have
+identical text, while relocating an unchanged sheet/track set preserves its identity.
+Save-state activation hashes on its storage thread and checks the service's atomic stop
+request between 64 KiB chunks, so a large disc cannot delay shutdown until EOF.
+
 The `.gpgxstate` file begins with a fixed 128-byte little-endian `GPGXST01` envelope.
 It stores schema/header lengths, millisecond timestamp, hardware identifier, slot,
 frontend frame number, payload length, the full game SHA-256, payload SHA-256, and the

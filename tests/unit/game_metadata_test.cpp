@@ -1,5 +1,6 @@
 #include "genplusgx/library/game_metadata.h"
 #include "genplusgx/library/game_metadata_service.h"
+#include "genplusgx/persistence.h"
 
 #include "synthetic_rom.h"
 
@@ -175,11 +176,15 @@ int main()
     return 8;
   }
   const auto streamedGenesis = readGameMetadata(genesisPath);
+  const auto cancelledMetadata = readGameMetadata(
+    genesisPath, [] { return true; });
   if (!check(streamedGenesis.status &&
       streamedGenesis.metadata.computedChecksum ==
         streamedGenesis.metadata.headerChecksum &&
       streamedGenesis.metadata.sha256.size() == 64U,
-      "Streaming Genesis checksum did not match its generated header")) {
+      "Streaming Genesis checksum did not match its generated header") ||
+      !check(cancelledMetadata.status.error == GameMetadataError::cancelled,
+        "Metadata hashing ignored a cooperative cancellation request")) {
     return 9;
   }
 
@@ -206,18 +211,50 @@ int main()
     return 11;
   }
 
+  const auto changedDirectory = pathIn(directory, "changed");
+  const auto relocatedDirectory = pathIn(directory, "relocated");
+  std::error_code directoryError;
+  std::filesystem::create_directories(changedDirectory, directoryError);
+  std::filesystem::create_directories(relocatedDirectory, directoryError);
+  auto changedDiscBytes = discBytes;
+  changedDiscBytes.back() ^= 0x01U;
+  const auto changedCuePath = changedDirectory / "fixture.cue";
+  const auto relocatedCuePath = relocatedDirectory / "fixture.cue";
+  if (!check(!directoryError &&
+      writeText(changedCuePath, cue) &&
+      writeBytes(changedDirectory / "track01.bin", changedDiscBytes) &&
+      writeText(relocatedCuePath, cue) &&
+      writeBytes(relocatedDirectory / "track01.bin", discBytes),
+      "Composite metadata identity fixtures could not be written")) {
+    return 12;
+  }
+  const auto changedCueMetadata = readGameMetadata(changedCuePath);
+  const auto relocatedCueMetadata = readGameMetadata(relocatedCuePath);
+  const auto persistenceIdentity = genplusgx::identifyGame(cuePath);
+  if (!check(changedCueMetadata.status && relocatedCueMetadata.status &&
+          persistenceIdentity.status,
+        "Composite metadata identities could not be read") ||
+      !check(cueMetadata.metadata.sha256 != changedCueMetadata.metadata.sha256,
+        "Metadata identity ignored changed CUE track content") ||
+      !check(cueMetadata.metadata.sha256 == relocatedCueMetadata.metadata.sha256,
+        "Metadata identity changed when identical CUE content was relocated") ||
+      !check(cueMetadata.metadata.sha256 == persistenceIdentity.identity.sha256,
+        "Library and persistence derived different CUE identities")) {
+    return 13;
+  }
+
   const auto unsafeCuePath = pathIn(directory, "unsafe.cue");
   constexpr std::string_view unsafeCue{
     "FILE \"../outside.bin\" BINARY\n  TRACK 01 MODE1/2048\n"};
   if (!check(writeText(unsafeCuePath, unsafeCue), "Unsafe CUE fixture failed") ||
       !check(readGameMetadata(unsafeCuePath).metadata.relatedDataPath.empty(),
         "CUE path traversal was followed by the metadata reader")) {
-    return 12;
+    return 14;
   }
 
   if (!check(!parseGameMetadataBytes(abc, ".txt").status,
       "Unsupported metadata input was accepted")) {
-    return 13;
+    return 15;
   }
 
   // A fixed-seed bounded property corpus exercises every offset parser with
@@ -238,29 +275,29 @@ int main()
       bytes, fuzzExtensions[iteration % fuzzExtensions.size()], bytes.size());
     if (!check(parsed.status && parsed.metadata.fileSize == bytes.size(),
         "Bounded metadata property corpus produced an invalid result")) {
-      return 14;
+      return 16;
     }
   }
 
   GameMetadataService service{2U, 4U};
   if (!check(service.start(), "Metadata service did not start")) {
-    return 15;
+    return 17;
   }
   const auto started = service.waitForEvent(2s);
   if (!check(started && started->type == GameMetadataEventType::serviceStarted,
       "Metadata service start event was not published") ||
       !check(service.request(41U, cuePath), "Metadata request was rejected")) {
-    return 16;
+    return 18;
   }
   const auto ready = service.waitForEvent(2s);
   if (!check(ready && ready->succeeded() && ready->operationId == 41U &&
       ready->path == cuePath && ready->metadata.trackCount == 2U,
       "Background metadata result was not delivered")) {
-    return 17;
+    return 19;
   }
   if (!check(!service.request(0U, cuePath), "Zero operation ID was accepted") ||
       !check(service.stop(), "Metadata service did not stop")) {
-    return 18;
+    return 20;
   }
   const auto stopped = service.waitForEvent(2s);
   if (!check(stopped && stopped->type == GameMetadataEventType::serviceStopped,
@@ -268,7 +305,7 @@ int main()
       !check(service.start(), "Metadata service did not restart") ||
       !check(service.waitForEvent(2s).has_value(), "Restart event was missing") ||
       !check(service.stop(), "Restarted metadata service did not stop")) {
-    return 19;
+    return 21;
   }
 
   return 0;

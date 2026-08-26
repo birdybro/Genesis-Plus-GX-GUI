@@ -91,5 +91,14 @@ int main()
       "ended game identity still permitted persistence access")) {
     return 6;
   }
+  const auto cancelledBegin = store.beginGame(
+    fixture.path(), [] { return true; });
+  if (!check(!cancelledBegin &&
+        cancelledBegin.error ==
+          genplusgx::BackupPersistenceError::identityFailed &&
+        !store.hasActiveGame(),
+      "cancelled identity creation retained an active backup game")) {
+    return 7;
+  }
   return 0;
 }

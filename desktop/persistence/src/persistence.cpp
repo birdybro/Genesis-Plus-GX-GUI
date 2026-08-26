@@ -1,5 +1,7 @@
 #include "genplusgx/persistence.h"
 
+#include "genplusgx/game_file.h"
+
 #include <QCryptographicHash>
 #include <QFile>
 #include <QFileInfo>
@@ -18,6 +20,7 @@ namespace genplusgx {
 namespace {
 
 constexpr std::size_t hashByteCount = 32U;
+constexpr std::string_view cueHashDomain{"GENPLUSGX-CUE-CONTENT-V1"};
 
 PersistenceStatus success()
 {
@@ -81,6 +84,16 @@ const char* saveFilename(SaveRamKind kind)
       return "scd-cartridge.brm";
   }
   return "unknown.ram";
+}
+
+void addUnsigned64(QCryptographicHash& hash, std::uint64_t value)
+{
+  std::array<char, 8U> encoded{};
+  for (std::size_t index = 0U; index < encoded.size(); ++index) {
+    encoded[encoded.size() - index - 1U] = static_cast<char>(value & 0xffU);
+    value >>= 8U;
+  }
+  hash.addData(QByteArrayView{encoded.data(), static_cast<qsizetype>(encoded.size())});
 }
 
 } // namespace
@@ -213,32 +226,137 @@ std::string sanitizeFilename(std::string_view input, std::size_t maximumLength)
   return result;
 }
 
-GameIdentityResult identifyGame(
+GameContentHashResult hashGameContent(
   const std::filesystem::path& path,
-  std::string_view preferredTitle)
+  const GameContentObserver& primaryFileObserver,
+  const GameContentCancellation& cancellationRequested)
 {
-  QFile input{pathString(path)};
-  if (!input.open(QIODevice::ReadOnly)) {
+  auto content = gameContentFiles(path);
+  if (!content.status) {
     return {
-      .status = failure(PersistenceError::fileOpenFailed, "Unable to open game content for hashing."),
-      .identity = {},
+      .status = failure(PersistenceError::invalidData, content.status.message),
+      .sha256 = {},
+      .primaryFileSize = 0U,
     };
   }
 
   QCryptographicHash hash{QCryptographicHash::Sha256};
+  const bool composite = content.files.size() > 1U;
+  if (composite) {
+    hash.addData(QByteArrayView{
+      cueHashDomain.data(), static_cast<qsizetype>(cueHashDomain.size())});
+    addUnsigned64(hash, static_cast<std::uint64_t>(content.files.size()));
+  }
+
   std::array<char, 64U * 1024U> buffer{};
-  while (true) {
-    const auto bytesRead = input.read(buffer.data(), static_cast<qint64>(buffer.size()));
-    if (bytesRead < 0) {
+  std::uintmax_t primaryFileSize = 0U;
+  for (std::size_t fileIndex = 0U; fileIndex < content.files.size(); ++fileIndex) {
+    if (cancellationRequested && cancellationRequested()) {
       return {
-        .status = failure(PersistenceError::hashFailed, "Unable to read game content while hashing."),
-        .identity = {},
+        .status = failure(PersistenceError::cancelled,
+          "Game-content hashing was cancelled."),
+        .sha256 = {},
+        .primaryFileSize = 0U,
       };
     }
-    if (bytesRead == 0) {
-      break;
+    const QFileInfo before{pathString(content.files[fileIndex])};
+    if (before.size() < 0) {
+      return {
+        .status = failure(PersistenceError::fileReadFailed,
+          "Unable to read a game-content file size while hashing."),
+        .sha256 = {},
+        .primaryFileSize = 0U,
+      };
     }
-    hash.addData(QByteArrayView{buffer.data(), bytesRead});
+    const auto expectedSize = static_cast<std::uintmax_t>(before.size());
+    if (fileIndex == 0U) {
+      primaryFileSize = expectedSize;
+    }
+    if (composite) {
+      addUnsigned64(hash, static_cast<std::uint64_t>(expectedSize));
+    }
+
+    QFile input{pathString(content.files[fileIndex])};
+    if (!input.open(QIODevice::ReadOnly)) {
+      return {
+        .status = failure(PersistenceError::fileOpenFailed,
+          "Unable to open game content for hashing."),
+        .sha256 = {},
+        .primaryFileSize = 0U,
+      };
+    }
+
+    std::uintmax_t offset = 0U;
+    while (true) {
+      if (cancellationRequested && cancellationRequested()) {
+        return {
+          .status = failure(PersistenceError::cancelled,
+            "Game-content hashing was cancelled."),
+          .sha256 = {},
+          .primaryFileSize = 0U,
+        };
+      }
+      const auto bytesRead = input.read(
+        buffer.data(), static_cast<qint64>(buffer.size()));
+      if (bytesRead < 0) {
+        return {
+          .status = failure(PersistenceError::hashFailed,
+            "Unable to read game content while hashing."),
+          .sha256 = {},
+          .primaryFileSize = 0U,
+        };
+      }
+      if (bytesRead == 0) {
+        break;
+      }
+      hash.addData(QByteArrayView{buffer.data(), bytesRead});
+      if (fileIndex == 0U && primaryFileObserver) {
+        primaryFileObserver({
+          reinterpret_cast<const std::uint8_t*>(buffer.data()),
+          static_cast<std::size_t>(bytesRead)}, offset);
+      }
+      offset += static_cast<std::uintmax_t>(bytesRead);
+    }
+
+    const QFileInfo after{pathString(content.files[fileIndex])};
+    if (offset != expectedSize || after.size() != before.size() ||
+        after.lastModified() != before.lastModified()) {
+      return {
+        .status = failure(PersistenceError::hashFailed,
+          "Game content changed while it was being hashed."),
+        .sha256 = {},
+        .primaryFileSize = 0U,
+      };
+    }
+  }
+
+  if (composite) {
+    const auto verifiedContent = gameContentFiles(path);
+    if (!verifiedContent.status || verifiedContent.files != content.files) {
+      return {
+        .status = failure(PersistenceError::hashFailed,
+          "The CUE sheet or its referenced content changed while hashing."),
+        .sha256 = {},
+        .primaryFileSize = 0U,
+      };
+    }
+  }
+
+  return {
+    .status = success(),
+    .sha256 = hash.result().toHex().toStdString(),
+    .primaryFileSize = primaryFileSize,
+  };
+}
+
+GameIdentityResult identifyGame(
+  const std::filesystem::path& path,
+  std::string_view preferredTitle,
+  const GameContentCancellation& cancellationRequested)
+{
+  const auto contentHash = hashGameContent(path, {}, cancellationRequested);
+  if (!contentHash.status) {
+    return {.status = contentHash.status, .identity = {}};
   }
 
   const std::string fallbackTitle = path.stem().string();
@@ -246,7 +364,7 @@ GameIdentityResult identifyGame(
   return {
     .status = success(),
     .identity = {
-      .sha256 = hash.result().toHex().toStdString(),
+      .sha256 = contentHash.sha256,
       .titleSlug = sanitizeFilename(title),
     },
   };

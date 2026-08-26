@@ -12,7 +12,8 @@ public:
   explicit PerGameBackupStore(PersistenceStore store);
 
   [[nodiscard]] BackupPersistenceStatus beginGame(
-    const std::filesystem::path& path) override;
+    const std::filesystem::path& path,
+    const BackupPersistenceCancellation& cancellationRequested = {}) override;
   [[nodiscard]] BackupPersistenceLoadResult load(
     BackupMemoryKind kind,
     std::size_t expectedSize) override;

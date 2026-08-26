@@ -62,6 +62,7 @@ target_link_libraries(
   genplusgx_game_metadata_test
   PRIVATE
     GenesisPlusGX::Library
+    GenesisPlusGX::Persistence
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Core

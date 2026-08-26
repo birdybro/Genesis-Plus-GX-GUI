@@ -33,10 +33,11 @@ PerGameBackupStore::PerGameBackupStore(PersistenceStore store)
 }
 
 BackupPersistenceStatus PerGameBackupStore::beginGame(
-  const std::filesystem::path& path)
+  const std::filesystem::path& path,
+  const BackupPersistenceCancellation& cancellationRequested)
 {
   activeIdentity_.reset();
-  const auto identity = identifyGame(path);
+  const auto identity = identifyGame(path, {}, cancellationRequested);
   if (!identity.status) {
     return failure(BackupPersistenceError::identityFailed, identity.status.message);
   }

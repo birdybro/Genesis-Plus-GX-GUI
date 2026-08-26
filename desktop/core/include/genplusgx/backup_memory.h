@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <span>
 #include <string>
 #include <vector>
@@ -46,12 +47,15 @@ struct BackupPersistenceLoadResult final {
   std::vector<std::uint8_t> data;
 };
 
+using BackupPersistenceCancellation = std::function<bool()>;
+
 class BackupMemoryPersistence {
 public:
   virtual ~BackupMemoryPersistence() = default;
 
   [[nodiscard]] virtual BackupPersistenceStatus beginGame(
-    const std::filesystem::path& path) = 0;
+    const std::filesystem::path& path,
+    const BackupPersistenceCancellation& cancellationRequested = {}) = 0;
   [[nodiscard]] virtual BackupPersistenceLoadResult load(
     BackupMemoryKind kind,
     std::size_t expectedSize) = 0;

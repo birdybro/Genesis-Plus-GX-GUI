@@ -135,12 +135,23 @@ interleaving, and CUE text itself in a temporary directory. A fixed-seed corpus 
 offsets. No corpus binary or result is stored, downloaded, or automatically promoted
 to a golden reference.
 
-`unit.game_library_scanner` writes the generated Genesis ROM and a four-byte original
+`unit.game_library_scanner` writes the generated Genesis ROM, generated Sega CD image,
+an original CUE that references that image as `track.bin`, and a four-byte original
 SG-1000 placeholder into a temporary directory alongside an unsupported text file. It
-then performs flat and recursive scans, verifies exact indexed systems and paths, and
-removes one temporary generated file to exercise stale-row cleanup. The database test
-creates malformed text and structurally incomplete SQLite files solely inside its
-temporary directory to verify collision-safe recovery. No fixture survives the test.
+then performs flat and recursive scans, verifies exact indexed systems and paths,
+requires the CUE but not its duplicate payload row, and removes one generated file to
+exercise stale-row cleanup. The database test creates malformed text and structurally
+incomplete SQLite files solely inside its temporary directory to verify collision-safe
+recovery. No fixture survives the test.
+
+`unit.persistence` and `unit.game_metadata` create temporary CUE/BIN sets. The
+persistence cases use identical original two-file sheet text, generated CC0 data-track
+bytes, and a tiny original audio-track pattern; one changes only the second track while
+another relocates the unchanged files. The metadata cases similarly change one
+generated track and relocate another. Together they prove relocation stability,
+every-referenced-file identity, shared library/save hashing, and distinct persistence
+directories without retaining any binary or digest as an automatically regenerated
+golden.
 
 `gui.game_library` creates the same original synthetic Genesis ROM in a temporary game
 directory and drives it through the native Add Directory control, real background

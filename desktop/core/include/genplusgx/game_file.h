@@ -40,6 +40,11 @@ struct CueSheetInfo final {
   std::size_t trackCount{0U};
 };
 
+struct GameContentFilesResult final {
+  GameFileStatus status;
+  std::vector<std::filesystem::path> files;
+};
+
 [[nodiscard]] std::span<const std::string_view> supportedGameExtensions() noexcept;
 [[nodiscard]] bool hasSupportedGameExtension(const std::filesystem::path& path);
 [[nodiscard]] std::span<const std::string_view> supportedDiscExtensions() noexcept;
@@ -51,6 +56,8 @@ struct CueSheetInfo final {
   const std::filesystem::path& path);
 [[nodiscard]] GameFileStatus validateGameFile(const std::filesystem::path& path);
 [[nodiscard]] GameFileStatus validateDiscImageFile(
+  const std::filesystem::path& path);
+[[nodiscard]] GameContentFilesResult gameContentFiles(
   const std::filesystem::path& path);
 
 } // namespace genplusgx

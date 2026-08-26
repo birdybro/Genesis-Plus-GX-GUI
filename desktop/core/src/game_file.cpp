@@ -194,6 +194,88 @@ GameFileStatus validateRegularGameFile(const std::filesystem::path& path)
   return {};
 }
 
+GameFileStatus inspectCueSheetFile(
+  const std::filesystem::path& path,
+  std::vector<std::filesystem::path>* resolvedFiles)
+{
+  std::error_code error;
+  const auto size = std::filesystem::file_size(path, error);
+  if (error) {
+    return failure(GameFileError::unreadable, "The CUE sheet size cannot be read.");
+  }
+  if (size > maximumCueSheetBytes) {
+    return failure(GameFileError::fileTooLarge,
+      "The CUE sheet exceeds the 1 MiB safety limit.");
+  }
+
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    return failure(GameFileError::unreadable, "The CUE sheet cannot be read.");
+  }
+  std::string text(static_cast<std::size_t>(size), '\0');
+  stream.read(text.data(), static_cast<std::streamsize>(text.size()));
+  if (!stream && !stream.eof()) {
+    return failure(GameFileError::unreadable,
+      "The CUE sheet could not be read completely.");
+  }
+  if (static_cast<std::size_t>(stream.gcount()) != text.size()) {
+    return failure(GameFileError::unreadable,
+      "The CUE sheet changed while it was being read.");
+  }
+
+  CueSheetInfo information;
+  if (auto status = validateCueSheetText(text, information); !status) {
+    return status;
+  }
+
+  auto parentPath = path.parent_path();
+  if (parentPath.empty()) {
+    parentPath = std::filesystem::current_path(error);
+    if (error) {
+      return failure(GameFileError::unreadable,
+        "The current directory cannot be resolved safely.");
+    }
+  }
+  const auto cueParent = std::filesystem::weakly_canonical(parentPath, error);
+  if (error) {
+    return failure(GameFileError::unreadable,
+      "The CUE sheet directory cannot be resolved safely.");
+  }
+  for (const auto& reference : information.referencedFiles) {
+    const auto candidate = parentPath / reference;
+    if (candidate.string().size() > maximumCorePathBytes) {
+      return failure(GameFileError::pathTooLong,
+        "A CUE track path exceeds the Genesis Plus GX 255-byte path limit.");
+    }
+    const auto resolved = std::filesystem::weakly_canonical(candidate, error);
+    if (error || !pathIsWithin(resolved, cueParent)) {
+      return failure(GameFileError::unsafeCueReference,
+        "A CUE track reference escapes the CUE sheet directory.");
+    }
+    if (!std::filesystem::is_regular_file(resolved, error) || error) {
+      return failure(GameFileError::missingCueTrackFile,
+        "A referenced CUE track file is missing or is not a regular file: " +
+          reference.generic_string());
+    }
+    const auto referencedSize = std::filesystem::file_size(resolved, error);
+    if (error || referencedSize == 0U) {
+      return failure(GameFileError::missingCueTrackFile,
+        "A referenced CUE track file is empty or unreadable: " +
+          reference.generic_string());
+    }
+    std::ifstream referencedStream(resolved, std::ios::binary);
+    if (!referencedStream) {
+      return failure(GameFileError::missingCueTrackFile,
+        "A referenced CUE track file cannot be read: " +
+          reference.generic_string());
+    }
+    if (resolvedFiles != nullptr) {
+      resolvedFiles->push_back(resolved);
+    }
+  }
+  return {};
+}
+
 } // namespace
 
 std::span<const std::string_view> supportedGameExtensions() noexcept
@@ -424,78 +506,7 @@ GameFileStatus validateCueSheetText(
 
 GameFileStatus validateCueSheetFile(const std::filesystem::path& path)
 {
-  std::error_code error;
-  const auto size = std::filesystem::file_size(path, error);
-  if (error) {
-    return failure(GameFileError::unreadable, "The CUE sheet size cannot be read.");
-  }
-  if (size > maximumCueSheetBytes) {
-    return failure(GameFileError::fileTooLarge,
-      "The CUE sheet exceeds the 1 MiB safety limit.");
-  }
-
-  std::ifstream stream(path, std::ios::binary);
-  if (!stream) {
-    return failure(GameFileError::unreadable, "The CUE sheet cannot be read.");
-  }
-  std::string text(static_cast<std::size_t>(size), '\0');
-  stream.read(text.data(), static_cast<std::streamsize>(text.size()));
-  if (!stream && !stream.eof()) {
-    return failure(GameFileError::unreadable, "The CUE sheet could not be read completely.");
-  }
-  if (static_cast<std::size_t>(stream.gcount()) != text.size()) {
-    return failure(GameFileError::unreadable,
-      "The CUE sheet changed while it was being read.");
-  }
-
-  CueSheetInfo information;
-  if (auto status = validateCueSheetText(text, information); !status) {
-    return status;
-  }
-
-  auto parentPath = path.parent_path();
-  if (parentPath.empty()) {
-    parentPath = std::filesystem::current_path(error);
-    if (error) {
-      return failure(GameFileError::unreadable,
-        "The current directory cannot be resolved safely.");
-    }
-  }
-  const auto cueParent = std::filesystem::weakly_canonical(parentPath, error);
-  if (error) {
-    return failure(GameFileError::unreadable,
-      "The CUE sheet directory cannot be resolved safely.");
-  }
-  for (const auto& reference : information.referencedFiles) {
-    const auto candidate = parentPath / reference;
-    if (candidate.string().size() > maximumCorePathBytes) {
-      return failure(GameFileError::pathTooLong,
-        "A CUE track path exceeds the Genesis Plus GX 255-byte path limit.");
-    }
-    const auto resolved = std::filesystem::weakly_canonical(candidate, error);
-    if (error || !pathIsWithin(resolved, cueParent)) {
-      return failure(GameFileError::unsafeCueReference,
-        "A CUE track reference escapes the CUE sheet directory.");
-    }
-    if (!std::filesystem::is_regular_file(resolved, error) || error) {
-      return failure(GameFileError::missingCueTrackFile,
-        "A referenced CUE track file is missing or is not a regular file: " +
-          reference.generic_string());
-    }
-    const auto referencedSize = std::filesystem::file_size(resolved, error);
-    if (error || referencedSize == 0U) {
-      return failure(GameFileError::missingCueTrackFile,
-        "A referenced CUE track file is empty or unreadable: " +
-          reference.generic_string());
-    }
-    std::ifstream referencedStream(resolved, std::ios::binary);
-    if (!referencedStream) {
-      return failure(GameFileError::missingCueTrackFile,
-        "A referenced CUE track file cannot be read: " +
-          reference.generic_string());
-    }
-  }
-  return {};
+  return inspectCueSheetFile(path, nullptr);
 }
 
 GameFileStatus validateGameFile(const std::filesystem::path& path)
@@ -525,6 +536,21 @@ GameFileStatus validateDiscImageFile(const std::filesystem::path& path)
       "The selected file type is not a supported Sega CD / Mega CD image.");
   }
   return validateGameFile(path);
+}
+
+GameContentFilesResult gameContentFiles(const std::filesystem::path& path)
+{
+  if (auto status = validateRegularGameFile(path); !status) {
+    return {.status = std::move(status), .files = {}};
+  }
+
+  std::vector<std::filesystem::path> files{path};
+  if (lowercase(path.extension().string()) == ".cue") {
+    if (auto status = inspectCueSheetFile(path, &files); !status) {
+      return {.status = std::move(status), .files = {}};
+    }
+  }
+  return {.status = {}, .files = std::move(files)};
 }
 
 } // namespace genplusgx

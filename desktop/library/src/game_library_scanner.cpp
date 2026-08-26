@@ -5,8 +5,12 @@
 
 #include <algorithm>
 #include <atomic>
+#include <cctype>
 #include <condition_variable>
+#include <iterator>
 #include <mutex>
+#include <ranges>
+#include <set>
 #include <system_error>
 #include <thread>
 #include <utility>
@@ -34,6 +38,22 @@ std::int64_t fileTimeMilliseconds(
   const auto time = entry.last_write_time(error);
   return error ? 0 : std::chrono::duration_cast<std::chrono::milliseconds>(
     time.time_since_epoch()).count();
+}
+
+bool isCueSheet(const std::filesystem::path& path)
+{
+  auto extension = path.extension().string();
+  std::ranges::transform(extension, extension.begin(), [](unsigned char character) {
+    return static_cast<char>(std::tolower(character));
+  });
+  return extension == ".cue";
+}
+
+std::filesystem::path normalizedScanPath(const std::filesystem::path& path)
+{
+  std::error_code error;
+  const auto canonical = std::filesystem::weakly_canonical(path, error);
+  return error ? path.lexically_normal() : canonical;
 }
 
 } // namespace
@@ -231,6 +251,8 @@ private:
     GameLibraryScanSummary summary;
     std::vector<LibraryScanRecord> batch;
     batch.reserve(GameLibraryDatabase::maximumScanBatchSize);
+    std::vector<std::filesystem::directory_entry> candidates;
+    candidates.reserve(1'024U);
     GameLibraryStatus batchStatus;
     bool limitExceeded = false;
     bool iterationFailed = static_cast<bool>(filesystemError);
@@ -243,7 +265,7 @@ private:
         command.directoryId, scan.generation, batch);
       batch.clear();
     };
-    const auto inspect = [&](const std::filesystem::directory_entry& entry) {
+    const auto collect = [&](const std::filesystem::directory_entry& entry) {
       if (cancelRequested_.load(std::memory_order_acquire) || !batchStatus) {
         return;
       }
@@ -259,20 +281,12 @@ private:
       if (!hasSupportedGameExtension(entry.path())) {
         return;
       }
-      ++summary.supportedFiles;
-      auto metadata = readGameMetadata(entry.path());
-      if (!metadata.status) {
+      if (entry.path().string().size() > maximumCorePathBytes) {
+        ++summary.supportedFiles;
         ++summary.skippedFiles;
-      } else {
-        batch.push_back({
-          .metadata = std::move(metadata.metadata),
-          .lastModifiedEpochMilliseconds = fileTimeMilliseconds(entry),
-        });
-        ++summary.indexedGames;
-        if (batch.size() == GameLibraryDatabase::maximumScanBatchSize) {
-          flush();
-        }
+        return;
       }
+      candidates.push_back(entry);
       if (summary.visitedFiles % 64U == 0U) {
         publishProgress(command, directory.path, summary);
       }
@@ -291,7 +305,7 @@ private:
           ++summary.skippedFiles;
           filesystemError.clear();
         } else {
-          inspect(*iterator);
+          collect(*iterator);
         }
         iterator.increment(filesystemError);
       }
@@ -308,7 +322,7 @@ private:
           ++summary.skippedFiles;
           filesystemError.clear();
         } else {
-          inspect(*iterator);
+          collect(*iterator);
         }
         iterator.increment(filesystemError);
       }
@@ -316,6 +330,55 @@ private:
     if (filesystemError) {
       iterationFailed = true;
       ++summary.skippedFiles;
+    }
+    if (!cancelRequested_.load(std::memory_order_acquire) &&
+        !limitExceeded && !iterationFailed) {
+      std::set<std::filesystem::path> referencedCueTracks;
+      for (const auto& entry : candidates) {
+        if (cancelRequested_.load(std::memory_order_acquire)) {
+          break;
+        }
+        if (!isCueSheet(entry.path())) {
+          continue;
+        }
+        const auto content = gameContentFiles(entry.path());
+        if (!content.status) {
+          continue;
+        }
+        for (auto file = std::next(content.files.begin());
+             file != content.files.end(); ++file) {
+          if (cancelRequested_.load(std::memory_order_acquire)) {
+            break;
+          }
+          referencedCueTracks.insert(normalizedScanPath(*file));
+        }
+      }
+
+      for (const auto& entry : candidates) {
+        if (cancelRequested_.load(std::memory_order_acquire) || !batchStatus) {
+          break;
+        }
+        if (!isCueSheet(entry.path()) && referencedCueTracks.contains(
+              normalizedScanPath(entry.path()))) {
+          continue;
+        }
+        ++summary.supportedFiles;
+        auto metadata = readGameMetadata(entry.path(), [this] {
+          return cancelRequested_.load(std::memory_order_acquire);
+        });
+        if (!metadata.status) {
+          ++summary.skippedFiles;
+        } else {
+          batch.push_back({
+            .metadata = std::move(metadata.metadata),
+            .lastModifiedEpochMilliseconds = fileTimeMilliseconds(entry),
+          });
+          ++summary.indexedGames;
+          if (batch.size() == GameLibraryDatabase::maximumScanBatchSize) {
+            flush();
+          }
+        }
+      }
     }
     if (!cancelRequested_.load(std::memory_order_acquire) &&
         !limitExceeded && !iterationFailed) {

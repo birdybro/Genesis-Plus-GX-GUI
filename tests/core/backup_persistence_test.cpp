@@ -14,6 +14,7 @@
 #include <memory>
 #include <optional>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 using namespace std::chrono_literals;
@@ -23,13 +24,29 @@ namespace {
 class FailingBackupPersistence final : public genplusgx::BackupMemoryPersistence {
 public:
   std::atomic<bool> failSave{false};
+  std::atomic<bool> waitForCancellation{false};
+  std::atomic<bool> sawCancellationCallback{false};
+  std::atomic<bool> cancellationObserved{false};
   std::atomic<int> beginCount{0};
   std::atomic<int> endCount{0};
 
   genplusgx::BackupPersistenceStatus beginGame(
-    const std::filesystem::path&) override
+    const std::filesystem::path&,
+    const genplusgx::BackupPersistenceCancellation& cancellationRequested) override
   {
     ++beginCount;
+    if (waitForCancellation.load()) {
+      sawCancellationCallback.store(static_cast<bool>(cancellationRequested));
+      while (cancellationRequested && !cancellationRequested()) {
+        std::this_thread::sleep_for(1ms);
+      }
+      cancellationObserved.store(
+        cancellationRequested && cancellationRequested());
+      return {
+        .error = genplusgx::BackupPersistenceError::identityFailed,
+        .message = "Injected game-identity cancellation.",
+      };
+    }
     return {};
   }
 
@@ -241,6 +258,35 @@ int main()
         failingStore->endCount.load() == 2,
       "shutdown did not surface save failure after releasing persistence identity")) {
     return 17;
+  }
+
+  auto cancellationStore = std::make_shared<FailingBackupPersistence>();
+  cancellationStore->waitForCancellation.store(true);
+  genplusgx::EmulationWorker cancellationWorker{
+    64U, 64U, 48'000, {}, {}, cancellationStore};
+  if (!check(cancellationWorker.start(), "cancellation worker start failed") ||
+      !check(cancellationWorker.waitForEvent(2s).has_value(),
+        "cancellation worker start event missing") ||
+      !check(cancellationWorker.submit(
+        genplusgx::EmulationCommand::load(30U, fixture.path())),
+        "cancellation load could not be queued")) {
+    return 18;
+  }
+  const auto cancellationDeadline = std::chrono::steady_clock::now() + 3s;
+  while (cancellationStore->beginCount.load() == 0 &&
+         std::chrono::steady_clock::now() < cancellationDeadline) {
+    std::this_thread::sleep_for(1ms);
+  }
+  const auto cancellationStarted = std::chrono::steady_clock::now();
+  const auto cancelledStop = cancellationWorker.stop();
+  const auto cancellationElapsed =
+    std::chrono::steady_clock::now() - cancellationStarted;
+  if (!check(cancelledStop && cancellationStore->beginCount.load() == 1 &&
+        cancellationStore->sawCancellationCallback.load() &&
+        cancellationStore->cancellationObserved.load() &&
+        cancellationElapsed < 1s,
+      "worker stop did not cancel an in-progress persistence identity")) {
+    return 19;
   }
   return 0;
 }

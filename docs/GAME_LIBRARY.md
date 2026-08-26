@@ -44,7 +44,11 @@ never removes the games from disk.
 Directory walks do not follow symbolic links and use the exact extension set advertised
 by the current desktop build. A scan visits at most 100,000 regular files and indexes
 metadata in fixed batches of 128. Unsupported files are ignored. Unreadable or changed
-supported files are counted as skipped and do not crash the scan.
+supported files are counted as skipped and do not crash the scan. Before parsing, the
+scanner validates every CUE candidate and records its resolved payload files. A `.bin`,
+`.iso`, or other supported payload referenced by a valid CUE is indexed through the CUE
+only, preventing one disc from appearing as both a sheet and a raw track; unrelated
+standalone files with the same extensions remain normal library games.
 
 ## Stored game data
 
@@ -65,7 +69,9 @@ transaction back, preserving the previously completed index.
 through a fixed-capacity queue. Progress and results return through a bounded event
 queue. File hashing and directory enumeration therefore never run on the Qt GUI or
 emulation threads. Each `GameLibraryDatabase` connection rejects use from any thread
-other than the one that initialized it.
+other than the one that initialized it. Metadata hashing checks the scanner's atomic
+cancellation request between 64 KiB chunks, so shutdown does not wait for the rest of a
+large image to be read.
 
 At startup, SQLite `quick_check` and required-schema probes run before the index is
 used. A malformed database or structurally incomplete current schema is renamed to a

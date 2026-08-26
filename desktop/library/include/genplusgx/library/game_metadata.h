@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <span>
 #include <string>
@@ -28,6 +29,7 @@ enum class GameMetadataError : std::uint8_t {
   fileTooLarge,
   openFailed,
   readFailed,
+  cancelled,
 };
 
 struct GameMetadataStatus final {
@@ -80,6 +82,7 @@ inline constexpr std::uintmax_t maximumMetadataFileBytes =
   std::string_view extension,
   std::uintmax_t fileSize = 0U);
 [[nodiscard]] GameMetadataResult readGameMetadata(
-  const std::filesystem::path& path);
+  const std::filesystem::path& path,
+  const std::function<bool()>& cancellationRequested = {});
 
 } // namespace genplusgx::library

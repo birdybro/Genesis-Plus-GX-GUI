@@ -3315,3 +3315,77 @@ actual shutdown sequence. Adversarial source and tree scans find no unfinished d
 path or accidental proprietary/build artifact.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/FINAL_TEST_REPORT.md`)
+
+## Milestone 57 detail
+
+**Status:** LOCAL GATES COMPLETE — HOSTED CI PENDING
+
+**Goal:** Re-audit the full standalone specification against production behavior and
+close the cross-feature Sega CD identity, library ownership, and large-file shutdown
+gaps found after the prior release-candidate evidence pass.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/backup_memory.h`
+- `desktop/core/include/genplusgx/game_file.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/core/src/game_file.cpp`
+- `desktop/persistence/CMakeLists.txt`
+- `desktop/persistence/include/genplusgx/backup_store.h`
+- `desktop/persistence/include/genplusgx/persistence.h`
+- `desktop/persistence/src/backup_store.cpp`
+- `desktop/persistence/src/persistence.cpp`
+- `desktop/persistence/src/state_storage_service.cpp`
+- `desktop/library/CMakeLists.txt`
+- `desktop/library/include/genplusgx/library/game_metadata.h`
+- `desktop/library/src/game_metadata.cpp`
+- `desktop/library/src/game_metadata_service.cpp`
+- `desktop/library/src/game_library_scanner.cpp`
+- `tests/unit/CMakeLists.txt`
+- `tests/core/backup_persistence_test.cpp`
+- `tests/unit/backup_store_test.cpp`
+- `tests/unit/game_file_test.cpp`
+- `tests/unit/persistence_test.cpp`
+- `tests/unit/game_metadata_test.cpp`
+- `tests/unit/game_library_scanner_test.cpp`
+- `README.md`
+- `CHANGELOG.md`
+- `cmake/Packaging.cmake`
+- `cmake/ValidateDocumentation.cmake`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/GAME_LIBRARY.md`
+- `docs/REQUIREMENTS_AUDIT.md`
+- `docs/SAVE_STATES.md`
+- `docs/TEST_MATRIX.md`
+- `tests/fixtures/README.md`
+
+**Tests added:** Existing `unit.game_file`, `unit.persistence`, `unit.game_metadata`,
+and `unit.game_library_scanner` gain assertions for validated content enumeration,
+legacy single-file hashes, composite CUE identity disagreement/agreement, shared
+metadata/persistence identity, cooperative cancellation, duplicate track suppression,
+and preservation of standalone files. `unit.backup_store` rejects a cancelled identity
+without retaining it, while `core.backup_persistence` blocks in a test persistence
+consumer and proves worker stop supplies and triggers its callback. Documentation/
+package validation now requires and installs the section-by-section requirements audit.
+
+**Gate evidence:** On the 2026-08-26 CachyOS Linux x86-64 host, clean Debug, clean
+Release, and clean ASan/UBSan builds each passed all 74 CTest cases. The sanitizer run
+used leak detection and immediate ASan/UBSan failure with no finding. The inherited
+Unix libretro target built, linked, and cleaned with only its two previously documented
+`const`-qualifier warnings. A fresh Release install passed runtime-layout verification
+and `--version`, contained 45 files (the additional file is this milestone's required
+audit), and produced the versioned TGZ plus matching neighboring SHA-256 file. Focused
+implementation tests and `git diff --check` also pass. The exact-commit ten-job hosted
+matrix is pending the first non-rewritten push of this implementation.
+
+**Acceptance criteria:** A CUE identity includes the validated sheet and every
+referenced track without incorporating installation paths; every frontend consumer uses
+the same digest; separate discs cannot share persistence; a relocated unchanged disc
+keeps its identity; library scans present the sheet without a duplicate raw-track row;
+live backup, state, metadata, and scanner shutdown can cancel between bounded read
+chunks; ordinary game hashes remain unchanged; the 58-section audit maps every claim
+to code/evidence or an explicit limitation; and every final release gate passes before
+the milestone is committed.
+
+**Commit SHA:** pending

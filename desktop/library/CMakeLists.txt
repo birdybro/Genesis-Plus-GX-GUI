@@ -22,6 +22,7 @@ target_link_libraries(
     Qt6::Sql
     GenesisPlusGX::FrontendTypes
     GenesisPlusGX::GameFiles
+    GenesisPlusGX::Persistence
     genplusgx_project_warnings
 )
 set_target_properties(genplusgx_library PROPERTIES OUTPUT_NAME genplusgx_library)
