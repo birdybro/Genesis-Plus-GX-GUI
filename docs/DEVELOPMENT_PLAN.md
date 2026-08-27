@@ -3826,7 +3826,12 @@ unnecessarily require the official Qt bundle's complete system XCB development g
 The install graph now locates only its required versioned XCB QPA runtime from the same
 Qt prefix, leaving the public source-build prerequisites unchanged. Actionlint and a
 fresh production-shaped configure pass. Exact warning-free hosted confirmation remains
-pending.
+pending. Run `33095468308` then configured, built, and passed 77/77 Linux Release tests,
+but package closure correctly rejected the official Qt build's unstaged ICU 73 runtime;
+the same-prefix ICU implementation/SONAME files are now explicit package inputs and all
+staged runtimes are themselves dependency roots. A fresh local install and CPack pass
+warning-free with ICU 78 staged, package verification succeeds, `ldd` has no missing
+entry, and an installed `--version` smoke succeeds with `LD_LIBRARY_PATH` removed.
 
 **Acceptance criteria:** Linux stages exact Qt/SDL runtimes and resolves only remaining
 transitive dependencies without private Qt build requirements or fallback-directory

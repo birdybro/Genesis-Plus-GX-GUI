@@ -34,7 +34,9 @@ platform documentation.
 - Windows deployment normalizes the Visual C++ Redistributable path before generating
   install scripts, eliminating invalid backslash-escape diagnostics.
 - Linux deployment locates Qt's XCB QPA runtime without importing its private CMake
-  component, keeping source configuration independent of private Qt/XCB headers.
+  component, and stages Qt's version-matched ICU companions, keeping source
+  configuration independent of private Qt/XCB headers while making the archive
+  independent of the build host's ICU version.
 
 ## [0.1.1] - 2026-08-26
 

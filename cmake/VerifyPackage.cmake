@@ -60,6 +60,9 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_match("*libQt6Core.so*" "deployed Qt Core runtime")
   require_match("*libSDL3.so*" "deployed SDL3 runtime")
   require_match("*librashader.so" "deployed libretro shader runtime")
+  require_match("*libicudata.so.*" "deployed ICU data runtime")
+  require_match("*libicui18n.so.*" "deployed ICU internationalization runtime")
+  require_match("*libicuuc.so.*" "deployed ICU common runtime")
   file(GLOB_RECURSE platform_plugins LIST_DIRECTORIES FALSE
     "${package_root}/*libqxcb.so"
     "${package_root}/*libqoffscreen.so")

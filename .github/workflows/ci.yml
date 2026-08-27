@@ -80,7 +80,7 @@ jobs:
           cmake --install build/ci-Release --prefix "$PWD/build/package-root"
           cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
             -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
-          build/package-root/bin/genesis-plus-gx-gui --version
+          env -u LD_LIBRARY_PATH build/package-root/bin/genesis-plus-gx-gui --version
           cpack --config build/ci-Release/CPackConfig.cmake \
             -G TGZ -B build/packages
 

@@ -19,11 +19,22 @@ if(NOT plugin_modules)
   message(FATAL_ERROR "No selected Qt plugins were installed")
 endif()
 
+file(GLOB staged_runtime_candidates LIST_DIRECTORIES FALSE
+  "${library_directory}/*.so*")
+set(staged_runtime_libraries)
+foreach(candidate IN LISTS staged_runtime_candidates)
+  file(REAL_PATH "${candidate}" real_candidate)
+  list(APPEND staged_runtime_libraries "${real_candidate}")
+endforeach()
+list(REMOVE_DUPLICATES staged_runtime_libraries)
+
 file(GET_RUNTIME_DEPENDENCIES
   EXECUTABLES "${binary}"
+  LIBRARIES ${staged_runtime_libraries}
   MODULES ${plugin_modules}
   RESOLVED_DEPENDENCIES_VAR resolved_dependencies
   UNRESOLVED_DEPENDENCIES_VAR unresolved_dependencies
+  CONFLICTING_DEPENDENCIES_PREFIX conflicting_dependencies
   PRE_EXCLUDE_REGEXES
     "^ld-linux.*"
     "^libc\\.so.*"
@@ -36,20 +47,32 @@ file(GET_RUNTIME_DEPENDENCIES
     "^linux-vdso.*"
 )
 
-if(unresolved_dependencies)
-  list(JOIN unresolved_dependencies ", " unresolved_text)
-  message(FATAL_ERROR "Unresolved Linux package dependencies: ${unresolved_text}")
+if(conflicting_dependencies_FILENAMES)
+  set(unshipped_conflicts)
+  foreach(dependency_name IN LISTS conflicting_dependencies_FILENAMES)
+    if(NOT EXISTS "${library_directory}/${dependency_name}")
+      list(APPEND unshipped_conflicts "${dependency_name}")
+    endif()
+  endforeach()
+  if(unshipped_conflicts)
+    list(JOIN unshipped_conflicts ", " conflict_text)
+    message(FATAL_ERROR
+      "Conflicting Linux dependencies are not staged: ${conflict_text}")
+  endif()
 endif()
 
-foreach(dependency IN LISTS resolved_dependencies)
-  get_filename_component(dependency_name "${dependency}" NAME)
-  if(dependency_name MATCHES "^libQt6.*\\.so" OR
-     dependency_name MATCHES "^libSDL3.*\\.so")
-    file(INSTALL "${dependency}"
-      DESTINATION "${library_directory}"
-      FOLLOW_SYMLINK_CHAIN)
+if(unresolved_dependencies)
+  set(missing_dependencies)
+  foreach(dependency_name IN LISTS unresolved_dependencies)
+    if(NOT EXISTS "${library_directory}/${dependency_name}")
+      list(APPEND missing_dependencies "${dependency_name}")
+    endif()
+  endforeach()
+  if(missing_dependencies)
+    list(JOIN missing_dependencies ", " missing_text)
+    message(FATAL_ERROR "Unresolved Linux package dependencies: ${missing_text}")
   endif()
-endforeach()
+endif()
 
 file(WRITE "${prefix}/@CMAKE_INSTALL_BINDIR@/qt.conf"
   "[Paths]\nPrefix=..\nLibraries=@CMAKE_INSTALL_LIBDIR@\nPlugins=@CMAKE_INSTALL_LIBDIR@/qt6/plugins\n")

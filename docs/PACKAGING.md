@@ -44,13 +44,16 @@ To inspect the self-contained install tree before archiving:
 cmake --install build/release --prefix build/package-root
 cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
   -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
-build/package-root/bin/genesis-plus-gx-gui --version
+env -u LD_LIBRARY_PATH build/package-root/bin/genesis-plus-gx-gui --version
 ```
 
 Use `windows` or `macos` for `VERIFY_PLATFORM` on those hosts. Verification requires the
 application executable, Qt Core runtime, SDL3 runtime, and native Qt platform plugin to
 exist in the staged tree. Windows verification also requires Microsoft's official
 Visual C++ x64 Redistributable installer.
+Linux verification additionally requires Qt's matching ICU runtime, and the smoke
+command clears the build environment's library override so missing package libraries
+cannot be hidden by the original dependency prefix.
 
 Normal packages must also contain the platform librashader runtime, the original
 `genplusgx-crt.slangp`/`.slang` files, and `librashader-MPL-2.0.md`. Verification
@@ -77,8 +80,10 @@ oldest supported Linux distribution gives the broadest compatibility.
 The install graph stages the public imported Qt and shared SDL targets, including their
 SONAME links, before resolving remaining transitive dependencies. Qt's required XCB QPA
 runtime is copied directly from the same Qt library prefix without importing private
-headers or build dependencies. This keeps deployment deterministic and avoids treating
-build-host search directories as package inputs.
+headers or build dependencies. Version-matched ICU libraries from that prefix are also
+staged because Qt's official binary build cannot rely on a Linux distribution shipping
+the same ICU major. This keeps deployment deterministic and avoids treating build-host
+search directories as package inputs.
 The archive includes Qt's XCB EGL and GLX integration plugins. Runtime rendering also
 preflights a context and surface before creating the accelerated display, automatically
 retaining the complete software-rendered shell if host OpenGL is unavailable.

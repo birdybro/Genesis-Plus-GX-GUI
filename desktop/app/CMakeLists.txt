@@ -173,38 +173,52 @@ if(UNIX AND NOT APPLE)
     )
   endforeach()
 
-  # Qt's XCB platform plugin links to this private runtime, but finding the private
-  # CMake component would unnecessarily require the complete XCB development graph.
-  # Locate only the shipped runtime beside the public Qt libraries and stage its
-  # versioned implementation plus SONAME link.
+  # Qt's XCB platform plugin links to a private runtime, and the official Linux Qt
+  # build links Core to its bundled ICU. Finding the private XCB CMake component
+  # would unnecessarily require the complete XCB development graph. Locate only
+  # these shipped runtimes beside the public Qt libraries and stage each versioned
+  # implementation plus SONAME link.
   get_filename_component(genplusgx_qt_library_directory
     "${Qt6_DIR}/../.." ABSOLUTE)
-  find_library(genplusgx_qt_xcbqpa_library
-    NAMES Qt6XcbQpa
-    PATHS "${genplusgx_qt_library_directory}"
-    NO_DEFAULT_PATH
-    NO_CACHE
-    REQUIRED
-  )
-  file(REAL_PATH "${genplusgx_qt_xcbqpa_library}"
-    genplusgx_qt_xcbqpa_real_library)
-  get_filename_component(genplusgx_qt_xcbqpa_directory
-    "${genplusgx_qt_xcbqpa_real_library}" DIRECTORY)
-  set(genplusgx_qt_xcbqpa_soname_library
-    "${genplusgx_qt_xcbqpa_directory}/libQt6XcbQpa.so.6")
-  if(NOT EXISTS "${genplusgx_qt_xcbqpa_soname_library}")
-    message(FATAL_ERROR
-      "Qt's XCB QPA SONAME library is missing: ${genplusgx_qt_xcbqpa_soname_library}")
-  endif()
-  set(genplusgx_qt_xcbqpa_runtime_files
-    "${genplusgx_qt_xcbqpa_real_library}"
-    "${genplusgx_qt_xcbqpa_soname_library}"
-  )
-  list(REMOVE_DUPLICATES genplusgx_qt_xcbqpa_runtime_files)
-  install(
-    FILES ${genplusgx_qt_xcbqpa_runtime_files}
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-  )
+  function(genplusgx_install_linux_companion library_basename)
+    find_library(genplusgx_companion_library
+      NAMES "${library_basename}"
+      PATHS "${genplusgx_qt_library_directory}"
+      NO_DEFAULT_PATH
+      NO_CACHE
+      REQUIRED
+    )
+    file(REAL_PATH "${genplusgx_companion_library}"
+      genplusgx_companion_real_library)
+    get_filename_component(genplusgx_companion_directory
+      "${genplusgx_companion_real_library}" DIRECTORY)
+    get_filename_component(genplusgx_companion_filename
+      "${genplusgx_companion_real_library}" NAME)
+    if(NOT genplusgx_companion_filename MATCHES
+       "^lib${library_basename}\\.so\\.([0-9]+)")
+      message(FATAL_ERROR
+        "Cannot determine the SONAME for ${genplusgx_companion_real_library}")
+    endif()
+    set(genplusgx_companion_soname_library
+      "${genplusgx_companion_directory}/lib${library_basename}.so.${CMAKE_MATCH_1}")
+    if(NOT EXISTS "${genplusgx_companion_soname_library}")
+      message(FATAL_ERROR
+        "Required SONAME library is missing: ${genplusgx_companion_soname_library}")
+    endif()
+    set(genplusgx_companion_runtime_files
+      "${genplusgx_companion_real_library}"
+      "${genplusgx_companion_soname_library}"
+    )
+    list(REMOVE_DUPLICATES genplusgx_companion_runtime_files)
+    install(
+      FILES ${genplusgx_companion_runtime_files}
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    )
+  endfunction()
+
+  foreach(companion_library IN ITEMS Qt6XcbQpa icudata icui18n icuuc)
+    genplusgx_install_linux_companion("${companion_library}")
+  endforeach()
 
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/LinuxDeploy.cmake.in"
