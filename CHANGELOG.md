@@ -37,6 +37,9 @@ platform documentation.
   component, and stages Qt's version-matched ICU companions, keeping source
   configuration independent of private Qt/XCB headers while making the archive
   independent of the build host's ICU version.
+- Linux deployment rewrites copied Qt plugin RUNPATHs for the packaged directory depth
+  and tests the archive through the real XCB backend, preventing an incompatible host
+  `libQt6XcbQpa` from being selected before the application window is created.
 
 ## [0.1.1] - 2026-08-26
 

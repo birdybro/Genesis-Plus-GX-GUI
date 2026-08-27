@@ -77,7 +77,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 63 Native release-gate evidence | COMPLETE | Record the exact warning-clean hosted matrix and archive inspection before tagging | final report and milestone ledger | ten-job exact CI; six checksums; four binary architectures; payload scan | Tested source and distributed runtime contents are traceable before immutable publication | pending |
 | 64 Libretro CRT shaders | COMPLETE | Add adjustable CRT rendering and modern Libretro Slang preset support | librashader integration, video/settings/UI, packaging, tests/docs | 77-test Debug/Release/ASan; 75-test shader-disabled build; real OpenGL render test | Built-in and user Slang chains render outside the core with bounded fallback | `a632526` |
 | 65 Native shader hardening | COMPLETE | Resolve Windows capability and macOS symbol-resolution findings | OpenGL runtime/resolver and cross-platform GUI regression | ten-job exact hosted matrix; real Linux/macOS render; safe Windows capability skip | Compatible contexts render; unsupported contexts retain normal video safely | `b5aeffa` |
-| 66 Native package log hardening | IN PROGRESS | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure, Windows redist path, packaging docs | warning-free local Release install/CPack; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning | pending |
+| 66 Native package log hardening | IN PROGRESS | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure/plugin isolation, Windows redist path, packaging docs | warning-free local Release install/CPack; real XCB smoke; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning and use only their matched Qt runtime | pending |
 
 ## Execution policy
 
@@ -3807,6 +3807,9 @@ found by reading every successful Milestone 65 hosted job log.
 - `CMakeLists.txt`
 - `desktop/app/CMakeLists.txt`
 - `cmake/LinuxDeploy.cmake.in`
+- `cmake/VerifyPackage.cmake`
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
 - `CHANGELOG.md`
 - `docs/PACKAGING.md`
 - `docs/DEVELOPMENT_PLAN.md`
@@ -3834,13 +3837,25 @@ warning-free with ICU 78 staged, package verification succeeds, `ldd` has no mis
 entry, and an installed `--version` smoke succeeds with `LD_LIBRARY_PATH` removed. Run
 `33096623874` showed that the official bundle ships only versioned ICU runtime names;
 discovery now falls back to a single unambiguous real version when no development
-symlink exists.
+symlink exists. Exact run `33096871699` subsequently passed all ten jobs, all 77-test
+native suites, sanitizers, and all package steps without the original Linux or Windows
+warnings. An adversarial download audit nevertheless found that the official Qt
+plugins retained a RUNPATH for Qt's source archive layout. That let the XCB plugin
+select an incompatible host `libQt6XcbQpa` on a lean tester system even though the
+correct library was staged. The install step now rewrites every copied plugin to the
+package lib directory; package verification enforces that invariant; and CI overrides
+the global offscreen test backend for an installed real-XCB process smoke. The new
+verifier rejects the downloaded pre-fix archive, while applying the deploy correction
+to that exact archive makes the verifier and native XCB launch pass. A fresh local
+Release build passes 77/77, install/CPack remain warning-free, and the installed XCB
+smoke passes with `LD_LIBRARY_PATH` removed. Exact hosted confirmation of this final
+correction remains pending.
 
 **Acceptance criteria:** Linux stages exact Qt/SDL runtimes and resolves only remaining
-transitive dependencies without private Qt build requirements or fallback-directory
-warnings; Windows safely embeds a normalized Visual C++ Redistributable path; all
-native jobs/tests/packages pass; and complete hosted logs contain no actionable
-packaging diagnostic.
+transitive dependencies without private Qt build requirements, fallback-directory
+warnings, or host Qt substitution; Windows safely embeds a normalized Visual C++
+Redistributable path; all native jobs/tests/packages pass; and complete hosted logs
+contain no actionable packaging diagnostic.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

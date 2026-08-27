@@ -58,6 +58,7 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
     "${package_root}/bin/genesis-plus-gx-gui"
     "Linux application executable")
   require_match("*libQt6Core.so*" "deployed Qt Core runtime")
+  require_match("*libQt6XcbQpa.so*" "deployed Qt XCB platform runtime")
   require_match("*libSDL3.so*" "deployed SDL3 runtime")
   require_match("*librashader.so" "deployed libretro shader runtime")
   require_match("*libicudata.so.*" "deployed ICU data runtime")
@@ -72,6 +73,26 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_match(
     "*libqxcb-*-integration.so"
     "deployed Qt XCB OpenGL integration plugin")
+  find_program(readelf_executable NAMES readelf REQUIRED)
+  file(GLOB_RECURSE qt_plugin_modules LIST_DIRECTORIES FALSE
+    "${package_root}/lib/qt6/plugins/*.so")
+  foreach(qt_plugin_module IN LISTS qt_plugin_modules)
+    execute_process(
+      COMMAND "${readelf_executable}" -d "${qt_plugin_module}"
+      RESULT_VARIABLE readelf_result
+      OUTPUT_VARIABLE readelf_output
+      ERROR_VARIABLE readelf_error
+    )
+    if(NOT readelf_result EQUAL 0)
+      message(FATAL_ERROR
+        "Could not inspect ${qt_plugin_module}: ${readelf_error}")
+    endif()
+    if(NOT readelf_output MATCHES
+       "(RPATH|RUNPATH)[^\n]*\\[\\$ORIGIN/\\.\\./\\.\\./\\.\\./\\]")
+      message(FATAL_ERROR
+        "Qt plugin cannot resolve the packaged lib directory: ${qt_plugin_module}")
+    endif()
+  endforeach()
   set(shader_directory
     "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
   set(librashader_license

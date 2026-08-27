@@ -44,12 +44,15 @@ To inspect the self-contained install tree before archiving:
 cmake --install build/release --prefix build/package-root
 cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
   -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
-env -u LD_LIBRARY_PATH build/package-root/bin/genesis-plus-gx-gui --version
+env -u LD_LIBRARY_PATH QT_QPA_PLATFORM=xcb xvfb-run -a \
+  build/package-root/bin/genesis-plus-gx-gui --version
 ```
 
 Use `windows` or `macos` for `VERIFY_PLATFORM` on those hosts. Verification requires the
 application executable, Qt Core runtime, SDL3 runtime, and native Qt platform plugin to
-exist in the staged tree. Windows verification also requires Microsoft's official
+exist in the staged tree. Linux verification additionally confirms that each Qt plugin's
+RUNPATH resolves the packaged Qt libraries rather than an arbitrary host installation.
+Windows verification also requires Microsoft's official
 Visual C++ x64 Redistributable installer.
 Linux verification additionally requires Qt's matching ICU runtime, and the smoke
 command clears the build environment's library override so missing package libraries

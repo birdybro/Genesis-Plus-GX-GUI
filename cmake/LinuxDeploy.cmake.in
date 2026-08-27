@@ -19,6 +19,43 @@ if(NOT plugin_modules)
   message(FATAL_ERROR "No selected Qt plugins were installed")
 endif()
 
+# The official Qt archive gives its plugins a RUNPATH relative to the archive's
+# original lib/plugins layout.  We deliberately install them one level deeper at
+# lib/qt6/plugins so qt.conf can keep the package layout conventional.  Rewrite
+# every copied plugin to find the Qt libraries in the package's lib directory;
+# otherwise the dynamic loader can silently select an incompatible system
+# libQt6XcbQpa and the XCB platform plugin fails before the window is created.
+if(NOT EXISTS "@CMAKE_READELF@")
+  message(FATAL_ERROR "CMAKE_READELF is required to validate Linux plugin RPATHs")
+endif()
+foreach(plugin_module IN LISTS plugin_modules)
+  execute_process(
+    COMMAND "@CMAKE_READELF@" -d "${plugin_module}"
+    RESULT_VARIABLE readelf_result
+    OUTPUT_VARIABLE readelf_output
+    ERROR_VARIABLE readelf_error
+  )
+  if(NOT readelf_result EQUAL 0)
+    message(FATAL_ERROR
+      "Could not inspect ${plugin_module}: ${readelf_error}")
+  endif()
+  string(REGEX MATCH
+    "(RPATH|RUNPATH)[^\n]*\\[([^]]*)\\]"
+    plugin_rpath_match "${readelf_output}")
+  if(NOT plugin_rpath_match)
+    message(FATAL_ERROR "Qt plugin has no RPATH/RUNPATH: ${plugin_module}")
+  endif()
+  set(plugin_rpath "${CMAKE_MATCH_2}")
+  set(expected_plugin_rpath "$ORIGIN/../../../")
+  if(NOT plugin_rpath STREQUAL expected_plugin_rpath)
+    file(RPATH_CHANGE
+      FILE "${plugin_module}"
+      OLD_RPATH "${plugin_rpath}"
+      NEW_RPATH "${expected_plugin_rpath}"
+    )
+  endif()
+endforeach()
+
 file(GLOB staged_runtime_candidates LIST_DIRECTORIES FALSE
   "${library_directory}/*.so*")
 set(staged_runtime_libraries)
