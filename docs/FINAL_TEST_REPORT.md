@@ -1,8 +1,8 @@
 # Final Test Report
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
-Linux startup correction, first tagged-release audit, and subsequent complete native
-log/artifact audits performed on 2026-08-26 (America/Denver).
+Linux startup correction, tagged-release audits, and the post-release Libretro shader
+feature verification through 2026-08-27 (America/Denver).
 
 ## Candidate identity
 
@@ -19,7 +19,7 @@ log/artifact audits performed on 2026-08-26 (America/Denver).
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA in that commit
 
-No golden reference changed during final verification. The Linux correction deploys
+No emulator golden reference changed during final verification. The Linux correction deploys
 Qt's XCB EGL/GLX integrations and preflights a usable context/surface before creating
 the accelerated child widget, so unavailable OpenGL now preserves the complete shell
 through the software renderer. The final hardening pass also made
@@ -29,6 +29,13 @@ suppressed library rows for owned raw tracks, and made live backup/state/metadat
 hashing cooperatively cancellable during shutdown. Earlier bounded user-visible runtime
 failure and aggregate shutdown-status guarantees remain intact.
 
+The post-release video layer now dynamically loads the pinned librashader 0.12.0
+OpenGL runtime, ships an original adjustable CRT preset, and supports modern Libretro
+Slang `.slangp` chains without changing core output. The real OpenGL regression found
+and fixed an incomplete one-level texture that produced black shader samples. Global
+and per-game settings, bounded preset/parameter validation, runtime fallback, PAL/NTSC
+uniform timing, packaging, license notices, and GUI controls are included.
+
 ## Build configurations tested
 
 Every local configuration was rebuilt with `--clean-first`. Newly authored frontend
@@ -36,9 +43,10 @@ code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr | 75/75 | Passed |
-| Release | Optimized native x86-64 | 75/75 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 75/75 | Passed; no finding |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 77/77 | Passed |
+| Release | Optimized native x86-64 | 77/77 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 77/77 | Passed; no project finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 75/75 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -48,22 +56,31 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-CTest registers 75 distinct tests:
+The default shader-enabled build registers 77 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 18 |
 | Integration | 1 |
-| Unit | 30 |
-| GUI/smoke | 18 |
-| **Total** | **75** |
+| Unit | 31 |
+| GUI/smoke | 19 |
+| **Total** | **77** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 48 `unit`, 19 `core`, 28 `integration`, and 18 `gui`. Focused
+layers. Label counts are 49 `unit`, 19 `core`, 29 `integration`, and 19 `gui`. Focused
 coverage also includes persistence (24), fixtures (22), concurrency (13), settings
-(12), input (9), video (6), audio (5), timing (4), release (4), fuzz/property (3), and
-packaging (3).
+(12), input (9), video (8), audio (5), timing (4), release (4), fuzz/property (3),
+shader (2), and packaging (3).
+
+`unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
+parameter count/name/value validation, real built-in metadata, undeclared overrides,
+and declared ranges. `gui.libretro_shader_render` uses a real OpenGL 3.3 context to
+sample an original input texture through librashader, then captures the actual
+`QOpenGLWidget` and proves the built-in CRT output is non-black and materially differs
+from normal presentation. Linux runs that test under Xvfb/GLX. LeakSanitizer suppresses
+only process-global allocations rooted in the host NVIDIA GL and DBus libraries; all
+project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal.
 
 ## Operating-system CI matrix
 
@@ -94,8 +111,9 @@ also links and cleans without a diagnostic.
 
 The local Release install was staged without a deployment warning in a fresh temporary
 root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
-`--version` process smoke. The tree contains 47 files, including the XCB EGL and GLX
-integration plugins, and no cartridge, disc, firmware, SRAM, BRAM, or state payload.
+`--version` process smoke. The tree contains 52 files, including the XCB EGL and GLX
+integration plugins, librashader runtime, built-in CRT preset/source, shader license,
+and new shader guide, with no cartridge, disc, firmware, SRAM, BRAM, or state payload.
 CPack produces the versioned
 `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
 closure archive's digest is intentionally not embedded in this packaged report because
@@ -191,7 +209,8 @@ correction; the sanitizer suite reports no finding.
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
   CD run through the separated desktop adapter and owner-thread emulation worker.
 - [x] Dynamic high-DPI OpenGL/software video, aspect/integer scaling, overscan, filters,
-  interlace, Game Gear viewport, fullscreen, runtime FPS, and native PNG screenshots.
+  interlace, Game Gear viewport, fullscreen, runtime FPS, native PNG screenshots,
+  adjustable built-in CRT output, and modern Libretro Slang preset chains.
 - [x] Bounded stereo audio, core mixing options, device/latency selection, live
   transactional reconfiguration, instrumentation, pause, and disconnect recovery.
 - [x] Keyboard and SDL3 controllers, hot-plug, eight player assignments, button/axis

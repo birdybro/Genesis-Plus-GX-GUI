@@ -24,6 +24,10 @@ QString userGuideText()
     "System, BIOS, Paths, and Advanced settings center; direct menu shortcuts "
     "remain available for common editors.\n"
     "\n"
+    "Video → Shaders enables the built-in adjustable CRT effect or loads a "
+    "user-provided modern Libretro Slang .slangp preset. Shaders need OpenGL "
+    "3.3; a failure keeps the normal unshaded display active.\n"
+    "\n"
     "Save data is loaded and written automatically in the platform application "
     "data directory. No ROMs or proprietary Sega firmware are included. The "
     "complete guide is installed as docs/USER_GUIDE.md with source builds.");

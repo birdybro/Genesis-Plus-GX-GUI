@@ -21,7 +21,7 @@ ctest --preset debug -L gui --output-on-failure
 | Loading | Injected Open dialog, invalid input errors, drag/drop, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `gui.game_loading`, `gui.main_window` |
 | Emulation controls | Live Pause/Resume, hard/soft reset, independent fast-forward hold/toggle composition, focus-safe hold release, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
 | Save states | Slots 0–9, save/load/delete, timestamps, changed execution, deterministic restore, wrong-game rejection, cancellable identity activation | `unit.state_storage_service`, `gui.save_state_workflow`, `gui.main_window` |
-| Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, Apply/Cancel/defaults | `gui.main_window`, `gui.display_widget` |
+| Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, built-in/custom Libretro shader selection and parameters, real OpenGL pass-through input sampling, actual CRT widget output, Apply/Cancel/defaults | `unit.shader_configuration`, `gui.main_window`, `gui.display_widget`, `gui.libretro_shader_render` |
 | Audio | Mute/volume/core controls, live latency/device changes without ring replacement, transactional failure, stopped-output retry, concurrent logical-capacity changes, bounded hot-plug refresh/recovery, Apply/Cancel/defaults | `unit.audio_ring_buffer`, `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
 | Controller/input UI | Gameplay/hotkey capture, separate fast-forward hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
@@ -45,6 +45,14 @@ generated 68000/disc workflow tests.
 The GUI layer deliberately avoids platform-native pixel goldens. Presentation geometry
 and emulator pixels are validated independently by deterministic unit/core hashes, while
 GUI tests assert semantics and state transitions across platforms.
+
+`gui.libretro_shader_render` is the focused exception to the normal offscreen software
+path. Linux CI runs it under Xvfb with GLX and requires a real OpenGL 3.3 context. It
+executes an original one-pass fixture through librashader, reads RGB output, then enables
+the bundled CRT preset on the actual `DisplayWidget` and requires a non-black image that
+materially differs from the baseline. Windows and macOS use their native Qt platform;
+they may return CTest skip code 77 only when the hosted environment cannot create a
+desktop OpenGL context.
 
 ## Supporting layers
 

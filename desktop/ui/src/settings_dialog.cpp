@@ -74,6 +74,19 @@ QString filterName(video::VideoFilter filter)
     ? QObject::tr("Bilinear") : QObject::tr("Nearest neighbor");
 }
 
+QString shaderName(video::ShaderMode mode)
+{
+  switch (mode) {
+    case video::ShaderMode::disabled:
+      return QObject::tr("Off");
+    case video::ShaderMode::builtinCrt:
+      return QObject::tr("Built-in CRT");
+    case video::ShaderMode::libretroPreset:
+      return QObject::tr("Custom Libretro preset");
+  }
+  return QObject::tr("Unknown");
+}
+
 QString hardwareName(CoreSystemHardware hardware)
 {
   switch (hardware) {
@@ -205,7 +218,7 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::appearance},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Video"),
-    tr("Presentation geometry, scaling, filtering, and Genesis Plus GX video output."),
+    tr("Presentation geometry, scaling, CRT shaders, and Genesis Plus GX video output."),
     "videoSettingsPage", "videoSettingsSummary", videoSummary_, {
       {tr("Video Settings…"), "configureVideoButton", SettingsPageAction::video},
     }));
@@ -306,10 +319,11 @@ void SettingsDialog::refresh()
     tr("Theme: %1\nHigh-DPI policy: operating-system scaling")
       .arg(themeName(overview_.appearance.theme)));
   videoSummary_->setText(
-    tr("Aspect: %1\nScaling: %2\nTexture filter: %3")
+    tr("Aspect: %1\nScaling: %2\nTexture filter: %3\nShader: %4")
       .arg(aspectName(overview_.video.aspect),
         scalingName(overview_.video.scaling),
-        filterName(overview_.video.presentationFilter)));
+        filterName(overview_.video.presentationFilter),
+        shaderName(overview_.video.shader.mode)));
   audioSummary_->setText(
     tr("Playback device: %1\nLatency: %2 ms\nVolume: %3%4")
       .arg(overview_.audio.outputDeviceName.empty()

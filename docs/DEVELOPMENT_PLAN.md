@@ -3690,3 +3690,59 @@ pushed before `v0.1.1` publication.
 
 **Commit SHA:** pending (resolve with
 `git log -1 -- docs/FINAL_TEST_REPORT.md`; a commit cannot contain its own SHA)
+
+## Milestone 64 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add reliable CRT presentation and modern Libretro Slang preset compatibility
+without changing Genesis Plus GX framebuffer production or core ownership.
+
+**Files changed:**
+
+- `cmake/Librashader.cmake`
+- `CMakeLists.txt`, `cmake/Packaging.cmake`, and `cmake/VerifyPackage.cmake`
+- `desktop/video/` shader configuration, dynamic runtime, display integration, and
+  original built-in CRT resources
+- `desktop/settings/` global schema migration and sparse per-game serialization
+- `desktop/ui/` menus, native picker seam, parameter editor, Settings summary, and
+  embedded help
+- `desktop/app/main.cpp` and `desktop/app/CMakeLists.txt`
+- `tests/unit/shader_configuration_test.cpp`
+- `tests/gui/libretro_shader_render_test.cpp` and related GUI/settings tests
+- `tests/fixtures/libretro-pass.slangp`, `tests/fixtures/libretro-pass.slang`, and
+  `tests/sanitizers/lsan-opengl.supp`
+- `.github/workflows/ci.yml` and `.github/workflows/release.yml`
+- README, changelog, architecture/build/user/testing/packaging/upstream documents,
+  final test report, fixture provenance, and third-party notices
+
+**Tests added:** `unit.shader_configuration` validates modes, path/file/parameter
+bounds, the real built-in preset, malformed input, unknown parameters, and declared
+ranges. `gui.libretro_shader_render` compiles and runs an original modern Slang fixture
+through the real librashader/OpenGL path, verifies sampled RGB output, then captures the
+actual `QOpenGLWidget` and requires the built-in CRT image to be non-black and
+materially different from the unshaded baseline. Existing video settings, per-game,
+menu, display, documentation, Windows package-fixture, and package-metadata tests gained
+shader coverage.
+
+**Gate evidence:** Warning-as-error Debug and clean Release builds pass 77/77 tests.
+A clean ASan/UBSan build passes 77/77 with leak detection and immediate failure; its
+only suppression patterns are external NVIDIA GL and DBus process caches observed with
+no project/librashader frame. A full shader-disabled warning build passes 75/75, proving
+the Rust-free fallback configuration. The real OpenGL test reproduces and guards the
+one-level texture/mipmap black-frame defect. A fresh 52-file Release stage passes the
+Linux package verifier and installed `--version` smoke, contains executable
+`librashader.so`, the CRT preset/source and MPL-2.0 license, and CPack emits the expected
+versioned TGZ/checksum. Hosted Windows/macOS/Linux confirmation and complete log audit
+begin after this milestone commit is pushed.
+
+**Acceptance criteria:** The built-in adjustable CRT effect and user `.slangp` presets
+are selectable through stable menu/settings controls; multi-pass/LUT/history behavior
+is delegated to pinned librashader 0.12.0; parameter/path/size errors fail visibly to
+normal video; schema-1 settings migrate safely; global and sparse per-game selection
+persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
+software/no-feature builds remain usable; required runtimes/resources/licenses ship on
+all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)

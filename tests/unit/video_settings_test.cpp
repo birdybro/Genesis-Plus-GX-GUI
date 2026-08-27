@@ -48,6 +48,14 @@ int main()
     .aspect = genplusgx::video::AspectMode::stretch,
     .scaling = genplusgx::video::ScaleMode::integer,
     .presentationFilter = genplusgx::video::VideoFilter::bilinear,
+    .shader = {
+      .mode = genplusgx::video::ShaderMode::libretroPreset,
+      .presetPath = path / "custom-crt.slangp",
+      .parameters = {
+        {.name = "SCANLINE_STRENGTH", .value = 0.42F},
+        {.name = "CURVATURE", .value = 0.08F},
+      },
+    },
     .core = {
       .overscan = genplusgx::CoreOverscanMode::full,
       .ntscFilter = genplusgx::CoreNtscFilter::sVideo,
@@ -74,6 +82,15 @@ int main()
     return 5;
   }
 
+  auto invalidShader = custom;
+  invalidShader.shader.presetPath = "relative.slangp";
+  if (!check(!genplusgx::settings::validateVideoSettings(invalidShader) &&
+        store.save(invalidShader).error ==
+          genplusgx::PersistenceError::invalidData,
+      "Invalid shader settings were accepted")) {
+    return 6;
+  }
+
   constexpr std::string_view legacy = R"json({
     "schemaVersion": 0,
     "integerScale": true,
@@ -85,7 +102,7 @@ int main()
     "doubleField": true
   })json";
   if (!check(writeText(store.path(), legacy), "Legacy settings could not be staged")) {
-    return 6;
+    return 7;
   }
   const auto migrated = store.load();
   if (!check(migrated.status && migrated.migrated &&
@@ -101,31 +118,54 @@ int main()
         migrated.settings.core.interlacedRender ==
           genplusgx::CoreInterlacedRenderMode::doubleField,
       "Schema-zero settings did not migrate semantically")) {
-    return 7;
+    return 8;
+  }
+
+  constexpr std::string_view schemaOne = R"json({
+    "schemaVersion": 1,
+    "video": {
+      "aspect": "native",
+      "scaling": "fit",
+      "presentationFilter": "nearest",
+      "overscan": "disabled",
+      "ntscFilter": "disabled",
+      "gameGearExtendedScreen": false,
+      "interlacedRender": "single-field"
+    }
+  })json";
+  if (!check(writeText(store.path(), schemaOne),
+        "Schema-one settings could not be staged")) {
+    return 9;
+  }
+  const auto schemaOneMigrated = store.load();
+  if (!check(schemaOneMigrated.status && schemaOneMigrated.migrated &&
+        schemaOneMigrated.settings ==
+          genplusgx::settings::defaultVideoSettings(),
+      "Schema-one settings did not gain safe shader defaults")) {
+    return 10;
   }
 
   if (!check(writeText(store.path(), "{broken"),
         "Corrupt settings could not be staged")) {
-    return 8;
+    return 11;
   }
   const auto corrupt = store.load();
   if (!check(!corrupt.status &&
         corrupt.status.error == genplusgx::PersistenceError::invalidData &&
         corrupt.settings == genplusgx::settings::defaultVideoSettings(),
       "Corrupt settings did not fail closed to defaults")) {
-    return 9;
+    return 12;
   }
 
   constexpr std::string_view future =
     R"json({"schemaVersion": 999, "video": {}})json";
   if (!check(writeText(store.path(), future),
         "Future settings could not be staged")) {
-    return 10;
+    return 13;
   }
   const auto unsupported = store.load();
   return check(!unsupported.status &&
       unsupported.status.message.find("not supported") != std::string::npos,
       "A future settings schema was silently accepted")
-    ? 0 : 11;
+    ? 0 : 14;
 }
-

@@ -52,6 +52,11 @@ application executable, Qt Core runtime, SDL3 runtime, and native Qt platform pl
 exist in the staged tree. Windows verification also requires Microsoft's official
 Visual C++ x64 Redistributable installer.
 
+Normal packages must also contain the platform librashader runtime, the original
+`genplusgx-crt.slangp`/`.slang` files, and `librashader-MPL-2.0.md`. Verification
+treats each as required. Custom user shader packs are never copied into or downloaded
+by packaging.
+
 ## Platform notes
 
 Windows packages are portable directories and do not modify the registry. The staged

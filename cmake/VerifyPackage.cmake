@@ -31,9 +31,14 @@ if(VERIFY_PLATFORM STREQUAL "windows")
   require_match("*Qt6Core.dll" "deployed Qt Core runtime")
   require_match("*SDL3*.dll" "deployed SDL3 runtime")
   require_match("*qwindows.dll" "deployed Qt Windows platform plugin")
+  require_match("*librashader.dll" "deployed libretro shader runtime")
   require_match(
     "*vc_redist.x64.exe"
     "official Microsoft Visual C++ x64 Redistributable installer")
+  set(shader_directory
+    "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
+  set(librashader_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
 elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(bundle "${package_root}/genesis-plus-gx-gui.app")
   require_file(
@@ -44,12 +49,17 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
     "deployed Qt Core framework")
   require_match("*SDL3*.dylib" "deployed SDL3 runtime")
   require_match("*libqcocoa.dylib" "deployed Qt Cocoa platform plugin")
+  require_match("*librashader.dylib" "deployed libretro shader runtime")
+  set(shader_directory "${bundle}/Contents/Resources/shaders")
+  set(librashader_license
+    "${bundle}/Contents/Resources/licenses/librashader-MPL-2.0.md")
 elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_file(
     "${package_root}/bin/genesis-plus-gx-gui"
     "Linux application executable")
   require_match("*libQt6Core.so*" "deployed Qt Core runtime")
   require_match("*libSDL3.so*" "deployed SDL3 runtime")
+  require_match("*librashader.so" "deployed libretro shader runtime")
   file(GLOB_RECURSE platform_plugins LIST_DIRECTORIES FALSE
     "${package_root}/*libqxcb.so"
     "${package_root}/*libqoffscreen.so")
@@ -59,8 +69,18 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_match(
     "*libqxcb-*-integration.so"
     "deployed Qt XCB OpenGL integration plugin")
+  set(shader_directory
+    "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
+  set(librashader_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
 else()
   message(FATAL_ERROR "Unsupported VERIFY_PLATFORM value: ${VERIFY_PLATFORM}")
 endif()
+
+require_file(
+  "${shader_directory}/genplusgx-crt.slangp" "built-in CRT shader preset")
+require_file(
+  "${shader_directory}/genplusgx-crt.slang" "built-in CRT shader source")
+require_file("${librashader_license}" "librashader MPL-2.0 license")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

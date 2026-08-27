@@ -240,6 +240,7 @@ public:
   void setGameLoaded(const std::filesystem::path& path);
   void setGameRuntimeIdentity(std::string system, std::string region);
   void setMeasuredFrameRate(double framesPerSecond);
+  void setNominalVideoRate(double framesPerSecond);
   void setNoGameLoaded();
   void showGameLoadError(
     const std::filesystem::path& path,
@@ -273,6 +274,7 @@ private:
   void chooseGame();
   void closeGame();
   void chooseDisc();
+  void chooseShaderPreset();
   void requestDiscEjected(bool ejected);
   void updateDiscActions();
   void requestGameInformation();

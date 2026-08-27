@@ -3,6 +3,7 @@
 #include "genplusgx/core_video_settings.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/video/video_geometry.h"
+#include "genplusgx/video/shader_configuration.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +15,7 @@ struct VideoSettings final {
   video::AspectMode aspect{video::AspectMode::native};
   video::ScaleMode scaling{video::ScaleMode::fit};
   video::VideoFilter presentationFilter{video::VideoFilter::nearest};
+  video::ShaderConfiguration shader;
   CoreVideoSettings core;
 
   [[nodiscard]] bool operator==(const VideoSettings&) const = default;
@@ -31,7 +33,7 @@ struct VideoSettingsLoadResult final {
 
 class VideoSettingsStore final {
 public:
-  static constexpr std::uint32_t schemaVersion = 1U;
+  static constexpr std::uint32_t schemaVersion = 2U;
   static constexpr std::size_t maximumFileBytes = 64U * 1024U;
 
   explicit VideoSettingsStore(std::filesystem::path path);
@@ -45,4 +47,3 @@ private:
 };
 
 } // namespace genplusgx::settings
-

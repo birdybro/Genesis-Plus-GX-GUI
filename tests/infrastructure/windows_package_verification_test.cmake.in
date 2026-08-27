@@ -9,6 +9,10 @@ foreach(runtime IN ITEMS
     bin/genesis-plus-gx-gui.exe
     bin/Qt6Core.dll
     bin/SDL3.dll
+    bin/librashader.dll
+    share/Genesis-Plus-GX-GUI/shaders/genplusgx-crt.slangp
+    share/Genesis-Plus-GX-GUI/shaders/genplusgx-crt.slang
+    share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md
     plugins/platforms/qwindows.dll)
   file(WRITE "${fixture_directory}/${runtime}" "package verification fixture")
 endforeach()

@@ -53,6 +53,11 @@ int main()
   PerGameSettings overrides;
   auto overrideVideo = global.video;
   overrideVideo.aspect = video::AspectMode::fourThree;
+  overrideVideo.shader = {
+    .mode = video::ShaderMode::builtinCrt,
+    .presetPath = {},
+    .parameters = {{.name = "CURVATURE", .value = 0.15F}},
+  };
   overrides.video = overrideVideo;
   auto overrideAudio = global.audio;
   overrideAudio.masterVolumePercent = 35;

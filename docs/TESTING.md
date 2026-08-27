@@ -39,6 +39,21 @@ presentation force the deterministic software display path. Native widget chrome
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
 window layer.
 
+`gui.libretro_shader_render` intentionally uses a real OpenGL context. Linux CI installs
+Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1`, so
+failure to create or execute the OpenGL 3.3 shader path is fatal. The test samples a
+known input through an original Slang pass and then verifies that the actual display
+widget's built-in CRT output is non-black and differs from its unshaded baseline.
+Windows and macOS run on their native Qt platforms and use skip code 77 only when the
+hosted environment provides no usable desktop OpenGL context.
+
+LeakSanitizer keeps a narrow symbol-based suppression file for allocations rooted in
+the host NVIDIA GL driver and Qt's system DBus library during this real-context process.
+It does not disable leak checking for the shader test or suppress any project,
+librashader, Mesa, or generic allocation frame; all other sanitizer diagnostics remain
+fatal. The suppression exists because those process-global host caches are outside the
+frontend's ownership and persist after every context/widget has been destroyed.
+
 `gui.desktop_startup_smoke` launches the actual desktop executable rather than a test
 facsimile. Its CMake harness creates a configuration-specific root below the build tree,
 uses Qt offscreen and SDL dummy audio, and supplies a bounded test-only auto-quit delay.
@@ -98,7 +113,8 @@ and Release, repeat the full suite under ASan/UBSan, and compile the inherited l
 target as a compatibility regression. Windows Server 2022 jobs build and test Debug and
 Release with the Visual Studio 2022 x64 toolchain. macOS 15 jobs run the same Debug and
 Release suites natively on Apple Silicon and Intel runners. Qt 6.8.3 and SDL 3.4.14 are
-explicit; third-party actions are pinned to immutable commit IDs. Failed CTest jobs
+explicit; Rust 1.88 is pinned for the librashader build; third-party actions are pinned
+to immutable commit IDs. Failed CTest jobs
 upload `LastTest.log` and CMake configure diagnostics with platform, architecture, and
 configuration-specific names.
 

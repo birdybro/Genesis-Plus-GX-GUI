@@ -14,7 +14,6 @@ target_link_libraries(
     Qt6::Test
     Qt6::Widgets
 )
-
 qt_add_executable(genplusgx_navigation_regression_test navigation_regression_test.cpp)
 set_target_properties(genplusgx_navigation_regression_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
@@ -256,6 +255,76 @@ set_tests_properties(
   gui.display_widget
   PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" LABELS "gui;integration;video"
 )
+
+if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
+  add_executable(
+    genplusgx_libretro_shader_render_test libretro_shader_render_test.cpp
+  )
+  target_link_libraries(
+    genplusgx_libretro_shader_render_test
+    PRIVATE
+      GenesisPlusGX::VideoWidget
+      genplusgx_project_options
+      genplusgx_project_warnings
+      Qt6::Gui
+      Qt6::Test
+      Qt6::Widgets
+  )
+  target_compile_definitions(
+    genplusgx_libretro_shader_render_test
+    PRIVATE
+      GENPLUSGX_SHADER_TEST_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
+  )
+  find_program(GENPLUSGX_XVFB_RUN_EXECUTABLE xvfb-run)
+  if(UNIX AND NOT APPLE AND GENPLUSGX_XVFB_RUN_EXECUTABLE)
+    add_test(
+      NAME gui.libretro_shader_render
+      COMMAND "${GENPLUSGX_XVFB_RUN_EXECUTABLE}" -a
+        -s "-screen 0 1024x768x24 +extension GLX"
+        $<TARGET_FILE:genplusgx_libretro_shader_render_test>
+    )
+    set(genplusgx_shader_test_environment
+      "QT_QPA_PLATFORM=xcb;GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1")
+  else()
+    add_test(
+      NAME gui.libretro_shader_render
+      COMMAND genplusgx_libretro_shader_render_test
+    )
+  endif()
+  set_tests_properties(
+    gui.libretro_shader_render
+    PROPERTIES
+      SKIP_RETURN_CODE 77
+      LABELS "gui;integration;video;shader;opengl"
+      TIMEOUT 30
+  )
+  if(WIN32)
+    set_tests_properties(
+      gui.libretro_shader_render PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=windows"
+    )
+  elseif(APPLE)
+    set_tests_properties(
+      gui.libretro_shader_render PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=cocoa"
+    )
+  else()
+    if(NOT GENPLUSGX_XVFB_RUN_EXECUTABLE)
+      set(genplusgx_shader_test_environment "QT_QPA_PLATFORM=xcb")
+    endif()
+  endif()
+  if(genplusgx_shader_test_environment)
+    set_tests_properties(
+      gui.libretro_shader_render
+      PROPERTIES ENVIRONMENT "${genplusgx_shader_test_environment}"
+    )
+  endif()
+  if(GENPLUSGX_ENABLE_SANITIZERS)
+    set_property(
+      TEST gui.libretro_shader_render
+      APPEND PROPERTY ENVIRONMENT
+        "LSAN_OPTIONS=suppressions=${PROJECT_SOURCE_DIR}/tests/sanitizers/lsan-opengl.supp:print_suppressions=1"
+    )
+  endif()
+endif()
 
 qt_add_executable(genplusgx_keyboard_input_test keyboard_input_test.cpp)
 set_target_properties(genplusgx_keyboard_input_test PROPERTIES AUTOMOC ON)

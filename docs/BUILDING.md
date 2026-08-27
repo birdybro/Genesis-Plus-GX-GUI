@@ -12,6 +12,7 @@ regenerate those legacy builds.
 - A C++20 compiler: GCC/Clang, Visual Studio 2022, or current Apple Clang
 - Qt 6.5 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, and Test
 - SDL 3.2 or newer with its CMake config package
+- Rust and Cargo 1.88 or newer for the default Libretro shader runtime
 - Platform OpenGL/window-system development files on Linux
 
 Hosted CI and release builds pin Qt 6.8.3 and SDL 3.4.14. A newer compatible local Qt
@@ -37,7 +38,9 @@ files. Keep architecture and compiler families consistent: for example, an MSVC 
 cannot link a MinGW Qt package, and an arm64 application cannot link x86-64 SDL.
 
 The CHD, zlib, zstd, LZMA, FLAC, Tremor, and minimp3 decoder sources needed by the core
-are bundled. CMake does not download dependencies or ROM/BIOS material during configure.
+are bundled. With shader support enabled, CMake downloads the checksum-pinned
+librashader 0.12.0 source archive and Cargo builds its OpenGL C API runtime. CMake never
+downloads ROM/BIOS material or an external shader pack.
 
 ## Linux
 
@@ -109,6 +112,7 @@ Useful cache options are:
 | `GENPLUSGX_ENABLE_SANITIZERS` | `OFF` | Enable ASan and UBSan on supported compilers |
 | `GENPLUSGX_ENABLE_CHD` | `ON` | Build bundled libchdr CHD decoding |
 | `GENPLUSGX_ENABLE_TREMOR` | `ON` | Build integer Ogg/Vorbis CD-audio decoding |
+| `GENPLUSGX_ENABLE_LIBRETRO_SHADERS` | `ON` | Fetch/build the pinned librashader OpenGL runtime and ship Slang preset support; requires Rust 1.88+ |
 | `GENPLUSGX_WINDOWS_REDIST` | empty | Official `vc_redist.x64.exe` included in Windows packages |
 | `GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS` | `OFF` | Register user-owned BIOS fixture tests |
 
@@ -156,6 +160,11 @@ contents are described in [PACKAGING.md](PACKAGING.md).
 - **OpenGL unavailable in a virtual machine:** the application has a deterministic
   software display path for tests, but interactive acceleration needs a functioning host
   OpenGL stack.
+- **Rust/Cargo missing or too old:** install Rust 1.88+ or configure with
+  `-DGENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF`. Official packages keep this feature on.
+- **A Libretro preset fails:** select the `.slangp` file, keep its relative pass/LUT
+  files together, and inspect the reported compile/load detail. Legacy `.glslp` and Cg
+  formats are not supported. See [LIBRETRO_SHADERS.md](LIBRETRO_SHADERS.md).
 
 Testing details are in [TESTING.md](TESTING.md). Report new reproducible build problems
 with configure output, compiler/Qt/SDL versions, OS/architecture, and the failed command.

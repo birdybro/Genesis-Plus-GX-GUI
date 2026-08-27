@@ -88,6 +88,11 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::bilinear);
   widget.setVideoFilter(genplusgx::video::VideoFilter::nearest);
   QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::nearest);
+  QCOMPARE(widget.sourceFramesPerSecond(), 60.0);
+  widget.setSourceFramesPerSecond(50.0);
+  QCOMPARE(widget.sourceFramesPerSecond(), 50.0);
+  widget.setSourceFramesPerSecond(0.0);
+  QCOMPARE(widget.sourceFramesPerSecond(), 50.0);
   widget.setScaleMode(genplusgx::video::ScaleMode::fit);
 
   widget.resize(320, 640);

@@ -1,5 +1,22 @@
 find_package(Threads REQUIRED)
 
+if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
+  add_executable(
+    genplusgx_shader_configuration_test shader_configuration_test.cpp
+  )
+  target_link_libraries(
+    genplusgx_shader_configuration_test
+    PRIVATE GenesisPlusGX::VideoWidget genplusgx_project_warnings Qt6::Core
+  )
+  add_test(
+    NAME unit.shader_configuration COMMAND genplusgx_shader_configuration_test
+  )
+  set_tests_properties(
+    unit.shader_configuration
+    PROPERTIES LABELS "unit;video;shader;parser;filesystem" TIMEOUT 30
+  )
+endif()
+
 add_executable(genplusgx_diagnostics_test diagnostics_test.cpp)
 target_link_libraries(
   genplusgx_diagnostics_test

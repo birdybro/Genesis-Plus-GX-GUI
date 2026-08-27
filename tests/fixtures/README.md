@@ -4,6 +4,20 @@ No commercial ROM, proprietary BIOS, copyrighted game asset, or automatically fe
 binary is used by the test suite. Binary fixtures are generated into temporary
 directories at test runtime and removed by RAII cleanup.
 
+## Original Libretro Slang pass-through preset
+
+| Field | Value |
+| --- | --- |
+| Stored filenames | `libretro-pass.slangp`, `libretro-pass.slang` |
+| Author | Original fixture authored for Genesis Plus GX GUI |
+| Purpose | Prove that the pinned librashader runtime compiles a modern Slang preset and samples the supplied OpenGL texture into a caller-owned output texture |
+| Provenance | No copied shader-pack code or assets; dedicated to CC0-1.0 with the other test fixtures |
+| Expected behavior | One pass scales a 4×4 red/green/blue/white texture to 64×48; at least one quarter of output RGB pixels must be non-black |
+
+The fixture has no lookup texture, game image, trademark graphic, or golden screenshot.
+The same integration test separately runs the original bundled CRT preset through the
+real `QOpenGLWidget` and compares its captured output with normal presentation.
+
 ## Generated Genesis RAM marker ROM
 
 | Field | Value |

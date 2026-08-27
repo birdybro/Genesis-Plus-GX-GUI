@@ -306,7 +306,9 @@ GUI render request (coalesced)
         |
 QOpenGLWidget texture upload
         |
-nearest/bilinear shader + aspect/integer-scale viewport
+optional librashader Slang pass chain into bounded output texture
+        |
+presentation pass + aspect/integer-scale viewport
         |
 window / fullscreen / high-DPI surface
 ```
@@ -336,12 +338,26 @@ frame is dropped and instrumented rather than queued or allocated.
 
 `DisplayWidget` selects an accelerated `QOpenGLWidget` canvas on normal window-system
 platforms. A persistent RGB565 texture is allocated only for geometry changes and each
-new generation uses `glTexSubImage2D`; a small shader draws the texture with selectable
-nearest or bilinear sampling. The OpenGL viewport converts the pure logical layout to
-device pixels for high-DPI/Retina surfaces. Context, shader, VAO, or texture failure
+new generation uses `glTexSubImage2D`; a small presentation program draws the texture
+with selectable nearest or bilinear sampling. Both mutable textures explicitly expose
+only mip level zero, so a Libretro pass that binds a mip-capable sampler cannot make the
+one-level input incomplete. The OpenGL viewport converts the pure logical layout to
+device pixels for high-DPI/Retina surfaces. Context, program, VAO, or texture failure
 switches asynchronously to Qt's portable backing-store painter. The same deterministic
 software path is selected for offscreen/minimal platforms and by the explicit
 `GENPLUSGX_FORCE_SOFTWARE_VIDEO` diagnostic override.
+
+When enabled, `LibretroShaderRuntime` dynamically resolves the pinned librashader C API
+and builds one OpenGL chain from the built-in or user-selected `.slangp` preset. It
+passes the source texture, frame number, nominal PAL/NTSC rate, original aspect, and
+validated parameter overrides to librashader, which owns preset-scoped intermediate,
+history, lookup-texture, and multi-pass resources. The frontend supplies one
+viewport-sized RGBA8 output texture and presents it with the existing final program;
+resize reallocates that output only when physical geometry changes. A configuration
+generation rebuilds the chain exactly once. Any load, compile, ABI, or render error is
+reported once and bypasses the chain while normal emulation/presentation continues.
+The software renderer likewise reports that OpenGL 3.3 is required without hiding the
+application shell.
 
 `calculateVideoLayout()` is Qt-independent policy for native pixels, forced 4:3, or
 stretch plus fit or integer scale. It validates all dimensions, centers contained output,
@@ -357,6 +373,11 @@ Blargg NTSC filtering. The adapter owns the large MD/SMS NTSC tables, initialize
 chosen preset before setting the core flag, and refreshes the upstream viewport using
 the same notification and horizontal-border policy as the libretro host. No Qt type or
 settings-file concern crosses this boundary.
+
+Shader selection and parameter values are frontend-only members of `VideoSettings`.
+The schema-1 to schema-2 migration adds a disabled default without altering prior video
+behavior; sparse per-game Video overrides carry the same validated configuration.
+No shader concern enters `CoreAdapter` or modifies Genesis Plus GX output algorithms.
 
 The GUI changes its display policy immediately, then submits the typed core subset as a
 worker command. Pending video-settings commands coalesce because only the newest

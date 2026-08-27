@@ -254,6 +254,25 @@ Gear viewport changes likewise come from the core rather than cropping the final
 window image. Region and VDP system selection are handled by the separate System
 Settings dialog instead of being conflated with display scaling.
 
+### CRT and Libretro shaders
+
+Choose **Video → Shaders → Built-in CRT** to enable the bundled adjustable scanline,
+aperture-grille, curvature, vignette, and brightness effect. Choose **Shader
+Parameters…** to edit the preset's declared controls. **Off** returns to normal
+presentation.
+
+**Load Libretro Preset…** accepts a user-provided modern Slang `.slangp` preset. The
+frontend uses librashader for multi-pass chains, lookup textures, history/feedback, and
+declared runtime parameters. Keep a downloaded shader pack's relative files together;
+the application stores the selected absolute preset path but does not copy or download
+its referenced files. Legacy `.glslp` and Cg presets are not supported.
+
+Shaders require OpenGL 3.3 or newer. A missing file, invalid preset, compilation error,
+or unavailable OpenGL renderer produces a descriptive error and leaves the normal
+unshaded image active. The selection is available in global Video settings and as a
+per-game Video override. See [LIBRETRO_SHADERS.md](LIBRETRO_SHADERS.md) for the exact
+compatibility and packaging contract.
+
 ## Input configuration
 
 Choose **Input → Controller Configuration…** to edit named keyboard/controller profiles,

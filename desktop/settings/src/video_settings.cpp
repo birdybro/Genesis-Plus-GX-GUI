@@ -1,6 +1,7 @@
 #include "genplusgx/settings/video_settings.h"
 
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QString>
@@ -68,6 +69,81 @@ QString presentationFilterName(video::VideoFilter filter)
   return {};
 }
 
+QString shaderModeName(video::ShaderMode mode)
+{
+  switch (mode) {
+    case video::ShaderMode::disabled: return QStringLiteral("disabled");
+    case video::ShaderMode::builtinCrt: return QStringLiteral("builtin-crt");
+    case video::ShaderMode::libretroPreset:
+      return QStringLiteral("libretro-preset");
+  }
+  return {};
+}
+
+QString fromPath(const std::filesystem::path& path)
+{
+#ifdef _WIN32
+  return QString::fromStdWString(path.wstring());
+#else
+  const auto bytes = path.u8string();
+  return QString::fromUtf8(reinterpret_cast<const char*>(bytes.data()),
+    static_cast<qsizetype>(bytes.size()));
+#endif
+}
+
+std::filesystem::path toPath(const QString& path)
+{
+#ifdef _WIN32
+  return std::filesystem::path{path.toStdWString()};
+#else
+  const auto bytes = path.toUtf8();
+  return std::filesystem::path{bytes.constData()};
+#endif
+}
+
+std::optional<video::ShaderConfiguration> readShader(
+  const QJsonObject& videoObject)
+{
+  const auto shaderObjectValue = videoObject.value(QStringLiteral("shader"));
+  if (!shaderObjectValue.isObject()) {
+    return std::nullopt;
+  }
+  const auto shaderObject = shaderObjectValue.toObject();
+  const auto mode = enumFromString<video::ShaderMode>(shaderObject,
+    QStringLiteral("mode"),
+    {{"disabled", video::ShaderMode::disabled},
+      {"builtin-crt", video::ShaderMode::builtinCrt},
+      {"libretro-preset", video::ShaderMode::libretroPreset}});
+  const auto pathValue = shaderObject.value(QStringLiteral("presetPath"));
+  const auto parametersValue = shaderObject.value(QStringLiteral("parameters"));
+  if (!mode || !pathValue.isString() || !parametersValue.isArray()) {
+    return std::nullopt;
+  }
+  video::ShaderConfiguration shader{
+    .mode = *mode,
+    .presetPath = toPath(pathValue.toString()),
+    .parameters = {},
+  };
+  const auto parameters = parametersValue.toArray();
+  shader.parameters.reserve(static_cast<std::size_t>(parameters.size()));
+  for (const auto& parameterValue : parameters) {
+    if (!parameterValue.isObject()) {
+      return std::nullopt;
+    }
+    const auto parameter = parameterValue.toObject();
+    const auto name = parameter.value(QStringLiteral("name"));
+    const auto value = parameter.value(QStringLiteral("value"));
+    if (!name.isString() || !value.isDouble()) {
+      return std::nullopt;
+    }
+    shader.parameters.push_back({
+      .name = name.toString().toStdString(),
+      .value = static_cast<float>(value.toDouble()),
+    });
+  }
+  return shader;
+}
+
 QString overscanName(CoreOverscanMode mode)
 {
   switch (mode) {
@@ -111,7 +187,9 @@ VideoSettingsLoadResult invalidResult(std::string message)
   };
 }
 
-std::optional<VideoSettings> readCurrent(const QJsonObject& videoObject)
+std::optional<VideoSettings> readCurrent(
+  const QJsonObject& videoObject,
+  bool hasShader)
 {
   const auto aspect = enumFromString<video::AspectMode>(videoObject,
     QStringLiteral("aspect"), {{"native", video::AspectMode::native},
@@ -146,10 +224,17 @@ std::optional<VideoSettings> readCurrent(const QJsonObject& videoObject)
       !gameGear.isBool()) {
     return std::nullopt;
   }
+  const auto shader = hasShader
+    ? readShader(videoObject)
+    : std::optional<video::ShaderConfiguration>{video::ShaderConfiguration{}};
+  if (!shader) {
+    return std::nullopt;
+  }
   return VideoSettings{
     .aspect = *aspect,
     .scaling = *scaling,
     .presentationFilter = *presentation,
+    .shader = *shader,
     .core = {
       .overscan = *overscan,
       .ntscFilter = *ntsc,
@@ -184,6 +269,7 @@ std::optional<VideoSettings> readLegacy(const QJsonObject& root)
                                      : video::ScaleMode::fit,
     .presentationFilter = bilinear.toBool() ? video::VideoFilter::bilinear
                                             : video::VideoFilter::nearest,
+    .shader = {},
     .core = {
       .overscan = static_cast<CoreOverscanMode>(overscanValue),
       .ntscFilter = ntscComposite.toBool() ? CoreNtscFilter::composite
@@ -211,6 +297,7 @@ bool validateVideoSettings(const VideoSettings& settings) noexcept
       static_cast<unsigned>(video::ScaleMode::integer) &&
     static_cast<unsigned>(settings.presentationFilter) <=
       static_cast<unsigned>(video::VideoFilter::bilinear) &&
+    video::validateShaderConfiguration(settings.shader) &&
     validateCoreVideoSettings(settings.core);
 }
 
@@ -253,16 +340,21 @@ VideoSettingsLoadResult VideoSettingsStore::load() const
     }
     return {.status = {}, .settings = *settings, .migrated = true};
   }
-  if (schema.toInt(-1) != static_cast<int>(schemaVersion)) {
+  const auto schemaVersionValue = schema.toInt(-1);
+  if (schemaVersionValue != 1 &&
+      schemaVersionValue != static_cast<int>(schemaVersion)) {
     return invalidResult("The video settings schema version is not supported.");
   }
   const auto videoObject = root.value(QStringLiteral("video"));
   const auto settings = videoObject.isObject()
-    ? readCurrent(videoObject.toObject()) : std::nullopt;
+    ? readCurrent(videoObject.toObject(),
+        schemaVersionValue == static_cast<int>(schemaVersion))
+    : std::nullopt;
   if (!settings || !validateVideoSettings(*settings)) {
     return invalidResult("The video settings values are invalid.");
   }
-  return {.status = {}, .settings = *settings, .migrated = false};
+  return {.status = {}, .settings = *settings,
+    .migrated = schemaVersionValue != static_cast<int>(schemaVersion)};
 }
 
 PersistenceStatus VideoSettingsStore::save(const VideoSettings& settings) const
@@ -270,11 +362,24 @@ PersistenceStatus VideoSettingsStore::save(const VideoSettings& settings) const
   if (!validateVideoSettings(settings)) {
     return invalid("Invalid video settings cannot be saved.");
   }
+  QJsonArray shaderParameters;
+  for (const auto& parameter : settings.shader.parameters) {
+    shaderParameters.push_back(QJsonObject{
+      {QStringLiteral("name"), QString::fromStdString(parameter.name)},
+      {QStringLiteral("value"), static_cast<double>(parameter.value)},
+    });
+  }
+  const QJsonObject shaderObject{
+    {QStringLiteral("mode"), shaderModeName(settings.shader.mode)},
+    {QStringLiteral("presetPath"), fromPath(settings.shader.presetPath)},
+    {QStringLiteral("parameters"), shaderParameters},
+  };
   const QJsonObject videoObject{
     {QStringLiteral("aspect"), aspectName(settings.aspect)},
     {QStringLiteral("scaling"), scalingName(settings.scaling)},
     {QStringLiteral("presentationFilter"),
       presentationFilterName(settings.presentationFilter)},
+    {QStringLiteral("shader"), shaderObject},
     {QStringLiteral("overscan"), overscanName(settings.core.overscan)},
     {QStringLiteral("ntscFilter"), ntscName(settings.core.ntscFilter)},
     {QStringLiteral("gameGearExtendedScreen"),

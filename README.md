@@ -34,6 +34,8 @@ region-appropriate BIOS supplied by the user.
 - Dedicated emulation thread with bounded video, audio, input, and command exchanges
 - Dynamic viewport rendering, aspect/integer scaling, overscan, interlace modes,
   nearest/bilinear filtering, fullscreen, high-DPI support, and native PNG screenshots
+- Built-in adjustable CRT presentation plus modern Libretro `.slangp` shader presets,
+  including multi-pass pipelines, lookup textures, history, and runtime parameters
 - SDL3 stereo audio with live output-device/latency changes, plus hot-pluggable
   controller profiles, deadzones, assignments, capture-based remapping, and specialized
   Genesis Plus GX device choices
@@ -95,6 +97,11 @@ Use **Input → Controller Configuration** to assign or remap keyboard and SDL c
 Default keyboard controls and application hotkeys are listed in
 [KEYBOARD_SHORTCUTS.md](docs/KEYBOARD_SHORTCUTS.md).
 
+Choose **Video → Shaders → Built-in CRT** for the included scanline/aperture-grille
+effect, or **Load Libretro Preset…** for a user-provided modern Slang `.slangp` preset.
+See the [Libretro shader guide](docs/LIBRETRO_SHADERS.md) for compatibility and OpenGL
+requirements. No third-party shader pack is bundled or downloaded.
+
 For Sega CD, configure your own USA, Europe, and/or Japan firmware under
 **Tools → BIOS Settings** before opening a disc. Firmware is validated locally and is
 never downloaded by the application. See [BIOS.md](docs/BIOS.md).
@@ -129,8 +136,9 @@ Tests always inject temporary roots and never touch this real directory.
 ## Building from source
 
 The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.5+ with Core,
-Gui, Widgets, OpenGLWidgets, Sql, and Test modules, and SDL 3.2+. Once CMake can locate
-the Qt and SDL config packages:
+Gui, Widgets, OpenGLWidgets, Sql, and Test modules, SDL 3.2+, and Rust/Cargo 1.88+ for
+the default Libretro shader runtime. Once CMake can locate the Qt and SDL config
+packages:
 
 ```bash
 cmake --preset debug
@@ -176,6 +184,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Building](docs/BUILDING.md)
 - [Development](docs/DEVELOPMENT.md)
 - [User guide](docs/USER_GUIDE.md)
+- [Libretro shaders](docs/LIBRETRO_SHADERS.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)
@@ -198,8 +207,8 @@ distribution obligations apply. Newly authored desktop/frontend code remains und
 those repository terms unless its file explicitly says otherwise. This is not a generic
 OSI open-source license; review it before redistributing binaries.
 
-Qt, SDL, libchdr, zlib, zstd, Tremor, Nuked OPN2, minimp3, LZMA SDK, and other bundled
-components retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
+Qt, SDL, librashader, libchdr, zlib, zstd, Tremor, Nuked OPN2, minimp3, LZMA SDK, and
+other bundled components retain their own licenses. See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)
 and the complete notices in [LICENSE.txt](LICENSE.txt).
 
 The authoritative emulator project is

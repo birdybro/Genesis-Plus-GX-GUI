@@ -39,6 +39,7 @@ foreach(document IN ITEMS
     BUILDING.md
     BIOS.md
     INPUT_CONFIGURATION.md
+    LIBRETRO_SHADERS.md
     SAVE_STATES.md)
   string(FIND "${install_script}" "${document}" position)
   if(position EQUAL -1)

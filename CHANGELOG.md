@@ -7,6 +7,26 @@ platform documentation.
 
 ## [Unreleased]
 
+### Added
+
+- Adjustable built-in CRT rendering and modern Libretro Slang `.slangp` compatibility
+  through a checksum-pinned librashader 0.12.0 OpenGL runtime, including multi-pass
+  chains, lookup textures, frame history/feedback, preset parameters, and per-game
+  overrides.
+- Video-menu and Settings controls for selecting presets and editing declared shader
+  parameters, with versioned persistence and relative shader-pack resource handling.
+- Real OpenGL/librashader and `QOpenGLWidget` regression coverage that verifies input
+  sampling, non-black output, and a materially changed built-in CRT image under Xvfb.
+
+### Fixed
+
+- Emulator and shader output textures now explicitly constrain their mip level range,
+  preventing a mip-capable Libretro sampler from producing a black frame when the
+  source contains only level zero.
+- Shader timing uniforms use the emulated PAL/NTSC nominal frame rate, and shader load,
+  compile, or rendering failures release the failed chain and retain the normal
+  unshaded display without retrying it every frame.
+
 ## [0.1.1] - 2026-08-26
 
 ### Added

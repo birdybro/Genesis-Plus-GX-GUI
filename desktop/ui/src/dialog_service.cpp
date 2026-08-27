@@ -66,6 +66,13 @@ std::optional<std::filesystem::path> DialogService::chooseArtwork(
   return std::nullopt;
 }
 
+std::optional<std::filesystem::path> DialogService::chooseShaderPreset(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
 std::optional<std::filesystem::path> QtDialogService::chooseGame(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -119,6 +126,20 @@ std::optional<std::filesystem::path> QtDialogService::chooseArtwork(
     QObject::tr("Choose Local Box Art"),
     pathToQString(initialDirectory),
     QObject::tr("Images (*.png *.jpg *.jpeg *.webp *.bmp);;All files (*)"));
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseShaderPreset(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Load Libretro Shader Preset"),
+    pathToQString(initialDirectory),
+    QObject::tr("Libretro Slang presets (*.slangp);;All files (*)"));
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};

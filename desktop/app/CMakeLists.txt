@@ -56,6 +56,49 @@ install(
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
 )
 
+if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
+  if(APPLE)
+    set(genplusgx_librashader_destination
+      "genesis-plus-gx-gui.app/Contents/Frameworks")
+    set(genplusgx_shader_destination
+      "genesis-plus-gx-gui.app/Contents/Resources/shaders")
+    set(genplusgx_librashader_license_destination
+      "genesis-plus-gx-gui.app/Contents/Resources/licenses")
+  elseif(WIN32)
+    set(genplusgx_librashader_destination "${CMAKE_INSTALL_BINDIR}")
+    set(genplusgx_shader_destination
+      "${CMAKE_INSTALL_DATADIR}/Genesis-Plus-GX-GUI/shaders")
+    set(genplusgx_librashader_license_destination
+      "${CMAKE_INSTALL_DATADIR}/doc/Genesis-Plus-GX-GUI")
+  else()
+    set(genplusgx_librashader_destination "${CMAKE_INSTALL_LIBDIR}")
+    set(genplusgx_shader_destination
+      "${CMAKE_INSTALL_DATADIR}/Genesis-Plus-GX-GUI/shaders")
+    set(genplusgx_librashader_license_destination
+      "${CMAKE_INSTALL_DATADIR}/doc/Genesis-Plus-GX-GUI")
+  endif()
+  install(
+    FILES "${GENPLUSGX_LIBRASHADER_BUILT_LIBRARY}"
+    DESTINATION "${genplusgx_librashader_destination}"
+    RENAME "${GENPLUSGX_LIBRASHADER_INSTALL_NAME}"
+    PERMISSIONS
+      OWNER_READ OWNER_WRITE OWNER_EXECUTE
+      GROUP_READ GROUP_EXECUTE
+      WORLD_READ WORLD_EXECUTE
+  )
+  install(
+    FILES
+      "${PROJECT_SOURCE_DIR}/desktop/resources/shaders/genplusgx-crt.slangp"
+      "${PROJECT_SOURCE_DIR}/desktop/resources/shaders/genplusgx-crt.slang"
+    DESTINATION "${genplusgx_shader_destination}"
+  )
+  install(
+    FILES "${librashader_source_SOURCE_DIR}/LICENSE.md"
+    DESTINATION "${genplusgx_librashader_license_destination}"
+    RENAME "librashader-MPL-2.0.md"
+  )
+endif()
+
 if(UNIX AND NOT APPLE)
   set(genplusgx_linux_plugins
     Qt6::QXcbIntegrationPlugin

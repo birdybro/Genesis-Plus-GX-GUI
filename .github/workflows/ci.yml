@@ -15,6 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
+  RUSTUP_TOOLCHAIN: 1.88.0
   QT_VERSION: 6.8.3
   SDL_VERSION: 3.4.14
   QT_QPA_PLATFORM: offscreen
@@ -36,10 +37,13 @@ jobs:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev xvfb
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
@@ -113,10 +117,13 @@ jobs:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
+
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev xvfb
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
@@ -190,6 +197,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
@@ -301,6 +311,9 @@ jobs:
     steps:
       - name: Check out source
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install pinned Rust toolchain
+        run: rustup toolchain install 1.88.0 --profile minimal --no-self-update
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1

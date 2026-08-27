@@ -108,6 +108,11 @@ QAction* MainWindow::addAction(
 void MainWindow::createCanvas()
 {
   displayWidget_ = new video::DisplayWidget(this);
+  displayWidget_->setShaderFailureSink([this](std::string detail) {
+    statusBar()->showMessage(tr("Shader disabled after a rendering error."), 5'000);
+    dialogService_->showError(this, tr("Libretro Shader Error"),
+      QString::fromStdString(detail));
+  });
   setCentralWidget(displayWidget_);
 }
 
@@ -325,6 +330,58 @@ void MainWindow::buildMenus()
     settings.presentationFilter = video::VideoFilter::bilinear;
     applyVideoSettings(settings, true);
   });
+  auto* shaders = video->addMenu(tr("&Shaders"));
+  shaders->setObjectName(QStringLiteral("shaderMenu"));
+  auto* shaderGroup = new QActionGroup(this);
+  shaderGroup->setObjectName(QStringLiteral("shaderActionGroup"));
+  auto* shaderOff = addAction(*shaders, tr("&Off"), "shaderDisabledAction");
+  auto* builtinCrt = addAction(
+    *shaders, tr("Built-in &CRT"), "builtinCrtShaderAction");
+  auto* customShader = addAction(
+    *shaders, tr("Custom Libretro Preset"), "customShaderAction");
+  for (auto* action : {shaderOff, builtinCrt, customShader}) {
+    action->setCheckable(true);
+    shaderGroup->addAction(action);
+  }
+  customShader->setEnabled(false);
+  shaderOff->setChecked(true);
+  connect(shaderOff, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.shader = {};
+    applyVideoSettings(settings, true);
+  });
+  connect(builtinCrt, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.shader = {
+      .mode = video::ShaderMode::builtinCrt,
+      .presetPath = {},
+      .parameters = {},
+    };
+    applyVideoSettings(settings, true);
+  });
+  connect(customShader, &QAction::triggered, this, [this] {
+    if (videoSettings_.shader.presetPath.empty()) {
+      chooseShaderPreset();
+      return;
+    }
+    auto settings = videoSettings_;
+    settings.shader.mode = video::ShaderMode::libretroPreset;
+    applyVideoSettings(settings, true);
+  });
+  shaders->addSeparator();
+  auto* loadShader = addAction(*shaders, tr("Load Libretro &Preset…"),
+    "loadShaderPresetAction");
+  connect(loadShader, &QAction::triggered,
+    this, &MainWindow::chooseShaderPreset);
+  auto* shaderSettings = addAction(*shaders, tr("Shader &Parameters…"),
+    "shaderParametersAction");
+  connect(shaderSettings, &QAction::triggered,
+    this, &MainWindow::showVideoSettings);
+#if !GENPLUSGX_HAS_LIBRETRO_SHADERS
+  shaders->setEnabled(false);
+  shaders->menuAction()->setToolTip(
+    tr("This build does not include Libretro shader support."));
+#endif
   auto* overscan = video->addMenu(tr("&Overscan"));
   overscan->setObjectName(QStringLiteral("overscanMenu"));
   auto* overscanGroup = new QActionGroup(this);
@@ -1371,7 +1428,31 @@ void MainWindow::showVideoSettings()
   dialog->setSettingsSink([this](const settings::VideoSettings& settings) {
     return applyVideoSettings(settings, true);
   });
+  dialog->setPresetChooser([this](const std::filesystem::path& initial) {
+    return dialogService_->chooseShaderPreset(this, initial);
+  });
   dialog->open();
+}
+
+void MainWindow::chooseShaderPreset()
+{
+  const auto initialDirectory = videoSettings_.shader.presetPath.has_parent_path()
+    ? videoSettings_.shader.presetPath.parent_path()
+    : std::filesystem::path{};
+  const auto selected = dialogService_->chooseShaderPreset(
+    this, initialDirectory);
+  if (!selected) {
+    return;
+  }
+  auto settings = videoSettings_;
+  settings.shader = {
+    .mode = video::ShaderMode::libretroPreset,
+    .presetPath = *selected,
+    .parameters = {},
+  };
+  if (applyVideoSettings(settings, true)) {
+    statusBar()->showMessage(tr("Libretro shader preset loaded."), 3'000);
+  }
 }
 
 void MainWindow::showAudioSettings()
@@ -1673,6 +1754,16 @@ bool MainWindow::applyVideoSettings(
   if (!settings::validateVideoSettings(settings)) {
     return false;
   }
+  if (settings.shader.mode != video::ShaderMode::disabled &&
+      settings.shader != videoSettings_.shader) {
+    const auto inspection = video::inspectShaderConfiguration(settings.shader);
+    if (!inspection.success) {
+      updateVideoActionChecks();
+      dialogService_->showError(this, tr("Libretro Shader Error"),
+        QString::fromStdString(inspection.error));
+      return false;
+    }
+  }
   if (notifySink && videoSettingsSink_) {
     const auto status = videoSettingsSink_(settings);
     if (!status) {
@@ -1687,6 +1778,7 @@ bool MainWindow::applyVideoSettings(
   displayWidget_->setAspectMode(settings.aspect);
   displayWidget_->setScaleMode(settings.scaling);
   displayWidget_->setVideoFilter(settings.presentationFilter);
+  displayWidget_->setShaderConfiguration(settings.shader);
   updateVideoActionChecks();
   if (auto* dialog = findChild<VideoSettingsDialog*>(
         QStringLiteral("videoSettingsDialog"))) {
@@ -1712,6 +1804,20 @@ void MainWindow::updateVideoActionChecks()
     videoSettings_.presentationFilter == video::VideoFilter::nearest);
   findChild<QAction*>(QStringLiteral("bilinearFilterAction"))->setChecked(
     videoSettings_.presentationFilter == video::VideoFilter::bilinear);
+  findChild<QAction*>(QStringLiteral("shaderDisabledAction"))->setChecked(
+    videoSettings_.shader.mode == video::ShaderMode::disabled);
+  findChild<QAction*>(QStringLiteral("builtinCrtShaderAction"))->setChecked(
+    videoSettings_.shader.mode == video::ShaderMode::builtinCrt);
+  auto* customShader = findChild<QAction*>(QStringLiteral("customShaderAction"));
+  customShader->setChecked(
+    videoSettings_.shader.mode == video::ShaderMode::libretroPreset);
+  customShader->setEnabled(!videoSettings_.shader.presetPath.empty());
+  customShader->setText(videoSettings_.shader.presetPath.empty()
+    ? tr("Custom Libretro Preset")
+    : tr("Custom: %1").arg(pathToQString(
+        videoSettings_.shader.presetPath.filename())));
+  findChild<QAction*>(QStringLiteral("shaderParametersAction"))->setEnabled(
+    videoSettings_.shader.mode != video::ShaderMode::disabled);
 
   const auto setDataChecked = [this](const char* actionName, int value, int current) {
     auto* action = findChild<QAction*>(QString::fromLatin1(actionName));
@@ -2110,6 +2216,13 @@ void MainWindow::setMeasuredFrameRate(double framesPerSecond)
     framesPerSecond = 0.0;
   }
   fpsStatus_->setText(tr("%1 FPS").arg(framesPerSecond, 0, 'f', 1));
+}
+
+void MainWindow::setNominalVideoRate(double framesPerSecond)
+{
+  if (displayWidget_ != nullptr) {
+    displayWidget_->setSourceFramesPerSecond(framesPerSecond);
+  }
 }
 
 void MainWindow::setNoGameLoaded()

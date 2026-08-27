@@ -73,6 +73,9 @@ Inspect these boundaries before trusting a successful compile:
 7. Cartridge/archive/disc formats, CUE parsing, CHD/libchdr API, and BIOS selection.
 8. Core option enum/range changes exposed by Video, Audio, System, Input, BIOS, Cheats,
    or per-game settings pages.
+9. Libretro shader support is entirely downstream of the copied framebuffer. Updating
+   librashader or its C ABI belongs in `cmake/Librashader.cmake` and `desktop/video`;
+   it must not be mixed into the inherited libretro frontend or emulator core.
 
 Do not paper over an adapter failure by weakening a deterministic expected result.
 Determine whether upstream intentionally corrected behavior, a frontend assumption is

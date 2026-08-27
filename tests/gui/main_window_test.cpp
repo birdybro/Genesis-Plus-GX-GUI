@@ -16,6 +16,7 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -41,10 +42,13 @@ public:
   std::vector<QString> errors;
   std::optional<std::filesystem::path> discSelection;
   std::optional<std::filesystem::path> directorySelection;
+  std::optional<std::filesystem::path> shaderSelection;
   std::filesystem::path discInitialDirectory;
   std::filesystem::path directoryInitialDirectory;
+  std::filesystem::path shaderInitialDirectory;
   int chooseDiscCount{0};
   int chooseDirectoryCount{0};
+  int chooseShaderCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
@@ -68,6 +72,14 @@ public:
     return directorySelection;
   }
 
+  std::optional<std::filesystem::path> chooseShaderPreset(
+    QWidget*, const std::filesystem::path& initialDirectory) override
+  {
+    ++chooseShaderCount;
+    shaderInitialDirectory = initialDirectory;
+    return shaderSelection;
+  }
+
   void showError(QWidget*, const QString& title, const QString& message) override
   {
     errors.push_back(title + QStringLiteral(": ") + message);
@@ -89,6 +101,7 @@ private slots:
   void exitActionClosesWindow();
   void videoActionsDriveDisplayPolicy();
   void videoSettingsDialogAppliesCancelsAndRestores();
+  void shaderMenuAndParameterWorkflow();
   void audioSettingsWorkflowAppliesCancelsAndRestores();
   void systemSettingsWorkflowIsValidatedAndDeferred();
   void biosSettingsValidatePersistAndCancel();
@@ -137,7 +150,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "fileMenu", "emulationMenu", "videoMenu", "audioMenu", "inputMenu",
     "toolsMenu", "helpMenu", "openRecentMenu", "stateSlotMenu", "videoScaleMenu",
     "aspectRatioMenu", "filteringMenu", "overscanMenu", "ntscFilterMenu",
-    "interlacedRenderMenu"};
+    "interlacedRenderMenu", "shaderMenu"};
   for (const auto* name : menuNames) {
     QVERIFY2(window.findChild<QMenu*>(QString::fromLatin1(name)) != nullptr, name);
   }
@@ -149,7 +162,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "videoSettingsAction", "audioSettingsAction",
     "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
-    "aboutQtAction"};
+    "aboutQtAction", "shaderDisabledAction", "builtinCrtShaderAction",
+    "loadShaderPresetAction"};
   for (const auto* name : enabledNames) {
     auto* action = window.findChild<QAction*>(QString::fromLatin1(name));
     QVERIFY2(action != nullptr, name);
@@ -533,6 +547,90 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   QCOMPARE(window.videoSettings(),
     genplusgx::settings::defaultVideoSettings());
   dialog->close();
+}
+
+void MainWindowTest::shaderMenuAndParameterWorkflow()
+{
+  genplusgx::ui::MainWindow window;
+  auto dialogs = std::make_shared<FakeDialogService>();
+  window.setDialogService(dialogs);
+  std::vector<genplusgx::settings::VideoSettings> updates;
+  window.setVideoSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+    return genplusgx::PersistenceStatus{};
+  });
+
+  auto* off = window.findChild<QAction*>(QStringLiteral("shaderDisabledAction"));
+  auto* crt = window.findChild<QAction*>(QStringLiteral("builtinCrtShaderAction"));
+  auto* custom = window.findChild<QAction*>(QStringLiteral("customShaderAction"));
+  auto* load = window.findChild<QAction*>(QStringLiteral("loadShaderPresetAction"));
+  auto* parameters = window.findChild<QAction*>(QStringLiteral("shaderParametersAction"));
+  QVERIFY(off != nullptr && crt != nullptr && custom != nullptr);
+  QVERIFY(load != nullptr && parameters != nullptr);
+  QVERIFY(off->isChecked());
+  QVERIFY(!custom->isEnabled());
+  QVERIFY(!parameters->isEnabled());
+
+#if !GENPLUSGX_HAS_LIBRETRO_SHADERS
+  auto* shaderMenu = window.findChild<QMenu*>(QStringLiteral("shaderMenu"));
+  QVERIFY(shaderMenu != nullptr);
+  QVERIFY(!shaderMenu->isEnabled());
+  return;
+#endif
+
+  crt->trigger();
+  QCOMPARE(window.videoSettings().shader.mode,
+    genplusgx::video::ShaderMode::builtinCrt);
+  QCOMPARE(window.displayWidget()->shaderConfiguration().mode,
+    genplusgx::video::ShaderMode::builtinCrt);
+  QVERIFY(crt->isChecked());
+  QVERIFY(parameters->isEnabled());
+  QCOMPARE(updates.size(), std::size_t{1});
+
+  parameters->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::VideoSettingsDialog*>(
+    QStringLiteral("videoSettingsDialog"));
+  QVERIFY(dialog != nullptr);
+  auto* mode = dialog->findChild<QComboBox*>(QStringLiteral("shaderModeCombo"));
+  auto* curvature = dialog->findChild<QDoubleSpinBox*>(
+    QStringLiteral("shaderParameter_CURVATURE"));
+  auto* validation = dialog->findChild<QLabel*>(
+    QStringLiteral("shaderValidationLabel"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyVideoSettingsButton"));
+  QVERIFY(mode != nullptr && curvature != nullptr && validation != nullptr);
+  QVERIFY(apply != nullptr);
+  QCOMPARE(mode->currentData().toInt(),
+    static_cast<int>(genplusgx::video::ShaderMode::builtinCrt));
+  QVERIFY(validation->text().contains(QStringLiteral("valid")));
+  curvature->setValue(0.12);
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(updates.size(), std::size_t{2});
+  const auto savedCurvature = std::find_if(
+    window.videoSettings().shader.parameters.cbegin(),
+    window.videoSettings().shader.parameters.cend(),
+    [](const auto& parameter) { return parameter.name == "CURVATURE"; });
+  QVERIFY(savedCurvature != window.videoSettings().shader.parameters.cend());
+  QCOMPARE(savedCurvature->value, 0.12F);
+  dialog->close();
+
+  dialogs->shaderSelection = genplusgx::video::builtinCrtPresetPath();
+  load->trigger();
+  QCOMPARE(dialogs->chooseShaderCount, 1);
+  QCOMPARE(window.videoSettings().shader.mode,
+    genplusgx::video::ShaderMode::libretroPreset);
+  QCOMPARE(window.videoSettings().shader.presetPath,
+    *dialogs->shaderSelection);
+  QVERIFY(custom->isEnabled());
+  QVERIFY(custom->isChecked());
+  QVERIFY(custom->text().contains(QStringLiteral("genplusgx-crt.slangp")));
+
+  off->trigger();
+  QCOMPARE(window.videoSettings().shader.mode,
+    genplusgx::video::ShaderMode::disabled);
+  QVERIFY(off->isChecked());
+  QVERIFY(!parameters->isEnabled());
 }
 
 void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()

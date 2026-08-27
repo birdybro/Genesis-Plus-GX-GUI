@@ -1,0 +1,14 @@
+# Genesis Plus GX GUI original lightweight CRT preset.
+shaders = 1
+shader0 = genplusgx-crt.slang
+filter_linear0 = true
+mipmap_input0 = false
+wrap_mode0 = clamp_to_edge
+scale_type0 = viewport
+
+parameters = "SCANLINE_STRENGTH;MASK_STRENGTH;CURVATURE;VIGNETTE;BRIGHTNESS"
+SCANLINE_STRENGTH = 0.30
+MASK_STRENGTH = 0.18
+CURVATURE = 0.08
+VIGNETTE = 0.18
+BRIGHTNESS = 1.08

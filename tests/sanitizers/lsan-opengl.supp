@@ -1,0 +1,5 @@
+# Desktop OpenGL and Qt/DBus process-global caches retained by host libraries.
+# Project allocations remain unsuppressed.
+leak:libnvidia-glcore.so
+leak:libnvidia-glsi.so
+leak:libdbus-1.so

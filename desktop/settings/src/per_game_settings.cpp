@@ -1,6 +1,7 @@
 #include "genplusgx/settings/per_game_settings.h"
 
 #include <QJsonDocument>
+#include <QJsonArray>
 #include <QJsonObject>
 #include <QJsonParseError>
 #include <QString>
@@ -60,6 +61,75 @@ std::optional<bool> boolean(const QJsonObject& object, const char* key)
   return value.isBool() ? std::optional{value.toBool()} : std::nullopt;
 }
 
+QString fromPath(const std::filesystem::path& path)
+{
+#ifdef _WIN32
+  return QString::fromStdWString(path.wstring());
+#else
+  const auto bytes = path.u8string();
+  return QString::fromUtf8(reinterpret_cast<const char*>(bytes.data()),
+    static_cast<qsizetype>(bytes.size()));
+#endif
+}
+
+std::filesystem::path toPath(const QString& path)
+{
+#ifdef _WIN32
+  return std::filesystem::path{path.toStdWString()};
+#else
+  const auto bytes = path.toUtf8();
+  return std::filesystem::path{bytes.constData()};
+#endif
+}
+
+std::optional<video::ShaderConfiguration> readShader(const QJsonObject& object)
+{
+  const auto mode = enumeration<video::ShaderMode>(object, "mode");
+  const auto path = object.value(QStringLiteral("presetPath"));
+  const auto parameterArray = object.value(QStringLiteral("parameters"));
+  if (!mode || !path.isString() || !parameterArray.isArray()) {
+    return std::nullopt;
+  }
+  video::ShaderConfiguration shader{
+    .mode = *mode,
+    .presetPath = toPath(path.toString()),
+    .parameters = {},
+  };
+  for (const auto& parameterValue : parameterArray.toArray()) {
+    if (!parameterValue.isObject()) {
+      return std::nullopt;
+    }
+    const auto parameter = parameterValue.toObject();
+    const auto name = parameter.value(QStringLiteral("name"));
+    const auto value = parameter.value(QStringLiteral("value"));
+    if (!name.isString() || !value.isDouble()) {
+      return std::nullopt;
+    }
+    shader.parameters.push_back({
+      .name = name.toString().toStdString(),
+      .value = static_cast<float>(value.toDouble()),
+    });
+  }
+  return video::validateShaderConfiguration(shader) ? std::optional{shader}
+                                                     : std::nullopt;
+}
+
+QJsonObject writeShader(const video::ShaderConfiguration& shader)
+{
+  QJsonArray parameters;
+  for (const auto& parameter : shader.parameters) {
+    parameters.push_back(QJsonObject{
+      {QStringLiteral("name"), QString::fromStdString(parameter.name)},
+      {QStringLiteral("value"), static_cast<double>(parameter.value)},
+    });
+  }
+  return {
+    {QStringLiteral("mode"), static_cast<int>(shader.mode)},
+    {QStringLiteral("presetPath"), fromPath(shader.presetPath)},
+    {QStringLiteral("parameters"), parameters},
+  };
+}
+
 std::optional<VideoSettings> readVideo(const QJsonObject& object)
 {
   const auto aspect = enumeration<video::AspectMode>(object, "aspect");
@@ -75,10 +145,21 @@ std::optional<VideoSettings> readVideo(const QJsonObject& object)
       !gameGear) {
     return std::nullopt;
   }
+  auto shader = video::ShaderConfiguration{};
+  if (object.contains(QStringLiteral("shader"))) {
+    const auto shaderValue = object.value(QStringLiteral("shader"));
+    const auto parsed = shaderValue.isObject()
+      ? readShader(shaderValue.toObject()) : std::nullopt;
+    if (!parsed) {
+      return std::nullopt;
+    }
+    shader = *parsed;
+  }
   VideoSettings value{
     .aspect = *aspect,
     .scaling = *scaling,
     .presentationFilter = *presentation,
+    .shader = std::move(shader),
     .core =
       {
         .overscan = *overscan,
@@ -96,6 +177,7 @@ QJsonObject writeVideo(const VideoSettings& value)
     {QStringLiteral("aspect"), static_cast<int>(value.aspect)},
     {QStringLiteral("scaling"), static_cast<int>(value.scaling)},
     {QStringLiteral("presentationFilter"), static_cast<int>(value.presentationFilter)},
+    {QStringLiteral("shader"), writeShader(value.shader)},
     {QStringLiteral("overscan"), static_cast<int>(value.core.overscan)},
     {QStringLiteral("ntscFilter"), static_cast<int>(value.core.ntscFilter)},
     {QStringLiteral("interlacedRender"), static_cast<int>(value.core.interlacedRender)},

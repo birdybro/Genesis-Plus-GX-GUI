@@ -21,6 +21,7 @@ set(required_documents
   docs/USER_GUIDE.md
   docs/KEYBOARD_SHORTCUTS.md
   docs/INPUT_CONFIGURATION.md
+  docs/LIBRETRO_SHADERS.md
   docs/BIOS.md
   docs/GAME_LIBRARY.md
   docs/SAVE_STATES.md
@@ -77,6 +78,7 @@ foreach(component IN ITEMS
     "Qt 6"
     "SDL 3"
     "Genesis Plus GX"
+    "librashader"
     "libchdr"
     "zlib"
     "zstd"

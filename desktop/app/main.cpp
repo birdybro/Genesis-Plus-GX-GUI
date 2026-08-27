@@ -1778,6 +1778,7 @@ int main(int argc, char* argv[])
     std::optional<genplusgx::EmulationWorkerMetrics> runtimeMetrics;
     if (instrumentationNow >= nextFrameRateSample) {
       runtimeMetrics = worker.metrics();
+      window.setNominalVideoRate(runtimeMetrics->targetFramesPerSecond);
       const bool emulationRunning = window.isGameLoaded() &&
         worker.state() == genplusgx::EmulationWorkerState::running;
       if (const auto measured = frameRateSampler.observe(

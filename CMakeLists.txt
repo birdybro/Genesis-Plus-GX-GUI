@@ -22,6 +22,11 @@ option(
 )
 option(GENPLUSGX_ENABLE_CHD "Enable CHD disc-image support" ON)
 option(GENPLUSGX_ENABLE_TREMOR "Enable bundled Tremor Ogg/Vorbis decoding" ON)
+option(
+  GENPLUSGX_ENABLE_LIBRETRO_SHADERS
+  "Enable libretro Slang shader preset support through librashader"
+  ON
+)
 set(
   GENPLUSGX_WINDOWS_REDIST
   ""
@@ -48,6 +53,10 @@ set(GENPLUSGX_VERSION "${PROJECT_VERSION}")
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Sql Test)
 find_package(SDL3 3.2 REQUIRED CONFIG)
+
+if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
+  include(Librashader)
+endif()
 
 execute_process(
   COMMAND git rev-parse --short=12 HEAD
@@ -93,6 +102,7 @@ target_link_libraries(genplusgx_frontend_types INTERFACE genplusgx_project_optio
 message(STATUS "Genesis Plus GX GUI ${GENPLUSGX_VERSION} (${GENPLUSGX_GIT_COMMIT})")
 message(STATUS "Qt: ${Qt6_VERSION}")
 message(STATUS "SDL3: ${SDL3_VERSION}")
+message(STATUS "Libretro shaders: ${GENPLUSGX_ENABLE_LIBRETRO_SHADERS}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
 
