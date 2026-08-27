@@ -2,4 +2,5 @@
 # Project allocations remain unsuppressed.
 leak:libnvidia-glcore.so
 leak:libnvidia-glsi.so
+leak:libEGL_nvidia.so
 leak:libdbus-1.so

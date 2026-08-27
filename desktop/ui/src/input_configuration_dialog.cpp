@@ -365,9 +365,8 @@ void InputConfigurationDialog::refreshAssignments()
   if (assignmentsLayout_ == nullptr) {
     return;
   }
-  while (auto* item = assignmentsLayout_->takeAt(0)) {
-    delete item->widget();
-    delete item;
+  while (assignmentsLayout_->rowCount() > 0) {
+    assignmentsLayout_->removeRow(0);
   }
   assignmentCombos_.clear();
   if (controllers_.empty()) {

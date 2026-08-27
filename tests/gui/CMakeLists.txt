@@ -275,6 +275,25 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     PRIVATE
       GENPLUSGX_SHADER_TEST_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
   )
+  add_executable(
+    genplusgx_external_rom_acceptance_test external_rom_acceptance_test.cpp
+  )
+  target_link_libraries(
+    genplusgx_external_rom_acceptance_test
+    PRIVATE
+      GenesisPlusGX::CoreAdapter
+      GenesisPlusGX::VideoWidget
+      genplusgx_project_options
+      genplusgx_project_warnings
+      Qt6::Gui
+      Qt6::Test
+      Qt6::Widgets
+  )
+  target_compile_definitions(
+    genplusgx_external_rom_acceptance_test
+    PRIVATE
+      GENPLUSGX_SHADER_TEST_FIXTURE_DIR="${PROJECT_SOURCE_DIR}/tests/fixtures"
+  )
   find_program(GENPLUSGX_XVFB_RUN_EXECUTABLE xvfb-run)
   if(UNIX AND NOT APPLE AND GENPLUSGX_XVFB_RUN_EXECUTABLE)
     add_test(

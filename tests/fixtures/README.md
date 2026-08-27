@@ -16,7 +16,17 @@ directories at test runtime and removed by RAII cleanup.
 
 The fixture has no lookup texture, game image, trademark graphic, or golden screenshot.
 The same integration test separately runs the original bundled CRT preset through the
-real `QOpenGLWidget` and compares its captured output with normal presentation.
+real `QOpenGLWidget` and compares its captured output with normal presentation. Its
+asymmetric red/green/blue/white quadrants make vertical and horizontal orientation
+errors semantic rather than pixel-golden assertions.
+
+## Optional user-owned game acceptance
+
+`genplusgx_external_rom_acceptance_test` accepts a developer-supplied game path at
+runtime. That game is not a project fixture: it is never fetched, copied, hashed into a
+golden, committed, or required by CI. The caller also supplies an output directory;
+game-derived comparison PNGs remain there for local inspection and must not be added to
+the repository. Required builds retain only the generated CC0 inputs documented below.
 
 ## Generated Genesis RAM marker ROM
 

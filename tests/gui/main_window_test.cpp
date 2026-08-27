@@ -477,6 +477,8 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   auto* scaling = dialog->findChild<QComboBox*>(QStringLiteral("videoScalingCombo"));
   auto* filter = dialog->findChild<QComboBox*>(
     QStringLiteral("videoPresentationFilterCombo"));
+  auto* shaderMode = dialog->findChild<QComboBox*>(
+    QStringLiteral("shaderModeCombo"));
   auto* overscan = dialog->findChild<QComboBox*>(QStringLiteral("coreOverscanCombo"));
   auto* ntsc = dialog->findChild<QComboBox*>(QStringLiteral("coreNtscFilterCombo"));
   auto* render = dialog->findChild<QComboBox*>(
@@ -488,12 +490,20 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   auto* restore = dialog->findChild<QPushButton*>(
     QStringLiteral("restoreVideoDefaultsButton"));
   QVERIFY(aspect != nullptr && scaling != nullptr && filter != nullptr);
+  QVERIFY(shaderMode != nullptr);
   QVERIFY(overscan != nullptr && ntsc != nullptr && render != nullptr);
   QVERIFY(gameGear != nullptr && apply != nullptr && restore != nullptr);
   QCOMPARE(aspect->currentData().toInt(),
     static_cast<int>(genplusgx::video::AspectMode::fourThree));
   QCOMPARE(overscan->currentData().toInt(),
     static_cast<int>(genplusgx::CoreOverscanMode::vertical));
+  QCOMPARE(aspect->count(), 3);
+  QCOMPARE(scaling->count(), 2);
+  QCOMPARE(filter->count(), 2);
+  QCOMPARE(shaderMode->count(), 3);
+  QCOMPARE(overscan->count(), 4);
+  QCOMPARE(ntsc->count(), 5);
+  QCOMPARE(render->count(), 2);
 
   aspect->setCurrentIndex(aspect->findData(
     static_cast<int>(genplusgx::video::AspectMode::stretch)));
@@ -677,6 +687,14 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
     QStringLiteral("masterVolumeSpinBox"));
   auto* filter = dialog->findChild<QComboBox*>(
     QStringLiteral("coreAudioFilterCombo"));
+  auto* output = dialog->findChild<QComboBox*>(
+    QStringLiteral("coreSoundOutputCombo"));
+  auto* ym2612 = dialog->findChild<QComboBox*>(
+    QStringLiteral("ym2612CoreCombo"));
+  auto* ym2413Mode = dialog->findChild<QComboBox*>(
+    QStringLiteral("ym2413ModeCombo"));
+  auto* ym2413Core = dialog->findChild<QComboBox*>(
+    QStringLiteral("ym2413CoreCombo"));
   auto* lowPass = dialog->findChild<QSpinBox*>(
     QStringLiteral("lowPassRangeSpinBox"));
   auto* eqLow = dialog->findChild<QSpinBox*>(
@@ -692,6 +710,8 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
   QVERIFY(dialog->findChild<QLabel*>(
     QStringLiteral("audioRestartRequiredLabel")) == nullptr);
   QVERIFY(filter != nullptr && lowPass != nullptr && eqLow != nullptr);
+  QVERIFY(output != nullptr && ym2612 != nullptr);
+  QVERIFY(ym2413Mode != nullptr && ym2413Core != nullptr);
   QVERIFY(psg != nullptr && apply != nullptr && restore != nullptr);
   QCOMPARE(device->currentData().toString(),
     QStringLiteral("Configured test output"));
@@ -702,6 +722,19 @@ void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()
   QVERIFY(device->findData(QStringLiteral("Hot-plugged output")) >= 0);
   QCOMPARE(latency->value(), 45);
   QCOMPARE(psg->value(), 125);
+  QCOMPARE(output->count(), 2);
+  QCOMPARE(filter->count(), 3);
+  QCOMPARE(ym2612->count(), 5);
+  QCOMPARE(ym2413Mode->count(), 3);
+  QCOMPARE(ym2413Core->count(), 2);
+  QCOMPARE(volume->minimum(), 0);
+  QCOMPARE(volume->maximum(), 100);
+  QCOMPARE(latency->minimum(), 10);
+  QCOMPARE(latency->maximum(), 500);
+  QCOMPARE(psg->minimum(), 0);
+  QCOMPARE(psg->maximum(), 200);
+  QCOMPARE(lowPass->minimum(), 5);
+  QCOMPARE(lowPass->maximum(), 95);
 
   volume->setValue(20);
   dialog->reject();
@@ -780,6 +813,10 @@ void MainWindowTest::systemSettingsWorkflowIsValidatedAndDeferred()
     static_cast<int>(genplusgx::CoreSystemHardware::masterSystem));
   QCOMPARE(region->currentData().toInt(),
     static_cast<int>(genplusgx::CoreSystemRegion::ntscU));
+  QCOMPARE(hardware->count(), 9);
+  QCOMPARE(region->count(), 5);
+  QCOMPARE(vdp->count(), 3);
+  QCOMPARE(clock->count(), 3);
 
   hardware->setCurrentIndex(hardware->findData(
     static_cast<int>(genplusgx::CoreSystemHardware::gameGear)));

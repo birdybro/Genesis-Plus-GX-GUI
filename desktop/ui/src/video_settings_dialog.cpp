@@ -294,10 +294,8 @@ void VideoSettingsDialog::clearShaderParameters()
 {
   shaderParameterMetadata_.clear();
   shaderParameterEditors_.clear();
-  while (shaderParametersForm_->count() > 0) {
-    auto* item = shaderParametersForm_->takeAt(0);
-    delete item->widget();
-    delete item;
+  while (shaderParametersForm_->rowCount() > 0) {
+    shaderParametersForm_->removeRow(0);
   }
 }
 

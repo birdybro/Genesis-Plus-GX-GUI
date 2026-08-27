@@ -2,6 +2,7 @@
 #include "synthetic_rom.h"
 
 #include <algorithm>
+#include <array>
 #include <cstdint>
 #include <iomanip>
 #include <iostream>
@@ -161,5 +162,116 @@ int main()
     return 15;
   }
 
-  return adapter.shutdown() ? 0 : 16;
+  const auto exerciseSetting = [&adapter](
+    const genplusgx::CoreAudioSettings& setting) {
+    genplusgx::CoreAudioSettings exposed;
+    if (!adapter.applyAudioSettings(setting) ||
+        !adapter.audioSettings(exposed) || exposed != setting ||
+        !adapter.reset() || !adapter.runFrame(true)) {
+      return false;
+    }
+    genplusgx::CoreAudioBatchInfo info;
+    if (!adapter.audioBatchInfo(info) || info.frameCount == 0U ||
+        info.frameCount > 2'000U) {
+      return false;
+    }
+    std::vector<genplusgx::StereoAudioFrame> samples(info.frameCount);
+    return adapter.copyAudioFrames(samples, info).ok();
+  };
+  std::size_t optionCases = 0U;
+  const auto exerciseEnumeration = [&exerciseSetting, &optionCases](
+    auto values, auto assign) {
+    for (const auto value : values) {
+      auto setting = genplusgx::CoreAudioSettings{};
+      assign(setting, value);
+      if (!exerciseSetting(setting)) {
+        return false;
+      }
+      ++optionCases;
+    }
+    return true;
+  };
+  if (!check(exerciseEnumeration(
+        std::array{genplusgx::CoreSoundOutput::stereo,
+          genplusgx::CoreSoundOutput::mono},
+        [](auto& setting, auto value) { setting.output = value; }),
+      "A sound-output option failed to produce bounded audio") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreAudioFilter::disabled,
+          genplusgx::CoreAudioFilter::lowPass,
+          genplusgx::CoreAudioFilter::equalizer},
+        [](auto& setting, auto value) { setting.filter = value; }),
+      "An audio-filter option failed to produce bounded audio") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreYm2612Core::mameDiscrete,
+          genplusgx::CoreYm2612Core::mameIntegrated,
+          genplusgx::CoreYm2612Core::mameEnhanced,
+          genplusgx::CoreYm2612Core::nukedYm2612,
+          genplusgx::CoreYm2612Core::nukedYm3438},
+        [](auto& setting, auto value) { setting.ym2612Core = value; }),
+      "A YM2612/YM3438 core option failed to produce bounded audio") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreYm2413Mode::disabled,
+          genplusgx::CoreYm2413Mode::enabled,
+          genplusgx::CoreYm2413Mode::autoDetect},
+        [](auto& setting, auto value) { setting.ym2413Mode = value; }),
+      "A YM2413 mode failed to produce bounded audio") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreYm2413Core::mame,
+          genplusgx::CoreYm2413Core::nuked},
+        [](auto& setting, auto value) { setting.ym2413Core = value; }),
+      "A YM2413 core failed to produce bounded audio")) {
+    return 16;
+  }
+
+  const auto exerciseRange = [&exerciseSetting, &optionCases](
+    int minimum, int maximum, auto assign) {
+    for (const int value : {minimum, maximum}) {
+      auto setting = genplusgx::CoreAudioSettings{};
+      assign(setting, value);
+      if (!exerciseSetting(setting)) {
+        return false;
+      }
+      ++optionCases;
+    }
+    return true;
+  };
+  if (!check(exerciseRange(0, 200,
+        [](auto& value, int level) { value.psgLevelPercent = level; }) &&
+      exerciseRange(0, 200,
+        [](auto& value, int level) { value.fmLevelPercent = level; }) &&
+      exerciseRange(0, 100,
+        [](auto& value, int level) { value.cddaLevelPercent = level; }) &&
+      exerciseRange(0, 100,
+        [](auto& value, int level) { value.pcmLevelPercent = level; }) &&
+      exerciseRange(5, 95,
+        [](auto& value, int level) { value.lowPassPercent = level; }) &&
+      exerciseRange(0, 200,
+        [](auto& value, int level) { value.equalizerLowPercent = level; }) &&
+      exerciseRange(0, 200,
+        [](auto& value, int level) { value.equalizerMidPercent = level; }) &&
+      exerciseRange(0, 200,
+        [](auto& value, int level) { value.equalizerHighPercent = level; }),
+      "An audio level endpoint failed to produce bounded audio")) {
+    return 17;
+  }
+  for (const bool enabled : {false, true}) {
+    auto fm = genplusgx::CoreAudioSettings{};
+    fm.highQualityFm = enabled;
+    auto psg = genplusgx::CoreAudioSettings{};
+    psg.highQualityPsg = enabled;
+    if (!check(exerciseSetting(fm) && exerciseSetting(psg),
+          "A high-quality audio option failed to produce bounded audio")) {
+      return 18;
+    }
+    optionCases += 2U;
+  }
+  if (!check(optionCases == 35U,
+        "The complete core audio option inventory did not execute") ||
+      !check(adapter.applyAudioSettings(genplusgx::CoreAudioSettings{}),
+        "Core audio defaults could not be restored after the option matrix")) {
+    return 19;
+  }
+
+  return adapter.shutdown() ? 0 : 20;
 }

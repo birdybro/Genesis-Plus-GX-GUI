@@ -49,10 +49,20 @@ GUI tests assert semantics and state transitions across platforms.
 `gui.libretro_shader_render` is the focused exception to the normal offscreen software
 path. Linux CI runs it under Xvfb with GLX and requires a real OpenGL 3.3 context. It
 executes an original one-pass fixture through librashader, reads RGB output, then enables
-the bundled CRT preset on the actual `DisplayWidget` and requires a non-black image that
-materially differs from the baseline. Windows and macOS use their native Qt platform;
+the bundled CRT preset on the actual `DisplayWidget` and requires a non-black, upright
+image that materially differs from the baseline. Its 36-case presentation matrix covers
+every aspect, scaling, texture-filter, and shader mode, followed by minimum/maximum
+coverage for all five CRT parameters. Windows and macOS use their native Qt platform;
 they may return CTest skip code 77 only when the hosted environment cannot create a
 desktop OpenGL context.
+
+Core option-domain regressions explicitly execute 13 video choices, 35 audio
+enumeration/range-endpoint choices, all 12 exposed emulated input devices, and all 24
+system enumeration/toggle values. The generated 8-bit fixtures additionally execute
+every compatible hardware override and both Game Gear viewport modes. GUI inventory
+assertions require the corresponding combo counts/ranges plus all 29 emulator hotkeys.
+The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 113
+compatible runtime cases on a user-owned game and emits local comparison images.
 
 ## Supporting layers
 

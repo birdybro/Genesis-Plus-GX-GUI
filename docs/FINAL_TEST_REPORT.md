@@ -46,6 +46,21 @@ Actual native Wayland captures now show both normal and built-in CRT output. The
 shader regression verifies that pre-application contract, and post-fix Release, Debug,
 and ASan/UBSan suites each pass 77/77.
 
+A subsequent orientation regression used the same user-supplied game in place. The
+previous final pass flipped every successful librashader output a second time; an
+asymmetric render assertion reproduced the defect before the code changed. The final
+pass now presents raw and shader textures with one consistent coordinate convention.
+The required real-OpenGL test covers 36 presentation combinations and ten CRT parameter
+endpoints. A separate optional native-Wayland acceptance run passed 113 real-game
+runtime cases spanning core video, audio, input devices, presentation, and compatible
+system reloads, generated 49 temporary comparison PNGs, and found every result upright
+both automatically and by contact-sheet review. The actual desktop process separately
+loaded Phantasy Star IV with built-in CRT at 59.9 FPS. No ROM or derived image entered
+the repository. The resulting code passes 77/77 in Release, Debug, and leak-detecting
+ASan/UBSan builds plus 75/75 with shader support disabled. The same 113-case native
+Wayland workload passes with ASan/UBSan address and undefined-behavior instrumentation;
+the required real-context shader test supplies the leak-detecting GPU gate.
+
 ## Build configurations tested
 
 Every local configuration was rebuilt with `--clean-first`. Newly authored frontend
@@ -91,6 +106,13 @@ sample an original input texture through librashader, then captures the actual
 from normal presentation. Linux runs that test under Xvfb/GLX. LeakSanitizer suppresses
 only process-global allocations rooted in the host NVIDIA GL and DBus libraries; all
 project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal.
+
+Option-domain coverage is also explicit rather than inferred: core tests execute all
+13 video values, 35 audio enumerations/endpoints, 12 emulated device types, and 24
+system values. UI inventory checks require every corresponding choice, range, and all
+29 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
+mute/volume/device/latency, keyboard/controller event paths, persistence, states,
+library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
 
 ## Operating-system CI matrix
 

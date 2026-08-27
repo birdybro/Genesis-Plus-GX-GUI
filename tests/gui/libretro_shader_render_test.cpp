@@ -23,6 +23,65 @@ namespace {
 
 constexpr int skipped = 77;
 
+struct AverageColor final {
+  double red{0.0};
+  double green{0.0};
+  double blue{0.0};
+};
+
+AverageColor averageColor(const QImage& image, const QRect& area)
+{
+  AverageColor result;
+  std::size_t count = 0U;
+  const auto bounded = area.intersected(image.rect());
+  for (int y = bounded.top(); y <= bounded.bottom(); ++y) {
+    for (int x = bounded.left(); x <= bounded.right(); ++x) {
+      const auto color = image.pixelColor(x, y);
+      result.red += color.redF();
+      result.green += color.greenF();
+      result.blue += color.blueF();
+      ++count;
+    }
+  }
+  if (count != 0U) {
+    result.red /= static_cast<double>(count);
+    result.green /= static_cast<double>(count);
+    result.blue /= static_cast<double>(count);
+  }
+  return result;
+}
+
+bool quadrantsAreUpright(
+  const QImage& image,
+  const genplusgx::video::VideoLayout& layout)
+{
+  if (!layout.valid()) {
+    return false;
+  }
+  // Sample the interior of each quadrant. Keeping away from the outer 15%
+  // makes this valid even at the built-in CRT shader's maximum curvature.
+  const auto region = [&layout](double x, double y) {
+    return QRect{
+      layout.x + static_cast<int>(std::lround(layout.width * x)),
+      layout.y + static_cast<int>(std::lround(layout.height * y)),
+      std::max(1, static_cast<int>(std::lround(layout.width * 0.20))),
+      std::max(1, static_cast<int>(std::lround(layout.height * 0.20))),
+    };
+  };
+  const auto topLeft = averageColor(image, region(0.15, 0.15));
+  const auto topRight = averageColor(image, region(0.65, 0.15));
+  const auto bottomLeft = averageColor(image, region(0.15, 0.65));
+  const auto bottomRight = averageColor(image, region(0.65, 0.65));
+  return topLeft.red > topLeft.green * 1.5 &&
+    topLeft.red > topLeft.blue * 1.5 &&
+    topRight.green > topRight.red * 1.5 &&
+    topRight.green > topRight.blue * 1.5 &&
+    bottomLeft.blue > bottomLeft.red * 1.5 &&
+    bottomLeft.blue > bottomLeft.green * 1.5 &&
+    bottomRight.red > 0.15 && bottomRight.green > 0.15 &&
+    bottomRight.blue > 0.15;
+}
+
 int unavailable(const char* detail)
 {
   if (qEnvironmentVariableIsSet("GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST")) {
@@ -221,6 +280,10 @@ int main(int argc, char** argv)
     std::cerr << "The display widget baseline framebuffer is empty.\n";
     return 8;
   }
+  if (!quadrantsAreUpright(baseline, widget.currentLayout())) {
+    std::cerr << "The unshaded display frame is not upright.\n";
+    return 8;
+  }
   widget.setShaderConfiguration({
     .mode = genplusgx::video::ShaderMode::builtinCrt,
     .presetPath = {},
@@ -263,6 +326,103 @@ int main(int argc, char** argv)
     std::cerr << "The CRT preset did not materially change the presented image ("
               << changedPixels << " changed pixels).\n";
     return 9;
+  }
+  if (!quadrantsAreUpright(displayed, widget.currentLayout())) {
+    std::cerr << "The CRT shader output is vertically inverted.\n";
+    return 9;
+  }
+
+  const std::array aspects{
+    genplusgx::video::AspectMode::native,
+    genplusgx::video::AspectMode::fourThree,
+    genplusgx::video::AspectMode::stretch,
+  };
+  const std::array scales{
+    genplusgx::video::ScaleMode::fit,
+    genplusgx::video::ScaleMode::integer,
+  };
+  const std::array filters{
+    genplusgx::video::VideoFilter::nearest,
+    genplusgx::video::VideoFilter::bilinear,
+  };
+  const std::array shaderConfigurations{
+    genplusgx::video::ShaderConfiguration{},
+    genplusgx::video::ShaderConfiguration{
+      .mode = genplusgx::video::ShaderMode::builtinCrt,
+      .presetPath = {},
+      .parameters = {},
+    },
+    genplusgx::video::ShaderConfiguration{
+      .mode = genplusgx::video::ShaderMode::libretroPreset,
+      .presetPath = std::filesystem::path{GENPLUSGX_SHADER_TEST_FIXTURE_DIR} /
+        "libretro-pass.slangp",
+      .parameters = {},
+    },
+  };
+  std::size_t presentationCases = 0U;
+  for (const auto aspect : aspects) {
+    widget.setAspectMode(aspect);
+    for (const auto scale : scales) {
+      widget.setScaleMode(scale);
+      for (const auto filter : filters) {
+        widget.setVideoFilter(filter);
+        for (const auto& shader : shaderConfigurations) {
+          widget.setShaderConfiguration(shader);
+          QTest::qWait(20);
+          const auto matrixImage = canvas->grabFramebuffer();
+          if (matrixImage.isNull() ||
+              !quadrantsAreUpright(matrixImage, widget.currentLayout())) {
+            std::cerr << "Video presentation case " << presentationCases
+                      << " changed frame orientation (aspect "
+                      << static_cast<int>(aspect) << ", scale "
+                      << static_cast<int>(scale) << ", filter "
+                      << static_cast<int>(filter) << ", shader "
+                      << static_cast<int>(shader.mode) << ").\n";
+            return 10;
+          }
+          ++presentationCases;
+        }
+      }
+    }
+  }
+  if (presentationCases != 36U) {
+    std::cerr << "The complete presentation matrix did not execute.\n";
+    return 10;
+  }
+
+  const genplusgx::video::ShaderConfiguration builtin{
+    .mode = genplusgx::video::ShaderMode::builtinCrt,
+    .presetPath = {},
+    .parameters = {},
+  };
+  const auto inspection = genplusgx::video::inspectShaderConfiguration(builtin);
+  if (!inspection.success || inspection.parameters.size() != 5U) {
+    std::cerr << "The built-in CRT parameter inventory was incomplete.\n";
+    return 11;
+  }
+  widget.setAspectMode(genplusgx::video::AspectMode::native);
+  widget.setScaleMode(genplusgx::video::ScaleMode::fit);
+  widget.setVideoFilter(genplusgx::video::VideoFilter::nearest);
+  std::size_t parameterCases = 0U;
+  for (const auto& parameter : inspection.parameters) {
+    for (const float value : {parameter.minimum, parameter.maximum}) {
+      auto configuration = builtin;
+      configuration.parameters.push_back({parameter.name, value});
+      widget.setShaderConfiguration(std::move(configuration));
+      QTest::qWait(20);
+      const auto parameterImage = canvas->grabFramebuffer();
+      if (parameterImage.isNull() ||
+          !quadrantsAreUpright(parameterImage, widget.currentLayout())) {
+        std::cerr << "CRT parameter " << parameter.name << " at " << value
+                  << " changed frame orientation.\n";
+        return 11;
+      }
+      ++parameterCases;
+    }
+  }
+  if (parameterCases != 10U) {
+    std::cerr << "The complete built-in CRT parameter matrix did not execute.\n";
+    return 11;
   }
   return 0;
 }

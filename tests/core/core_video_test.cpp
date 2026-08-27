@@ -131,7 +131,29 @@ int main()
     return 13;
   }
 
+  std::size_t optionCases = 0U;
+  for (const auto overscan : {
+         genplusgx::CoreOverscanMode::disabled,
+         genplusgx::CoreOverscanMode::vertical,
+         genplusgx::CoreOverscanMode::horizontal,
+         genplusgx::CoreOverscanMode::full}) {
+    auto preset = genplusgx::CoreVideoSettings{};
+    preset.overscan = overscan;
+    genplusgx::CoreVideoSettings exposed;
+    if (!check(adapter.applyVideoSettings(preset),
+          "An overscan option could not be applied") ||
+        !check(adapter.videoSettings(exposed) && exposed == preset,
+          "An overscan option was not retained") ||
+        !check(adapter.runFrame(false), "An overscan option could not render") ||
+        !check(adapter.copyVideoFrame(enhancedPixels, enhancedInfo) &&
+            enhancedInfo.width >= 320U && enhancedInfo.height >= 224U,
+          "An overscan option produced invalid geometry")) {
+      return 14;
+    }
+    ++optionCases;
+  }
   for (const auto filter : {
+         genplusgx::CoreNtscFilter::disabled,
          genplusgx::CoreNtscFilter::monochrome,
          genplusgx::CoreNtscFilter::composite,
          genplusgx::CoreNtscFilter::sVideo,
@@ -143,10 +165,44 @@ int main()
         !check(adapter.runFrame(false),
           "A bundled NTSC preset could not render a frame") ||
         !check(adapter.copyVideoFrame(enhancedPixels, enhancedInfo) &&
-            enhancedInfo.width > 320U,
+            (filter == genplusgx::CoreNtscFilter::disabled
+                ? enhancedInfo.width >= 320U : enhancedInfo.width > 320U),
           "A bundled NTSC preset did not produce expanded output")) {
       return 14;
     }
+    ++optionCases;
+  }
+  for (const auto render : {
+         genplusgx::CoreInterlacedRenderMode::singleField,
+         genplusgx::CoreInterlacedRenderMode::doubleField}) {
+    auto preset = genplusgx::CoreVideoSettings{};
+    preset.interlacedRender = render;
+    genplusgx::CoreVideoSettings exposed;
+    if (!check(adapter.applyVideoSettings(preset) &&
+          adapter.videoSettings(exposed) && exposed == preset &&
+          adapter.runFrame(false) &&
+          adapter.copyVideoFrame(enhancedPixels, enhancedInfo),
+        "An interlaced-render option failed its live frame path")) {
+      return 14;
+    }
+    ++optionCases;
+  }
+  for (const bool extended : {false, true}) {
+    auto preset = genplusgx::CoreVideoSettings{};
+    preset.gameGearExtendedScreen = extended;
+    genplusgx::CoreVideoSettings exposed;
+    if (!check(adapter.applyVideoSettings(preset) &&
+          adapter.videoSettings(exposed) && exposed == preset &&
+          adapter.runFrame(false) &&
+          adapter.copyVideoFrame(enhancedPixels, enhancedInfo),
+        "A Game Gear viewport option failed its live frame path")) {
+      return 14;
+    }
+    ++optionCases;
+  }
+  if (!check(optionCases == 13U,
+        "The complete core video option inventory did not execute")) {
+    return 14;
   }
   if (!check(adapter.applyVideoSettings(enhanced),
         "Active video settings could not be restored after preset coverage")) {

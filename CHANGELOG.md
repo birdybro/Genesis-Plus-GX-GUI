@@ -16,10 +16,18 @@ platform documentation.
 - Video-menu and Settings controls for selecting presets and editing declared shader
   parameters, with versioned persistence and relative shader-pack resource handling.
 - Real OpenGL/librashader and `QOpenGLWidget` regression coverage that verifies input
-  sampling, non-black output, and a materially changed built-in CRT image under Xvfb.
+  sampling, non-black output, upright orientation across all 36 presentation
+  combinations, and both endpoints of every built-in CRT parameter under Xvfb.
+- An opt-in external-ROM acceptance runner that exercises complete video, audio,
+  emulated-input-device, and compatible system-option matrices against a user-owned
+  game while writing comparison PNGs only to a caller-selected directory.
 
 ### Fixed
 
+- Built-in and custom Libretro shader output is no longer vertically inverted by a
+  redundant second texture-coordinate flip in the final presentation pass.
+- Dynamic controller-assignment and shader-parameter forms now remove complete rows,
+  eliminating invalid-layout diagnostics during normal dialog refreshes.
 - Native Wayland sessions now configure the OpenGL 3.3 core surface format before
   constructing `QApplication`, keeping Qt's backing-store compositor context
   compatible with the emulator `QOpenGLWidget` instead of displaying a black game

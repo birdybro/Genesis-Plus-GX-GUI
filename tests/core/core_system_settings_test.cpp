@@ -1,6 +1,7 @@
 #include "genplusgx/core_adapter.h"
 #include "synthetic_rom.h"
 
+#include <array>
 #include <cstdint>
 #include <iostream>
 
@@ -40,6 +41,76 @@ int main()
     return 3;
   }
 
+  std::size_t optionCases = 0U;
+  const auto exerciseEnumeration = [&adapter, &optionCases](auto values, auto assign) {
+    for (const auto value : values) {
+      auto settings = genplusgx::CoreSystemSettings{};
+      assign(settings, value);
+      genplusgx::CoreSystemSettings retained;
+      if (!adapter.applySystemSettings(settings) ||
+          !adapter.systemSettings(retained) || retained != settings) {
+        return false;
+      }
+      ++optionCases;
+    }
+    return true;
+  };
+  if (!check(exerciseEnumeration(
+        std::array{genplusgx::CoreSystemHardware::automatic,
+          genplusgx::CoreSystemHardware::sg1000,
+          genplusgx::CoreSystemHardware::sg1000II,
+          genplusgx::CoreSystemHardware::sg1000IIRamExtension,
+          genplusgx::CoreSystemHardware::markIII,
+          genplusgx::CoreSystemHardware::masterSystem,
+          genplusgx::CoreSystemHardware::masterSystemII,
+          genplusgx::CoreSystemHardware::gameGear,
+          genplusgx::CoreSystemHardware::genesis},
+        [](auto& settings, auto value) { settings.hardware = value; }),
+      "A hardware override option was not retained") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreSystemRegion::automatic,
+          genplusgx::CoreSystemRegion::ntscU,
+          genplusgx::CoreSystemRegion::palEurope,
+          genplusgx::CoreSystemRegion::ntscJapan,
+          genplusgx::CoreSystemRegion::palJapan},
+        [](auto& settings, auto value) { settings.region = value; }),
+      "A region option was not retained") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreVideoStandard::automatic,
+          genplusgx::CoreVideoStandard::ntsc,
+          genplusgx::CoreVideoStandard::pal},
+        [](auto& settings, auto value) { settings.videoStandard = value; }),
+      "A VDP standard option was not retained") ||
+      !check(exerciseEnumeration(
+        std::array{genplusgx::CoreMasterClock::automatic,
+          genplusgx::CoreMasterClock::ntsc,
+          genplusgx::CoreMasterClock::pal},
+        [](auto& settings, auto value) { settings.masterClock = value; }),
+      "A master-clock option was not retained")) {
+    return 4;
+  }
+  for (const bool enabled : {false, true}) {
+    auto lockups = genplusgx::CoreSystemSettings{};
+    lockups.emulateIllegalAccessLockups = enabled;
+    auto addressErrors = genplusgx::CoreSystemSettings{};
+    addressErrors.enableAddressErrors = enabled;
+    genplusgx::CoreSystemSettings retained;
+    if (!check(adapter.applySystemSettings(lockups) &&
+          adapter.systemSettings(retained) && retained == lockups &&
+          adapter.applySystemSettings(addressErrors) &&
+          adapter.systemSettings(retained) && retained == addressErrors,
+        "A system-accuracy toggle was not retained")) {
+      return 4;
+    }
+    optionCases += 2U;
+  }
+  if (!check(optionCases == 24U,
+        "The complete core system option inventory did not execute") ||
+      !check(adapter.applySystemSettings(genplusgx::CoreSystemSettings{}),
+        "System defaults could not be restored after the option matrix")) {
+    return 4;
+  }
+
   genplusgx::CoreSystemSettings palVideoNtscClock;
   palVideoNtscClock.region = genplusgx::CoreSystemRegion::palEurope;
   palVideoNtscClock.videoStandard = genplusgx::CoreVideoStandard::pal;
@@ -50,7 +121,7 @@ int main()
         "Pre-load system settings were rejected") ||
       !check(adapter.loadGame(fixture.path()),
         "Configured Genesis fixture could not load")) {
-    return 4;
+    return 5;
   }
   genplusgx::CoreTimingInfo firstTiming;
   if (!check(adapter.timingInfo(firstTiming) && firstTiming.pal &&
@@ -59,7 +130,7 @@ int main()
       "Independent PAL VDP and NTSC master clock settings were not applied") ||
       !check(adapter.hardware() == 0x80U,
         "Automatic hardware selection changed the Genesis fixture")) {
-    return 5;
+    return 6;
   }
 
   genplusgx::CoreSystemSettings nextLoad;
@@ -71,7 +142,7 @@ int main()
         "Loaded-session system settings were rejected") ||
       !check(adapter.systemSettings(exposed) && exposed == nextLoad,
         "Deferred system settings snapshot was not retained")) {
-    return 6;
+    return 7;
   }
   genplusgx::CoreTimingInfo unchangedTiming;
   if (!check(adapter.timingInfo(unchangedTiming) &&
@@ -79,12 +150,12 @@ int main()
         unchangedTiming.linesPerFrame == firstTiming.linesPerFrame &&
         adapter.hardware() == 0x80U,
       "Reload-required settings mutated the active machine")) {
-    return 7;
+    return 8;
   }
 
   if (!check(adapter.unloadGame() && adapter.loadGame(fixture.path()),
         "Deferred system settings reload failed")) {
-    return 8;
+    return 9;
   }
   genplusgx::CoreTimingInfo secondTiming;
   if (!check(adapter.hardware() == 0x01U,
@@ -93,14 +164,14 @@ int main()
         secondTiming.linesPerFrame == 262U &&
         secondTiming.masterClockHz == 53'203'424U,
         "Forced NTSC VDP and PAL master clock were not independently applied")) {
-    return 9;
+    return 10;
   }
 
   if (!check(adapter.unloadGame() &&
         adapter.applySystemSettings(genplusgx::CoreSystemSettings{}) &&
         adapter.loadGame(fixture.path()) && adapter.hardware() == 0x80U,
       "Restored automatic hardware did not detect Genesis on the next load")) {
-    return 10;
+    return 11;
   }
-  return adapter.shutdown() ? 0 : 11;
+  return adapter.shutdown() ? 0 : 12;
 }

@@ -47,11 +47,38 @@ widget's built-in CRT output is non-black and differs from its unshaded baseline
 It also invokes and verifies the production pre-`QApplication` surface-format setup;
 this ordering is required for Qt to composite the accelerated child correctly on
 native Wayland.
+The widget portion uses an asymmetric quadrant frame and rejects a vertical or
+horizontal orientation change. It executes all 36 combinations of native/4:3/stretch,
+fit/integer, nearest/bilinear, and off/built-in/custom shader presentation, then checks
+both endpoints of all five bundled CRT parameters.
 Windows and macOS run on their native Qt platforms and use skip code 77 only when the
 hosted environment provides no usable desktop OpenGL context.
 
+## Optional real-ROM option acceptance
+
+`genplusgx_external_rom_acceptance_test` is built with shader-enabled desktop tests but
+is intentionally not registered as a required CTest: it requires a game legally
+provided by the developer. It loads the file through the real `CoreAdapter`, executes
+13 core-video, 35 core-audio, 12 emulated-device, 36 accelerated-presentation, and 17
+compatible system-reload cases, and checks bounded output/lifecycle behavior. Shader
+images must be closer to the unshaded upright image than to its vertical mirror.
+
+Run it on a native desktop backend with an output directory outside the source tree:
+
+```bash
+QT_QPA_PLATFORM=wayland \
+  ./build/debug/tests/gui/genplusgx_external_rom_acceptance_test \
+  "/path/to/a/user-owned-game.md" /tmp/genplusgx-video-comparisons
+```
+
+The output PNGs contain frames from the supplied game. They are for local inspection;
+never commit, publish, or upload them without the rights holder's permission. The
+program never copies the ROM or firmware into the source/build tree. Required CI uses
+the CC0 synthetic fixtures through the same core and display assertions.
+
 LeakSanitizer keeps a narrow symbol-based suppression file for allocations rooted in
-the host NVIDIA GL driver and Qt's system DBus library during this real-context process.
+the host NVIDIA GL/EGL driver and Qt's system DBus library during this real-context
+process.
 It does not disable leak checking for the shader test or suppress any project,
 librashader, Mesa, or generic allocation frame; all other sanitizer diagnostics remain
 fatal. The suppression exists because those process-global host caches are outside the

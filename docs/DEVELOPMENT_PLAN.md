@@ -80,6 +80,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 66 Native package log hardening | COMPLETE | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure/plugin isolation, Windows redist path, packaging docs | warning-free local Release install/CPack; real XCB smoke; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning and use only their matched Qt runtime | `1a16da8` |
 | 67 Cross-platform shader evidence | COMPLETE | Close the shader feature against exact native logs and distributable artifacts | final report and milestone ledger | ten-job exact CI; six checksums; four architectures; real XCB archive launch | Shader behavior and package closure are traceable on every supported host | pending |
 | 68 Native Wayland presentation | COMPLETE | Fix valid accelerated frames compositing as black on native Wayland | pre-application OpenGL surface setup, render regression, docs | Phantasy Star IV native Wayland captures; 77-test Release/Debug/ASan suites | Normal and CRT-filtered frames reach the Wayland compositor without changing core output | pending |
+| 69 Full option regression | COMPLETE | Fix shader orientation and exercise every exposed option domain | final presentation pass, exhaustive core/UI matrices, external-ROM runner, docs | synthetic full suites plus 113-case Phantasy Star IV native-Wayland acceptance | Shader output remains upright; video/audio/input/system options have explicit bounded runtime coverage | pending |
 
 ## Execution policy
 
@@ -3941,6 +3942,56 @@ ASan/UBSan suites each pass 77/77 with no sanitizer finding.
 CRT modes; XCB and software rendering remain functional; the OpenGL format contract is
 checked automatically; core code and framebuffer generation are unchanged; all local
 regressions pass; and the clean milestone is committed and pushed.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 69 detail
+
+**Status:** COMPLETE
+
+**Goal:** Remove the redundant final-pass texture inversion exposed by the built-in CRT
+shader and replace non-black-only checks with comprehensive option-domain regressions.
+
+**Files changed:**
+
+- `desktop/video/src/display_widget.cpp`
+- `desktop/ui/src/input_configuration_dialog.cpp`
+- `desktop/ui/src/video_settings_dialog.cpp`
+- core and GUI option tests under `tests/`
+- `tests/gui/external_rom_acceptance_test.cpp`
+- release, testing, fixture, and milestone documentation
+
+**Tests added:** The accelerated shader test uses an asymmetric quadrant image and
+requires upright output for the 3 aspect modes × 2 scale modes × 2 texture filters ×
+3 shader modes matrix. It also tests the minimum and maximum of all five built-in CRT
+parameters. Core regressions now explicitly execute 13 video choices, 35 audio
+enumeration/endpoint choices, all 12 exposed emulated devices, 24 system values, every
+8-bit hardware override, and both Game Gear viewport modes. GUI tests assert the exact
+option inventory and ranges for video, audio, input, system, and all 29 hotkeys.
+
+**Gate evidence:** Before the renderer change, the new asymmetric assertion failed with
+`The CRT shader output is vertically inverted.` After removing the second flip, the
+focused test and its 46 orientation cases pass on native Wayland. The optional external
+runner loaded the supplied Phantasy Star IV ROM in place and passed 13 core-video,
+35 core-audio, 12 input-device, 36 accelerated-presentation, and 17 compatible
+system-reload cases. It wrote 49 temporary PNGs; automated normal-versus-vertical
+correlation and visual contact-sheet review found every image upright. The real desktop
+executable separately loaded that ROM with the built-in CRT enabled through the full
+MainWindow/worker path and rendered an upright image at 59.9 FPS on native Wayland. No
+ROM-derived output was added to the repository. Release, Debug, and leak-detecting
+ASan/UBSan configurations pass 77/77; the shader-disabled configuration passes 75/75.
+The 113-case native-Wayland real-ROM runner also passes with ASan/UBSan address and
+undefined-behavior instrumentation. Its separate leak pass found only process-global
+NVIDIA EGL/DBus and address-only allocations after their owning host plugins unloaded;
+the required real-context shader test retains leak detection and leaves all project
+and librashader allocation frames unsuppressed.
+
+**Acceptance criteria:** Normal, built-in CRT, and custom Slang output retain the same
+orientation across presentation policies; every exposed settings family has explicit
+inventory coverage; real-game acceptance can be repeated without distributing a ROM;
+all required local and hosted regressions pass; and no new warning or unbounded buffer
+is introduced.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

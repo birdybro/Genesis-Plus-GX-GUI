@@ -43,7 +43,17 @@ int main()
   const std::array cases{
     SystemCase{".sg", genplusgx::CoreSystemHardware::automatic,
       SYSTEM_SG, 256U, 192U},
+    SystemCase{".sg", genplusgx::CoreSystemHardware::sg1000,
+      SYSTEM_SG, 256U, 192U},
+    SystemCase{".sg", genplusgx::CoreSystemHardware::sg1000II,
+      SYSTEM_SGII, 256U, 192U},
+    SystemCase{".sg", genplusgx::CoreSystemHardware::sg1000IIRamExtension,
+      SYSTEM_SGII_RAM_EXT, 256U, 192U},
     SystemCase{".sms", genplusgx::CoreSystemHardware::automatic,
+      SYSTEM_SMS2, 256U, 192U},
+    SystemCase{".sms", genplusgx::CoreSystemHardware::masterSystem,
+      SYSTEM_SMS, 256U, 192U},
+    SystemCase{".sms", genplusgx::CoreSystemHardware::masterSystemII,
       SYSTEM_SMS2, 256U, 192U},
     SystemCase{".gg", genplusgx::CoreSystemHardware::automatic,
       SYSTEM_GG, 160U, 144U},
@@ -83,5 +93,28 @@ int main()
     }
   }
 
-  return check(adapter.shutdown(), "Eight-bit adapter shutdown failed") ? 0 : 4;
+  genplusgx::CoreVideoSettings extended;
+  extended.gameGearExtendedScreen = true;
+  if (!check(adapter.applySystemSettings(genplusgx::CoreSystemSettings{}),
+        "Automatic hardware could not be restored for Game Gear coverage") ||
+      !check(adapter.applyVideoSettings(extended),
+        "Extended Game Gear viewport could not be enabled") ||
+      !check(adapter.loadGame(gg.path()),
+        "Game Gear fixture could not load with its extended viewport") ||
+      !check(adapter.runFrame(false),
+        "Extended Game Gear viewport did not render")) {
+    return 4;
+  }
+  genplusgx::CoreVideoFrameInfo extendedFrame;
+  if (!check(adapter.videoFrameInfo(extendedFrame) &&
+        extendedFrame.width == 256U && extendedFrame.height == 192U,
+      "Extended Game Gear viewport did not expose 256x192 output") ||
+      !check(adapter.unloadGame(),
+        "Extended Game Gear session did not unload") ||
+      !check(adapter.applyVideoSettings(genplusgx::CoreVideoSettings{}),
+        "Default Game Gear viewport could not be restored")) {
+    return 4;
+  }
+
+  return check(adapter.shutdown(), "Eight-bit adapter shutdown failed") ? 0 : 5;
 }

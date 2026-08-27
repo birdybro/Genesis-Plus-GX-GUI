@@ -1,0 +1,531 @@
+#include "genplusgx/core_adapter.h"
+#include "genplusgx/video/display_widget.h"
+
+#include <QApplication>
+#include <QImage>
+#include <QOpenGLWidget>
+#include <QTest>
+
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdint>
+#include <filesystem>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <span>
+#include <string>
+#include <utility>
+#include <vector>
+
+namespace {
+
+using genplusgx::CoreAudioSettings;
+using genplusgx::CoreInputDevice;
+using genplusgx::CoreInputSettings;
+using genplusgx::CoreSystemSettings;
+using genplusgx::CoreVideoFrameInfo;
+using genplusgx::CoreVideoSettings;
+
+bool check(bool condition, const std::string& message)
+{
+  if (!condition) {
+    std::cerr << message << '\n';
+  }
+  return condition;
+}
+
+CoreInputSettings oneDevice(CoreInputDevice device)
+{
+  CoreInputSettings settings;
+  settings.devices.fill(CoreInputDevice::none);
+  if (device != CoreInputDevice::none) {
+    settings.devices[0] = device;
+  }
+  return settings;
+}
+
+bool copyCurrentFrame(
+  genplusgx::CoreAdapter& adapter,
+  std::vector<std::uint16_t>& pixels,
+  CoreVideoFrameInfo& frame)
+{
+  if (!adapter.videoFrameInfo(frame) || frame.pixelCount() == 0U ||
+      frame.pixelCount() > genplusgx::VideoFrameExchange::maximumSurfacePixels) {
+    return false;
+  }
+  pixels.resize(frame.pixelCount());
+  return adapter.copyVideoFrame(pixels, frame).ok() &&
+    std::ranges::any_of(pixels, [](std::uint16_t pixel) { return pixel != 0U; });
+}
+
+bool publishFrame(
+  const std::shared_ptr<genplusgx::VideoFrameExchange>& exchange,
+  genplusgx::video::DisplayWidget& widget,
+  const std::vector<std::uint16_t>& pixels,
+  const CoreVideoFrameInfo& frame)
+{
+  auto lease = exchange->beginWrite();
+  if (!lease || lease->pixels().size() < pixels.size()) {
+    return false;
+  }
+  std::ranges::copy(pixels, lease->pixels().begin());
+  return lease->publish(frame).ok() && widget.presentLatestFrame();
+}
+
+double imageDifference(
+  const QImage& reference,
+  const QImage& candidate,
+  const genplusgx::video::VideoLayout& layout,
+  bool verticallyFlipReference)
+{
+  if (reference.size() != candidate.size() || !layout.valid()) {
+    return std::numeric_limits<double>::infinity();
+  }
+  const int left = layout.x + layout.width / 5;
+  const int right = layout.x + (layout.width * 4) / 5;
+  const int top = layout.y + layout.height / 5;
+  const int bottom = layout.y + (layout.height * 4) / 5;
+  double difference = 0.0;
+  std::size_t samples = 0U;
+  for (int y = top; y < bottom; y += 2) {
+    const int referenceY = verticallyFlipReference
+      ? layout.y + layout.height - 1 - (y - layout.y) : y;
+    for (int x = left; x < right; x += 2) {
+      const auto first = reference.pixelColor(x, referenceY);
+      const auto second = candidate.pixelColor(x, y);
+      difference += std::abs(first.redF() - second.redF()) +
+        std::abs(first.greenF() - second.greenF()) +
+        std::abs(first.blueF() - second.blueF());
+      ++samples;
+    }
+  }
+  return samples == 0U ? std::numeric_limits<double>::infinity()
+                       : difference / static_cast<double>(samples);
+}
+
+bool isNonBlack(const QImage& image)
+{
+  for (int y = 0; y < image.height(); y += 4) {
+    for (int x = 0; x < image.width(); x += 4) {
+      if (image.pixelColor(x, y).value() > 8) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+QString outputPath(
+  const std::filesystem::path& directory,
+  const std::string& filename)
+{
+  return QString::fromStdString((directory / filename).string());
+}
+
+bool exerciseAudioCase(
+  genplusgx::CoreAdapter& adapter,
+  std::span<const std::uint8_t> state,
+  const CoreAudioSettings& settings)
+{
+  CoreAudioSettings retained;
+  // The upstream raw-state payload contains the active sound-core context,
+  // whose size differs between MAME and Nuked implementations. Restore the
+  // configuration under which this temporary baseline state was captured
+  // before loading it, then exercise the live switch being tested.
+  if (!adapter.applyAudioSettings(CoreAudioSettings{}) ||
+      !adapter.loadRawState(state)) {
+    std::cerr << "  audio diagnostic: state reload failed\n";
+    return false;
+  }
+  if (!adapter.applyAudioSettings(settings)) {
+    std::cerr << "  audio diagnostic: live setting application failed\n";
+    return false;
+  }
+  if (!adapter.audioSettings(retained) || retained != settings) {
+    std::cerr << "  audio diagnostic: setting was not retained\n";
+    return false;
+  }
+  if (!adapter.runFrame(true)) {
+    std::cerr << "  audio diagnostic: emulated frame failed\n";
+    return false;
+  }
+  genplusgx::CoreAudioBatchInfo info;
+  if (!adapter.audioBatchInfo(info) || info.frameCount == 0U ||
+      info.frameCount > 2'000U) {
+    std::cerr << "  audio diagnostic: invalid/missing batch ("
+              << info.frameCount << " frames)\n";
+    return false;
+  }
+  std::vector<genplusgx::StereoAudioFrame> samples(info.frameCount);
+  if (!adapter.copyAudioFrames(samples, info)) {
+    std::cerr << "  audio diagnostic: batch copy failed\n";
+    return false;
+  }
+  return true;
+}
+
+std::vector<CoreAudioSettings> audioCases()
+{
+  std::vector<CoreAudioSettings> result;
+  const auto add = [&result](auto values, auto assign) {
+    for (const auto value : values) {
+      CoreAudioSettings settings;
+      assign(settings, value);
+      result.push_back(settings);
+    }
+  };
+  add(std::array{genplusgx::CoreSoundOutput::stereo,
+        genplusgx::CoreSoundOutput::mono},
+    [](auto& settings, auto value) { settings.output = value; });
+  add(std::array{genplusgx::CoreAudioFilter::disabled,
+        genplusgx::CoreAudioFilter::lowPass,
+        genplusgx::CoreAudioFilter::equalizer},
+    [](auto& settings, auto value) { settings.filter = value; });
+  add(std::array{genplusgx::CoreYm2612Core::mameDiscrete,
+        genplusgx::CoreYm2612Core::mameIntegrated,
+        genplusgx::CoreYm2612Core::mameEnhanced,
+        genplusgx::CoreYm2612Core::nukedYm2612,
+        genplusgx::CoreYm2612Core::nukedYm3438},
+    [](auto& settings, auto value) { settings.ym2612Core = value; });
+  add(std::array{genplusgx::CoreYm2413Mode::disabled,
+        genplusgx::CoreYm2413Mode::enabled,
+        genplusgx::CoreYm2413Mode::autoDetect},
+    [](auto& settings, auto value) { settings.ym2413Mode = value; });
+  add(std::array{genplusgx::CoreYm2413Core::mame,
+        genplusgx::CoreYm2413Core::nuked},
+    [](auto& settings, auto value) { settings.ym2413Core = value; });
+  const auto addRange = [&result](int minimum, int maximum, auto assign) {
+    for (const int value : {minimum, maximum}) {
+      CoreAudioSettings settings;
+      assign(settings, value);
+      result.push_back(settings);
+    }
+  };
+  addRange(0, 200, [](auto& value, int level) { value.psgLevelPercent = level; });
+  addRange(0, 200, [](auto& value, int level) { value.fmLevelPercent = level; });
+  addRange(0, 100, [](auto& value, int level) { value.cddaLevelPercent = level; });
+  addRange(0, 100, [](auto& value, int level) { value.pcmLevelPercent = level; });
+  addRange(5, 95, [](auto& value, int level) { value.lowPassPercent = level; });
+  addRange(0, 200,
+    [](auto& value, int level) { value.equalizerLowPercent = level; });
+  addRange(0, 200,
+    [](auto& value, int level) { value.equalizerMidPercent = level; });
+  addRange(0, 200,
+    [](auto& value, int level) { value.equalizerHighPercent = level; });
+  for (const bool enabled : {false, true}) {
+    CoreAudioSettings fm;
+    fm.highQualityFm = enabled;
+    result.push_back(fm);
+    CoreAudioSettings psg;
+    psg.highQualityPsg = enabled;
+    result.push_back(psg);
+  }
+  return result;
+}
+
+std::vector<std::pair<std::string, CoreVideoSettings>> videoCases()
+{
+  std::vector<std::pair<std::string, CoreVideoSettings>> result;
+  for (const auto value : {genplusgx::CoreOverscanMode::disabled,
+         genplusgx::CoreOverscanMode::vertical,
+         genplusgx::CoreOverscanMode::horizontal,
+         genplusgx::CoreOverscanMode::full}) {
+    CoreVideoSettings settings;
+    settings.overscan = value;
+    result.emplace_back("overscan-" + std::to_string(static_cast<int>(value)), settings);
+  }
+  for (const auto value : {genplusgx::CoreNtscFilter::disabled,
+         genplusgx::CoreNtscFilter::monochrome,
+         genplusgx::CoreNtscFilter::composite,
+         genplusgx::CoreNtscFilter::sVideo,
+         genplusgx::CoreNtscFilter::rgb}) {
+    CoreVideoSettings settings;
+    settings.ntscFilter = value;
+    result.emplace_back("ntsc-" + std::to_string(static_cast<int>(value)), settings);
+  }
+  for (const auto value : {genplusgx::CoreInterlacedRenderMode::singleField,
+         genplusgx::CoreInterlacedRenderMode::doubleField}) {
+    CoreVideoSettings settings;
+    settings.interlacedRender = value;
+    result.emplace_back("interlace-" + std::to_string(static_cast<int>(value)), settings);
+  }
+  for (const bool enabled : {false, true}) {
+    CoreVideoSettings settings;
+    settings.gameGearExtendedScreen = enabled;
+    result.emplace_back(enabled ? "gamegear-extended" : "gamegear-native", settings);
+  }
+  return result;
+}
+
+} // namespace
+
+int main(int argc, char** argv)
+{
+  genplusgx::video::configureOpenGLSurfaceFormat();
+  QApplication application(argc, argv);
+  if (argc != 3) {
+    std::cerr << "Usage: genplusgx_external_rom_acceptance_test ROM OUTPUT_DIRECTORY\n";
+    return 2;
+  }
+  const std::filesystem::path rom{argv[1]};
+  const std::filesystem::path outputDirectory{argv[2]};
+  std::error_code filesystemError;
+  if (!check(std::filesystem::is_regular_file(rom, filesystemError),
+        "The external ROM does not exist") ||
+      !check(std::filesystem::create_directories(outputDirectory, filesystemError) ||
+          std::filesystem::is_directory(outputDirectory, filesystemError),
+        "The comparison output directory could not be created")) {
+    return 2;
+  }
+
+  genplusgx::CoreAdapter adapter;
+  if (!check(adapter.initialize(), "The core adapter could not initialize") ||
+      !check(adapter.loadGame(rom), "The external game could not load")) {
+    return 3;
+  }
+  for (std::size_t frame = 0U; frame < 600U; ++frame) {
+    if (!check(adapter.runFrame(false), "The real-ROM warm-up frame failed")) {
+      return 4;
+    }
+  }
+  std::vector<std::uint8_t> stableState;
+  if (!check(adapter.saveRawState(stableState),
+        "The real-ROM comparison state could not be captured")) {
+    return 4;
+  }
+
+  std::vector<std::uint16_t> referencePixels;
+  CoreVideoFrameInfo referenceFrame;
+  if (!check(copyCurrentFrame(adapter, referencePixels, referenceFrame),
+        "The real-ROM reference frame was empty")) {
+    return 5;
+  }
+
+  for (const auto& [name, settings] : videoCases()) {
+    if (!check(adapter.loadRawState(stableState) &&
+          adapter.applyVideoSettings(settings) && adapter.runFrame(false),
+        "Core video option failed for the real ROM: " + name)) {
+      return 6;
+    }
+    std::vector<std::uint16_t> pixels;
+    CoreVideoFrameInfo frame;
+    if (!check(copyCurrentFrame(adapter, pixels, frame),
+          "Core video option produced an empty real-ROM frame: " + name)) {
+      return 6;
+    }
+    const QImage image{
+      reinterpret_cast<const uchar*>(pixels.data()),
+      static_cast<int>(frame.width), static_cast<int>(frame.height),
+      static_cast<int>(frame.width * sizeof(std::uint16_t)), QImage::Format_RGB16};
+    if (!check(image.copy().save(outputPath(outputDirectory, "core-" + name + ".png")),
+          "Core video comparison PNG could not be written: " + name)) {
+      return 6;
+    }
+  }
+
+  const auto actualAudioCases = audioCases();
+  if (!check(actualAudioCases.size() == 35U,
+        "The complete audio option inventory was not constructed")) {
+    return 7;
+  }
+  for (std::size_t index = 0U; index < actualAudioCases.size(); ++index) {
+    if (!check(exerciseAudioCase(adapter, stableState, actualAudioCases[index]),
+          "Audio option failed on the real ROM at case " + std::to_string(index))) {
+      return 7;
+    }
+  }
+
+  constexpr std::array devices{
+    CoreInputDevice::none,
+    CoreInputDevice::pad3Button,
+    CoreInputDevice::pad6Button,
+    CoreInputDevice::segaMouse,
+    CoreInputDevice::lightGun,
+    CoreInputDevice::paddle,
+    CoreInputDevice::sportsPad,
+    CoreInputDevice::xe1Ap,
+    CoreInputDevice::pico,
+    CoreInputDevice::terebiOekaki,
+    CoreInputDevice::graphicBoard,
+    CoreInputDevice::activator,
+  };
+  std::uint64_t sequence = 1U;
+  for (const auto device : devices) {
+    genplusgx::InputSnapshot snapshot;
+    snapshot.sequence = sequence++;
+    snapshot.players[0].connected = device != CoreInputDevice::none;
+    snapshot.players[0].buttons = 0x0FFFU;
+    snapshot.players[0].analogX = 12'345;
+    snapshot.players[0].analogY = -12'345;
+    CoreInputSettings retained;
+    const auto settings = oneDevice(device);
+    if (!check(adapter.applyInputSettings(settings) &&
+          adapter.inputSettings(retained) && retained == settings &&
+          adapter.setInputSnapshot(snapshot) && adapter.runFrame(true) &&
+          adapter.appliedInputSequence() == snapshot.sequence,
+        "An input-device option failed on the real ROM")) {
+      return 8;
+    }
+  }
+
+  if (!check(adapter.loadRawState(stableState) &&
+        adapter.applyVideoSettings(CoreVideoSettings{}) && adapter.runFrame(false) &&
+        copyCurrentFrame(adapter, referencePixels, referenceFrame),
+      "The default real-ROM frame could not be restored")) {
+    return 9;
+  }
+  auto exchange = std::make_shared<genplusgx::VideoFrameExchange>();
+  genplusgx::video::DisplayWidget widget;
+  std::string shaderFailure;
+  widget.setShaderFailureSink([&shaderFailure](std::string message) {
+    shaderFailure = std::move(message);
+  });
+  widget.setFrameExchange(exchange);
+  widget.resize(640, 480);
+  widget.show();
+  if (!QTest::qWaitForWindowExposed(&widget) || !widget.usesAcceleratedRenderer() ||
+      !publishFrame(exchange, widget, referencePixels, referenceFrame)) {
+    std::cerr << "The accelerated real-ROM comparison display was unavailable.\n";
+    return 9;
+  }
+  auto* canvas = widget.findChild<QOpenGLWidget*>(QStringLiteral("openGLCanvas"));
+  if (canvas == nullptr) {
+    std::cerr << "The real-ROM OpenGL canvas was unavailable.\n";
+    return 9;
+  }
+
+  constexpr std::array aspects{
+    genplusgx::video::AspectMode::native,
+    genplusgx::video::AspectMode::fourThree,
+    genplusgx::video::AspectMode::stretch,
+  };
+  constexpr std::array scales{
+    genplusgx::video::ScaleMode::fit,
+    genplusgx::video::ScaleMode::integer,
+  };
+  constexpr std::array filters{
+    genplusgx::video::VideoFilter::nearest,
+    genplusgx::video::VideoFilter::bilinear,
+  };
+  const std::array shaders{
+    genplusgx::video::ShaderConfiguration{},
+    genplusgx::video::ShaderConfiguration{
+      .mode = genplusgx::video::ShaderMode::builtinCrt,
+      .presetPath = {}, .parameters = {}},
+    genplusgx::video::ShaderConfiguration{
+      .mode = genplusgx::video::ShaderMode::libretroPreset,
+      .presetPath = std::filesystem::path{GENPLUSGX_SHADER_TEST_FIXTURE_DIR} /
+        "libretro-pass.slangp",
+      .parameters = {}},
+  };
+  std::size_t presentationCases = 0U;
+  for (const auto aspect : aspects) {
+    widget.setAspectMode(aspect);
+    for (const auto scale : scales) {
+      widget.setScaleMode(scale);
+      for (const auto filter : filters) {
+        widget.setVideoFilter(filter);
+        QImage baseline;
+        for (const auto& shader : shaders) {
+          shaderFailure.clear();
+          widget.setShaderConfiguration(shader);
+          QTest::qWait(25);
+          const auto image = canvas->grabFramebuffer();
+          const auto name = "presentation-" + std::to_string(presentationCases) +
+            "-a" + std::to_string(static_cast<int>(aspect)) +
+            "-s" + std::to_string(static_cast<int>(scale)) +
+            "-f" + std::to_string(static_cast<int>(filter)) +
+            "-h" + std::to_string(static_cast<int>(shader.mode)) + ".png";
+          if (!check(shaderFailure.empty(), "A real-ROM shader failed: " + shaderFailure) ||
+              !check(!image.isNull() && isNonBlack(image),
+                "A presentation option produced a black real-ROM image") ||
+              !check(image.save(outputPath(outputDirectory, name)),
+                "A presentation comparison PNG could not be written")) {
+            return 10;
+          }
+          if (shader.mode == genplusgx::video::ShaderMode::disabled) {
+            baseline = image;
+          } else {
+            const auto upright = imageDifference(
+              baseline, image, widget.currentLayout(), false);
+            const auto inverted = imageDifference(
+              baseline, image, widget.currentLayout(), true);
+            if (!check(upright < inverted,
+                  "A shader presentation is closer to vertically inverted output")) {
+              return 10;
+            }
+          }
+          ++presentationCases;
+        }
+      }
+    }
+  }
+  if (!check(presentationCases == 36U,
+        "The complete real-ROM presentation matrix did not execute")) {
+    return 10;
+  }
+
+  if (!check(adapter.unloadGame(), "The real-ROM session could not unload")) {
+    return 11;
+  }
+  std::vector<CoreSystemSettings> systemCases;
+  const auto addSystemCases = [&systemCases](auto values, auto assign) {
+    for (const auto value : values) {
+      CoreSystemSettings settings;
+      assign(settings, value);
+      systemCases.push_back(settings);
+    }
+  };
+  addSystemCases(std::array{genplusgx::CoreSystemHardware::automatic,
+      genplusgx::CoreSystemHardware::genesis},
+    [](auto& settings, auto value) { settings.hardware = value; });
+  addSystemCases(std::array{genplusgx::CoreSystemRegion::automatic,
+      genplusgx::CoreSystemRegion::ntscU,
+      genplusgx::CoreSystemRegion::palEurope,
+      genplusgx::CoreSystemRegion::ntscJapan,
+      genplusgx::CoreSystemRegion::palJapan},
+    [](auto& settings, auto value) { settings.region = value; });
+  addSystemCases(std::array{genplusgx::CoreVideoStandard::automatic,
+      genplusgx::CoreVideoStandard::ntsc,
+      genplusgx::CoreVideoStandard::pal},
+    [](auto& settings, auto value) { settings.videoStandard = value; });
+  addSystemCases(std::array{genplusgx::CoreMasterClock::automatic,
+      genplusgx::CoreMasterClock::ntsc,
+      genplusgx::CoreMasterClock::pal},
+    [](auto& settings, auto value) { settings.masterClock = value; });
+  for (const bool enabled : {false, true}) {
+    CoreSystemSettings lockups;
+    lockups.emulateIllegalAccessLockups = enabled;
+    systemCases.push_back(lockups);
+    CoreSystemSettings errors;
+    errors.enableAddressErrors = enabled;
+    systemCases.push_back(errors);
+  }
+  if (!check(systemCases.size() == 17U,
+        "The real-ROM system option inventory was incomplete")) {
+    return 11;
+  }
+  for (const auto& settings : systemCases) {
+    CoreSystemSettings retained;
+    genplusgx::CoreTimingInfo timing;
+    if (!check(adapter.applySystemSettings(settings) &&
+          adapter.systemSettings(retained) && retained == settings &&
+          adapter.loadGame(rom) && adapter.runFrame(false) &&
+          adapter.timingInfo(timing) && timing.framesPerSecond() > 40.0 &&
+          timing.framesPerSecond() < 70.0 && adapter.unloadGame(),
+        "A system option failed the real-ROM reload path")) {
+      return 11;
+    }
+  }
+  if (!check(adapter.applySystemSettings(CoreSystemSettings{}) && adapter.shutdown(),
+        "The real-ROM acceptance session did not shut down cleanly")) {
+    return 12;
+  }
+  std::cout << "PASS: 13 core video cases, 35 core audio cases, 12 input "
+               "devices, 36 accelerated presentation cases, and 17 system "
+               "reload cases. Comparison PNGs: "
+            << outputDirectory << '\n';
+  return 0;
+}

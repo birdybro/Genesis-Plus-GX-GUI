@@ -163,6 +163,33 @@ void InputConfigurationDialogTest::profilesDefaultsAndApplySemantics()
   QVERIFY(axis != nullptr);
   QVERIFY(apply != nullptr);
   QVERIFY(restore != nullptr);
+  auto* bindingsPage = dialog.findChild<QWidget*>(
+    QStringLiteral("inputBindingsPage"));
+  auto* advancedPage = dialog.findChild<QWidget*>(
+    QStringLiteral("advancedInputPage"));
+  auto* hotkeysPage = dialog.findChild<QWidget*>(
+    QStringLiteral("emulatorHotkeysPage"));
+  QVERIFY(bindingsPage != nullptr && advancedPage != nullptr);
+  QVERIFY(hotkeysPage != nullptr);
+  QCOMPARE(bindingsPage->findChildren<genplusgx::ui::BindingCaptureButton*>().size(),
+    24);
+  QCOMPARE(hotkeysPage->findChildren<genplusgx::ui::BindingCaptureButton*>().size(),
+    static_cast<qsizetype>(genplusgx::input::emulatorHotkeyActionCount));
+  const auto advancedCombos = advancedPage->findChildren<QComboBox*>();
+  std::size_t deviceComboCount = 0U;
+  std::size_t axisComboCount = 0U;
+  for (const auto* combo : advancedCombos) {
+    if (combo->objectName().startsWith(QStringLiteral("logicalDevicePlayer"))) {
+      QCOMPARE(combo->count(), 12);
+      ++deviceComboCount;
+    } else if (combo->objectName().startsWith(
+                 QStringLiteral("controllerAxis"))) {
+      QCOMPARE(combo->count(), 12);
+      ++axisComboCount;
+    }
+  }
+  QCOMPARE(deviceComboCount, genplusgx::InputSnapshot::maximumPlayers);
+  QCOMPARE(axisComboCount, std::size_t{4U});
 
   QCOMPARE(profileCombo->count(), 1);
   QVERIFY(!remove->isEnabled());

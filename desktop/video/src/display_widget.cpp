@@ -111,15 +111,13 @@ protected:
         "void main(){ textureCoordinate=textureInput; gl_Position=vec4(position,0.0,1.0); }";
     const char* fragmentSource = modernShader
       ? "#version 150\n"
-        "uniform sampler2D frameTexture; uniform float flipTexture;"
+        "uniform sampler2D frameTexture;"
         "in vec2 textureCoordinate; out vec4 outputColor;"
-        "void main(){ vec2 uv=vec2(textureCoordinate.x,mix(textureCoordinate.y,"
-        "1.0-textureCoordinate.y,flipTexture)); outputColor=texture(frameTexture,uv); }"
+        "void main(){ outputColor=texture(frameTexture,textureCoordinate); }"
       : "#ifdef GL_ES\nprecision mediump float;\n#endif\n"
-        "uniform sampler2D frameTexture; uniform float flipTexture;"
+        "uniform sampler2D frameTexture;"
         "varying vec2 textureCoordinate;"
-        "void main(){ vec2 uv=vec2(textureCoordinate.x,mix(textureCoordinate.y,"
-        "1.0-textureCoordinate.y,flipTexture)); gl_FragColor=texture2D(frameTexture,uv); }";
+        "void main(){ gl_FragColor=texture2D(frameTexture,textureCoordinate); }";
 
     if (!program_.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexSource) ||
         !program_.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentSource) ||
@@ -158,7 +156,6 @@ protected:
     program_.setAttributeBuffer(
       textureInput, GL_FLOAT, 2 * sizeof(float), 2, 4 * sizeof(float));
     program_.setUniformValue("frameTexture", 0);
-    program_.setUniformValue("flipTexture", 0.0F);
     program_.release();
     vertexBuffer_.release();
     vertexArray_.release();
@@ -240,7 +237,6 @@ protected:
     }
 
     GLuint presentationTexture = texture_;
-    float flipTexture = 0.0F;
     if (owner_.shaderConfiguration_.mode != ShaderMode::disabled) {
       ensureShaderOutputTexture(
         static_cast<std::uint32_t>(viewportWidth),
@@ -255,7 +251,6 @@ protected:
               static_cast<float>(layout.width) /
                 static_cast<float>(layout.height))) {
           presentationTexture = shaderOutputTexture_;
-          flipTexture = 1.0F;
         } else if (failedShaderGeneration_ !=
                    owner_.shaderConfigurationGeneration_) {
           failedShaderGeneration_ = owner_.shaderConfigurationGeneration_;
@@ -288,7 +283,6 @@ protected:
     vertexArray_.bind();
     program_.bind();
     program_.setUniformValue("frameTexture", 0);
-    program_.setUniformValue("flipTexture", flipTexture);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
     program_.release();
     vertexArray_.release();
