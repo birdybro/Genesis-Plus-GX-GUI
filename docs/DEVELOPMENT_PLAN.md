@@ -3820,8 +3820,11 @@ the real librashader/OpenGL regression. A fresh install and CPack TGZ complete w
 a CMake warning; the verifier and installed `--version` smoke pass; application and XCB
 plugin dependency inspection resolves Qt and SDL from the staged tree; and both the
 versioned shared objects and required SONAME links are present. The source hosted run
-`33091984835` otherwise passed every native test and artifact check. Exact warning-free
-hosted confirmation remains pending after this milestone is pushed.
+`33091984835` otherwise passed every native test and artifact check. Initial follow-up
+run `33094813598` proved that the official Qt bundle exposes the imported XCB target but
+requires system `xkbcommon-x11` development metadata to resolve it; Linux CI and release
+jobs now install that explicit prerequisite. Actionlint and a fresh production-shaped
+configure pass. Exact warning-free hosted confirmation remains pending.
 
 **Acceptance criteria:** Linux stages exact imported Qt/SDL targets and resolves only
 remaining transitive dependencies without fallback-directory warnings; Windows safely
