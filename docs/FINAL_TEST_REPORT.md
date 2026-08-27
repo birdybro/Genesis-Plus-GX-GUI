@@ -10,7 +10,7 @@ log/artifact audits performed on 2026-08-26 (America/Denver).
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA
 - Prior full-matrix implementation baseline:
-  `466626a37b3ecd57039ff0a861fb784a6b76cbe6`
+  `25954ed60f941a507e0b7bd930c8cbff8613f24e`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -68,8 +68,8 @@ packaging (3).
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`33023291621`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33023291621)
-completed successfully against the prior full-matrix package-closure implementation.
+[`33024729781`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33024729781)
+completed successfully against the exact save-path-hardened implementation baseline.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -85,9 +85,10 @@ completed successfully against the prior full-matrix package-closure implementat
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
 Each hosted CMake job ran all 75 registered tests. Package jobs staged and verified
-native runtimes before uploading artifacts. Full logs were read for all ten jobs; the
-only actionable finding was in the separate inherited libretro build and is corrected
-by this candidate's checked save-path construction and warning gate.
+native runtimes before uploading artifacts. Full logs were read for all ten jobs; there
+is no compiler/linker warning, sanitizer signature, runtime error, Qt-test warning,
+skipped CTest, timeout, or deployment failure. The stricter inherited libretro build
+also links and cleans without a diagnostic.
 
 ## Packaging results
 
@@ -106,6 +107,13 @@ requires the executable, Qt platform/runtime libraries, SDL3, relevant plugins, 
 Windows Microsoft's official Visual C++ x64 Redistributable installer before any
 artifact can upload. Release publication remains guarded by an authorized matching
 version tag.
+
+All four exact-commit artifact families were downloaded after run `33024729781`. The
+six individual SHA-256 manifests verify. Extracted executables identify as Windows
+PE32+ x86-64, Linux ELF x86-64, macOS Mach-O arm64, and macOS Mach-O x86-64. Required
+Qt platform/SQLite plugins and SDL3 are present; Linux has both XCB GL integrations and
+Windows has the official redistributable while omitting unused DirectX compiler DLLs.
+An archive-name audit found no game, disc image, BIOS, SRAM, BRAM, or state payload.
 
 ## Tagged-release log audit
 
@@ -155,7 +163,8 @@ legacy libretro risk: per-game Sega CD backup paths could silently truncate into
 256-byte buffer and collide. The release candidate now formats those paths into a
 larger dedicated buffer, rejects overflow explicitly, fixes the two old qualifier
 diagnostics, and promotes both warning classes to errors in CI and release builds.
-Hosted confirmation of this final source correction is required before tagging.
+Exact hosted confirmation is run `33024729781`: all ten jobs pass, every CMake job is
+75/75, the legacy build is warning-clean, and all six native package checksums verify.
 
 ## Linux startup correction verification
 

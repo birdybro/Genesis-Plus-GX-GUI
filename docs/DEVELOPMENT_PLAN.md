@@ -70,10 +70,11 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 56 Final release-candidate evidence | COMPLETE | Rebuild every local configuration and refresh exact hosted/package/report evidence | Linux deploy policy, final report, architecture shutdown order, milestone ledger | clean 74-test Debug/Release/ASan suites; libretro; ten-job hosted matrix; warning-free staged install and CPack | Final documentation describes the tested candidate and current behavior; tree and package remain clean | `2f53681` |
 | 57 Composite-disc release hardening | COMPLETE | Unify multi-file disc identity, library ownership, and shutdown cancellation after a full requirements audit | game-file/content hash, persistence, metadata/library scanner, worker cancellation, audit/tests/docs | clean 74-test Debug/Release/ASan suites; libretro; package; exact ten-job hosted matrix | CUE identity covers every track, library avoids track duplicates, and no large hash blocks shutdown | `4d2e7d0` |
 | 58 Final verification evidence | COMPLETE | Close the release ledger/report against the exact hardened implementation and hosted artifacts | final report, requirements audit, milestone ledger | prior exact implementation gates plus complete documentation/package regression | Published evidence is current, traceable, honest about limitations, and ready for final handoff | `70bfa8b` |
-| 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | pending |
-| 60 Tagged release hardening | COMPLETE | Audit every first-release job log, eliminate authored cross-platform warnings, and make asset publication retry-safe | warning policy/fixes, reduced links, release workflow, version/docs | warning-as-error Debug/Release/ASan; 74-test suites; hosted Windows/Linux/macOS matrix and release retry | No authored warning is hidden by a green job; transient upload failure cannot publish a partial release | pending |
-| 61 Cross-platform package closure | COMPLETE | Resolve issues found by the warning-gated hosted-log and artifact audit before tagging | Windows runtime/deploy policy, Apple vendor diagnostic scope, package test/docs | warning-as-error Debug/Release/ASan 75-test suites; hosted matrix and archive inspection | Windows testers receive the official compiler runtime; successful macOS logs have no unresolved vendor warning | pending |
-| 62 Legacy save-path hardening | COMPLETE | Resolve the final actionable warning found in the complete hosted-log audit | checked BRAM path builder, legacy warning gates, release evidence | warning-clean legacy link; 75-test Debug/Release/ASan suites; hosted matrix required before tag | No save identity can be silently truncated; legacy diagnostics cannot hide behind a green job | pending |
+| 59 Linux black-screen correction | COMPLETE | Keep the complete shell visible when packaged XCB OpenGL support is absent or unusable | renderer preflight, Linux deploy/verification, GUI visibility regression, release notes/report | real before/after desktop capture; 74-test Debug/Release/ASan suites; staged-package launch and plugin-removal fallback | Portable package includes XCB EGL/GLX; failed GL preflight selects software before a `QOpenGLWidget` can blank the shell | `94c6e4a` |
+| 60 Tagged release hardening | COMPLETE | Audit every first-release job log, eliminate authored cross-platform warnings, and make asset publication retry-safe | warning policy/fixes, reduced links, release workflow, version/docs | warning-as-error Debug/Release/ASan; 74-test suites; hosted Windows/Linux/macOS matrix and release retry | No authored warning is hidden by a green job; transient upload failure cannot publish a partial release | `e0de76a` |
+| 61 Cross-platform package closure | COMPLETE | Resolve issues found by the warning-gated hosted-log and artifact audit before tagging | Windows runtime/deploy policy, Apple vendor diagnostic scope, package test/docs | warning-as-error Debug/Release/ASan 75-test suites; hosted matrix and archive inspection | Windows testers receive the official compiler runtime; successful macOS logs have no unresolved vendor warning | `466626a` |
+| 62 Legacy save-path hardening | COMPLETE | Resolve the final actionable warning found in the complete hosted-log audit | checked BRAM path builder, legacy warning gates, release evidence | warning-clean legacy link; 75-test Debug/Release/ASan suites; exact hosted/artifact audit | No save identity can be silently truncated; legacy diagnostics cannot hide behind a green job | `25954ed` |
+| 63 Native release-gate evidence | COMPLETE | Record the exact warning-clean hosted matrix and archive inspection before tagging | final report and milestone ledger | ten-job exact CI; six checksums; four binary architectures; payload scan | Tested source and distributed runtime contents are traceable before immutable publication | pending |
 
 ## Execution policy
 
@@ -3320,7 +3321,7 @@ and honest external-fixture/signing/format limitations. Architecture documents t
 actual shutdown sequence. Adversarial source and tree scans find no unfinished desktop
 path or accidental proprietary/build artifact.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/FINAL_TEST_REPORT.md`)
+**Commit SHA:** `2f53681`
 
 ## Milestone 57 detail
 
@@ -3433,8 +3434,7 @@ audit has no unresolved implementation finding, documentation/package validation
 passes, every milestone commit is pushed, and the final branch is clean and synchronized
 with `origin` after the closure workflow succeeds.
 
-**Commit SHA:** pending (resolve with
-`git log -1 -- docs/FINAL_TEST_REPORT.md`; a commit cannot contain its own SHA)
+**Commit SHA:** `70bfa8b`
 
 ## Milestone 59 detail
 
@@ -3479,9 +3479,7 @@ accelerated and fallback starts expose the normal menus/status and an actionable
 state, while loaded-frame presentation retains the existing bounded GPU/software
 paths.
 
-**Commit SHA:** pending (resolve with
-`git log -1 -- desktop/video/src/display_widget.cpp`; a commit cannot contain its own
-SHA)
+**Commit SHA:** `94c6e4a`
 
 ## Milestone 60 detail
 
@@ -3547,8 +3545,7 @@ all six archives, six neighboring checksums, and the aggregate manifest upload; 
 asset receives bounded retries; an exhausted upload leaves no partial public release;
 and the immutable failed-attempt tag is not moved or force-rewritten.
 
-**Commit SHA:** pending (resolve with
-`git log -1 -- .github/workflows/release.yml`; a commit cannot contain its own SHA)
+**Commit SHA:** `e0de76a`
 
 ## Milestone 61 detail
 
@@ -3603,8 +3600,7 @@ the understood bundled-header collision without a warning; all authored warnings
 fatal; all tests pass without skips; and the final hosted logs and native artifacts are
 audited before the immutable `v0.1.1` tag is created.
 
-**Commit SHA:** pending (resolve with
-`git log -1 -- cmake/VerifyPackage.cmake`; a commit cannot contain its own SHA)
+**Commit SHA:** `466626a`
 
 ## Milestone 62 detail
 
@@ -3650,5 +3646,47 @@ warnings are gone; CI fails if either diagnostic returns; all 75 desktop tests a
 native hosted matrix pass; all hosted logs and produced artifacts are audited before
 tagging.
 
+**Commit SHA:** `25954ed`
+
+## Milestone 63 detail
+
+**Status:** COMPLETE
+
+**Goal:** Close the release gate against the exact save-path-hardened implementation by
+auditing every native job log and every produced package before creating an immutable
+version tag.
+
+**Files changed:**
+
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+
+**Tests added:** None. This is an evidence-only closure over implementation commit
+`25954ed60f941a507e0b7bd930c8cbff8613f24e`; documentation validation remains part of
+the common 75-test suite.
+
+**Gate evidence:** Exact-commit Continuous Integration run
+[`33024729781`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33024729781)
+passed all ten jobs. Linux Debug, Release, ASan/UBSan, Windows MSVC x64 Debug/Release,
+macOS arm64 Debug/Release, and macOS x86-64 Debug/Release each report 75/75 tests;
+the stricter legacy build links and cleans without a diagnostic. A complete log scan
+found no compiler/linker warning, sanitizer signature, runtime error, Qt-test warning,
+skipped CTest, timeout, or deployment failure. Normal configure probes, absent optional
+Vulkan headers, conditionally skipped failure uploads, and omission of Qt's unused
+OpenSSL backend require no product change.
+
+All four artifact families were downloaded. Each of the six package checksums verifies.
+The application binaries identify as Windows PE32+ x86-64, Linux ELF x86-64, macOS
+Mach-O arm64, and macOS Mach-O x86-64. Archive inspection confirms Qt's native platform
+and SQLite plugins plus SDL3; Linux contains both XCB GL integrations and Windows
+contains the official redistributable without unused DirectX compiler DLLs. No archive
+contains a ROM, disc image, BIOS, SRAM, BRAM, or state payload.
+
+**Acceptance criteria:** The exact implementation has a clean ten-job native matrix;
+all 75 tests pass on every supported CMake host/configuration; the legacy warning gate
+passes; every package checksum and architecture is verified; runtime dependencies are
+present; no prohibited content is distributed; and the evidence is committed and
+pushed before `v0.1.1` publication.
+
 **Commit SHA:** pending (resolve with
-`git log -1 -- libretro/libretro.c`; a commit cannot contain its own SHA)
+`git log -1 -- docs/FINAL_TEST_REPORT.md`; a commit cannot contain its own SHA)
