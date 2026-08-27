@@ -36,6 +36,16 @@ and fixed an incomplete one-level texture that produced black shader samples. Gl
 and per-game settings, bounded preset/parameter validation, runtime fallback, PAL/NTSC
 uniform timing, packaging, license notices, and GUI controls are included.
 
+A subsequent native Wayland investigation used the user-supplied Phantasy Star IV ROM
+in place without copying it into the tree. Before correction, the core ran at 59.8 FPS
+and the OpenGL framebuffer regression passed, while an actual KDE Wayland compositor
+capture showed a solid-black game area; XCB and forced software captures showed the
+expected image. The frontend now establishes its OpenGL 3.3 core default format before
+`QApplication`, allowing Qt's backing-store and `QOpenGLWidget` contexts to share.
+Actual native Wayland captures now show both normal and built-in CRT output. The real
+shader regression verifies that pre-application contract, and post-fix Release, Debug,
+and ASan/UBSan suites each pass 77/77.
+
 ## Build configurations tested
 
 Every local configuration was rebuilt with `--clean-first`. Newly authored frontend

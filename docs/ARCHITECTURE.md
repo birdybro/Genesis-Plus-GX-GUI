@@ -342,7 +342,10 @@ new generation uses `glTexSubImage2D`; a small presentation program draws the te
 with selectable nearest or bilinear sampling. Both mutable textures explicitly expose
 only mip level zero, so a Libretro pass that binds a mip-capable sampler cannot make the
 one-level input incomplete. The OpenGL viewport converts the pure logical layout to
-device pixels for high-DPI/Retina surfaces. Context, program, VAO, or texture failure
+device pixels for high-DPI/Retina surfaces. Before `QApplication` exists, the process
+sets the same OpenGL 3.3 core format used by the canvas; this makes Qt's top-level
+backing-store compositor and `QOpenGLWidget` contexts shareable, including on native
+Wayland. Context, program, VAO, or texture failure
 switches asynchronously to Qt's portable backing-store painter. The same deterministic
 software path is selected for offscreen/minimal platforms and by the explicit
 `GENPLUSGX_FORCE_SOFTWARE_VIDEO` diagnostic override.

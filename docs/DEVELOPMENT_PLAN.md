@@ -79,6 +79,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 65 Native shader hardening | COMPLETE | Resolve Windows capability and macOS symbol-resolution findings | OpenGL runtime/resolver and cross-platform GUI regression | ten-job exact hosted matrix; real Linux/macOS render; safe Windows capability skip | Compatible contexts render; unsupported contexts retain normal video safely | `b5aeffa` |
 | 66 Native package log hardening | COMPLETE | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure/plugin isolation, Windows redist path, packaging docs | warning-free local Release install/CPack; real XCB smoke; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning and use only their matched Qt runtime | `1a16da8` |
 | 67 Cross-platform shader evidence | COMPLETE | Close the shader feature against exact native logs and distributable artifacts | final report and milestone ledger | ten-job exact CI; six checksums; four architectures; real XCB archive launch | Shader behavior and package closure are traceable on every supported host | pending |
+| 68 Native Wayland presentation | COMPLETE | Fix valid accelerated frames compositing as black on native Wayland | pre-application OpenGL surface setup, render regression, docs | Phantasy Star IV native Wayland captures; 77-test Release/Debug/ASan suites | Normal and CRT-filtered frames reach the Wayland compositor without changing core output | pending |
 
 ## Execution policy
 
@@ -3896,6 +3897,50 @@ shader/runtime/license assets, and a prohibited game/firmware/save payload scan 
 compatible hosted contexts render a real Slang preset; unsupported graphics capability
 degrades safely; distributable artifacts contain the runtime, preset, license, and
 matched platform dependencies; and no actionable log finding remains open.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 68 detail
+
+**Status:** COMPLETE
+
+**Goal:** Correct a native Wayland presentation failure where Genesis Plus GX continued
+to produce valid Phantasy Star IV frames at the nominal rate but Qt composited the
+accelerated game area as solid black.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `desktop/video/include/genplusgx/video/display_widget.h`
+- `desktop/video/src/display_widget.cpp`
+- `tests/gui/libretro_shader_render_test.cpp`
+- `CHANGELOG.md`
+- `docs/ARCHITECTURE.md`
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+- `docs/TESTING.md`
+- `docs/USER_GUIDE.md`
+
+**Tests added:** The real OpenGL/librashader regression now calls and verifies the
+production surface-format setup before constructing `QApplication`, guarding the
+context-sharing order required by `QOpenGLWidget`. It continues to require sampled,
+non-black, materially transformed shader output.
+
+**Gate evidence:** The unmodified Release application reproduced the black compositor
+output on the host's native KDE Wayland/NVIDIA session while its status bar reported
+59.8 FPS. The same process rendered correctly through forced software video and XCB,
+isolating the defect from the ROM and core. After configuring the shared OpenGL 3.3
+core format before `QApplication`, native Wayland compositor captures show the supplied
+Phantasy Star IV ROM in windowed/fullscreen normal presentation and with the built-in
+CRT chain. No ROM was copied into the repository. The focused display/shader tests and
+the real shader executable under native Wayland pass. Complete Release, Debug, and
+ASan/UBSan suites each pass 77/77 with no sanitizer finding.
+
+**Acceptance criteria:** Native Wayland displays live accelerated frames in normal and
+CRT modes; XCB and software rendering remain functional; the OpenGL format contract is
+checked automatically; core code and framebuffer generation are unchanged; all local
+regressions pass; and the clean milestone is committed and pushed.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

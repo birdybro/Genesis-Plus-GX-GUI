@@ -37,6 +37,16 @@ int unavailable(const char* detail)
 
 int main(int argc, char** argv)
 {
+  genplusgx::video::configureOpenGLSurfaceFormat();
+  const auto defaultFormat = QSurfaceFormat::defaultFormat();
+  if (defaultFormat.renderableType() != QSurfaceFormat::OpenGL ||
+      defaultFormat.majorVersion() < 3 ||
+      (defaultFormat.majorVersion() == 3 &&
+       defaultFormat.minorVersion() < 3) ||
+      defaultFormat.profile() != QSurfaceFormat::CoreProfile) {
+    std::cerr << "The application OpenGL surface format was not configured.\n";
+    return 1;
+  }
   QApplication application(argc, argv);
   QSurfaceFormat format;
   format.setRenderableType(QSurfaceFormat::OpenGL);

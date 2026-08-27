@@ -60,6 +60,11 @@ bool canCreateOpenGLRenderer()
 
 } // namespace
 
+void configureOpenGLSurfaceFormat()
+{
+  QSurfaceFormat::setDefaultFormat(acceleratedSurfaceFormat());
+}
+
 class OpenGLCanvas final : public QOpenGLWidget, protected QOpenGLFunctions {
 public:
   explicit OpenGLCanvas(DisplayWidget& owner)

@@ -20,6 +20,10 @@ platform documentation.
 
 ### Fixed
 
+- Native Wayland sessions now configure the OpenGL 3.3 core surface format before
+  constructing `QApplication`, keeping Qt's backing-store compositor context
+  compatible with the emulator `QOpenGLWidget` instead of displaying a black game
+  area while emulation continues normally.
 - Emulator and shader output textures now explicitly constrain their mip level range,
   preventing a mip-capable Libretro sampler from producing a black frame when the
   source contains only level zero.

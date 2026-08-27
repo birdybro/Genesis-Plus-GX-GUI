@@ -273,6 +273,10 @@ unshaded image active. The selection is available in global Video settings and a
 per-game Video override. See [LIBRETRO_SHADERS.md](LIBRETRO_SHADERS.md) for the exact
 compatibility and packaging contract.
 
+The accelerated renderer works on native X11 and Wayland sessions. If a graphics
+driver cannot provide the requested context, the frontend automatically retains the
+normal software-rendered picture; shaders are unavailable only for that session.
+
 ## Input configuration
 
 Choose **Input → Controller Configuration…** to edit named keyboard/controller profiles,

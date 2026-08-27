@@ -189,6 +189,7 @@ std::string biosValidationStateName(
 int main(int argc, char* argv[])
 {
   genplusgx::ui::configureHighDpiPolicy();
+  genplusgx::video::configureOpenGLSurfaceFormat();
   QApplication application(argc, argv);
   QCoreApplication::setOrganizationName(QStringLiteral("Genesis Plus GX GUI"));
   QCoreApplication::setOrganizationDomain(QStringLiteral("genesisplusgx.org"));

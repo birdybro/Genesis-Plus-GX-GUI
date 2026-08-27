@@ -21,6 +21,10 @@ namespace genplusgx::video {
 
 class OpenGLCanvas;
 
+// Must be called before QApplication is constructed so Qt's backing-store
+// compositor and QOpenGLWidget create mutually shareable contexts.
+void configureOpenGLSurfaceFormat();
+
 class DisplayWidget final : public QWidget {
 public:
   explicit DisplayWidget(QWidget* parent = nullptr);

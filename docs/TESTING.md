@@ -44,6 +44,9 @@ Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TES
 failure to create or execute the OpenGL 3.3 shader path is fatal. The test samples a
 known input through an original Slang pass and then verifies that the actual display
 widget's built-in CRT output is non-black and differs from its unshaded baseline.
+It also invokes and verifies the production pre-`QApplication` surface-format setup;
+this ordering is required for Qt to composite the accelerated child correctly on
+native Wayland.
 Windows and macOS run on their native Qt platforms and use skip code 77 only when the
 hosted environment provides no usable desktop OpenGL context.
 
