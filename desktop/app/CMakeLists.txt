@@ -143,12 +143,36 @@ if(UNIX AND NOT APPLE)
     )
   endforeach()
 
-  get_filename_component(genplusgx_qt_library_directory
-    "${Qt6_DIR}/../.." ABSOLUTE)
-  get_filename_component(genplusgx_sdl_library_directory
-    "${SDL3_DIR}/../.." ABSOLUTE)
-  set(genplusgx_dependency_search_directories
-    "${genplusgx_qt_library_directory};${genplusgx_sdl_library_directory}")
+  set(genplusgx_linux_runtime_targets
+    Qt6::Core
+    Qt6::DBus
+    Qt6::Gui
+    Qt6::OpenGL
+    Qt6::OpenGLWidgets
+    Qt6::Sql
+    Qt6::Widgets
+    Qt6::XcbQpaPrivate
+  )
+  if(TARGET SDL3::SDL3-shared)
+    list(APPEND genplusgx_linux_runtime_targets SDL3::SDL3-shared)
+  else()
+    message(FATAL_ERROR "The Linux package requires the shared SDL3 target")
+  endif()
+  # Stage the resolved imported libraries and their SONAME links explicitly. This
+  # lets GET_RUNTIME_DEPENDENCIES inspect only the package closure instead of using
+  # fallback search directories that produce deployment warnings in modern CMake.
+  foreach(runtime_target IN LISTS genplusgx_linux_runtime_targets)
+    if(NOT TARGET "${runtime_target}")
+      message(FATAL_ERROR
+        "Required Linux runtime target is missing: ${runtime_target}")
+    endif()
+    install(
+      FILES
+        "$<TARGET_FILE:${runtime_target}>"
+        "$<TARGET_SONAME_FILE:${runtime_target}>"
+      DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    )
+  endforeach()
 
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/LinuxDeploy.cmake.in"
@@ -178,6 +202,8 @@ else()
       set(genplusgx_windows_redist "$ENV{GENPLUSGX_WINDOWS_REDIST}")
     endif()
     if(genplusgx_windows_redist)
+      cmake_path(CONVERT "${genplusgx_windows_redist}"
+        TO_CMAKE_PATH_LIST genplusgx_windows_redist NORMALIZE)
       if(NOT EXISTS "${genplusgx_windows_redist}")
         message(FATAL_ERROR
           "GENPLUSGX_WINDOWS_REDIST does not exist: ${genplusgx_windows_redist}")

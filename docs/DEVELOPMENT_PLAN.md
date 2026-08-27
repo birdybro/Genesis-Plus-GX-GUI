@@ -75,6 +75,9 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 61 Cross-platform package closure | COMPLETE | Resolve issues found by the warning-gated hosted-log and artifact audit before tagging | Windows runtime/deploy policy, Apple vendor diagnostic scope, package test/docs | warning-as-error Debug/Release/ASan 75-test suites; hosted matrix and archive inspection | Windows testers receive the official compiler runtime; successful macOS logs have no unresolved vendor warning | `466626a` |
 | 62 Legacy save-path hardening | COMPLETE | Resolve the final actionable warning found in the complete hosted-log audit | checked BRAM path builder, legacy warning gates, release evidence | warning-clean legacy link; 75-test Debug/Release/ASan suites; exact hosted/artifact audit | No save identity can be silently truncated; legacy diagnostics cannot hide behind a green job | `25954ed` |
 | 63 Native release-gate evidence | COMPLETE | Record the exact warning-clean hosted matrix and archive inspection before tagging | final report and milestone ledger | ten-job exact CI; six checksums; four binary architectures; payload scan | Tested source and distributed runtime contents are traceable before immutable publication | pending |
+| 64 Libretro CRT shaders | COMPLETE | Add adjustable CRT rendering and modern Libretro Slang preset support | librashader integration, video/settings/UI, packaging, tests/docs | 77-test Debug/Release/ASan; 75-test shader-disabled build; real OpenGL render test | Built-in and user Slang chains render outside the core with bounded fallback | `a632526` |
+| 65 Native shader hardening | COMPLETE | Resolve Windows capability and macOS symbol-resolution findings | OpenGL runtime/resolver and cross-platform GUI regression | ten-job exact hosted matrix; real Linux/macOS render; safe Windows capability skip | Compatible contexts render; unsupported contexts retain normal video safely | `b5aeffa` |
+| 66 Native package log hardening | IN PROGRESS | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure, Windows redist path, packaging docs | warning-free local Release install/CPack; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning | pending |
 
 ## Execution policy
 
@@ -3749,7 +3752,7 @@ cannot contain its own SHA)
 
 ## Milestone 65 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Harden native OpenGL shader initialization using the first hosted Windows
 and macOS evidence from Milestone 64.
@@ -3774,13 +3777,56 @@ Windows jobs exposed a hosted software context limited to GLSL 1.30, while optim
 macOS jobs exposed Qt's omission of core framework exports such as `glGetString` from
 its extension resolver. The runtime now checks its true context and macOS falls back to
 the system OpenGL framework for core symbols. After the correction, clean local Debug,
-Release, and ASan/UBSan builds each pass 77/77 tests. Hosted confirmation and full job
-log/package audit remain pending.
+Release, and ASan/UBSan builds each pass 77/77 tests. Exact hosted run
+[`33091984835`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33091984835)
+passes all ten jobs. Linux and both macOS architectures execute the real shader test;
+Windows registers 77 tests, passes 76, and capability-skips only the real shader test
+because the hosted software context exposes less than desktop OpenGL 3.3. All six
+package checksums, four executable/runtime architectures, required shader assets, and
+prohibited-content checks pass. Full log inspection found no compiler, linker,
+sanitizer, runtime, or test failure; two packaging diagnostics are tracked separately
+by Milestone 66.
 
 **Acceptance criteria:** Linux executes the real Libretro shader regression; compatible
 Windows and macOS contexts initialize safely; unsupported hosts retain normal unshaded
 video without a crash or repeated retry; all native jobs pass; and every hosted log and
 package is inspected before this milestone is marked complete.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 66 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Eliminate the Linux dependency-search and Windows generated-path diagnostics
+found by reading every successful Milestone 65 hosted job log.
+
+**Files changed:**
+
+- `CMakeLists.txt`
+- `desktop/app/CMakeLists.txt`
+- `cmake/LinuxDeploy.cmake.in`
+- `CHANGELOG.md`
+- `docs/PACKAGING.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** No new runtime behavior is introduced. Existing package verification,
+installed-process smoke, full CTest, and hosted artifact checks cover the changed
+install graph.
+
+**Gate evidence:** A clean local Release configure/build passes 77/77 tests, including
+the real librashader/OpenGL regression. A fresh install and CPack TGZ complete without
+a CMake warning; the verifier and installed `--version` smoke pass; application and XCB
+plugin dependency inspection resolves Qt and SDL from the staged tree; and both the
+versioned shared objects and required SONAME links are present. The source hosted run
+`33091984835` otherwise passed every native test and artifact check. Exact warning-free
+hosted confirmation remains pending after this milestone is pushed.
+
+**Acceptance criteria:** Linux stages exact imported Qt/SDL targets and resolves only
+remaining transitive dependencies without fallback-directory warnings; Windows safely
+embeds a normalized Visual C++ Redistributable path; all native jobs/tests/packages
+pass; and complete hosted logs contain no actionable packaging diagnostic.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

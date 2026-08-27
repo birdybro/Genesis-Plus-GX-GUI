@@ -8,7 +8,6 @@ set(prefix "$ENV{DESTDIR}${CMAKE_INSTALL_PREFIX}")
 set(binary "${prefix}/@CMAKE_INSTALL_BINDIR@/genesis-plus-gx-gui")
 set(library_directory "${prefix}/@CMAKE_INSTALL_LIBDIR@")
 set(plugin_directory "${library_directory}/qt6/plugins")
-set(dependency_search_directories "@genplusgx_dependency_search_directories@")
 
 if(NOT EXISTS "${binary}")
   message(FATAL_ERROR "Installed Linux executable is missing: ${binary}")
@@ -23,7 +22,6 @@ endif()
 file(GET_RUNTIME_DEPENDENCIES
   EXECUTABLES "${binary}"
   MODULES ${plugin_modules}
-  DIRECTORIES ${dependency_search_directories}
   RESOLVED_DEPENDENCIES_VAR resolved_dependencies
   UNRESOLVED_DEPENDENCIES_VAR unresolved_dependencies
   PRE_EXCLUDE_REGEXES

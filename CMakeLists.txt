@@ -52,6 +52,9 @@ set(GENPLUSGX_APP_ID "org.genesisplusgx.gui")
 set(GENPLUSGX_VERSION "${PROJECT_VERSION}")
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Sql Test)
+if(UNIX AND NOT APPLE)
+  find_package(Qt6 6.5 REQUIRED COMPONENTS DBus XcbQpaPrivate)
+endif()
 find_package(SDL3 3.2 REQUIRED CONFIG)
 
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)

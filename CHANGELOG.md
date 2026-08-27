@@ -29,6 +29,10 @@ platform documentation.
 - The macOS OpenGL loader now resolves framework-exported core functions when Qt's
   extension resolver does not expose them, allowing librashader to initialize on both
   Apple Silicon and Intel hosts.
+- Linux packages explicitly stage the imported Qt and SDL runtime targets before
+  dependency closure, eliminating CMake fallback-directory deployment warnings.
+- Windows deployment normalizes the Visual C++ Redistributable path before generating
+  install scripts, eliminating invalid backslash-escape diagnostics.
 
 ## [0.1.1] - 2026-08-26
 
