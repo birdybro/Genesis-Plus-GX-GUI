@@ -77,7 +77,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 63 Native release-gate evidence | COMPLETE | Record the exact warning-clean hosted matrix and archive inspection before tagging | final report and milestone ledger | ten-job exact CI; six checksums; four binary architectures; payload scan | Tested source and distributed runtime contents are traceable before immutable publication | pending |
 | 64 Libretro CRT shaders | COMPLETE | Add adjustable CRT rendering and modern Libretro Slang preset support | librashader integration, video/settings/UI, packaging, tests/docs | 77-test Debug/Release/ASan; 75-test shader-disabled build; real OpenGL render test | Built-in and user Slang chains render outside the core with bounded fallback | `a632526` |
 | 65 Native shader hardening | COMPLETE | Resolve Windows capability and macOS symbol-resolution findings | OpenGL runtime/resolver and cross-platform GUI regression | ten-job exact hosted matrix; real Linux/macOS render; safe Windows capability skip | Compatible contexts render; unsupported contexts retain normal video safely | `b5aeffa` |
-| 66 Native package log hardening | IN PROGRESS | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure/plugin isolation, Windows redist path, packaging docs | warning-free local Release install/CPack; real XCB smoke; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning and use only their matched Qt runtime | pending |
+| 66 Native package log hardening | COMPLETE | Eliminate packaging diagnostics found by the complete shader-run log audit | Linux runtime closure/plugin isolation, Windows redist path, packaging docs | warning-free local Release install/CPack; real XCB smoke; hosted log and artifact audit | Native package jobs contain no unresolved deployment warning and use only their matched Qt runtime | `1a16da8` |
+| 67 Cross-platform shader evidence | COMPLETE | Close the shader feature against exact native logs and distributable artifacts | final report and milestone ledger | ten-job exact CI; six checksums; four architectures; real XCB archive launch | Shader behavior and package closure are traceable on every supported host | pending |
 
 ## Execution policy
 
@@ -3797,7 +3798,7 @@ cannot contain its own SHA)
 
 ## Milestone 66 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Eliminate the Linux dependency-search and Windows generated-path diagnostics
 found by reading every successful Milestone 65 hosted job log.
@@ -3848,14 +3849,53 @@ the global offscreen test backend for an installed real-XCB process smoke. The n
 verifier rejects the downloaded pre-fix archive, while applying the deploy correction
 to that exact archive makes the verifier and native XCB launch pass. A fresh local
 Release build passes 77/77, install/CPack remain warning-free, and the installed XCB
-smoke passes with `LD_LIBRARY_PATH` removed. Exact hosted confirmation of this final
-correction remains pending.
+smoke passes with `LD_LIBRARY_PATH` removed. Exact hosted run
+[`33098836359`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33098836359)
+passes all ten jobs. Its Linux Release log records all eight plugin rewrites, package
+verification, a forced-XCB process launch, and artifact upload. Complete log inspection
+contains no actionable compiler, CMake, linker, sanitizer, test, or deployment
+diagnostic. All six downloaded checksums verify; the four executable architectures and
+every package layout verify; and loader tracing on the extracted Linux archive resolves
+`libQt6XcbQpa.so.6` inside that archive with no unresolved application dependency.
 
 **Acceptance criteria:** Linux stages exact Qt/SDL runtimes and resolves only remaining
 transitive dependencies without private Qt build requirements, fallback-directory
 warnings, or host Qt substitution; Windows safely embeds a normalized Visual C++
 Redistributable path; all native jobs/tests/packages pass; and complete hosted logs
 contain no actionable packaging diagnostic.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 67 detail
+
+**Status:** COMPLETE
+
+**Goal:** Record exact cross-platform logs and artifact evidence for the completed
+Libretro CRT shader feature and all audit-driven native corrections.
+
+**Files changed:**
+
+- `docs/DEVELOPMENT_PLAN.md`
+- `docs/FINAL_TEST_REPORT.md`
+
+**Tests added:** None; this evidence milestone records already-executed implementation,
+regression, sanitizer, package, and archive gates.
+
+**Gate evidence:** Exact implementation run
+[`33098836359`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33098836359)
+passes Linux Debug/Release/ASan+UBSan, warning-clean legacy libretro, Windows MSVC x64
+Debug/Release, macOS arm64 Debug/Release, and macOS x86_64 Debug/Release. Linux and both
+macOS architectures execute the real OpenGL/librashader test; Windows passes the other
+76 tests and capability-skips only that test because the hosted software renderer lacks
+desktop OpenGL 3.3. All successful logs were read in full. Six artifact checksums, four
+binary architectures, four package-layout checks, Linux matched-runtime/XCB launch,
+shader/runtime/license assets, and a prohibited game/firmware/save payload scan pass.
+
+**Acceptance criteria:** Every supported native family builds and tests the feature;
+compatible hosted contexts render a real Slang preset; unsupported graphics capability
+degrades safely; distributable artifacts contain the runtime, preset, license, and
+matched platform dependencies; and no actionable log finding remains open.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

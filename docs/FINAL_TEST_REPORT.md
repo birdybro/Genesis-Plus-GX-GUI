@@ -9,8 +9,8 @@ feature verification through 2026-08-27 (America/Denver).
 - Tested implementation: the current commit containing this report; use
   `git log -1 -- docs/FINAL_TEST_REPORT.md` to resolve it without embedding a circular
   SHA
-- Prior full-matrix implementation baseline:
-  `25954ed60f941a507e0b7bd930c8cbff8613f24e`
+- Exact shader/package implementation baseline:
+  `1a16da87911e9cabe2bc33cea5222946f69444d8`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -85,8 +85,9 @@ project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`33024729781`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33024729781)
-completed successfully against the exact save-path-hardened implementation baseline.
+[`33098836359`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33098836359)
+completed successfully against the exact shader and native-package implementation
+baseline.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -101,19 +102,26 @@ completed successfully against the exact save-path-hardened implementation basel
 | macOS Intel x86-64 | Debug | Passed |
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
-Each hosted CMake job ran all 75 registered tests. Package jobs staged and verified
-native runtimes before uploading artifacts. Full logs were read for all ten jobs; there
-is no compiler/linker warning, sanitizer signature, runtime error, Qt-test warning,
-skipped CTest, timeout, or deployment failure. The stricter inherited libretro build
-also links and cleans without a diagnostic.
+Each hosted CMake job registered all 77 tests. Linux and both macOS architectures pass
+77/77, including real OpenGL/librashader rendering. Windows passes 76 and reports only
+the intentional capability skip for that render test because the hosted software
+OpenGL context is below desktop 3.3; the application retains normal unshaded video in
+that condition. Package jobs staged and verified native runtimes before uploading
+artifacts. Full logs were read for all ten jobs; there is no compiler/CMake/linker
+warning, sanitizer signature, runtime error, failed test, timeout, invalid generated
+path, dependency fallback warning, or deployment failure. The stricter inherited
+libretro build also links and cleans without a diagnostic.
 
 ## Packaging results
 
 The local Release install was staged without a deployment warning in a fresh temporary
 root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
-`--version` process smoke. The tree contains 52 files, including the XCB EGL and GLX
-integration plugins, librashader runtime, built-in CRT preset/source, shader license,
-and new shader guide, with no cartridge, disc, firmware, SRAM, BRAM, or state payload.
+`--version` process smoke. The tree contains 55 files, including the matched XCB QPA
+and ICU runtimes, XCB EGL and GLX integration plugins, librashader runtime, built-in CRT
+preset/source, shader license, and shader guide, with no cartridge, disc, firmware,
+SRAM, BRAM, or state payload. Every copied Qt plugin has a package-relative RUNPATH;
+the real XCB smoke clears `LD_LIBRARY_PATH`, and loader tracing resolves XCB QPA from
+inside the extracted archive.
 CPack produces the versioned
 `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` and a neighboring SHA-256 file. The
 closure archive's digest is intentionally not embedded in this packaged report because
@@ -126,12 +134,14 @@ Windows Microsoft's official Visual C++ x64 Redistributable installer before any
 artifact can upload. Release publication remains guarded by an authorized matching
 version tag.
 
-All four exact-commit artifact families were downloaded after run `33024729781`. The
+All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows
 PE32+ x86-64, Linux ELF x86-64, macOS Mach-O arm64, and macOS Mach-O x86-64. Required
 Qt platform/SQLite plugins and SDL3 are present; Linux has both XCB GL integrations and
-Windows has the official redistributable while omitting unused DirectX compiler DLLs.
-An archive-name audit found no game, disc image, BIOS, SRAM, BRAM, or state payload.
+its matching Qt XCB/ICU runtimes; Windows has the official redistributable while
+omitting unused DirectX compiler DLLs. Every archive contains the built-in CRT preset,
+Slang source, librashader runtime, and MPL-2.0 license. An archive-name audit found no
+game, disc image, BIOS, SRAM, BRAM, or state payload.
 
 ## Tagged-release log audit
 
@@ -247,9 +257,12 @@ placeholder text; test/documentation matches describe generated negative fixture
 deliberate states, the marker audit itself, or the no-commercial-screenshot policy.
 Inherited core, legacy-platform, and vendored-library markers remain outside the desktop
 frontend boundary and were not altered merely to cosmetically clear the search. There
-are no skipped or disabled CTest/Qt tests. The two `WILL_FAIL` registrations are negative
-tests proving malformed and mismatched release tags are rejected. Every production menu
-action has a connection and stable object name.
+are no disabled CTest/Qt tests. The hosted Windows software renderer capability-skips
+only the real OpenGL 3.3 shader-render test; that same test executes on Linux and both
+macOS architectures, and Windows' unsupported-context fallback is covered separately.
+The two `WILL_FAIL` registrations are negative tests proving malformed and mismatched
+release tags are rejected. Every production menu action has a connection and stable
+object name.
 
 The tree was also checked for unbounded command/video/audio storage, current-directory
 save names, workstation paths, proprietary game/firmware files, accidental build
