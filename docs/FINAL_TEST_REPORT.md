@@ -114,6 +114,19 @@ system values. UI inventory checks require every corresponding choice, range, an
 mute/volume/device/latency, keyboard/controller event paths, persistence, states,
 library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
 
+Exact option-regression CI run
+[`33125797973`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33125797973)
+passes all ten jobs against commit `5f09458f9e25c08fb87a0fe627f034377b996150`.
+All nine CMake jobs register 77 tests: Linux and both macOS architectures pass 77/77;
+Windows passes 76 and capability-skips only the documented real-OpenGL test because
+the hosted software context is below desktop OpenGL 3.3. Linux ASan/UBSan and the
+legacy warning gate pass, and every Release job verifies and uploads its native package.
+The full 12,719-line log corpus was downloaded and scanned; it contains no compiler or
+linker warning, sanitizer signature, failed test, timeout, runtime error, invalid path,
+or packaging failure. Normal Windows pthread feature probes, absent optional Vulkan
+headers, and omission of the unused OpenSSL deployment plugin are non-actionable
+capability/dependency messages rather than application defects.
+
 ## Operating-system CI matrix
 
 Continuous Integration run

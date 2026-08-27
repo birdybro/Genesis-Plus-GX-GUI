@@ -3985,7 +3985,14 @@ The 113-case native-Wayland real-ROM runner also passes with ASan/UBSan address 
 undefined-behavior instrumentation. Its separate leak pass found only process-global
 NVIDIA EGL/DBus and address-only allocations after their owning host plugins unloaded;
 the required real-context shader test retains leak detection and leaves all project
-and librashader allocation frames unsuppressed.
+and librashader allocation frames unsuppressed. Exact-commit CI run
+[`33125797973`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33125797973)
+passes all ten Linux, Windows, macOS arm64, and macOS x86_64 jobs. All nine CMake jobs
+register 77 tests; Linux and both macOS architectures pass all 77, while Windows passes
+76 and capability-skips only its known sub-OpenGL-3.3 software render context. The
+complete 12,719-line hosted log set contains no compiler/linker warning, sanitizer
+signature, failed test, timeout, or packaging failure. Linux, Windows, and both macOS
+Release jobs also verify and upload their native packages.
 
 **Acceptance criteria:** Normal, built-in CRT, and custom Slang output retain the same
 orientation across presentation policies; every exposed settings family has explicit
