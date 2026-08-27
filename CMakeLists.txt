@@ -53,7 +53,7 @@ set(GENPLUSGX_VERSION "${PROJECT_VERSION}")
 
 find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Sql Test)
 if(UNIX AND NOT APPLE)
-  find_package(Qt6 6.5 REQUIRED COMPONENTS DBus XcbQpaPrivate)
+  find_package(Qt6 6.5 REQUIRED COMPONENTS DBus)
 endif()
 find_package(SDL3 3.2 REQUIRED CONFIG)
 

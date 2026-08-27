@@ -33,8 +33,8 @@ platform documentation.
   dependency closure, eliminating CMake fallback-directory deployment warnings.
 - Windows deployment normalizes the Visual C++ Redistributable path before generating
   install scripts, eliminating invalid backslash-escape diagnostics.
-- Linux CI installs the XKB/X11 development metadata required to resolve Qt's imported
-  XCB runtime target during portable-package configuration.
+- Linux deployment locates Qt's XCB QPA runtime without importing its private CMake
+  component, keeping source configuration independent of private Qt/XCB headers.
 
 ## [0.1.1] - 2026-08-26
 

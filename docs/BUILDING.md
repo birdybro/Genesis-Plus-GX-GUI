@@ -49,16 +49,12 @@ by the distribution. On Ubuntu 24.04 the native prerequisites used by CI begin w
 
 ```bash
 sudo apt-get update
-sudo apt-get install ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev \
-  libxkbcommon-x11-dev
+sudo apt-get install ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev
 ```
 
 Install Qt 6.5+ and SDL3 through their official packages, a suitable distribution
 package, or locally built prefixes, then set `CMAKE_PREFIX_PATH` as above. Some stable
 Linux distributions do not yet package SDL3; do not substitute SDL2.
-`libxkbcommon-x11-dev` supplies the metadata needed to identify Qt's private XCB
-runtime for a self-contained portable package; application code does not include or
-link against private Qt headers.
 
 ## Windows
 

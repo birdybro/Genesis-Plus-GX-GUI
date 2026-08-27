@@ -3821,15 +3821,18 @@ a CMake warning; the verifier and installed `--version` smoke pass; application 
 plugin dependency inspection resolves Qt and SDL from the staged tree; and both the
 versioned shared objects and required SONAME links are present. The source hosted run
 `33091984835` otherwise passed every native test and artifact check. Initial follow-up
-run `33094813598` proved that the official Qt bundle exposes the imported XCB target but
-requires system `xkbcommon-x11` development metadata to resolve it; Linux CI and release
-jobs now install that explicit prerequisite. Actionlint and a fresh production-shaped
-configure pass. Exact warning-free hosted confirmation remains pending.
+runs `33094813598` and `33095085634` proved that importing the private XCB target would
+unnecessarily require the official Qt bundle's complete system XCB development graph.
+The install graph now locates only its required versioned XCB QPA runtime from the same
+Qt prefix, leaving the public source-build prerequisites unchanged. Actionlint and a
+fresh production-shaped configure pass. Exact warning-free hosted confirmation remains
+pending.
 
-**Acceptance criteria:** Linux stages exact imported Qt/SDL targets and resolves only
-remaining transitive dependencies without fallback-directory warnings; Windows safely
-embeds a normalized Visual C++ Redistributable path; all native jobs/tests/packages
-pass; and complete hosted logs contain no actionable packaging diagnostic.
+**Acceptance criteria:** Linux stages exact Qt/SDL runtimes and resolves only remaining
+transitive dependencies without private Qt build requirements or fallback-directory
+warnings; Windows safely embeds a normalized Visual C++ Redistributable path; all
+native jobs/tests/packages pass; and complete hosted logs contain no actionable
+packaging diagnostic.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

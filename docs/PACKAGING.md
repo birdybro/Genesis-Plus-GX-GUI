@@ -74,9 +74,11 @@ The Linux archive targets the Ubuntu version used by CI. It is relocatable and i
 Qt and SDL application libraries, but intentionally relies on base-system graphics,
 window-system, C/C++ runtime, and libc libraries for ABI compatibility. Building on the
 oldest supported Linux distribution gives the broadest compatibility.
-The install graph stages the exact imported Qt and shared SDL targets, including their
-SONAME links, before resolving remaining transitive dependencies. This keeps deployment
-deterministic and avoids treating build-host search directories as package inputs.
+The install graph stages the public imported Qt and shared SDL targets, including their
+SONAME links, before resolving remaining transitive dependencies. Qt's required XCB QPA
+runtime is copied directly from the same Qt library prefix without importing private
+headers or build dependencies. This keeps deployment deterministic and avoids treating
+build-host search directories as package inputs.
 The archive includes Qt's XCB EGL and GLX integration plugins. Runtime rendering also
 preflights a context and surface before creating the accelerated display, automatically
 retaining the complete software-rendered shell if host OpenGL is unavailable.

@@ -151,7 +151,6 @@ if(UNIX AND NOT APPLE)
     Qt6::OpenGLWidgets
     Qt6::Sql
     Qt6::Widgets
-    Qt6::XcbQpaPrivate
   )
   if(TARGET SDL3::SDL3-shared)
     list(APPEND genplusgx_linux_runtime_targets SDL3::SDL3-shared)
@@ -173,6 +172,39 @@ if(UNIX AND NOT APPLE)
       DESTINATION "${CMAKE_INSTALL_LIBDIR}"
     )
   endforeach()
+
+  # Qt's XCB platform plugin links to this private runtime, but finding the private
+  # CMake component would unnecessarily require the complete XCB development graph.
+  # Locate only the shipped runtime beside the public Qt libraries and stage its
+  # versioned implementation plus SONAME link.
+  get_filename_component(genplusgx_qt_library_directory
+    "${Qt6_DIR}/../.." ABSOLUTE)
+  find_library(genplusgx_qt_xcbqpa_library
+    NAMES Qt6XcbQpa
+    PATHS "${genplusgx_qt_library_directory}"
+    NO_DEFAULT_PATH
+    NO_CACHE
+    REQUIRED
+  )
+  file(REAL_PATH "${genplusgx_qt_xcbqpa_library}"
+    genplusgx_qt_xcbqpa_real_library)
+  get_filename_component(genplusgx_qt_xcbqpa_directory
+    "${genplusgx_qt_xcbqpa_real_library}" DIRECTORY)
+  set(genplusgx_qt_xcbqpa_soname_library
+    "${genplusgx_qt_xcbqpa_directory}/libQt6XcbQpa.so.6")
+  if(NOT EXISTS "${genplusgx_qt_xcbqpa_soname_library}")
+    message(FATAL_ERROR
+      "Qt's XCB QPA SONAME library is missing: ${genplusgx_qt_xcbqpa_soname_library}")
+  endif()
+  set(genplusgx_qt_xcbqpa_runtime_files
+    "${genplusgx_qt_xcbqpa_real_library}"
+    "${genplusgx_qt_xcbqpa_soname_library}"
+  )
+  list(REMOVE_DUPLICATES genplusgx_qt_xcbqpa_runtime_files)
+  install(
+    FILES ${genplusgx_qt_xcbqpa_runtime_files}
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+  )
 
   configure_file(
     "${PROJECT_SOURCE_DIR}/cmake/LinuxDeploy.cmake.in"
