@@ -186,8 +186,25 @@ if(UNIX AND NOT APPLE)
       PATHS "${genplusgx_qt_library_directory}"
       NO_DEFAULT_PATH
       NO_CACHE
-      REQUIRED
     )
+    if(NOT genplusgx_companion_library)
+      file(GLOB genplusgx_companion_candidates LIST_DIRECTORIES FALSE
+        "${genplusgx_qt_library_directory}/lib${library_basename}.so.*")
+      set(genplusgx_companion_real_candidates)
+      foreach(candidate IN LISTS genplusgx_companion_candidates)
+        file(REAL_PATH "${candidate}" real_candidate)
+        list(APPEND genplusgx_companion_real_candidates "${real_candidate}")
+      endforeach()
+      list(REMOVE_DUPLICATES genplusgx_companion_real_candidates)
+      list(LENGTH genplusgx_companion_real_candidates candidate_count)
+      if(NOT candidate_count EQUAL 1)
+        message(FATAL_ERROR
+          "Expected one version of ${library_basename} beside Qt, found: "
+          "${genplusgx_companion_real_candidates}")
+      endif()
+      list(GET genplusgx_companion_real_candidates 0
+        genplusgx_companion_library)
+    endif()
     file(REAL_PATH "${genplusgx_companion_library}"
       genplusgx_companion_real_library)
     get_filename_component(genplusgx_companion_directory

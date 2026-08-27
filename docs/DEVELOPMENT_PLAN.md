@@ -3831,7 +3831,10 @@ but package closure correctly rejected the official Qt build's unstaged ICU 73 r
 the same-prefix ICU implementation/SONAME files are now explicit package inputs and all
 staged runtimes are themselves dependency roots. A fresh local install and CPack pass
 warning-free with ICU 78 staged, package verification succeeds, `ldd` has no missing
-entry, and an installed `--version` smoke succeeds with `LD_LIBRARY_PATH` removed.
+entry, and an installed `--version` smoke succeeds with `LD_LIBRARY_PATH` removed. Run
+`33096623874` showed that the official bundle ships only versioned ICU runtime names;
+discovery now falls back to a single unambiguous real version when no development
+symlink exists.
 
 **Acceptance criteria:** Linux stages exact Qt/SDL runtimes and resolves only remaining
 transitive dependencies without private Qt build requirements or fallback-directory
