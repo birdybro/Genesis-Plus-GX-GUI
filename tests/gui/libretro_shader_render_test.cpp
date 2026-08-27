@@ -53,6 +53,12 @@ int main(int argc, char** argv)
   if (!surface.isValid() || !context.makeCurrent(&surface)) {
     return unavailable("The OpenGL test surface could not be made current.");
   }
+  const auto actualFormat = context.format();
+  if (context.isOpenGLES() || actualFormat.majorVersion() < 3 ||
+      (actualFormat.majorVersion() == 3 && actualFormat.minorVersion() < 3)) {
+    context.doneCurrent();
+    return unavailable("The host returned an OpenGL context older than 3.3.");
+  }
   auto* gl = context.functions();
   gl->initializeOpenGLFunctions();
 

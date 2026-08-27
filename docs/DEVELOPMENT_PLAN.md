@@ -3746,3 +3746,41 @@ all package layouts; and every applicable local gate passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
+
+## Milestone 65 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Harden native OpenGL shader initialization using the first hosted Windows
+and macOS evidence from Milestone 64.
+
+**Files changed:**
+
+- `desktop/video/src/libretro_shader_runtime.cpp`
+- `tests/gui/libretro_shader_render_test.cpp`
+- `CHANGELOG.md`
+- `docs/DEVELOPMENT_PLAN.md`
+
+**Tests added:** The existing real librashader render test now verifies the actual
+context returned by the host before calling OpenGL 3.3 entry points. Linux CI continues
+to require real execution; a native runner that cannot provide desktop OpenGL 3.3
+reports the test as skipped instead of misclassifying missing host graphics support as
+a shader defect.
+
+**Gate evidence:** Run
+[`33090351433`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33090351433)
+passed Linux Debug, Release, ASan/UBSan, and legacy jobs plus both macOS Debug jobs. Its
+Windows jobs exposed a hosted software context limited to GLSL 1.30, while optimized
+macOS jobs exposed Qt's omission of core framework exports such as `glGetString` from
+its extension resolver. The runtime now checks its true context and macOS falls back to
+the system OpenGL framework for core symbols. After the correction, clean local Debug,
+Release, and ASan/UBSan builds each pass 77/77 tests. Hosted confirmation and full job
+log/package audit remain pending.
+
+**Acceptance criteria:** Linux executes the real Libretro shader regression; compatible
+Windows and macOS contexts initialize safely; unsupported hosts retain normal unshaded
+video without a crash or repeated retry; all native jobs pass; and every hosted log and
+package is inspected before this milestone is marked complete.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)

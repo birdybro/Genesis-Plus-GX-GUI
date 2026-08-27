@@ -23,6 +23,10 @@
 #include <utility>
 #include <vector>
 
+#ifdef Q_OS_MACOS
+#include <dlfcn.h>
+#endif
+
 namespace genplusgx::video {
 namespace {
 
@@ -235,7 +239,18 @@ const void* openGlLoader(const char* name)
   if (context == nullptr) {
     return nullptr;
   }
-  const auto function = context->getProcAddress(name);
+  auto function = context->getProcAddress(name);
+#ifdef Q_OS_MACOS
+  if (function == nullptr) {
+    static void* const openGlFramework = dlopen(
+      "/System/Library/Frameworks/OpenGL.framework/OpenGL",
+      RTLD_LAZY | RTLD_LOCAL);
+    if (openGlFramework == nullptr) {
+      return nullptr;
+    }
+    return dlsym(openGlFramework, name);
+  }
+#endif
   const void* result = nullptr;
   static_assert(sizeof(function) == sizeof(result));
   std::memcpy(&result, &function, sizeof(result));
@@ -381,6 +396,17 @@ bool LibretroShaderRuntime::initialize(
     impl_->error = "No shader preset was selected.";
     return false;
   }
+#if GENPLUSGX_HAS_LIBRETRO_SHADERS
+  const auto* context = QOpenGLContext::currentContext();
+  if (context == nullptr || context->isOpenGLES() ||
+      context->format().majorVersion() < 3 ||
+      (context->format().majorVersion() == 3 &&
+       context->format().minorVersion() < 3)) {
+    impl_->error =
+      "Libretro shaders require a current desktop OpenGL 3.3 context.";
+    return false;
+  }
+#endif
   const auto inspection = inspectShaderConfiguration(configuration);
   if (!inspection.success) {
     impl_->error = inspection.error;

@@ -26,6 +26,9 @@ platform documentation.
 - Shader timing uniforms use the emulated PAL/NTSC nominal frame rate, and shader load,
   compile, or rendering failures release the failed chain and retain the normal
   unshaded display without retrying it every frame.
+- The macOS OpenGL loader now resolves framework-exported core functions when Qt's
+  extension resolver does not expose them, allowing librashader to initialize on both
+  Apple Silicon and Intel hosts.
 
 ## [0.1.1] - 2026-08-26
 
