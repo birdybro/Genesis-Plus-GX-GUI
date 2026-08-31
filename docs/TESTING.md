@@ -39,6 +39,12 @@ presentation force the deterministic software display path. Native widget chrome
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
 window layer.
 
+`core.debug_tools` loads the generated CC0 Genesis fixture and verifies owner-thread
+snapshots, logical byte order, immutable publication, bounded reads/writes, paused-only
+mutation, and worker serialization. `gui.debug_tools` verifies that the developer menu
+is opt-in and drives the real CPU, memory, VDP, sound, input, control, and state surfaces
+using typed responses. Neither test reads a commercial ROM or the user's settings.
+
 `gui.libretro_shader_render` intentionally uses a real OpenGL context. Linux CI installs
 Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1`, so
 failure to create or execute the OpenGL 3.3 shader path is fatal. The test samples a

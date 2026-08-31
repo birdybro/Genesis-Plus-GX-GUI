@@ -51,6 +51,8 @@ region-appropriate BIOS supplied by the user.
   diagnostics
 - Unified General/Video/Audio/Input/System/BIOS/Paths/Advanced settings center with
   live summaries and direct access to each validated category editor
+- Opt-in native debug workspace with live CPU, memory, VDP, sound, input, and validated
+  save-state inspection; it remains hidden during normal play unless explicitly enabled
 - Headless unit, core, integration, GUI, stress, property, and sanitizer tests
 
 ## Installing
@@ -184,6 +186,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Building](docs/BUILDING.md)
 - [Development](docs/DEVELOPMENT.md)
 - [User guide](docs/USER_GUIDE.md)
+- [Debug tools](docs/DEBUG_TOOLS.md)
 - [Libretro shaders](docs/LIBRETRO_SHADERS.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)

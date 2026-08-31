@@ -17,6 +17,7 @@ set(required_documents
   docs/ARCHITECTURE.md
   docs/BUILDING.md
   docs/DEVELOPMENT.md
+  docs/DEBUG_TOOLS.md
   docs/TESTING.md
   docs/USER_GUIDE.md
   docs/KEYBOARD_SHORTCUTS.md

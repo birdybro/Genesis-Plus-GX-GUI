@@ -109,7 +109,8 @@ AppearanceSettingsLoadResult AppearanceSettingsStore::load() const
     }
     settings.theme = darkTheme.toBool() ? ThemeMode::dark : ThemeMode::light;
     migrated = true;
-  } else if (schema.toInt(-1) == static_cast<int>(schemaVersion)) {
+  } else if (schema.toInt(-1) == 1 ||
+             schema.toInt(-1) == static_cast<int>(schemaVersion)) {
     const auto appearance = root.value(QStringLiteral("appearance"));
     if (!appearance.isObject()) {
       return invalidResult("The appearance settings values are invalid.");
@@ -123,6 +124,18 @@ AppearanceSettingsLoadResult AppearanceSettingsStore::load() const
       return invalidResult("The appearance theme is invalid.");
     }
     settings.theme = *parsed;
+    if (schema.toInt(-1) == 1) {
+      settings.developerToolsEnabled = false;
+      migrated = true;
+    } else {
+      const auto developerTools = appearance.toObject().value(
+        QStringLiteral("developerToolsEnabled"));
+      if (!developerTools.isBool()) {
+        return invalidResult(
+          "The developer-tools visibility setting is missing.");
+      }
+      settings.developerToolsEnabled = developerTools.toBool();
+    }
   } else {
     return invalidResult("The appearance settings schema version is not supported.");
   }
@@ -143,7 +156,11 @@ PersistenceStatus AppearanceSettingsStore::save(
     QJsonObject{
       {QStringLiteral("schemaVersion"), static_cast<int>(schemaVersion)},
       {QStringLiteral("appearance"),
-        QJsonObject{{QStringLiteral("theme"), themeName(settings.theme)}}},
+        QJsonObject{
+          {QStringLiteral("theme"), themeName(settings.theme)},
+          {QStringLiteral("developerToolsEnabled"),
+            settings.developerToolsEnabled},
+        }},
     }}.toJson(QJsonDocument::Indented);
   return writeFileAtomically(path_,
     std::span<const std::uint8_t>{

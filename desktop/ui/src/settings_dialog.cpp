@@ -316,8 +316,9 @@ void SettingsDialog::dispatch(SettingsPageAction action)
 void SettingsDialog::refresh()
 {
   generalSummary_->setText(
-    tr("Theme: %1\nHigh-DPI policy: operating-system scaling")
-      .arg(themeName(overview_.appearance.theme)));
+    tr("Theme: %1\nHigh-DPI policy: operating-system scaling\nDebug tools: %2")
+      .arg(themeName(overview_.appearance.theme),
+        overview_.appearance.developerToolsEnabled ? tr("enabled") : tr("hidden")));
   videoSummary_->setText(
     tr("Aspect: %1\nScaling: %2\nTexture filter: %3\nShader: %4")
       .arg(aspectName(overview_.video.aspect),

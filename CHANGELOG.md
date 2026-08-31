@@ -9,6 +9,13 @@ platform documentation.
 
 ### Added
 
+- An opt-in, hidden-by-default developer workspace for live 68000/Z80 registers,
+  bounded memory reads and paused writes, VDP registers/palette/tiles/sprites/planes/
+  scroll data, YM2612/PSG state, logical input snapshots, run controls, and validated
+  save-state slot operations.
+- A thread-owned debug protocol that publishes immutable snapshots between frames and
+  rejects mutation while emulation is running, keeping Genesis Plus GX globals out of
+  the GUI thread.
 - Adjustable built-in CRT rendering and modern Libretro Slang `.slangp` compatibility
   through a checksum-pinned librashader 0.12.0 OpenGL runtime, including multi-pass
   chains, lookup textures, frame history/feedback, preset parameters, and per-game

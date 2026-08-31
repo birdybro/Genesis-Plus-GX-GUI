@@ -160,6 +160,26 @@ The worker emits immutable events containing operation IDs. The coordinator disc
 stale completion events after a newer load/unload generation, preventing late UI
 updates from a previous game.
 
+Developer inspection uses the same owner-thread boundary. The hidden debug window
+submits a typed `debugRequest` into the fixed-capacity command queue; the worker invokes
+the C host bridge only between frames and publishes an immutable response event. A
+snapshot contains bounded CPU, VDP, sound, input, and RAM copies, so no widget retains a
+pointer into Genesis Plus GX globals. Arbitrary memory transfers are separately capped
+at 4096 bytes. The worker permits observations while running but rejects register and
+memory mutation unless its authoritative state is paused.
+
+```text
+DebugToolsWindow -> bounded worker command -> CoreAdapter -> C host bridge -> core
+       ^                                                            |
+       +----------- immutable snapshot/response event <-------------+
+```
+
+The window keeps at most one snapshot and one memory read outstanding. Its 250 ms
+refresh timer does not drive emulation, queue duplicate work, or allocate per frame.
+Closing or hiding the window stops polling; disabling the opt-in setting destroys it.
+Save-state buttons deliberately route through the normal asynchronous state manager,
+retaining game identity, checksum, atomic-write, and wrong-game protections.
+
 ## Per-game settings resolution
 
 ```text

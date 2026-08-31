@@ -1382,6 +1382,12 @@ int main(int argc, char* argv[])
   std::optional<genplusgx::cheats::CheatSystem> activeCheatSystem;
   genplusgx::cheats::CheatConfiguration activeCheatConfiguration;
   std::uint64_t screenshotOperationId = 4'500'000U;
+  std::uint64_t debugOperationId = 4'750'000U;
+  window.setDebugRequestSink(
+    [&debugOperationId, &worker](genplusgx::CoreDebugRequest request) {
+      return worker.submit(genplusgx::EmulationCommand::debug(
+        ++debugOperationId, std::move(request))).ok();
+    });
   std::optional<std::uint64_t> pendingScreenshot;
   window.setDiagnosticsSnapshotProvider(
     [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
@@ -1835,6 +1841,16 @@ int main(int argc, char* argv[])
         static_cast<void>(window.presentLatestFrame());
         continue;
       }
+      if (event->command == genplusgx::EmulationCommandType::debugRequest) {
+        if (event->succeeded() &&
+            event->type == genplusgx::EmulationEventType::debugResponse) {
+          window.presentDebugResponse(std::move(event->debug));
+        } else if (!event->succeeded()) {
+          window.showDebugRequestError(event->message.empty()
+            ? "The emulator rejected a debug request."
+            : event->message);
+        }
+      }
       if (pendingCheatOperation &&
           event->operationId == *pendingCheatOperation &&
           event->command == genplusgx::EmulationCommandType::cheats) {
@@ -2169,7 +2185,8 @@ int main(int argc, char* argv[])
            *event->command == genplusgx::EmulationCommandType::changeDisc ||
            *event->command == genplusgx::EmulationCommandType::cheats ||
            *event->command == genplusgx::EmulationCommandType::captureState ||
-           *event->command == genplusgx::EmulationCommandType::restoreState);
+           *event->command == genplusgx::EmulationCommandType::restoreState ||
+           *event->command == genplusgx::EmulationCommandType::debugRequest);
         if (!hasWorkflowSpecificError) {
           reportRuntimeFailure(
             event->message.empty()
@@ -2610,6 +2627,7 @@ int main(int argc, char* argv[])
   window.setPerGameSettingsSink({});
   window.setAppearanceSettingsSink({});
   window.setDiagnosticsSnapshotProvider({});
+  window.setDebugRequestSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});

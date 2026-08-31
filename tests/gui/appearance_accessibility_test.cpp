@@ -6,6 +6,7 @@
 #include <QAction>
 #include <QApplication>
 #include <QComboBox>
+#include <QCheckBox>
 #include <QLabel>
 #include <QPushButton>
 #include <QTest>
@@ -74,6 +75,11 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   QVERIFY(apply != nullptr);
   QVERIFY(restore != nullptr);
   QVERIFY(validation != nullptr);
+  auto* developerTools = dialog.findChild<QCheckBox*>(
+    QStringLiteral("developerToolsEnabledCheck"));
+  QVERIFY(developerTools != nullptr);
+  QVERIFY(!developerTools->isChecked());
+  QVERIFY(!developerTools->accessibleDescription().isEmpty());
   QCOMPARE(label->buddy(), theme);
   QVERIFY(!theme->accessibleName().isEmpty());
   QVERIFY(!theme->accessibleDescription().isEmpty());
@@ -83,14 +89,19 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   theme->setCurrentIndex(
     theme->findData(static_cast<int>(genplusgx::settings::ThemeMode::dark)));
   QTest::keyClick(theme, Qt::Key_Tab);
+  QCOMPARE(QApplication::focusWidget(), developerTools);
+  developerTools->setChecked(true);
+  QTest::keyClick(developerTools, Qt::Key_Tab);
   QCOMPARE(QApplication::focusWidget(), restore);
   QTest::mouseClick(apply, Qt::LeftButton);
   QVERIFY(applied.has_value());
   QCOMPARE(applied->theme, genplusgx::settings::ThemeMode::dark);
+  QVERIFY(applied->developerToolsEnabled);
 
   QTest::mouseClick(restore, Qt::LeftButton);
   QCOMPARE(theme->currentData().toInt(),
     static_cast<int>(genplusgx::settings::ThemeMode::system));
+  QVERIFY(!developerTools->isChecked());
 
   dialog.setSettingsSink([](const genplusgx::settings::AppearanceSettings&) {
     return genplusgx::PersistenceStatus{

@@ -413,6 +413,22 @@ Keyboard and SDL game-controller defaults and remapping are documented in
 [INPUT_CONFIGURATION.md](INPUT_CONFIGURATION.md); shortcuts are listed in
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md).
 
+## Debug tools
+
+The emulator debugger is deliberately absent from the normal menus. To opt in, open
+**Tools → Settings… → General**, enable **Show developer/debug tools**, and apply the
+change. A **Tools → Developer Tools → Emulator Debug Workspace…** command then opens a
+separate native window. Disabling the setting closes that window and hides the submenu
+again; the choice is versioned and persists between launches.
+
+The workspace samples CPU, memory, VDP, sound, and logical input state between emulated
+frames. It can pause/resume, advance one whole frame, reset, inspect bounded memory,
+and use the normal game-identity-checked state slots. Memory or register edits require
+pause and are rejected again by the emulation worker if UI state is stale. This is a
+developer facility: editing live state can crash the emulated program, but it must not
+race the core or bypass frontend file validation. See [DEBUG_TOOLS.md](DEBUG_TOOLS.md)
+for all views and safety boundaries.
+
 ## Logs and diagnostics
 
 Choose **Tools → Log and Diagnostics…** to inspect a live support report. It includes

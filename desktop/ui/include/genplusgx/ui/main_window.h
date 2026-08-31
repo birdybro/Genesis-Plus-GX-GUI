@@ -117,6 +117,7 @@ public:
     const settings::AppearanceSettings&)>;
   using DiagnosticsSnapshotProvider =
     std::function<diagnostics::DiagnosticsSnapshot()>;
+  using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -139,6 +140,10 @@ public:
   void showSettings(SettingsPage page = SettingsPage::general);
   void setDiagnosticsSnapshotProvider(DiagnosticsSnapshotProvider provider);
   void showDiagnostics();
+  void setDebugRequestSink(DebugRequestSink sink);
+  void showDebugTools();
+  void presentDebugResponse(CoreDebugResponse response);
+  void showDebugRequestError(const std::string& detail);
   void setGameLoadSink(GameLoadSink sink);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
@@ -339,6 +344,7 @@ private:
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
+  DebugRequestSink debugRequestSink_;
   cheats::CheatConfiguration cheatConfiguration_;
   cheats::CheatSystem cheatSystem_{cheats::CheatSystem::genesis};
   settings::PerGameSettings perGameSettings_;

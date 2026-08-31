@@ -1,6 +1,7 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 
 #include <QComboBox>
+#include <QCheckBox>
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -48,6 +49,24 @@ AppearanceSettingsDialog::AppearanceSettingsDialog(
   form->addRow(themeLabel, theme_);
   root->addWidget(group);
 
+  auto* developerGroup = new QGroupBox(tr("Developer features"), this);
+  developerGroup->setObjectName(QStringLiteral("developerFeaturesGroup"));
+  auto* developerLayout = new QVBoxLayout(developerGroup);
+  developerTools_ = new QCheckBox(
+    tr("Enable hidden emulator &debug tools"), developerGroup);
+  developerTools_->setObjectName(QStringLiteral("developerToolsEnabledCheck"));
+  developerTools_->setAccessibleDescription(tr(
+    "Shows advanced CPU, memory, video, sound, input, and analysis tools. "
+    "These controls can alter the running machine and are intended for developers."));
+  developerLayout->addWidget(developerTools_);
+  auto* warning = new QLabel(tr(
+    "Debug tools are hidden by default. Memory and register edits are available "
+    "only while emulation is paused."), developerGroup);
+  warning->setObjectName(QStringLiteral("developerToolsWarningLabel"));
+  warning->setWordWrap(true);
+  developerLayout->addWidget(warning);
+  root->addWidget(developerGroup);
+
   auto* scaling = new QLabel(
     tr("Interface size follows the operating system's display scaling, including "
        "fractional scaling and Retina displays. Emulator pixels remain controlled "
@@ -92,7 +111,8 @@ AppearanceSettingsDialog::AppearanceSettingsDialog(
   connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
   root->addWidget(buttons);
 
-  QWidget::setTabOrder(theme_, restore);
+  QWidget::setTabOrder(theme_, developerTools_);
+  QWidget::setTabOrder(developerTools_, restore);
   QWidget::setTabOrder(restore, applyButton);
   QWidget::setTabOrder(applyButton, ok);
   QWidget::setTabOrder(ok, cancel);
@@ -108,6 +128,7 @@ settings::AppearanceSettings AppearanceSettingsDialog::settings() const
 {
   return {
     .theme = static_cast<settings::ThemeMode>(theme_->currentData().toInt()),
+    .developerToolsEnabled = developerTools_->isChecked(),
   };
 }
 
@@ -120,6 +141,7 @@ void AppearanceSettingsDialog::setSettings(const settings::AppearanceSettings& v
   if (index >= 0) {
     theme_->setCurrentIndex(index);
   }
+  developerTools_->setChecked(value.developerToolsEnabled);
   validation_->clear();
   validation_->hide();
 }

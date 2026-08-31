@@ -7,6 +7,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/cheat_manager_dialog.h
   include/genplusgx/ui/dialog_service.h
   include/genplusgx/ui/diagnostics_dialog.h
+  include/genplusgx/ui/debug_tools_window.h
   include/genplusgx/ui/game_information_dialog.h
   include/genplusgx/ui/game_library_dialog.h
   include/genplusgx/ui/help_dialog.h
@@ -26,6 +27,7 @@ add_library(genplusgx_ui STATIC
   src/cheat_manager_dialog.cpp
   src/dialog_service.cpp
   src/diagnostics_dialog.cpp
+  src/debug_tools_window.cpp
   src/game_information_dialog.cpp
   src/game_library_dialog.cpp
   src/help_dialog.cpp
@@ -61,6 +63,7 @@ target_link_libraries(
     GenesisPlusGX::Settings
     GenesisPlusGX::VideoWidget
   PRIVATE
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_options
     genplusgx_project_warnings
 )

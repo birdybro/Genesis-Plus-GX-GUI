@@ -8,6 +8,7 @@
 #include "genplusgx/ui/cheat_manager_dialog.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/diagnostics_dialog.h"
+#include "genplusgx/ui/debug_tools_window.h"
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/help_dialog.h"
@@ -537,6 +538,14 @@ void MainWindow::buildMenus()
   auto* diagnostics = addAction(
     *tools, tr("Log and &Diagnostics…"), "diagnosticsAction");
   connect(diagnostics, &QAction::triggered, this, &MainWindow::showDiagnostics);
+  tools->addSeparator();
+  auto* developer = tools->addMenu(tr("&Developer Tools"));
+  developer->setObjectName(QStringLiteral("developerToolsMenu"));
+  developer->menuAction()->setVisible(false);
+  auto* debugger = addAction(
+    *developer, tr("Emulator &Debug Workspace…"), "debugToolsAction",
+    QKeySequence{tr("Ctrl+Shift+D")});
+  connect(debugger, &QAction::triggered, this, &MainWindow::showDebugTools);
 
   auto* help = createMenu(tr("&Help"), "helpMenu");
   auto* userGuide = addAction(
@@ -682,6 +691,10 @@ void MainWindow::setEmulationControlState(bool paused, bool fastForward)
     fastForwardToggled_ = fastForwardActive_;
   }
   updateEmulationControls();
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->setPaused(emulationPaused_);
+  }
 }
 
 bool MainWindow::requestEmulationControl(
@@ -1415,6 +1428,82 @@ void MainWindow::showDiagnostics()
   dialog->open();
 }
 
+void MainWindow::setDebugRequestSink(DebugRequestSink sink)
+{
+  debugRequestSink_ = std::move(sink);
+}
+
+void MainWindow::showDebugTools()
+{
+  if (!appearanceSettings_.developerToolsEnabled) {
+    return;
+  }
+  if (auto* existing = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* window = new DebugToolsWindow(this);
+  window->setRequestSink([this](CoreDebugRequest request) {
+    return debugRequestSink_ && debugRequestSink_(std::move(request));
+  });
+  window->setControlSink([this](DebugControlOperation operation) {
+    switch (operation) {
+      case DebugControlOperation::pause:
+        static_cast<void>(requestEmulationControl(EmulationUiOperation::pause));
+        break;
+      case DebugControlOperation::resume:
+        static_cast<void>(requestEmulationControl(EmulationUiOperation::resume));
+        break;
+      case DebugControlOperation::frameAdvance:
+        static_cast<void>(requestEmulationControl(
+          EmulationUiOperation::frameAdvance));
+        break;
+      case DebugControlOperation::hardReset:
+        static_cast<void>(requestEmulationControl(EmulationUiOperation::hardReset));
+        break;
+      case DebugControlOperation::softReset:
+        static_cast<void>(requestEmulationControl(EmulationUiOperation::softReset));
+        break;
+    }
+  });
+  window->setStateSink(
+    [this](DebugStateOperation operation, std::uint32_t slot) {
+      setSelectedStateSlot(slot);
+      switch (operation) {
+        case DebugStateOperation::save:
+          requestStateOperation(StateUiOperation::save);
+          break;
+        case DebugStateOperation::load:
+          requestStateOperation(StateUiOperation::load);
+          break;
+        case DebugStateOperation::remove:
+          requestStateOperation(StateUiOperation::remove);
+          break;
+      }
+    });
+  window->setGameLoaded(isGameLoaded());
+  window->setPaused(emulationPaused_);
+  window->show();
+}
+
+void MainWindow::presentDebugResponse(CoreDebugResponse response)
+{
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->presentResponse(std::move(response));
+  }
+}
+
+void MainWindow::showDebugRequestError(const std::string& detail)
+{
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->showRequestError(detail);
+  }
+}
+
 void MainWindow::showVideoSettings()
 {
   if (auto* existing = findChild<VideoSettingsDialog*>(
@@ -1608,6 +1697,15 @@ void MainWindow::setAppearanceSettings(settings::AppearanceSettings value)
     return;
   }
   appearanceSettings_ = value;
+  if (auto* menu = findChild<QMenu*>(QStringLiteral("developerToolsMenu"))) {
+    menu->menuAction()->setVisible(value.developerToolsEnabled);
+  }
+  if (!value.developerToolsEnabled) {
+    if (auto* debugger = findChild<DebugToolsWindow*>(
+          QStringLiteral("debugToolsWindow"))) {
+      debugger->close();
+    }
+  }
   if (auto* dialog = findChild<AppearanceSettingsDialog*>(
         QStringLiteral("appearanceSettingsDialog"))) {
     dialog->setSettings(appearanceSettings_);
@@ -2165,6 +2263,10 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   fpsStatus_->setText(tr("0.0 FPS"));
   statusBar()->showMessage(tr("Loading game…"));
   refreshSettingsDialog();
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->setGameLoaded(false);
+  }
 }
 
 void MainWindow::setGameLoaded(const std::filesystem::path& path)
@@ -2188,6 +2290,11 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   gameStatus_->setText(pathToQString(path.filename()));
   statusBar()->showMessage(tr("Game loaded"), 3000);
   refreshSettingsDialog();
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->setGameLoaded(true);
+    debugger->setPaused(emulationPaused_);
+  }
 }
 
 void MainWindow::setGameRuntimeIdentity(std::string system, std::string region)
@@ -2263,6 +2370,10 @@ void MainWindow::setNoGameLoaded()
   displayWidget_->clearFrame();
   updateStateSlotPresentation();
   refreshSettingsDialog();
+  if (auto* debugger = findChild<DebugToolsWindow*>(
+        QStringLiteral("debugToolsWindow"))) {
+    debugger->setGameLoaded(false);
+  }
 }
 
 void MainWindow::chooseDisc()

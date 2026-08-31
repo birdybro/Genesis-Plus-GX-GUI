@@ -82,7 +82,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 68 Native Wayland presentation | COMPLETE | Fix valid accelerated frames compositing as black on native Wayland | pre-application OpenGL surface setup, render regression, docs | Phantasy Star IV native Wayland captures; 77-test Release/Debug/ASan suites | Normal and CRT-filtered frames reach the Wayland compositor without changing core output | pending |
 | 69 Full option regression | COMPLETE | Fix shader orientation and exercise every exposed option domain | final presentation pass, exhaustive core/UI matrices, external-ROM runner, docs | synthetic full suites plus 113-case Phantasy Star IV native-Wayland acceptance | Shader output remains upright; video/audio/input/system options have explicit bounded runtime coverage | pending |
 | 70 Debug inspection API | COMPLETE | Add thread-owned CPU, memory, VDP, sound, and input snapshots plus safe edits | core debug bridge, adapter/worker protocol, tests/docs | generated-ROM snapshot, byte-order, write-bound and concurrency tests | No GUI thread accesses core globals; all transfers remain bounded | pending |
-| 71 Hidden debug workspace | PLANNED | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | pending |
+| 71 Hidden debug workspace | COMPLETE | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | pending |
 | 72 Debug analysis tools | PLANNED | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | pending |
 | 73 Debug hardening | PLANNED | Exercise debugger workflows with synthetic and supplied external ROMs across all gates | real-ROM acceptance, stress/sanitizer/CI/docs | clean Debug/Release/ASan, external acceptance, hosted matrix | Debug mode does not alter normal emulation and native logs are clean | pending |
 
@@ -3793,6 +3793,42 @@ memory regions, complete VDP inspection memories, FM/PSG shadows, input state, a
 frame/hardware identity; requests are asynchronous through the worker; writes cannot
 race active frames; normal frame/audio hashes remain unchanged; and no unbounded queue
 or per-frame snapshot allocation is introduced.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 71 detail
+
+**Status:** COMPLETE
+
+**Goal:** Expose the thread-owned debug data plane through a conventional, accessible
+Qt workspace that remains absent from normal menus until the user explicitly opts in.
+
+**Files changed:**
+
+- versioned appearance settings/store and General settings page
+- `desktop/ui/include/genplusgx/ui/debug_tools_window.h`
+- `desktop/ui/src/debug_tools_window.cpp`
+- MainWindow/application composition and target manifests
+- `tests/gui/debug_tools_window_test.cpp` and appearance settings/UI regressions
+- README, changelog, architecture, testing, user, and debug-tools documentation
+
+**Tests added:** `gui.debug_tools` verifies hidden-by-default menu semantics and actual
+typed data presentation for both CPUs, bounded memory, VDP register/palette/tile/
+sprite/plane/scroll explorers, both sound chips, all logical input ports, run controls,
+paused register/memory edits, and the normal validated state manager. Existing settings
+tests verify schema-1 migration leaves developer tools hidden and schema-2 persists the
+explicit opt-in.
+
+**Gate evidence:** The new tests and authored frontend code compile with warnings as
+errors. Focused appearance, MainWindow, and debugger GUI regressions pass headlessly.
+The complete Debug gate is run immediately before committing this milestone.
+
+**Acceptance criteria:** No developer menu is visible in a new or migrated install;
+every gpgx inspection family that is safe to sample is reachable after opt-in; widgets
+retain stable object names and keyboard operation; polling is bounded and stops while
+hidden; mutations remain paused-only on the worker; and state controls retain normal
+game-identity and corruption validation.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

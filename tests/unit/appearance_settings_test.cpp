@@ -46,6 +46,7 @@ int main()
 
   const genplusgx::settings::AppearanceSettings dark{
     .theme = genplusgx::settings::ThemeMode::dark,
+    .developerToolsEnabled = true,
   };
   if (!check(store.save(dark), "Dark appearance settings could not be saved") ||
       !check(store.load().settings == dark,
@@ -91,22 +92,39 @@ int main()
     return 8;
   }
 
+  constexpr std::string_view schemaOne = R"json({
+    "schemaVersion": 1,
+    "appearance": {"theme": "dark"}
+  })json";
+  if (!check(writeText(store.path(), schemaOne),
+        "Schema-one appearance settings could not be staged")) {
+    return 9;
+  }
+  const auto schemaOneLoaded = store.load();
+  if (!check(schemaOneLoaded.status && schemaOneLoaded.migrated &&
+          schemaOneLoaded.settings.theme ==
+            genplusgx::settings::ThemeMode::dark &&
+          !schemaOneLoaded.settings.developerToolsEnabled,
+        "Schema-one settings did not migrate with debug tools hidden")) {
+    return 10;
+  }
+
   constexpr std::string_view future =
     R"json({"schemaVersion": 999, "appearance": {"theme": "system"}})json";
   if (!check(writeText(store.path(), future),
         "Future appearance settings could not be staged")) {
-    return 9;
+    return 11;
   }
   const auto unsupported = store.load();
   if (!check(!unsupported.status &&
                unsupported.status.message.find("not supported") != std::string::npos,
         "A future appearance schema was silently accepted")) {
-    return 10;
+    return 12;
   }
 
   if (!check(writeText(store.path(), "{broken"),
         "Corrupt appearance settings could not be staged")) {
-    return 11;
+    return 13;
   }
   const auto corrupt = store.load();
   return check(!corrupt.status &&
@@ -114,5 +132,5 @@ int main()
                  corrupt.settings == genplusgx::settings::defaultAppearanceSettings(),
            "Corrupt appearance settings did not fail closed")
            ? 0
-           : 12;
+           : 14;
 }

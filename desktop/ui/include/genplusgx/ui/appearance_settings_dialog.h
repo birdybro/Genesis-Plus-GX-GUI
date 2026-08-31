@@ -7,6 +7,7 @@
 #include <functional>
 
 class QComboBox;
+class QCheckBox;
 class QLabel;
 
 namespace genplusgx::ui {
@@ -30,6 +31,7 @@ private:
   void restoreDefaults();
 
   QComboBox* theme_{nullptr};
+  QCheckBox* developerTools_{nullptr};
   QLabel* validation_{nullptr};
   SettingsSink settingsSink_;
 };
