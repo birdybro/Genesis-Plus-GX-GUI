@@ -7,9 +7,9 @@
 extern uint8 genplusgx_debug_fm_registers[2][0x100];
 extern const int *genplusgx_debug_psg_registers(void);
 
-static int genesis_hardware(void)
+static uint8_t genesis_hardware(void)
 {
-  return (system_hw & SYSTEM_PBC) == SYSTEM_MD;
+  return (uint8_t)((system_hw & SYSTEM_PBC) == SYSTEM_MD);
 }
 
 static uint8 logical_byte(const uint8 *data, uint32_t offset, int word_swapped)
