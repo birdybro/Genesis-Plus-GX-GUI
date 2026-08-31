@@ -1151,7 +1151,8 @@ void DebugToolsWindow::updateVdpViews()
 void DebugToolsWindow::updateSoundViews()
 {
   for (int address = 0; address < 256; ++address) {
-    setRegisterRow(*fmRegisters_, address, hexadecimal(address, 2),
+    setRegisterRow(*fmRegisters_, address,
+      hexadecimal(static_cast<std::uint64_t>(address), 2),
       snapshot_->sound.fmRegisters[0][static_cast<std::size_t>(address)],
       2, false);
     auto* bankOne = itemAt(*fmRegisters_, address, 2);
