@@ -26,8 +26,8 @@ set_target_properties(genplusgx_debug_tools_live_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_debug_tools_live_test
   PRIVATE
-    GenesisPlusGX::CoreAdapter
     genplusgx::ui
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Test
@@ -47,8 +47,8 @@ set_target_properties(genplusgx_emulation_controls_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_emulation_controls_test
   PRIVATE
-    GenesisPlusGX::CoreAdapter
     genplusgx::ui
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Test
@@ -239,8 +239,8 @@ set_target_properties(genplusgx_game_loading_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_game_loading_test
   PRIVATE
-    GenesisPlusGX::CoreAdapter
     genplusgx::ui
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Test
@@ -264,8 +264,8 @@ set_target_properties(
 target_link_libraries(
   genplusgx_save_state_workflow_test
   PRIVATE
-    GenesisPlusGX::CoreAdapter
     genplusgx::ui
+    GenesisPlusGX::CoreAdapter
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Test
