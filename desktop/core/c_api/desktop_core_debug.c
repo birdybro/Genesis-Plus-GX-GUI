@@ -42,10 +42,14 @@ static void set_logical_byte(
   data[offset] = value;
 }
 
-static uint16 native_word(const uint8 *data, uint32_t offset)
+static uint16 native_word(const volatile uint8 *data, uint32_t offset)
 {
   uint16 value;
-  memcpy(&value, data + offset, sizeof(value));
+  uint8 bytes[sizeof(value)];
+  /* CRAM/VSRAM are four-byte aligned; keep optimized x86 reads scalar. */
+  bytes[0] = data[offset];
+  bytes[1] = data[offset + 1U];
+  memcpy(&value, bytes, sizeof(value));
   return value;
 }
 
