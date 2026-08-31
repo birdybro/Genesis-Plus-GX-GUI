@@ -84,8 +84,12 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 70 Debug inspection API | COMPLETE | Add thread-owned CPU, memory, VDP, sound, and input snapshots plus safe edits | core debug bridge, adapter/worker protocol, tests/docs | generated-ROM snapshot, byte-order, write-bound and concurrency tests | No GUI thread accesses core globals; all transfers remain bounded | `038fe623` |
 | 71 Hidden debug workspace | COMPLETE | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | `a219e906` |
 | 72 Debug analysis tools | COMPLETE | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | `4182de0a` |
-| 73 Debug hardening | COMPLETE | Exercise debugger workflows across generated 68000/Z80 systems and every local quality gate | active 8-bit RAM bridge, live GUI/worker tests, stress/sanitizer/docs | clean Debug/Release/ASan, native GUI, adversarial review | Debug mode does not alter normal emulation and native logs are clean | pending |
-| 74 Debug hosted evidence | PLANNED | Audit exact-commit Linux, Windows, and macOS builds, tests, and packages | CI evidence and final report | all ten hosted jobs and complete logs | No cross-platform warning, failure, sanitizer issue, or packaging regression | pending |
+| 73 Debug hardening | COMPLETE | Exercise debugger workflows across generated 68000/Z80 systems and every local quality gate | active 8-bit RAM bridge, live GUI/worker tests, stress/sanitizer/docs | clean Debug/Release/ASan, native GUI, adversarial review | Debug mode does not alter normal emulation and native logs are clean | `8252743` |
+| 74 macOS debug build hardening | COMPLETE | Resolve the first Clang warning-as-error finding from hosted debugger validation | FM-register address formatting and regression gate | complete local Debug suite and hosted macOS compilation | Authored debugger code is conversion-clean on Apple Clang | `f97df21` |
+| 75 Windows debug build hardening | COMPLETE | Resolve the MSVC narrowing finding exposed after the macOS correction | C debug bridge hardware-width conversion | complete local Debug suite and hosted Windows compilation | Core debug state crosses the C ABI without implicit narrowing | `9b6702b` |
+| 76 Intel debug snapshot alignment | COMPLETE | Fix optimized Intel macOS debugger snapshot crashes | scalar CRAM/VSRAM word capture and stress regression | optimized Clang reproduction, 50-run core/live-GUI stress, full local gates | Debug capture never assumes stronger alignment than inherited core storage provides | `4b06089` |
+| 77 macOS debug link closure | COMPLETE | Eliminate duplicate core-adapter linkage found by full successful-run log inspection | GUI integration target link ordering | one adapter occurrence per link command; 81-test Debug/Release/ASan suites | Successful hosted logs remain free of authored linker warnings | `2799b3c` |
+| 78 Debug hosted evidence | COMPLETE | Audit exact-commit Linux, Windows, and macOS builds, tests, packages, and complete logs | CI evidence and final report | all ten hosted jobs, 13,564 log lines, and four artifacts | No cross-platform warning, failure, sanitizer issue, or packaging regression remains | pending |
 
 ## Execution policy
 
@@ -3913,6 +3917,84 @@ exercise the same production adapter and worker.
 supported 8-bit family exposes active RAM; all debug transfers and collections remain
 bounded; the hidden/closed debugger adds no normal-play sampling; complete local gates
 pass without warning or sanitizer finding; and the tree contains no ROM-derived data.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestones 74-77 detail
+
+**Status:** COMPLETE
+
+**Goal:** Use the native compiler and optimizer evidence to remove every debugger defect
+that was invisible on the Linux/GCC development host, then remove the final diagnostic
+found while reading the otherwise successful hosted logs.
+
+**Files changed:**
+
+- `desktop/ui/src/debug_tools_window.cpp`
+- `desktop/core/c_api/desktop_core_debug.c`
+- `tests/gui/CMakeLists.txt`
+
+**Defects found and corrected:** Initial run
+[`33412808933`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33412808933)
+found an Apple Clang implicit conversion in FM-register address formatting. The next
+run exposed an MSVC conversion from the core hardware-mode return value into the fixed
+debug ABI byte. Run
+[`33417688240`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33417688240)
+then passed nine jobs but crashed `core.debug_tools` and `gui.debug_tools_live` only in
+optimized Intel macOS builds. An optimized local Clang reproduction and disassembly
+showed a generated aligned SIMD load over inherited CRAM/VSRAM storage whose contract
+provides only four-byte alignment. Debug capture now assembles each native word from
+two scalar byte reads, preserving the core byte representation without changing its
+layout or normal emulation. Both formerly crashing executables then passed 50
+consecutive optimized-Clang runs apiece.
+
+Successful run
+[`33419754566`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33419754566)
+was read in full and revealed four duplicate-static-library linker warnings on macOS.
+Ordering the direct core-adapter dependency after the UI target retains the tests'
+required public headers while allowing CMake to emit the adapter once. Local Ninja
+link-command inspection proves exactly one occurrence in each of the four affected GUI
+integration executables.
+
+**Gate evidence:** After each correction the full warning-gated local suite passed.
+The final link correction passes 81/81 in Debug, 81/81 in optimized Release, and 81/81
+under ASan/UBSan with no finding.
+
+**Acceptance criteria:** Apple Clang, MSVC, and optimized Intel builds have no authored
+conversion or alignment defect; debugger snapshots retain correct byte order; the
+real live GUI workflow remains stable; no static adapter is duplicated on an Apple
+link command; and all local gates remain green.
+
+**Commit SHAs:** `f97df21`, `9b6702b`, `4b06089`, and `2799b3c`
+
+## Milestone 78 detail
+
+**Status:** COMPLETE
+
+**Goal:** Close debugger delivery against the exact corrected commit on every supported
+host, including package creation and a complete log audit.
+
+**Gate evidence:** Continuous Integration run
+[`33421889014`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33421889014)
+passes all ten jobs at `2799b3c88572314ac576af34c3b9fd06c8666467`:
+Linux Debug, Release/package, ASan/UBSan, and legacy libretro; Windows MSVC Debug and
+Release/package; and macOS arm64/x86-64 Debug and Release/package. Every CMake job
+registers 81 tests. Linux and both macOS architectures pass 81/81; Windows passes all
+supported tests and capability-skips only the documented real-OpenGL test on its
+software context. The complete 13,564-line corpus contains no compiler/linker warning,
+sanitizer signature, crash, runtime error, failed test, timeout, invalid generated
+path, or deployment failure. Expected Windows pthread probes, optional Vulkan-header
+absence, and omission of the unused OpenSSL plugin are not application defects.
+
+Four verified workflow artifacts were produced: Linux x86-64 (39,876,276 bytes),
+Windows x86-64 (52,448,121 bytes), macOS arm64 (63,684,037 bytes), and macOS x86-64
+(65,291,661 bytes).
+
+**Acceptance criteria:** The exact implementation passes every native host, sanitizer,
+legacy, test, and packaging job; the full logs contain no unresolved project issue;
+portable packages exist for all four architectures; and the published evidence names
+the one intentional host-capability skip honestly.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

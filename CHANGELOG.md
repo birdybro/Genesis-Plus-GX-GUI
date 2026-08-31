@@ -34,6 +34,11 @@ platform documentation.
 
 ### Fixed
 
+- Debug snapshots now use scalar byte assembly for inherited CRAM/VSRAM storage,
+  preventing optimized Intel macOS builds from issuing a falsely aligned SIMD read and
+  crashing the CPU/VDP inspection workflows.
+- Debugger presentation and C-bridge conversions are explicit across Apple Clang and
+  MSVC, and GUI integration tests no longer link the core adapter twice on macOS.
 - Z80 RAM inspection, search, watch, and paused writes now target the active work RAM
   for SG-1000, Master System/Mark III, Game Gear, and Power Base Converter sessions
   instead of the inactive Genesis sound-CPU buffer. New sessions select their active

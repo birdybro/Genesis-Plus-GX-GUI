@@ -11,6 +11,8 @@ and debugger verification through 2026-08-31 (America/Denver).
   SHA
 - Exact shader/package implementation baseline:
   `1a16da87911e9cabe2bc33cea5222946f69444d8`
+- Exact debugger implementation and hosted evidence baseline:
+  `2799b3c88572314ac576af34c3b9fd06c8666467`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -69,6 +71,12 @@ Genesis and Master System programs, installs breakpoints through the widgets, ob
 real worker pauses, and reads their written RAM. Core coverage additionally executes
 SG-1000 and Game Gear programs. That coverage found and fixed the 8-bit Z80 RAM view
 initially selecting the inactive Genesis sound-CPU buffer instead of console work RAM.
+Native validation subsequently found and fixed Apple Clang and MSVC conversion
+warnings, plus an optimized Intel-only crash caused by assuming 16-byte alignment while
+reading inherited four-byte-aligned CRAM/VSRAM. The scalar capture fix passed each
+formerly crashing optimized-Clang debugger test 50 consecutive times. A complete
+successful-run log audit also removed duplicate core-adapter entries from four macOS
+GUI-test link commands.
 
 ## Build configurations tested
 
@@ -139,6 +147,25 @@ or packaging failure. Normal Windows pthread feature probes, absent optional Vul
 headers, and omission of the unused OpenSSL deployment plugin are non-actionable
 capability/dependency messages rather than application defects.
 
+### Exact debugger cross-platform verification
+
+Continuous Integration run
+[`33421889014`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33421889014)
+passes all ten jobs against exact commit
+`2799b3c88572314ac576af34c3b9fd06c8666467`. Linux Debug, Release, and ASan/UBSan;
+macOS arm64 Debug/Release; and macOS x86-64 Debug/Release each pass 81/81. Windows MSVC
+Debug/Release pass every supported test and capability-skip only
+`gui.libretro_shader_render` because the hosted software context is below desktop
+OpenGL 3.3. The legacy libretro warning gate also builds, links, and cleans.
+
+All 13,564 log lines were inspected. There is no compiler or linker warning, sanitizer
+signature, crash, runtime error, failed test, timeout, invalid generated path, or
+deployment failure. The only matches requiring classification are normal Windows
+pthread feature probes, absent optional Vulkan headers, source text for fail-closed
+Visual C++ runtime checks that did not execute, and `windeployqt` intentionally omitting
+the unused OpenSSL backend. This final corpus specifically confirms that the former
+Intel Release debugger crashes and duplicate-library linker warnings are gone.
+
 ## Operating-system CI matrix
 
 Continuous Integration run
@@ -190,6 +217,11 @@ requires the executable, Qt platform/runtime libraries, SDL3, relevant plugins, 
 Windows Microsoft's official Visual C++ x64 Redistributable installer before any
 artifact can upload. Release publication remains guarded by an authorized matching
 version tag.
+
+Exact debugger-evidence run `33421889014` produced four current workflow artifacts:
+Linux x86-64 (39,876,276 bytes), Windows x86-64 (52,448,121 bytes), macOS arm64
+(63,684,037 bytes), and macOS x86-64 (65,291,661 bytes). These are CI artifacts for
+tester consumption, not a newly authorized version tag or GitHub Release.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows
