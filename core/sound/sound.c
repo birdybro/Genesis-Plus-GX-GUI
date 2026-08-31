@@ -65,6 +65,25 @@ void (*fm_reset)(unsigned int cycles);
 void (*fm_write)(unsigned int cycles, unsigned int address, unsigned int data);
 unsigned int (*fm_read)(unsigned int cycles, unsigned int address);
 
+/* Desktop debugger shadow. This observes register-port traffic without
+ * changing either FM implementation or its timing. */
+uint8 genplusgx_debug_fm_registers[2][0x100];
+static uint8 genplusgx_debug_fm_latch[2];
+
+static void genplusgx_debug_shadow_fm(unsigned int address, unsigned int value)
+{
+  unsigned int port = (address >> 1) & 1;
+  if (address & 1)
+  {
+    genplusgx_debug_fm_registers[port][genplusgx_debug_fm_latch[port]] =
+      (uint8)value;
+  }
+  else
+  {
+    genplusgx_debug_fm_latch[port] = (uint8)value;
+  }
+}
+
 #ifdef HAVE_YM3438_CORE
 static ym3438_t ym3438;
 static short ym3438_accm[24][2];
@@ -125,6 +144,7 @@ static void YM2612_Write(unsigned int cycles, unsigned int a, unsigned int v)
   }
 
   /* write FM register */
+  genplusgx_debug_shadow_fm(a, v);
   YM2612Write(a, v);
 }
 
@@ -218,6 +238,7 @@ static void YM3438_Write(unsigned int cycles, unsigned int a, unsigned int v)
   fm_update(cycles);
 
   /* write FM register */
+  genplusgx_debug_shadow_fm(a, v);
   OPN2_Write(&ym3438, a, v);
 }
 
@@ -359,6 +380,10 @@ void sound_init( void )
 
 void sound_reset(void)
 {
+  memset(genplusgx_debug_fm_registers, 0,
+    sizeof(genplusgx_debug_fm_registers));
+  memset(genplusgx_debug_fm_latch, 0, sizeof(genplusgx_debug_fm_latch));
+
   /* reset sound chips */
   fm_reset(0);
   psg_reset();

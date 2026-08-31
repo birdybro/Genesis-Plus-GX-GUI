@@ -93,6 +93,11 @@ static struct
 
 static void psg_update(unsigned int clocks);
 
+const int *genplusgx_debug_psg_registers(void)
+{
+  return psg.regs;
+}
+
 void psg_init(PSG_TYPE type)
 {
   int i;

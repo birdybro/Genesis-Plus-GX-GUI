@@ -51,6 +51,7 @@ enum class EmulationCommandType {
   changeDisc,
   captureState,
   restoreState,
+  debugRequest,
 };
 
 struct EmulationCommand final {
@@ -66,6 +67,7 @@ struct EmulationCommand final {
   CoreFirmwareSettings coreFirmwareSettings;
   std::vector<std::uint8_t> rawState;
   std::vector<CoreCheatPatch> coreCheats;
+  CoreDebugRequest coreDebugRequest;
 
   [[nodiscard]] static EmulationCommand simple(
     EmulationCommandType type,
@@ -106,6 +108,9 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand restore(
     std::uint64_t operationId,
     std::span<const std::uint8_t> rawState);
+  [[nodiscard]] static EmulationCommand debug(
+    std::uint64_t operationId,
+    CoreDebugRequest request);
 };
 
 enum class EmulationWorkerError {
@@ -133,6 +138,7 @@ enum class EmulationEventType {
   commandFailed,
   frameCompleted,
   stateCaptured,
+  debugResponse,
   workerStopped,
 };
 
@@ -152,6 +158,7 @@ struct EmulationEvent final {
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
   CoreDiscInfo disc;
+  CoreDebugResponse debug;
 
   [[nodiscard]] bool succeeded() const noexcept
   {

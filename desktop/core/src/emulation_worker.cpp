@@ -171,6 +171,15 @@ EmulationCommand EmulationCommand::restore(
   return command;
 }
 
+EmulationCommand EmulationCommand::debug(
+  std::uint64_t operationId,
+  CoreDebugRequest request)
+{
+  auto command = simple(EmulationCommandType::debugRequest, operationId);
+  command.coreDebugRequest = std::move(request);
+  return command;
+}
+
 class EmulationWorker::Private final {
 public:
   Private(
@@ -589,6 +598,7 @@ private:
     bool validTransition = true;
     EmulationEventType eventType = EmulationEventType::commandCompleted;
     std::vector<std::uint8_t> capturedState;
+    CoreDebugResponse debugResponse;
     const auto current = owner_.state_.load(std::memory_order_acquire);
 
     switch (command.type) {
@@ -740,6 +750,22 @@ private:
             adapter, current == EmulationWorkerState::running);
         }
         break;
+      case EmulationCommandType::debugRequest: {
+        const auto writesCore =
+          command.coreDebugRequest.type !=
+            CoreDebugRequestType::captureSnapshot &&
+          command.coreDebugRequest.type != CoreDebugRequestType::readMemory;
+        validTransition = current == EmulationWorkerState::paused ||
+          (!writesCore && current == EmulationWorkerState::running);
+        if (validTransition) {
+          coreResult = adapter.debugRequest(
+            command.coreDebugRequest, debugResponse);
+          if (coreResult) {
+            eventType = EmulationEventType::debugResponse;
+          }
+        }
+        break;
+      }
     }
 
     updatePacingMetrics();
@@ -789,6 +815,7 @@ private:
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
     event.rawState = std::move(capturedState);
+    event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
       static_cast<void>(adapter.discInfo(event.disc));
     }

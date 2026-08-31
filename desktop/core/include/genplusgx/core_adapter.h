@@ -4,6 +4,7 @@
 #include "genplusgx/backup_memory.h"
 #include "genplusgx/core_audio_settings.h"
 #include "genplusgx/core_cheat.h"
+#include "genplusgx/core_debug.h"
 #include "genplusgx/core_firmware_settings.h"
 #include "genplusgx/core_input_settings.h"
 #include "genplusgx/core_system_settings.h"
@@ -51,6 +52,8 @@ enum class CoreError {
   persistenceFailed,
   stateSaveFailed,
   stateLoadFailed,
+  debugUnavailable,
+  invalidDebugRequest,
 };
 
 struct CoreResult final {
@@ -148,6 +151,8 @@ struct CoreDiscInfo final {
 
 class CoreAdapter final {
 public:
+  static constexpr std::size_t maximumDebugTransferBytes = 4U * 1024U;
+
   explicit CoreAdapter(int audioSampleRate = 48'000);
   ~CoreAdapter();
 
@@ -208,6 +213,9 @@ public:
   [[nodiscard]] CoreResult discInfo(CoreDiscInfo& output) const;
   [[nodiscard]] CoreResult setDiscEjected(bool ejected);
   [[nodiscard]] CoreResult changeDisc(const std::filesystem::path& path);
+  [[nodiscard]] CoreResult debugRequest(
+    const CoreDebugRequest& request,
+    CoreDebugResponse& response);
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

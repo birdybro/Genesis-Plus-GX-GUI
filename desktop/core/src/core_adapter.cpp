@@ -2,6 +2,7 @@
 #include "genplusgx/game_file.h"
 
 #include "desktop_core_host.h"
+#include "desktop_core_debug.h"
 
 extern "C" {
 #include "shared.h"
@@ -1221,6 +1222,184 @@ CoreResult CoreAdapter::systemSettings(CoreSystemSettings& output) const
   }
   output = private_->systemSettings;
   return success();
+}
+
+CoreResult CoreAdapter::debugRequest(
+  const CoreDebugRequest& request,
+  CoreDebugResponse& response)
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    response = {};
+    return owner;
+  }
+
+  response = {
+    .type = request.type,
+    .region = request.region,
+    .offset = request.offset,
+    .snapshot = {},
+    .bytes = {},
+  };
+  const auto region = static_cast<unsigned int>(request.region);
+  constexpr auto maximumRegion = static_cast<unsigned int>(
+    CoreDebugMemoryRegion::vdpRegisters);
+
+  switch (request.type) {
+    case CoreDebugRequestType::captureSnapshot: {
+      auto raw = std::make_unique<genplusgx_debug_snapshot>();
+      if (genplusgx_debug_capture(raw.get()) == 0) {
+        return failure(
+          CoreError::debugUnavailable, "Core debug state is unavailable.");
+      }
+      auto snapshot = std::make_shared<CoreDebugSnapshot>();
+      snapshot->frameNumber = frameCount_;
+      snapshot->hardware = raw->hardware;
+      snapshot->romSize = raw->rom_size;
+      snapshot->m68kActive = raw->m68k_active != 0;
+      std::ranges::copy(raw->m68k.data, snapshot->m68k.data.begin());
+      std::ranges::copy(raw->m68k.address, snapshot->m68k.address.begin());
+      snapshot->m68k.programCounter = raw->m68k.program_counter;
+      snapshot->m68k.status = raw->m68k.status;
+      snapshot->m68k.userStackPointer = raw->m68k.user_stack_pointer;
+      snapshot->m68k.interruptStackPointer =
+        raw->m68k.interrupt_stack_pointer;
+      snapshot->z80 = {
+        .af = raw->z80.af,
+        .bc = raw->z80.bc,
+        .de = raw->z80.de,
+        .hl = raw->z80.hl,
+        .afAlternate = raw->z80.af_alternate,
+        .bcAlternate = raw->z80.bc_alternate,
+        .deAlternate = raw->z80.de_alternate,
+        .hlAlternate = raw->z80.hl_alternate,
+        .ix = raw->z80.ix,
+        .iy = raw->z80.iy,
+        .stackPointer = raw->z80.stack_pointer,
+        .programCounter = raw->z80.program_counter,
+        .interruptVector = raw->z80.interrupt_vector,
+        .refresh = raw->z80.refresh,
+        .interruptMode = raw->z80.interrupt_mode,
+        .interruptFlipFlop1 = raw->z80.interrupt_flip_flop_1 != 0,
+        .interruptFlipFlop2 = raw->z80.interrupt_flip_flop_2 != 0,
+        .halted = raw->z80.halted != 0,
+        .bank = raw->z80.bank,
+      };
+      std::ranges::copy(
+        raw->vdp_registers, snapshot->vdp.registers.begin());
+      snapshot->vdp.status = raw->vdp_status;
+      snapshot->vdp.dmaLength = raw->dma_length;
+      snapshot->vdp.dmaSource = raw->dma_source;
+      snapshot->vdp.dmaType = raw->dma_type;
+      snapshot->vdp.horizontalCounter = raw->horizontal_counter;
+      snapshot->vdp.verticalCounter = raw->vertical_counter;
+      snapshot->vdp.pal = raw->pal != 0;
+      snapshot->vdp.interlaced = raw->interlaced != 0;
+      snapshot->vdp.oddField = raw->odd_field != 0;
+      std::ranges::copy(raw->vram, snapshot->vdp.vram.begin());
+      std::ranges::copy(raw->cram, snapshot->vdp.cram.begin());
+      std::ranges::copy(raw->vsram, snapshot->vdp.vsram.begin());
+      std::ranges::copy(
+        raw->sprite_table, snapshot->vdp.spriteTable.begin());
+      for (std::size_t bank = 0U;
+           bank < snapshot->sound.fmRegisters.size(); ++bank) {
+        std::ranges::copy(raw->fm_registers[bank],
+          snapshot->sound.fmRegisters[bank].begin());
+      }
+      std::ranges::copy(
+        raw->psg_registers, snapshot->sound.psgRegisters.begin());
+      std::ranges::copy(
+        raw->input_buttons, snapshot->input.buttons.begin());
+      for (std::size_t player = 0U;
+           player < snapshot->input.analog.size(); ++player) {
+        std::ranges::copy(
+          raw->input_analog[player], snapshot->input.analog[player].begin());
+      }
+      std::ranges::copy(raw->m68k_ram, snapshot->m68kRam.begin());
+      std::ranges::copy(raw->z80_ram, snapshot->z80Ram.begin());
+      response.snapshot = std::move(snapshot);
+      return success();
+    }
+    case CoreDebugRequestType::readMemory: {
+      if (region > maximumRegion || request.size == 0U ||
+          request.size > maximumDebugTransferBytes) {
+        return failure(CoreError::invalidDebugRequest,
+          "The debug memory read must target a known region and at most 4096 bytes.");
+      }
+      response.bytes.resize(request.size);
+      if (genplusgx_debug_read_region(region, request.offset,
+            response.bytes.data(), response.bytes.size()) == 0) {
+        response.bytes.clear();
+        return failure(CoreError::invalidDebugRequest,
+          "The debug memory read is outside the selected region.");
+      }
+      return success();
+    }
+    case CoreDebugRequestType::writeMemory:
+      if (region > maximumRegion || request.bytes.empty() ||
+          request.bytes.size() > maximumDebugTransferBytes ||
+          genplusgx_debug_write_region(region, request.offset,
+            request.bytes.data(), request.bytes.size()) == 0) {
+        return failure(CoreError::invalidDebugRequest,
+          "The debug memory write is empty, too large, or outside the selected region.");
+      }
+      return success();
+    case CoreDebugRequestType::setM68kRegisters: {
+      genplusgx_debug_m68k_registers registers{};
+      std::ranges::copy(request.m68k.data, registers.data);
+      std::ranges::copy(request.m68k.address, registers.address);
+      registers.program_counter = request.m68k.programCounter;
+      registers.status = request.m68k.status;
+      registers.user_stack_pointer = request.m68k.userStackPointer;
+      registers.interrupt_stack_pointer = request.m68k.interruptStackPointer;
+      if (genplusgx_debug_set_m68k_registers(&registers) == 0) {
+        return failure(
+          CoreError::invalidDebugRequest, "The 68K registers were rejected.");
+      }
+      return success();
+    }
+    case CoreDebugRequestType::setZ80Registers: {
+      genplusgx_debug_z80_registers registers{
+        .af = request.z80.af,
+        .bc = request.z80.bc,
+        .de = request.z80.de,
+        .hl = request.z80.hl,
+        .af_alternate = request.z80.afAlternate,
+        .bc_alternate = request.z80.bcAlternate,
+        .de_alternate = request.z80.deAlternate,
+        .hl_alternate = request.z80.hlAlternate,
+        .ix = request.z80.ix,
+        .iy = request.z80.iy,
+        .stack_pointer = request.z80.stackPointer,
+        .program_counter = request.z80.programCounter,
+        .interrupt_vector = request.z80.interruptVector,
+        .refresh = request.z80.refresh,
+        .interrupt_mode = request.z80.interruptMode,
+        .interrupt_flip_flop_1 = static_cast<std::uint8_t>(
+          request.z80.interruptFlipFlop1 ? 1U : 0U),
+        .interrupt_flip_flop_2 = static_cast<std::uint8_t>(
+          request.z80.interruptFlipFlop2 ? 1U : 0U),
+        .halted = static_cast<std::uint8_t>(
+          request.z80.halted ? 1U : 0U),
+        .bank = request.z80.bank,
+      };
+      if (registers.interrupt_mode > 2U ||
+          genplusgx_debug_set_z80_registers(&registers) == 0) {
+        return failure(
+          CoreError::invalidDebugRequest, "The Z80 registers were rejected.");
+      }
+      return success();
+    }
+    case CoreDebugRequestType::setVdpRegister:
+      if (genplusgx_debug_set_vdp_register(
+            request.vdpRegister, request.vdpValue) == 0) {
+        return failure(CoreError::invalidDebugRequest,
+          "The VDP register index is outside the 32-register file.");
+      }
+      return success();
+  }
+  return failure(
+    CoreError::invalidDebugRequest, "The debug request type is invalid.");
 }
 
 CoreLifecycleState CoreAdapter::state() const noexcept

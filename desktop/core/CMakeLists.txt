@@ -83,6 +83,7 @@ endif()
 
 add_library(genplusgx_core_host OBJECT
   c_api/desktop_core_cheats.c
+  c_api/desktop_core_debug.c
   c_api/desktop_core_host.c
 )
 target_link_libraries(
@@ -143,6 +144,7 @@ include(TestBigEndian)
 test_big_endian(GENPLUSGX_BIG_ENDIAN)
 if(NOT GENPLUSGX_BIG_ENDIAN)
   target_compile_definitions(genplusgx_core PUBLIC LSB_FIRST)
+  target_compile_definitions(genplusgx_core_host PRIVATE LSB_FIRST)
 endif()
 
 if(GENPLUSGX_ENABLE_TREMOR)
@@ -265,8 +267,10 @@ endif()
 
 add_library(
   genplusgx_core_adapter STATIC
+  include/genplusgx/core_debug.h
   include/genplusgx/core_firmware_settings.h
   include/genplusgx/core_input_settings.h
+  src/core_debug.cpp
   src/core_adapter.cpp
   src/emulation_worker.cpp
 )
