@@ -139,6 +139,7 @@ enum class EmulationEventType {
   frameCompleted,
   stateCaptured,
   debugResponse,
+  debugBreakpointHit,
   workerStopped,
 };
 

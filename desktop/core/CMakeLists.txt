@@ -267,9 +267,11 @@ endif()
 
 add_library(
   genplusgx_core_adapter STATIC
+  include/genplusgx/debug_analysis.h
   include/genplusgx/core_debug.h
   include/genplusgx/core_firmware_settings.h
   include/genplusgx/core_input_settings.h
+  src/debug_analysis.cpp
   src/core_debug.cpp
   src/core_adapter.cpp
   src/emulation_worker.cpp

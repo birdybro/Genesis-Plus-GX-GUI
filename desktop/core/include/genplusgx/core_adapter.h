@@ -216,6 +216,8 @@ public:
   [[nodiscard]] CoreResult debugRequest(
     const CoreDebugRequest& request,
     CoreDebugResponse& response);
+  [[nodiscard]] CoreResult debugProgramCounters(
+    CoreDebugProgramCounters& output) const;
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

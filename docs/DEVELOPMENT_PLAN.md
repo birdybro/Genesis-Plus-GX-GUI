@@ -83,7 +83,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 69 Full option regression | COMPLETE | Fix shader orientation and exercise every exposed option domain | final presentation pass, exhaustive core/UI matrices, external-ROM runner, docs | synthetic full suites plus 113-case Phantasy Star IV native-Wayland acceptance | Shader output remains upright; video/audio/input/system options have explicit bounded runtime coverage | pending |
 | 70 Debug inspection API | COMPLETE | Add thread-owned CPU, memory, VDP, sound, and input snapshots plus safe edits | core debug bridge, adapter/worker protocol, tests/docs | generated-ROM snapshot, byte-order, write-bound and concurrency tests | No GUI thread accesses core globals; all transfers remain bounded | pending |
 | 71 Hidden debug workspace | COMPLETE | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | pending |
-| 72 Debug analysis tools | PLANNED | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | pending |
+| 72 Debug analysis tools | COMPLETE | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | pending |
 | 73 Debug hardening | PLANNED | Exercise debugger workflows with synthetic and supplied external ROMs across all gates | real-ROM acceptance, stress/sanitizer/CI/docs | clean Debug/Release/ASan, external acceptance, hosted matrix | Debug mode does not alter normal emulation and native logs are clean | pending |
 
 ## Execution policy
@@ -3829,6 +3829,43 @@ every gpgx inspection family that is safe to sample is reachable after opt-in; w
 retain stable object names and keyboard operation; polling is bounded and stops while
 hidden; mutations remain paused-only on the worker; and state controls retain normal
 game-identity and corruption validation.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 72 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add deterministic value analysis and pause-on-address workflows without
+introducing the debugger fork's always-on instruction hooks or unsafe cross-thread core
+access.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/debug_analysis.h` and implementation
+- core debug types/C host program-counter bridge
+- core adapter and emulation-worker breakpoint protocol
+- debugger Analysis tabs for RAM search, RAM watch, and breakpoints
+- unit, generated-ROM core, GUI, architecture, testing, changelog, and user docs
+
+**Tests added:** `unit.debug_analysis` exercises bounded candidate initialization,
+8/16/32-bit big/little-endian reads, signed interpretation, exact, increase, unchanged,
+and signed comparison filters. `core.debug_tools` now rejects oversized queued payloads,
+installs worker-owned breakpoints, resumes the generated Genesis control loop, observes
+a real program-counter match, and proves the worker pauses. `gui.debug_tools` drives a
+65,536-candidate search down to one address, adds a typed watch and breakpoint, and
+presents an unsolicited hit on the correct page.
+
+**Gate evidence:** The focused model/core/worker/GUI tests pass with the frontend's
+warning-as-error policy. The complete Debug gate is run immediately before committing
+this milestone.
+
+**Acceptance criteria:** Searches and watches use immutable snapshots and correct CPU
+byte order; all candidate/display/watch/breakpoint collections have explicit caps;
+breakpoint requests are serialized and validated on the owner thread; normal play has
+no program-counter sampling when the list is empty; a match pauses at a documented
+frame boundary; and the UI does not claim unsupported instruction stepping.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

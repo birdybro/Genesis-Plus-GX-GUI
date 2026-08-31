@@ -4,6 +4,7 @@
 #include "genplusgx/timing/host_timer_resolution.h"
 
 #include <array>
+#include <algorithm>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -218,6 +219,8 @@ public:
     shutdownStatus_ = success();
     acceptingCommands_ = true;
     fastForward_ = false;
+    frameBreakpoints_.clear();
+    lastBreakpointHit_.reset();
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
     try {
       thread_ = std::thread{&Private::threadMain, this};
@@ -237,6 +240,15 @@ public:
       return failure(
         EmulationWorkerError::invalidCommand,
         "A command operation ID must be nonzero.");
+    }
+    if (command.type == EmulationCommandType::debugRequest &&
+        (command.coreDebugRequest.bytes.size() >
+           CoreAdapter::maximumDebugTransferBytes ||
+         command.coreDebugRequest.breakpoints.size() >
+           maximumCoreDebugBreakpoints)) {
+      return failure(
+        EmulationWorkerError::invalidCommand,
+        "The debug command payload exceeds its fixed transfer limit.");
     }
 
     std::scoped_lock lock{mutex_};
@@ -603,6 +615,8 @@ private:
 
     switch (command.type) {
       case EmulationCommandType::loadGame: {
+        frameBreakpoints_.clear();
+        lastBreakpointHit_.reset();
         coreResult = saveBackupMemory(adapter);
         if (!coreResult) {
           break;
@@ -634,6 +648,8 @@ private:
         break;
       }
       case EmulationCommandType::unloadGame:
+        frameBreakpoints_.clear();
+        lastBreakpointHit_.reset();
         coreResult = saveBackupMemory(adapter);
         if (coreResult) {
           discardLatestFrame();
@@ -650,6 +666,7 @@ private:
       case EmulationCommandType::resume:
         validTransition = current == EmulationWorkerState::paused;
         if (validTransition) {
+          lastBreakpointHit_.reset();
           pacer_.resume(Clock::now());
           owner_.state_.store(EmulationWorkerState::running, std::memory_order_release);
         }
@@ -751,15 +768,21 @@ private:
         }
         break;
       case EmulationCommandType::debugRequest: {
-        const auto writesCore =
-          command.coreDebugRequest.type !=
+        const auto requestType = command.coreDebugRequest.type;
+        const auto writesCore = requestType !=
             CoreDebugRequestType::captureSnapshot &&
-          command.coreDebugRequest.type != CoreDebugRequestType::readMemory;
+          requestType != CoreDebugRequestType::readMemory &&
+          requestType != CoreDebugRequestType::setFrameBreakpoints;
         validTransition = current == EmulationWorkerState::paused ||
           (!writesCore && current == EmulationWorkerState::running);
         if (validTransition) {
-          coreResult = adapter.debugRequest(
-            command.coreDebugRequest, debugResponse);
+          if (requestType == CoreDebugRequestType::setFrameBreakpoints) {
+            coreResult = setFrameBreakpoints(
+              command.coreDebugRequest.breakpoints, debugResponse);
+          } else {
+            coreResult = adapter.debugRequest(
+              command.coreDebugRequest, debugResponse);
+          }
           if (coreResult) {
             eventType = EmulationEventType::debugResponse;
           }
@@ -841,6 +864,24 @@ private:
     }
 
     pacer_.frameExecuted(Clock::now());
+    auto frameState = EmulationWorkerState::running;
+    if (const auto breakpoint = matchingFrameBreakpoint(adapter)) {
+      frameState = EmulationWorkerState::paused;
+      owner_.state_.store(frameState, std::memory_order_release);
+      pacer_.pause();
+      audioFrames_->clear();
+      lastBreakpointHit_ = breakpoint;
+      auto event = eventFor(EmulationEventType::debugBreakpointHit, frameState);
+      event.command = EmulationCommandType::debugRequest;
+      event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
+      event.videoGeneration = videoFrames_->metrics().publishedFrames;
+      event.appliedInputSequence = adapter.appliedInputSequence();
+      event.fastForward = fastForward_;
+      event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
+      event.debug.breakpointHit = breakpoint;
+      publishOperation(std::move(event));
+    }
     updatePacingMetrics();
 
     std::scoped_lock lock{mutex_};
@@ -848,7 +889,7 @@ private:
       ++replacedFrameEvents_;
     }
     auto event = eventFor(
-      EmulationEventType::frameCompleted, EmulationWorkerState::running);
+      EmulationEventType::frameCompleted, frameState);
     event.frameNumber = adapter.frameCount();
     event.hardware = adapter.hardware();
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
@@ -856,6 +897,66 @@ private:
     event.fastForward = fastForward_;
     latestFrame_ = std::move(event);
     eventReady_.notify_all();
+  }
+
+  CoreResult setFrameBreakpoints(
+    const std::vector<CoreDebugBreakpoint>& requested,
+    CoreDebugResponse& response)
+  {
+    if (requested.size() > maximumCoreDebugBreakpoints) {
+      return {
+        CoreError::invalidDebugRequest,
+        "At most 64 frame-boundary breakpoints may be active.",
+      };
+    }
+    auto breakpoints = requested;
+    for (const auto& breakpoint : breakpoints) {
+      const auto maximum = breakpoint.cpu == CoreDebugCpu::m68k
+        ? 0x00FF'FFFFU : 0x0000'FFFFU;
+      if (breakpoint.address > maximum) {
+        return {
+          CoreError::invalidDebugRequest,
+          "A frame-boundary breakpoint address is outside its CPU address range.",
+        };
+      }
+    }
+    std::ranges::sort(breakpoints, [](const auto& left, const auto& right) {
+      if (left.cpu != right.cpu) {
+        return left.cpu < right.cpu;
+      }
+      return left.address < right.address;
+    });
+    breakpoints.erase(std::unique(breakpoints.begin(), breakpoints.end()),
+      breakpoints.end());
+    frameBreakpoints_ = std::move(breakpoints);
+    lastBreakpointHit_.reset();
+    response = {};
+    response.type = CoreDebugRequestType::setFrameBreakpoints;
+    return {};
+  }
+
+  std::optional<CoreDebugBreakpoint> matchingFrameBreakpoint(CoreAdapter& adapter)
+  {
+    if (frameBreakpoints_.empty()) {
+      return std::nullopt;
+    }
+    CoreDebugProgramCounters counters;
+    if (!adapter.debugProgramCounters(counters)) {
+      return std::nullopt;
+    }
+    const auto found = std::ranges::find_if(
+      frameBreakpoints_, [&counters](const auto& breakpoint) {
+        if (breakpoint.cpu == CoreDebugCpu::m68k) {
+          return counters.m68kActive &&
+            breakpoint.address == (counters.m68k & 0x00FF'FFFFU);
+        }
+        return breakpoint.address == counters.z80;
+      });
+    if (found == frameBreakpoints_.end() ||
+        (lastBreakpointHit_ && *lastBreakpointHit_ == *found)) {
+      return std::nullopt;
+    }
+    return *found;
   }
 
   CoreResult executeOneFrame(CoreAdapter& adapter)
@@ -984,6 +1085,8 @@ private:
   bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
   std::vector<std::uint8_t> backupScratch_;
+  std::vector<CoreDebugBreakpoint> frameBreakpoints_;
+  std::optional<CoreDebugBreakpoint> lastBreakpointHit_;
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};

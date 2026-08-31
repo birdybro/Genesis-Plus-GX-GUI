@@ -22,10 +22,10 @@ request an immediate sample.
 - **CPU** shows all 68000 data/address registers, PC, SR, USP, and ISP, plus the Z80 main
   and alternate register sets, IX/IY, stack/program counters, interrupt state, halt
   state, and bank. Hexadecimal edits are available only while paused.
-- **Memory** reads cartridge ROM, 68000 RAM, Z80 RAM, VRAM, CRAM, VSRAM, cartridge SRAM,
-  Sega CD program/word/backup RAM, and Sega CD RAM cartridge where present. Reads and
-  paused writes are bounded to 4096 bytes per request. The displayed address includes
-  the selected region's logical bus base.
+- **Memory** reads cartridge ROM, 68000 RAM, Z80 RAM, VRAM, CRAM, VSRAM, and the raw VDP
+  register file. Reads and paused writes are bounded to 4096 bytes per request. The
+  displayed address includes the selected region's logical bus base. Persistent SRAM
+  and Sega CD backup-memory files remain protected by their normal persistence tools.
 - **VDP** shows the 32 raw register bytes, 64-color palette, decoded tile patterns,
   sprite attribute table, Plane A/Plane B/window maps, and representative horizontal
   and vertical scroll values. VDP register edits require pause.
@@ -40,6 +40,36 @@ request an immediate sample.
 The VDP explorers decode the latest snapshot rather than asking the core to render a
 second frame. Consequently the tools cannot change framebuffer or audio hashes merely
 by being open.
+
+## RAM analysis
+
+The **Analysis → RAM Search** page scans 68000 or Z80 RAM as overlapping 8-, 16-, or
+32-bit values. 68000 values use logical big-endian byte order; Z80 values use
+little-endian order. Signed and unsigned modes support equal, not-equal, changed,
+unchanged, increased, decreased, greater-than, and less-than filters. **New Search**
+captures a baseline and each **Filter** compares the latest immutable snapshot with the
+previous retained baseline. A search has at most 65,536 candidates, and the table shows
+at most the first 1,024 while preserving the exact total.
+
+The **RAM Watch** page maintains at most 256 typed addresses and reports their current
+value and whether it changed since the prior visible snapshot. Watches read copied RAM;
+they never add memory callbacks to the core. Searches and watches are cleared when the
+game closes or changes so an address cannot silently cross game identities.
+
+## Program-counter breakpoints
+
+The **Breakpoints** page accepts up to 64 unique 68000 or Z80 addresses. The list is
+installed transactionally on the emulation worker. When any breakpoint is active, that
+worker reads only the two program counters after each completed frame. A match pauses
+emulation, clears pending host audio, reports the CPU/address, and switches the debugger
+to the breakpoint page. Resume re-arms the breakpoint.
+
+These are explicitly frame-boundary breakpoints: they are useful for stable main loops,
+idle loops, and frame handlers but do not stop midway through an instruction. This
+design keeps the debugger fully outside the authoritative CPU algorithms and imposes no
+per-instruction branch or callback when developer tools are disabled. **Step Frame**
+likewise advances one complete frame; instruction-level stepping and an external IDA
+server are not claimed by this frontend.
 
 ## Safety and threading
 
@@ -58,23 +88,17 @@ Debug edits can put the emulated software into a nonsensical state. Save first a
 pause before editing. This risk is confined to the emulated session; normal recoverable
 errors are shown in the workspace status bar and logged without frame-by-frame noise.
 
-## Current stepping boundary
-
-**Step Frame** advances exactly one complete emulated frame and returns to pause. The
-first workspace release does not claim instruction-level stepping or an external IDA
-debug server. RAM search/watch and frame-boundary program-counter breakpoints are
-tracked as the next debug-analysis milestone and will preserve the same worker-owned
-boundary.
-
 ## Automated coverage
 
 The generated-ROM `core.debug_tools` regression verifies snapshots, byte order,
-transfer limits, edits, rejection while running, and command serialization. The
-headless `gui.debug_tools` regression verifies default hiding, every inspection page,
-controls, and validated state routing. Run them with:
+transfer limits, edits, rejection while running, command serialization, and a real
+pause-on-breakpoint workflow. `unit.debug_analysis` verifies typed/endian reads and RAM
+filter semantics. The headless `gui.debug_tools` regression verifies default hiding,
+every inspection page, searches, watches, breakpoints, controls, and validated state
+routing. Run them with:
 
 ```bash
-ctest --preset debug -R 'core.debug_tools|gui.debug_tools' --output-on-failure
+ctest --preset debug -R 'debug_analysis|core.debug_tools|gui.debug_tools' --output-on-failure
 ```
 
 No proprietary ROM, BIOS, or ROM-derived image is stored by these tests.

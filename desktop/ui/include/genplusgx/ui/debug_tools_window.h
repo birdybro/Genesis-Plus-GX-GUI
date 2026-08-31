@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/core_debug.h"
+#include "genplusgx/debug_analysis.h"
 
 #include <QMainWindow>
 
@@ -10,6 +11,7 @@
 #include <string>
 
 class QAction;
+class QCheckBox;
 class QComboBox;
 class QLabel;
 class QLineEdit;
@@ -17,6 +19,7 @@ class QPlainTextEdit;
 class QPushButton;
 class QSpinBox;
 class QTableWidget;
+class QTabWidget;
 class QTimer;
 
 namespace genplusgx::ui {
@@ -33,6 +36,15 @@ enum class DebugStateOperation {
   save,
   load,
   remove,
+};
+
+struct DebugMemoryWatch final {
+  CoreDebugMemoryRegion region{CoreDebugMemoryRegion::m68kRam};
+  std::uint32_t offset{0};
+  DebugValueWidth width{DebugValueWidth::byte};
+  DebugValueFormat format{DebugValueFormat::unsignedInteger};
+  std::uint32_t previousValue{0};
+  bool initialized{false};
 };
 
 class DebugToolsWindow final : public QMainWindow {
@@ -66,6 +78,7 @@ private:
   void buildVdpPage();
   void buildSoundPage();
   void buildInputPage();
+  void buildAnalysisPage();
   void buildStatePage();
   void updateAllViews();
   void updateCpuViews();
@@ -76,6 +89,20 @@ private:
   void updateVdpViews();
   void updateSoundViews();
   void updateInputView();
+  void beginRamSearch();
+  void filterRamSearch();
+  void resetRamSearch();
+  void updateRamSearchTable();
+  void updateSearchValueControl();
+  void updateWatchAddressRange();
+  void addMemoryWatch();
+  void removeMemoryWatch();
+  void updateMemoryWatches();
+  void updateBreakpointAddressRange();
+  void addFrameBreakpoint();
+  void removeFrameBreakpoint();
+  void updateBreakpointTable();
+  [[nodiscard]] bool submitFrameBreakpoints();
   void applyM68kEdit(int row, int column);
   void applyZ80Edit(int row, int column);
   void applyVdpEdit(int row, int column);
@@ -87,6 +114,7 @@ private:
   StateSink stateSink_;
   std::shared_ptr<const CoreDebugSnapshot> snapshot_;
   QTimer* refreshTimer_{nullptr};
+  QTabWidget* tabs_{nullptr};
   QAction* pauseAction_{nullptr};
   QAction* resumeAction_{nullptr};
   QAction* frameAdvanceAction_{nullptr};
@@ -111,6 +139,23 @@ private:
   QTableWidget* fmRegisters_{nullptr};
   QTableWidget* psgRegisters_{nullptr};
   QTableWidget* inputState_{nullptr};
+  QWidget* analysisPage_{nullptr};
+  QTabWidget* analysisTabs_{nullptr};
+  QComboBox* ramSearchRegion_{nullptr};
+  QComboBox* ramSearchWidth_{nullptr};
+  QComboBox* ramSearchComparison_{nullptr};
+  QCheckBox* ramSearchSigned_{nullptr};
+  QLineEdit* ramSearchValue_{nullptr};
+  QLabel* ramSearchCount_{nullptr};
+  QTableWidget* ramSearchResults_{nullptr};
+  QComboBox* watchRegion_{nullptr};
+  QSpinBox* watchAddress_{nullptr};
+  QComboBox* watchWidth_{nullptr};
+  QCheckBox* watchSigned_{nullptr};
+  QTableWidget* watchTable_{nullptr};
+  QComboBox* breakpointCpu_{nullptr};
+  QSpinBox* breakpointAddress_{nullptr};
+  QTableWidget* breakpointTable_{nullptr};
   QComboBox* stateSlot_{nullptr};
   QWidget* statePage_{nullptr};
   bool gameLoaded_{false};
@@ -118,6 +163,11 @@ private:
   bool snapshotPending_{false};
   bool memoryPending_{false};
   bool updating_{false};
+  DebugRamSearch ramSearch_;
+  CoreDebugMemoryRegion ramSearchMemoryRegion_{CoreDebugMemoryRegion::m68kRam};
+  DebugValueFormat ramSearchFormat_{DebugValueFormat::unsignedInteger};
+  std::vector<DebugMemoryWatch> watches_;
+  std::vector<CoreDebugBreakpoint> frameBreakpoints_;
 };
 
 } // namespace genplusgx::ui

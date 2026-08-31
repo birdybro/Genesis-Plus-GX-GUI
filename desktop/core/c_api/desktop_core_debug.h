@@ -68,7 +68,16 @@ typedef struct
   uint8_t z80_ram[0x2000];
 } genplusgx_debug_snapshot;
 
+typedef struct
+{
+  uint32_t m68k;
+  uint16_t z80;
+  uint8_t m68k_active;
+} genplusgx_debug_program_counters;
+
 int genplusgx_debug_capture(genplusgx_debug_snapshot *output);
+int genplusgx_debug_get_program_counters(
+  genplusgx_debug_program_counters *output);
 size_t genplusgx_debug_region_size(unsigned int region);
 int genplusgx_debug_read_region(
   unsigned int region,

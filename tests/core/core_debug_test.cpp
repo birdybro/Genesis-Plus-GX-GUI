@@ -35,6 +35,20 @@ std::optional<genplusgx::EmulationEvent> waitForOperation(
   return std::nullopt;
 }
 
+std::optional<genplusgx::EmulationEvent> waitForBreakpoint(
+  genplusgx::EmulationWorker& worker)
+{
+  const auto deadline = std::chrono::steady_clock::now() + 3s;
+  while (std::chrono::steady_clock::now() < deadline) {
+    auto event = worker.waitForEvent(100ms);
+    if (event && event->type ==
+        genplusgx::EmulationEventType::debugBreakpointHit) {
+      return event;
+    }
+  }
+  return std::nullopt;
+}
+
 bool submitAndWait(
   genplusgx::EmulationWorker& worker,
   genplusgx::EmulationCommand command,
@@ -152,12 +166,17 @@ int main()
     genplusgx::CoreAdapter::maximumDebugTransferBytes + 1U);
   auto invalidWrite = writeRam;
   invalidWrite.offset = 0xFFFFU;
+  genplusgx::CoreDebugRequest workerOwned;
+  workerOwned.type = genplusgx::CoreDebugRequestType::setFrameBreakpoints;
   if (!check(adapter.debugRequest(invalidRead, response).error ==
           genplusgx::CoreError::invalidDebugRequest,
         "Oversized memory read was accepted") ||
       !check(adapter.debugRequest(invalidWrite, response).error ==
           genplusgx::CoreError::invalidDebugRequest,
-        "Out-of-range memory write was accepted")) {
+        "Out-of-range memory write was accepted") ||
+      !check(adapter.debugRequest(workerOwned, response).error ==
+          genplusgx::CoreError::invalidDebugRequest,
+        "Core adapter accepted worker-owned breakpoints")) {
     return 6;
   }
 
@@ -175,7 +194,14 @@ int main()
 
   genplusgx::EmulationWorker worker;
   genplusgx::EmulationEvent event;
+  auto oversizedBreakpoints = workerOwned;
+  oversizedBreakpoints.breakpoints.resize(
+    genplusgx::maximumCoreDebugBreakpoints + 1U);
   if (!check(worker.start(), "Worker start failed") ||
+      !check(!worker.submit(genplusgx::EmulationCommand::debug(
+          9U, oversizedBreakpoints)) &&
+          worker.metrics().commandQueueDepth == 0U,
+        "Worker queued an oversized breakpoint payload") ||
       !check(submitAndWait(worker,
           genplusgx::EmulationCommand::load(10U, fixture.path()), event) &&
           event.succeeded(),
@@ -200,8 +226,45 @@ int main()
           genplusgx::EmulationCommand::debug(14U, capture), event) &&
           event.succeeded() && event.debug.snapshot != nullptr,
         "Running snapshot request was not serialized between frames") ||
-      !check(worker.stop(), "Worker shutdown failed")) {
+      !check(submitAndWait(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::pause, 15U), event) &&
+          event.succeeded(),
+        "Worker did not pause before breakpoint configuration")) {
     return 8;
+  }
+
+  genplusgx::CoreDebugRequest breakpoints;
+  breakpoints.type = genplusgx::CoreDebugRequestType::setFrameBreakpoints;
+  breakpoints.breakpoints = {
+    {genplusgx::CoreDebugCpu::m68k, 0x250U},
+    {genplusgx::CoreDebugCpu::m68k, 0x256U},
+    {genplusgx::CoreDebugCpu::m68k, 0x25AU},
+  };
+  if (!check(submitAndWait(worker,
+          genplusgx::EmulationCommand::debug(16U, breakpoints), event) &&
+          event.succeeded() &&
+          event.type == genplusgx::EmulationEventType::debugResponse,
+        "Frame breakpoint configuration failed") ||
+      !check(submitAndWait(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::resume, 17U), event) &&
+          event.succeeded(),
+        "Worker did not resume for breakpoint test")) {
+    return 9;
+  }
+  auto breakpoint = waitForBreakpoint(worker);
+  if (!check(breakpoint.has_value() && breakpoint->debug.breakpointHit.has_value(),
+        "Frame breakpoint did not pause the generated ROM") ||
+      !check(breakpoint->workerState ==
+          genplusgx::EmulationWorkerState::paused &&
+          breakpoint->debug.breakpointHit->cpu ==
+            genplusgx::CoreDebugCpu::m68k,
+        "Breakpoint hit did not report a paused 68K address") ||
+      !check(worker.state() == genplusgx::EmulationWorkerState::paused,
+        "Worker continued after a breakpoint hit") ||
+      !check(worker.stop(), "Worker shutdown failed")) {
+    return 10;
   }
 
   const auto regions = genplusgx::coreDebugMemoryRegions(0x1234U);
@@ -210,5 +273,5 @@ int main()
         genplusgx::coreDebugCramColor(0x01FFU) == 0xFFFFFFFFU,
       "Debug region metadata or CRAM color conversion is incorrect")
     ? 0
-    : 9;
+    : 11;
 }

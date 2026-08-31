@@ -1,5 +1,16 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_debug_analysis_test debug_analysis_test.cpp)
+target_link_libraries(
+  genplusgx_debug_analysis_test
+  PRIVATE GenesisPlusGX::CoreAdapter genplusgx_project_warnings
+)
+add_test(NAME unit.debug_analysis COMMAND genplusgx_debug_analysis_test)
+set_tests_properties(
+  unit.debug_analysis
+  PROPERTIES LABELS "unit;debug;parser" TIMEOUT 30
+)
+
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
   add_executable(
     genplusgx_shader_configuration_test shader_configuration_test.cpp

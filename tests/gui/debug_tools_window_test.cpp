@@ -9,6 +9,7 @@
 #include <QMenu>
 #include <QPlainTextEdit>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTest>
@@ -124,13 +125,14 @@ void DebugToolsWindowTest::workspacePresentsEveryLiveInspectionSurface()
 
   auto* tabs = window.findChild<QTabWidget*>(QStringLiteral("debugToolsTabs"));
   QVERIFY(tabs != nullptr);
-  QCOMPARE(tabs->count(), 6);
+  QCOMPARE(tabs->count(), 7);
   QCOMPARE(tabs->tabText(0), QStringLiteral("CPU"));
   QCOMPARE(tabs->tabText(1), QStringLiteral("Memory"));
   QCOMPARE(tabs->tabText(2), QStringLiteral("VDP"));
   QCOMPARE(tabs->tabText(3), QStringLiteral("Sound"));
   QCOMPARE(tabs->tabText(4), QStringLiteral("Input"));
-  QCOMPARE(tabs->tabText(5), QStringLiteral("States"));
+  QCOMPARE(tabs->tabText(5), QStringLiteral("Analysis"));
+  QCOMPARE(tabs->tabText(6), QStringLiteral("States"));
 
   auto* m68k = window.findChild<QTableWidget*>(
     QStringLiteral("debugM68kRegisterTable"));
@@ -173,6 +175,55 @@ void DebugToolsWindowTest::workspacePresentsEveryLiveInspectionSurface()
     QStringLiteral("debugMemoryHexView"))->toPlainText();
   QVERIFY(text.contains(QStringLiteral("13 57 41 42")));
   QVERIFY(text.contains(QStringLiteral(".WAB")));
+
+  auto* analysisTabs = window.findChild<QTabWidget*>(
+    QStringLiteral("debugAnalysisTabs"));
+  QVERIFY(analysisTabs != nullptr);
+  QCOMPARE(analysisTabs->count(), 3);
+  QCOMPARE(analysisTabs->tabText(0), QStringLiteral("RAM Search"));
+  QCOMPARE(analysisTabs->tabText(1), QStringLiteral("RAM Watch"));
+  QCOMPARE(analysisTabs->tabText(2), QStringLiteral("Breakpoints"));
+
+  window.findChild<QLineEdit*>(QStringLiteral("debugRamSearchValueEdit"))
+    ->setText(QStringLiteral("0x13"));
+  window.findChild<QPushButton*>(
+    QStringLiteral("debugRamSearchNewButton"))->click();
+  auto* searchResults = window.findChild<QTableWidget*>(
+    QStringLiteral("debugRamSearchResultsTable"));
+  QCOMPARE(searchResults->rowCount(), 1'024);
+  window.findChild<QPushButton*>(
+    QStringLiteral("debugRamSearchFilterButton"))->click();
+  QCOMPARE(searchResults->rowCount(), 1);
+  QCOMPARE(searchResults->item(0, 0)->text(), QStringLiteral("0XFF0000"));
+  QCOMPARE(searchResults->item(0, 1)->text(), QStringLiteral("0X13"));
+
+  window.findChild<QPushButton*>(QStringLiteral("debugWatchAddButton"))->click();
+  auto* watches = window.findChild<QTableWidget*>(QStringLiteral("debugWatchTable"));
+  QCOMPARE(watches->rowCount(), 1);
+  QCOMPARE(watches->item(0, 1)->text(), QStringLiteral("0XFF0000"));
+  QCOMPARE(watches->item(0, 3)->text(), QStringLiteral("0X13"));
+
+  window.findChild<QSpinBox*>(QStringLiteral("debugBreakpointAddressSpin"))
+    ->setValue(0x200);
+  window.findChild<QPushButton*>(
+    QStringLiteral("debugBreakpointAddButton"))->click();
+  QCOMPARE(requests.back().type,
+    genplusgx::CoreDebugRequestType::setFrameBreakpoints);
+  QCOMPARE(requests.back().breakpoints.size(), 1U);
+  QCOMPARE(requests.back().breakpoints.front().address, 0x200U);
+  auto* breakpointTable = window.findChild<QTableWidget*>(
+    QStringLiteral("debugBreakpointTable"));
+  QCOMPARE(breakpointTable->rowCount(), 1);
+  QCOMPARE(breakpointTable->item(0, 0)->text(), QStringLiteral("68000"));
+
+  genplusgx::CoreDebugResponse hit;
+  hit.type = genplusgx::CoreDebugRequestType::setFrameBreakpoints;
+  hit.breakpointHit = genplusgx::CoreDebugBreakpoint{
+    genplusgx::CoreDebugCpu::m68k, 0x200U};
+  window.presentResponse(std::move(hit));
+  QCOMPARE(analysisTabs->currentIndex(), 2);
+  QVERIFY(window.findChild<QAction*>(
+    QStringLiteral("debugResumeAction"))->isEnabled());
 }
 
 void DebugToolsWindowTest::pausedEditsControlsAndStateActionsUseTypedCallbacks()

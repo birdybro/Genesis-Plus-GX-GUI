@@ -4,6 +4,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string_view>
 #include <vector>
 
@@ -103,6 +104,26 @@ struct CoreDebugSnapshot final {
   std::array<std::uint8_t, 0x2000> z80Ram{};
 };
 
+enum class CoreDebugCpu : std::uint8_t {
+  m68k,
+  z80,
+};
+
+struct CoreDebugBreakpoint final {
+  CoreDebugCpu cpu{CoreDebugCpu::m68k};
+  std::uint32_t address{0};
+
+  [[nodiscard]] bool operator==(const CoreDebugBreakpoint&) const = default;
+};
+
+struct CoreDebugProgramCounters final {
+  bool m68kActive{false};
+  std::uint32_t m68k{0};
+  std::uint16_t z80{0};
+};
+
+inline constexpr std::size_t maximumCoreDebugBreakpoints = 64U;
+
 enum class CoreDebugRequestType : std::uint8_t {
   captureSnapshot,
   readMemory,
@@ -110,6 +131,7 @@ enum class CoreDebugRequestType : std::uint8_t {
   setM68kRegisters,
   setZ80Registers,
   setVdpRegister,
+  setFrameBreakpoints,
 };
 
 struct CoreDebugRequest final {
@@ -122,6 +144,7 @@ struct CoreDebugRequest final {
   CoreDebugZ80Registers z80;
   std::uint8_t vdpRegister{0};
   std::uint8_t vdpValue{0};
+  std::vector<CoreDebugBreakpoint> breakpoints;
 };
 
 struct CoreDebugResponse final {
@@ -130,6 +153,7 @@ struct CoreDebugResponse final {
   std::uint32_t offset{0};
   std::shared_ptr<const CoreDebugSnapshot> snapshot;
   std::vector<std::uint8_t> bytes;
+  std::optional<CoreDebugBreakpoint> breakpointHit;
 };
 
 [[nodiscard]] std::array<CoreDebugMemoryRegionInfo, 7>

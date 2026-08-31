@@ -16,6 +16,9 @@ platform documentation.
 - A thread-owned debug protocol that publishes immutable snapshots between frames and
   rejects mutation while emulation is running, keeping Genesis Plus GX globals out of
   the GUI thread.
+- Bounded 8/16/32-bit signed or unsigned RAM search and watch tools, plus worker-owned
+  68000/Z80 frame-boundary program-counter breakpoints that pause on a live match
+  without enabling an always-on instruction hook.
 - Adjustable built-in CRT rendering and modern Libretro Slang `.slangp` compatibility
   through a checksum-pinned librashader 0.12.0 OpenGL runtime, including multi-pass
   chains, lookup textures, frame history/feedback, preset parameters, and per-game

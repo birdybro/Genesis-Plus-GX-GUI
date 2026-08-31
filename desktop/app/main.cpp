@@ -1843,7 +1843,9 @@ int main(int argc, char* argv[])
       }
       if (event->command == genplusgx::EmulationCommandType::debugRequest) {
         if (event->succeeded() &&
-            event->type == genplusgx::EmulationEventType::debugResponse) {
+            (event->type == genplusgx::EmulationEventType::debugResponse ||
+             event->type ==
+               genplusgx::EmulationEventType::debugBreakpointHit)) {
           window.presentDebugResponse(std::move(event->debug));
         } else if (!event->succeeded()) {
           window.showDebugRequestError(event->message.empty()

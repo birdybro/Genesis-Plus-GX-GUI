@@ -3,6 +3,7 @@
 
 #include <QAction>
 #include <QColor>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
 #include <QGroupBox>
@@ -10,6 +11,7 @@
 #include <QHideEvent>
 #include <QHBoxLayout>
 #include <QImage>
+#include <QItemSelectionModel>
 #include <QLabel>
 #include <QLineEdit>
 #include <QPlainTextEdit>
@@ -214,6 +216,104 @@ QString formatMemory(
   return output;
 }
 
+DebugValueWidth selectedWidth(const QComboBox& combo)
+{
+  return static_cast<DebugValueWidth>(combo.currentData().toUInt());
+}
+
+DebugValueFormat selectedFormat(const QCheckBox& signedValues)
+{
+  return signedValues.isChecked()
+    ? DebugValueFormat::signedInteger
+    : DebugValueFormat::unsignedInteger;
+}
+
+DebugValueEndian regionEndian(CoreDebugMemoryRegion region)
+{
+  return region == CoreDebugMemoryRegion::z80Ram
+    ? DebugValueEndian::little : DebugValueEndian::big;
+}
+
+std::span<const std::uint8_t> snapshotMemory(
+  const CoreDebugSnapshot& snapshot,
+  CoreDebugMemoryRegion region)
+{
+  switch (region) {
+    case CoreDebugMemoryRegion::m68kRam: return snapshot.m68kRam;
+    case CoreDebugMemoryRegion::z80Ram: return snapshot.z80Ram;
+    default: return {};
+  }
+}
+
+QString analysisRegionName(CoreDebugMemoryRegion region)
+{
+  return region == CoreDebugMemoryRegion::z80Ram
+    ? QStringLiteral("Z80 RAM") : QStringLiteral("68K RAM");
+}
+
+QString analysisValue(
+  std::uint32_t value,
+  DebugValueWidth width,
+  DebugValueFormat format)
+{
+  const int digits = static_cast<int>(width) * 2;
+  const auto interpreted = debugInterpretValue(value, width, format);
+  if (format == DebugValueFormat::signedInteger) {
+    return QStringLiteral("%1 (%2)").arg(hexadecimal(value, digits))
+      .arg(static_cast<qlonglong>(interpreted));
+  }
+  return hexadecimal(value, digits);
+}
+
+bool comparisonUsesValue(DebugRamComparison comparison)
+{
+  return comparison == DebugRamComparison::equalTo ||
+    comparison == DebugRamComparison::notEqualTo ||
+    comparison == DebugRamComparison::greaterThan ||
+    comparison == DebugRamComparison::lessThan;
+}
+
+bool parseAnalysisValue(
+  const QString& text,
+  DebugValueWidth width,
+  DebugValueFormat format,
+  std::int64_t& output)
+{
+  const auto normalized = text.trimmed();
+  const auto bits = static_cast<unsigned int>(width) * 8U;
+  const auto maximumUnsigned = bits == 32U
+    ? std::numeric_limits<std::uint32_t>::max()
+    : ((std::uint32_t{1U} << bits) - 1U);
+  if (normalized.startsWith(QStringLiteral("0x"), Qt::CaseInsensitive)) {
+    bool ok = false;
+    const auto raw = normalized.mid(2).toULongLong(&ok, 16);
+    if (!ok || raw > maximumUnsigned) {
+      return false;
+    }
+    output = debugInterpretValue(
+      static_cast<std::uint32_t>(raw), width, format);
+    return true;
+  }
+  bool ok = false;
+  const auto parsed = normalized.toLongLong(&ok, 10);
+  if (!ok) {
+    return false;
+  }
+  if (format == DebugValueFormat::unsignedInteger) {
+    if (parsed < 0 || static_cast<std::uint64_t>(parsed) > maximumUnsigned) {
+      return false;
+    }
+  } else {
+    const auto minimum = -(std::int64_t{1} << (bits - 1U));
+    const auto maximum = (std::int64_t{1} << (bits - 1U)) - 1;
+    if (parsed < minimum || parsed > maximum) {
+      return false;
+    }
+  }
+  output = parsed;
+  return true;
+}
+
 } // namespace
 
 DebugToolsWindow::DebugToolsWindow(QWidget* parent)
@@ -225,14 +325,15 @@ DebugToolsWindow::DebugToolsWindow(QWidget* parent)
   resize(1'080, 760);
 
   buildToolbar();
-  auto* tabs = new QTabWidget(this);
-  tabs->setObjectName(QStringLiteral("debugToolsTabs"));
-  setCentralWidget(tabs);
+  tabs_ = new QTabWidget(this);
+  tabs_->setObjectName(QStringLiteral("debugToolsTabs"));
+  setCentralWidget(tabs_);
   buildCpuPage();
   buildMemoryPage();
   buildVdpPage();
   buildSoundPage();
   buildInputPage();
+  buildAnalysisPage();
   buildStatePage();
 
   refreshTimer_ = new QTimer(this);
@@ -429,6 +530,196 @@ void DebugToolsWindow::buildInputPage()
   qobject_cast<QTabWidget*>(centralWidget())->addTab(inputState_, tr("Input"));
 }
 
+void DebugToolsWindow::buildAnalysisPage()
+{
+  analysisPage_ = new QWidget(this);
+  analysisPage_->setObjectName(QStringLiteral("debugAnalysisPage"));
+  auto* layout = new QVBoxLayout(analysisPage_);
+  auto* explanation = new QLabel(tr(
+    "RAM analysis uses immutable frame snapshots. Program-counter breakpoints "
+    "are checked after each complete frame and pause the emulation worker on a match."),
+    analysisPage_);
+  explanation->setWordWrap(true);
+  layout->addWidget(explanation);
+  analysisTabs_ = new QTabWidget(analysisPage_);
+  analysisTabs_->setObjectName(QStringLiteral("debugAnalysisTabs"));
+  layout->addWidget(analysisTabs_);
+
+  auto* searchPage = new QWidget(analysisTabs_);
+  searchPage->setObjectName(QStringLiteral("debugRamSearchPage"));
+  auto* searchLayout = new QVBoxLayout(searchPage);
+  auto* searchForm = new QFormLayout;
+  ramSearchRegion_ = new QComboBox(searchPage);
+  ramSearchRegion_->setObjectName(QStringLiteral("debugRamSearchRegionCombo"));
+  ramSearchRegion_->addItem(tr("68K RAM"),
+    static_cast<int>(CoreDebugMemoryRegion::m68kRam));
+  ramSearchRegion_->addItem(tr("Z80 RAM"),
+    static_cast<int>(CoreDebugMemoryRegion::z80Ram));
+  ramSearchWidth_ = new QComboBox(searchPage);
+  ramSearchWidth_->setObjectName(QStringLiteral("debugRamSearchWidthCombo"));
+  ramSearchWidth_->addItem(tr("8-bit"), static_cast<int>(DebugValueWidth::byte));
+  ramSearchWidth_->addItem(tr("16-bit"), static_cast<int>(DebugValueWidth::word));
+  ramSearchWidth_->addItem(tr("32-bit"),
+    static_cast<int>(DebugValueWidth::longWord));
+  ramSearchSigned_ = new QCheckBox(tr("Interpret as signed"), searchPage);
+  ramSearchSigned_->setObjectName(QStringLiteral("debugRamSearchSignedCheck"));
+  ramSearchComparison_ = new QComboBox(searchPage);
+  ramSearchComparison_->setObjectName(
+    QStringLiteral("debugRamSearchComparisonCombo"));
+  const std::array comparisons{
+    std::pair{tr("Equal to"), DebugRamComparison::equalTo},
+    std::pair{tr("Not equal to"), DebugRamComparison::notEqualTo},
+    std::pair{tr("Changed"), DebugRamComparison::changed},
+    std::pair{tr("Unchanged"), DebugRamComparison::unchanged},
+    std::pair{tr("Increased"), DebugRamComparison::increased},
+    std::pair{tr("Decreased"), DebugRamComparison::decreased},
+    std::pair{tr("Greater than"), DebugRamComparison::greaterThan},
+    std::pair{tr("Less than"), DebugRamComparison::lessThan},
+  };
+  for (const auto& [name, comparison] : comparisons) {
+    ramSearchComparison_->addItem(name, static_cast<int>(comparison));
+  }
+  ramSearchValue_ = new QLineEdit(searchPage);
+  ramSearchValue_->setObjectName(QStringLiteral("debugRamSearchValueEdit"));
+  ramSearchValue_->setText(QStringLiteral("0"));
+  ramSearchValue_->setPlaceholderText(tr("Decimal or 0x-prefixed hexadecimal"));
+  searchForm->addRow(tr("&Region:"), ramSearchRegion_);
+  searchForm->addRow(tr("&Width:"), ramSearchWidth_);
+  searchForm->addRow(QString{}, ramSearchSigned_);
+  searchForm->addRow(tr("&Comparison:"), ramSearchComparison_);
+  searchForm->addRow(tr("&Value:"), ramSearchValue_);
+  searchLayout->addLayout(searchForm);
+  auto* searchButtons = new QHBoxLayout;
+  auto* newSearch = new QPushButton(tr("New Search"), searchPage);
+  newSearch->setObjectName(QStringLiteral("debugRamSearchNewButton"));
+  auto* filterSearch = new QPushButton(tr("Filter"), searchPage);
+  filterSearch->setObjectName(QStringLiteral("debugRamSearchFilterButton"));
+  auto* resetSearch = new QPushButton(tr("Reset"), searchPage);
+  resetSearch->setObjectName(QStringLiteral("debugRamSearchResetButton"));
+  searchButtons->addWidget(newSearch);
+  searchButtons->addWidget(filterSearch);
+  searchButtons->addWidget(resetSearch);
+  searchButtons->addStretch();
+  searchLayout->addLayout(searchButtons);
+  ramSearchCount_ = new QLabel(tr("No active search."), searchPage);
+  ramSearchCount_->setObjectName(QStringLiteral("debugRamSearchCountLabel"));
+  searchLayout->addWidget(ramSearchCount_);
+  ramSearchResults_ = makeTable(searchPage, "debugRamSearchResultsTable", 0,
+    {tr("Address"), tr("Current"), tr("Previous filter")});
+  searchLayout->addWidget(ramSearchResults_);
+  connect(newSearch, &QPushButton::clicked,
+    this, &DebugToolsWindow::beginRamSearch);
+  connect(filterSearch, &QPushButton::clicked,
+    this, &DebugToolsWindow::filterRamSearch);
+  connect(resetSearch, &QPushButton::clicked,
+    this, &DebugToolsWindow::resetRamSearch);
+  connect(ramSearchComparison_, &QComboBox::currentIndexChanged,
+    this, &DebugToolsWindow::updateSearchValueControl);
+  const auto invalidateSearch = [this] {
+    if (ramSearch_.active()) {
+      resetRamSearch();
+      setStatus(tr("Search layout changed; start a new RAM search."), 3'000);
+    }
+  };
+  connect(ramSearchRegion_, &QComboBox::currentIndexChanged,
+    this, invalidateSearch);
+  connect(ramSearchWidth_, &QComboBox::currentIndexChanged,
+    this, invalidateSearch);
+  connect(ramSearchSigned_, &QCheckBox::toggled,
+    this, invalidateSearch);
+  analysisTabs_->addTab(searchPage, tr("RAM Search"));
+
+  auto* watchPage = new QWidget(analysisTabs_);
+  watchPage->setObjectName(QStringLiteral("debugRamWatchPage"));
+  auto* watchLayout = new QVBoxLayout(watchPage);
+  auto* watchControls = new QHBoxLayout;
+  watchRegion_ = new QComboBox(watchPage);
+  watchRegion_->setObjectName(QStringLiteral("debugWatchRegionCombo"));
+  watchRegion_->addItem(tr("68K RAM"),
+    static_cast<int>(CoreDebugMemoryRegion::m68kRam));
+  watchRegion_->addItem(tr("Z80 RAM"),
+    static_cast<int>(CoreDebugMemoryRegion::z80Ram));
+  watchAddress_ = new QSpinBox(watchPage);
+  watchAddress_->setObjectName(QStringLiteral("debugWatchAddressSpin"));
+  watchAddress_->setDisplayIntegerBase(16);
+  watchAddress_->setPrefix(QStringLiteral("0x"));
+  watchWidth_ = new QComboBox(watchPage);
+  watchWidth_->setObjectName(QStringLiteral("debugWatchWidthCombo"));
+  watchWidth_->addItem(tr("8-bit"), static_cast<int>(DebugValueWidth::byte));
+  watchWidth_->addItem(tr("16-bit"), static_cast<int>(DebugValueWidth::word));
+  watchWidth_->addItem(tr("32-bit"), static_cast<int>(DebugValueWidth::longWord));
+  watchSigned_ = new QCheckBox(tr("Signed"), watchPage);
+  watchSigned_->setObjectName(QStringLiteral("debugWatchSignedCheck"));
+  auto* addWatch = new QPushButton(tr("Add Watch"), watchPage);
+  addWatch->setObjectName(QStringLiteral("debugWatchAddButton"));
+  auto* removeWatch = new QPushButton(tr("Remove Selected"), watchPage);
+  removeWatch->setObjectName(QStringLiteral("debugWatchRemoveButton"));
+  watchControls->addWidget(watchRegion_);
+  watchControls->addWidget(watchAddress_);
+  watchControls->addWidget(watchWidth_);
+  watchControls->addWidget(watchSigned_);
+  watchControls->addWidget(addWatch);
+  watchControls->addWidget(removeWatch);
+  watchLayout->addLayout(watchControls);
+  watchTable_ = makeTable(watchPage, "debugWatchTable", 0,
+    {tr("Region"), tr("Address"), tr("Type"), tr("Value"), tr("Changed")});
+  watchLayout->addWidget(watchTable_);
+  connect(watchRegion_, &QComboBox::currentIndexChanged,
+    this, &DebugToolsWindow::updateWatchAddressRange);
+  connect(watchWidth_, &QComboBox::currentIndexChanged,
+    this, &DebugToolsWindow::updateWatchAddressRange);
+  connect(addWatch, &QPushButton::clicked,
+    this, &DebugToolsWindow::addMemoryWatch);
+  connect(removeWatch, &QPushButton::clicked,
+    this, &DebugToolsWindow::removeMemoryWatch);
+  updateWatchAddressRange();
+  analysisTabs_->addTab(watchPage, tr("RAM Watch"));
+
+  auto* breakpointPage = new QWidget(analysisTabs_);
+  breakpointPage->setObjectName(QStringLiteral("debugBreakpointPage"));
+  auto* breakpointLayout = new QVBoxLayout(breakpointPage);
+  auto* breakpointNote = new QLabel(tr(
+    "Frame-boundary breakpoints compare the selected CPU program counter after "
+    "each completed frame. They do not stop in the middle of an instruction."),
+    breakpointPage);
+  breakpointNote->setWordWrap(true);
+  breakpointLayout->addWidget(breakpointNote);
+  auto* breakpointControls = new QHBoxLayout;
+  breakpointCpu_ = new QComboBox(breakpointPage);
+  breakpointCpu_->setObjectName(QStringLiteral("debugBreakpointCpuCombo"));
+  breakpointCpu_->addItem(tr("68000"), static_cast<int>(CoreDebugCpu::m68k));
+  breakpointCpu_->addItem(tr("Z80"), static_cast<int>(CoreDebugCpu::z80));
+  breakpointAddress_ = new QSpinBox(breakpointPage);
+  breakpointAddress_->setObjectName(QStringLiteral("debugBreakpointAddressSpin"));
+  breakpointAddress_->setDisplayIntegerBase(16);
+  breakpointAddress_->setPrefix(QStringLiteral("0x"));
+  auto* addBreakpoint = new QPushButton(tr("Add Breakpoint"), breakpointPage);
+  addBreakpoint->setObjectName(QStringLiteral("debugBreakpointAddButton"));
+  auto* removeBreakpoint = new QPushButton(
+    tr("Remove Selected"), breakpointPage);
+  removeBreakpoint->setObjectName(QStringLiteral("debugBreakpointRemoveButton"));
+  breakpointControls->addWidget(breakpointCpu_);
+  breakpointControls->addWidget(breakpointAddress_);
+  breakpointControls->addWidget(addBreakpoint);
+  breakpointControls->addWidget(removeBreakpoint);
+  breakpointControls->addStretch();
+  breakpointLayout->addLayout(breakpointControls);
+  breakpointTable_ = makeTable(breakpointPage, "debugBreakpointTable", 0,
+    {tr("CPU"), tr("Program counter")});
+  breakpointLayout->addWidget(breakpointTable_);
+  connect(breakpointCpu_, &QComboBox::currentIndexChanged,
+    this, &DebugToolsWindow::updateBreakpointAddressRange);
+  connect(addBreakpoint, &QPushButton::clicked,
+    this, &DebugToolsWindow::addFrameBreakpoint);
+  connect(removeBreakpoint, &QPushButton::clicked,
+    this, &DebugToolsWindow::removeFrameBreakpoint);
+  updateBreakpointAddressRange();
+  analysisTabs_->addTab(breakpointPage, tr("Breakpoints"));
+
+  updateSearchValueControl();
+  tabs_->addTab(analysisPage_, tr("Analysis"));
+}
+
 void DebugToolsWindow::buildStatePage()
 {
   statePage_ = new QWidget(this);
@@ -489,6 +780,12 @@ void DebugToolsWindow::setGameLoaded(bool loaded)
     snapshotPending_ = false;
     memoryPending_ = false;
     memoryView_->clear();
+    ramSearch_.clear();
+    watches_.clear();
+    frameBreakpoints_.clear();
+    updateRamSearchTable();
+    updateMemoryWatches();
+    breakpointTable_->setRowCount(0);
     setStatus(tr("Load a game to inspect emulator state."));
   } else {
     setStatus(tr("Waiting for emulator debug state…"));
@@ -508,6 +805,7 @@ void DebugToolsWindow::setPaused(bool paused)
   refreshAction_->setEnabled(gameLoaded_);
   memoryWriteButton_->setEnabled(gameLoaded_ && paused);
   statePage_->setEnabled(gameLoaded_);
+  analysisPage_->setEnabled(gameLoaded_);
   if (snapshot_) {
     updateCpuViews();
     updateVdpViews();
@@ -552,6 +850,22 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
   if (response.type == CoreDebugRequestType::readMemory) {
     memoryPending_ = false;
     updateMemoryView(response);
+    return;
+  }
+  if (response.type == CoreDebugRequestType::setFrameBreakpoints) {
+    if (response.breakpointHit) {
+      setPaused(true);
+      tabs_->setCurrentWidget(analysisPage_);
+      analysisTabs_->setCurrentIndex(2);
+      const auto cpu = response.breakpointHit->cpu == CoreDebugCpu::m68k
+        ? tr("68000") : tr("Z80");
+      const int digits = response.breakpointHit->cpu == CoreDebugCpu::m68k ? 6 : 4;
+      setStatus(tr("%1 frame-boundary breakpoint hit at %2.")
+        .arg(cpu, hexadecimal(response.breakpointHit->address, digits)));
+      requestRefresh();
+    } else {
+      setStatus(tr("Frame-boundary breakpoint list updated."), 2'000);
+    }
     return;
   }
   setStatus(tr("Debug edit applied."), 2'000);
@@ -605,6 +919,8 @@ void DebugToolsWindow::updateAllViews()
   updateVdpViews();
   updateSoundViews();
   updateInputView();
+  updateRamSearchTable();
+  updateMemoryWatches();
   updating_ = false;
 }
 
@@ -852,6 +1168,267 @@ void DebugToolsWindow::updateInputView()
       item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
     }
   }
+}
+
+void DebugToolsWindow::beginRamSearch()
+{
+  if (!snapshot_) {
+    setStatus(tr("Load a game and wait for a debug snapshot first."), 4'000);
+    return;
+  }
+  ramSearchMemoryRegion_ = static_cast<CoreDebugMemoryRegion>(
+    ramSearchRegion_->currentData().toInt());
+  ramSearchFormat_ = selectedFormat(*ramSearchSigned_);
+  const auto memory = snapshotMemory(*snapshot_, ramSearchMemoryRegion_);
+  if (!ramSearch_.begin(memory, selectedWidth(*ramSearchWidth_),
+        regionEndian(ramSearchMemoryRegion_))) {
+    setStatus(tr("The selected RAM search cannot be initialized."), 4'000);
+    return;
+  }
+  updateRamSearchTable();
+  setStatus(tr("RAM search started with %1 candidates.")
+    .arg(static_cast<qulonglong>(ramSearch_.candidates().size())), 3'000);
+}
+
+void DebugToolsWindow::filterRamSearch()
+{
+  if (!snapshot_ || !ramSearch_.active()) {
+    setStatus(tr("Start a new RAM search before filtering."), 4'000);
+    return;
+  }
+  const auto comparison = static_cast<DebugRamComparison>(
+    ramSearchComparison_->currentData().toInt());
+  std::int64_t value = 0;
+  if (comparisonUsesValue(comparison) &&
+      !parseAnalysisValue(ramSearchValue_->text(), ramSearch_.width(),
+        ramSearchFormat_, value)) {
+    setStatus(tr("The RAM search value is outside the selected type."), 4'000);
+    return;
+  }
+  if (!ramSearch_.filter(snapshotMemory(*snapshot_, ramSearchMemoryRegion_),
+        comparison, ramSearchFormat_, value)) {
+    setStatus(tr("The current snapshot cannot refine this RAM search."), 4'000);
+    return;
+  }
+  updateRamSearchTable();
+  setStatus(tr("RAM search refined to %1 candidates.")
+    .arg(static_cast<qulonglong>(ramSearch_.candidates().size())), 3'000);
+}
+
+void DebugToolsWindow::resetRamSearch()
+{
+  ramSearch_.clear();
+  updateRamSearchTable();
+}
+
+void DebugToolsWindow::updateRamSearchTable()
+{
+  constexpr std::size_t maximumDisplayedCandidates = 1'024U;
+  if (!ramSearch_.active() || !snapshot_) {
+    ramSearchCount_->setText(tr("No active search."));
+    ramSearchResults_->setRowCount(0);
+    return;
+  }
+  const auto& candidates = ramSearch_.candidates();
+  const auto displayed = std::min(candidates.size(), maximumDisplayedCandidates);
+  ramSearchCount_->setText(candidates.size() > displayed
+    ? tr("%1 candidates; showing the first %2.")
+        .arg(static_cast<qulonglong>(candidates.size()))
+        .arg(static_cast<qulonglong>(displayed))
+    : tr("%1 candidates.").arg(static_cast<qulonglong>(candidates.size())));
+  ramSearchResults_->setRowCount(static_cast<int>(displayed));
+  const auto memory = snapshotMemory(*snapshot_, ramSearchMemoryRegion_);
+  const auto base = ramSearchMemoryRegion_ == CoreDebugMemoryRegion::m68kRam
+    ? 0x00FF'0000U : 0U;
+  for (std::size_t row = 0U; row < displayed; ++row) {
+    const auto& candidate = candidates[row];
+    std::uint32_t current = 0U;
+    static_cast<void>(debugReadValue(memory, candidate.offset,
+      ramSearch_.width(), ramSearch_.endian(), current));
+    const std::array values{
+      hexadecimal(base + candidate.offset, ramSearchMemoryRegion_ ==
+        CoreDebugMemoryRegion::m68kRam ? 6 : 4),
+      analysisValue(current, ramSearch_.width(), ramSearchFormat_),
+      analysisValue(candidate.previousValue,
+        ramSearch_.width(), ramSearchFormat_),
+    };
+    for (int column = 0; column < static_cast<int>(values.size()); ++column) {
+      auto* item = itemAt(*ramSearchResults_, static_cast<int>(row), column);
+      item->setText(values[static_cast<std::size_t>(column)]);
+      item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    }
+  }
+}
+
+void DebugToolsWindow::updateSearchValueControl()
+{
+  const auto comparison = static_cast<DebugRamComparison>(
+    ramSearchComparison_->currentData().toInt());
+  ramSearchValue_->setEnabled(comparisonUsesValue(comparison));
+}
+
+void DebugToolsWindow::updateWatchAddressRange()
+{
+  const auto region = static_cast<CoreDebugMemoryRegion>(
+    watchRegion_->currentData().toInt());
+  const auto regionSize = region == CoreDebugMemoryRegion::z80Ram
+    ? 0x2000U : 0x10000U;
+  const auto bytes = static_cast<std::uint32_t>(selectedWidth(*watchWidth_));
+  watchAddress_->setMaximum(static_cast<int>(regionSize - bytes));
+}
+
+void DebugToolsWindow::addMemoryWatch()
+{
+  constexpr std::size_t maximumWatches = 256U;
+  if (watches_.size() >= maximumWatches) {
+    setStatus(tr("At most 256 RAM watches may be active."), 4'000);
+    return;
+  }
+  DebugMemoryWatch watch{
+    .region = static_cast<CoreDebugMemoryRegion>(
+      watchRegion_->currentData().toInt()),
+    .offset = static_cast<std::uint32_t>(watchAddress_->value()),
+    .width = selectedWidth(*watchWidth_),
+    .format = selectedFormat(*watchSigned_),
+  };
+  const auto duplicate = std::ranges::find_if(watches_, [&watch](const auto& item) {
+    return item.region == watch.region && item.offset == watch.offset &&
+      item.width == watch.width && item.format == watch.format;
+  });
+  if (duplicate != watches_.end()) {
+    setStatus(tr("That RAM watch already exists."), 3'000);
+    return;
+  }
+  watches_.push_back(watch);
+  updateMemoryWatches();
+}
+
+void DebugToolsWindow::removeMemoryWatch()
+{
+  auto rows = watchTable_->selectionModel()->selectedRows();
+  std::ranges::sort(rows, [](const QModelIndex& left, const QModelIndex& right) {
+    return left.row() > right.row();
+  });
+  for (const auto& index : rows) {
+    if (index.row() >= 0 &&
+        static_cast<std::size_t>(index.row()) < watches_.size()) {
+      watches_.erase(watches_.begin() + index.row());
+    }
+  }
+  updateMemoryWatches();
+}
+
+void DebugToolsWindow::updateMemoryWatches()
+{
+  watchTable_->setRowCount(static_cast<int>(watches_.size()));
+  for (std::size_t row = 0U; row < watches_.size(); ++row) {
+    auto& watch = watches_[row];
+    std::uint32_t current = 0U;
+    const bool available = snapshot_ && debugReadValue(
+      snapshotMemory(*snapshot_, watch.region), watch.offset,
+      watch.width, regionEndian(watch.region), current);
+    const bool changed = available && watch.initialized &&
+      current != watch.previousValue;
+    const auto base = watch.region == CoreDebugMemoryRegion::m68kRam
+      ? 0x00FF'0000U : 0U;
+    const std::array values{
+      analysisRegionName(watch.region),
+      hexadecimal(base + watch.offset,
+        watch.region == CoreDebugMemoryRegion::m68kRam ? 6 : 4),
+      tr("%1-bit %2")
+        .arg(static_cast<int>(watch.width) * 8)
+        .arg(watch.format == DebugValueFormat::signedInteger
+          ? tr("signed") : tr("unsigned")),
+      available ? analysisValue(current, watch.width, watch.format)
+                : tr("Unavailable"),
+      changed ? tr("Yes") : tr("No"),
+    };
+    for (int column = 0; column < static_cast<int>(values.size()); ++column) {
+      auto* item = itemAt(*watchTable_, static_cast<int>(row), column);
+      item->setText(values[static_cast<std::size_t>(column)]);
+      item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    }
+    if (available) {
+      watch.previousValue = current;
+      watch.initialized = true;
+    }
+  }
+}
+
+void DebugToolsWindow::updateBreakpointAddressRange()
+{
+  const auto cpu = static_cast<CoreDebugCpu>(
+    breakpointCpu_->currentData().toInt());
+  breakpointAddress_->setMaximum(
+    cpu == CoreDebugCpu::m68k ? 0x00FF'FFFF : 0x0000'FFFF);
+}
+
+void DebugToolsWindow::addFrameBreakpoint()
+{
+  if (frameBreakpoints_.size() >= maximumCoreDebugBreakpoints) {
+    setStatus(tr("At most 64 frame-boundary breakpoints may be active."), 4'000);
+    return;
+  }
+  const CoreDebugBreakpoint breakpoint{
+    .cpu = static_cast<CoreDebugCpu>(breakpointCpu_->currentData().toInt()),
+    .address = static_cast<std::uint32_t>(breakpointAddress_->value()),
+  };
+  if (std::ranges::find(frameBreakpoints_, breakpoint) != frameBreakpoints_.end()) {
+    setStatus(tr("That frame-boundary breakpoint already exists."), 3'000);
+    return;
+  }
+  frameBreakpoints_.push_back(breakpoint);
+  updateBreakpointTable();
+  if (!submitFrameBreakpoints()) {
+    frameBreakpoints_.pop_back();
+    updateBreakpointTable();
+  }
+}
+
+void DebugToolsWindow::removeFrameBreakpoint()
+{
+  const auto previous = frameBreakpoints_;
+  auto rows = breakpointTable_->selectionModel()->selectedRows();
+  std::ranges::sort(rows, [](const QModelIndex& left, const QModelIndex& right) {
+    return left.row() > right.row();
+  });
+  for (const auto& index : rows) {
+    if (index.row() >= 0 &&
+        static_cast<std::size_t>(index.row()) < frameBreakpoints_.size()) {
+      frameBreakpoints_.erase(frameBreakpoints_.begin() + index.row());
+    }
+  }
+  updateBreakpointTable();
+  if (!submitFrameBreakpoints()) {
+    frameBreakpoints_ = previous;
+    updateBreakpointTable();
+  }
+}
+
+void DebugToolsWindow::updateBreakpointTable()
+{
+  breakpointTable_->setRowCount(static_cast<int>(frameBreakpoints_.size()));
+  for (std::size_t row = 0U; row < frameBreakpoints_.size(); ++row) {
+    const auto& breakpoint = frameBreakpoints_[row];
+    const std::array values{
+      breakpoint.cpu == CoreDebugCpu::m68k ? tr("68000") : tr("Z80"),
+      hexadecimal(breakpoint.address,
+        breakpoint.cpu == CoreDebugCpu::m68k ? 6 : 4),
+    };
+    for (int column = 0; column < static_cast<int>(values.size()); ++column) {
+      auto* item = itemAt(*breakpointTable_, static_cast<int>(row), column);
+      item->setText(values[static_cast<std::size_t>(column)]);
+      item->setFlags(Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    }
+  }
+}
+
+bool DebugToolsWindow::submitFrameBreakpoints()
+{
+  CoreDebugRequest request;
+  request.type = CoreDebugRequestType::setFrameBreakpoints;
+  request.breakpoints = frameBreakpoints_;
+  return submit(std::move(request));
 }
 
 void DebugToolsWindow::applyM68kEdit(int row, int column)

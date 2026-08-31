@@ -1240,6 +1240,7 @@ CoreResult CoreAdapter::debugRequest(
     .offset = request.offset,
     .snapshot = {},
     .bytes = {},
+    .breakpointHit = {},
   };
   const auto region = static_cast<unsigned int>(request.region);
   constexpr auto maximumRegion = static_cast<unsigned int>(
@@ -1397,9 +1398,34 @@ CoreResult CoreAdapter::debugRequest(
           "The VDP register index is outside the 32-register file.");
       }
       return success();
+    case CoreDebugRequestType::setFrameBreakpoints:
+      return failure(CoreError::invalidDebugRequest,
+        "Frame breakpoints are owned by the emulation worker.");
   }
   return failure(
     CoreError::invalidDebugRequest, "The debug request type is invalid.");
+}
+
+CoreResult CoreAdapter::debugProgramCounters(
+  CoreDebugProgramCounters& output) const
+{
+  std::scoped_lock lock{coreMutex};
+  if (const auto owner = requireOwner(true); !owner) {
+    output = {};
+    return owner;
+  }
+  genplusgx_debug_program_counters counters{};
+  if (genplusgx_debug_get_program_counters(&counters) == 0) {
+    output = {};
+    return failure(
+      CoreError::debugUnavailable, "Core program counters are unavailable.");
+  }
+  output = {
+    .m68kActive = counters.m68k_active != 0,
+    .m68k = counters.m68k,
+    .z80 = counters.z80,
+  };
+  return success();
 }
 
 CoreLifecycleState CoreAdapter::state() const noexcept

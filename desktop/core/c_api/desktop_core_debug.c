@@ -174,6 +174,19 @@ int genplusgx_debug_capture(genplusgx_debug_snapshot *output)
   return 1;
 }
 
+int genplusgx_debug_get_program_counters(
+  genplusgx_debug_program_counters *output)
+{
+  if (output == NULL)
+  {
+    return 0;
+  }
+  output->m68k = m68k_get_reg(M68K_REG_PC);
+  output->z80 = Z80.pc.w.l;
+  output->m68k_active = (system_hw & SYSTEM_MD) != 0;
+  return 1;
+}
+
 size_t genplusgx_debug_region_size(unsigned int region)
 {
   size_t size;
