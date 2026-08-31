@@ -34,6 +34,7 @@ ctest --preset debug -L gui --output-on-failure
 | Per-game settings | Sparse overrides, nested editors, Use Global Settings, persistence failure, game-session gating | `gui.per_game_settings` |
 | Appearance/accessibility | Settings-center routing, system/light/dark themes, Apply/OK/Cancel/defaults, live summary refresh, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility`, `gui.settings` |
 | Diagnostics | Live snapshot refresh, privacy filtering, read-only report, clipboard equality, one-dialog ownership | `gui.diagnostics` |
+| Developer tools | Hidden-by-default setting/menu, CPU/RAM/VDP/sound/input/state views, paused edits, typed RAM search/watch, frame-boundary breakpoints, real 68000/Z80 worker pauses, and active SG-1000/Master System/Game Gear RAM | `unit.debug_analysis`, `core.debug_tools`, `gui.debug_tools`, `gui.debug_tools_live` |
 | Executable smoke | `--help`, `--version`, isolated full MainWindow/service startup, corrupt-settings user-visible error dispatch, persistent-path/SQLite creation, event-loop entry, and graceful shutdown | `gui.desktop_help`, `gui.desktop_version`, `gui.desktop_startup_smoke`, `gui.desktop_startup_error_smoke` |
 
 Core system coverage uses original runtime-generated Z80 programs rather than metadata

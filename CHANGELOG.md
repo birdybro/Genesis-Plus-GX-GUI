@@ -34,6 +34,10 @@ platform documentation.
 
 ### Fixed
 
+- Z80 RAM inspection, search, watch, and paused writes now target the active work RAM
+  for SG-1000, Master System/Mark III, Game Gear, and Power Base Converter sessions
+  instead of the inactive Genesis sound-CPU buffer. New sessions select their active
+  CPU/RAM automatically, and inactive 68000 RAM access fails closed.
 - Built-in and custom Libretro shader output is no longer vertically inverted by a
   redundant second texture-coordinate flip in the final presentation pass.
 - Dynamic controller-assignment and shader-parameter forms now remove complete rows,

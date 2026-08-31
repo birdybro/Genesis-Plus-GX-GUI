@@ -21,6 +21,27 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+qt_add_executable(genplusgx_debug_tools_live_test debug_tools_live_test.cpp)
+set_target_properties(genplusgx_debug_tools_live_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_debug_tools_live_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx::ui
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.debug_tools_live COMMAND genplusgx_debug_tools_live_test)
+set_tests_properties(
+  gui.debug_tools_live
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;integration;debug;fixture;concurrency;lifecycle"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_emulation_controls_test emulation_controls_test.cpp)
 set_target_properties(genplusgx_emulation_controls_test PROPERTIES AUTOMOC ON)
 target_link_libraries(

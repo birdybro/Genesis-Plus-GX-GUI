@@ -23,9 +23,13 @@ request an immediate sample.
   and alternate register sets, IX/IY, stack/program counters, interrupt state, halt
   state, and bank. Hexadecimal edits are available only while paused.
 - **Memory** reads cartridge ROM, 68000 RAM, Z80 RAM, VRAM, CRAM, VSRAM, and the raw VDP
-  register file. Reads and paused writes are bounded to 4096 bytes per request. The
-  displayed address includes the selected region's logical bus base. Persistent SRAM
-  and Sega CD backup-memory files remain protected by their normal persistence tools.
+  register file. On SG-1000, Mark III/Master System, and Game Gear software, Z80 RAM is
+  the active console work RAM rather than the Genesis sound-CPU buffer. Reads and
+  paused writes are bounded to 4096 bytes per request. The displayed address includes
+  the selected region's logical bus base. A newly loaded game selects its active CPU
+  and RAM automatically; inactive 68000 RAM access on an 8-bit system is rejected
+  instead of aliasing work RAM with the wrong byte order. Persistent SRAM and Sega CD
+  backup-memory files remain protected by their normal persistence tools.
 - **VDP** shows the 32 raw register bytes, 64-color palette, decoded tile patterns,
   sprite attribute table, Plane A/Plane B/window maps, and representative horizontal
   and vertical scroll values. VDP register edits require pause.
@@ -90,15 +94,18 @@ errors are shown in the workspace status bar and logged without frame-by-frame n
 
 ## Automated coverage
 
-The generated-ROM `core.debug_tools` regression verifies snapshots, byte order,
-transfer limits, edits, rejection while running, command serialization, and a real
-pause-on-breakpoint workflow. `unit.debug_analysis` verifies typed/endian reads and RAM
-filter semantics. The headless `gui.debug_tools` regression verifies default hiding,
-every inspection page, searches, watches, breakpoints, controls, and validated state
-routing. Run them with:
+The generated-ROM `core.debug_tools` regression verifies Genesis, SG-1000, Master
+System, and Game Gear snapshots, active CPU/RAM selection, byte order, transfer limits,
+edits, rejection while running, command serialization, and a real pause-on-breakpoint
+workflow. `unit.debug_analysis` verifies typed/endian reads and RAM filter semantics.
+The headless `gui.debug_tools` regression verifies default hiding, every inspection
+page, searches, watches, breakpoints, controls, and validated state routing.
+`gui.debug_tools_live` connects the actual workspace to the actual worker and proves
+both 68000 and Z80 generated programs pause at configured breakpoints and expose their
+written RAM. Run them with:
 
 ```bash
-ctest --preset debug -R 'debug_analysis|core.debug_tools|gui.debug_tools' --output-on-failure
+ctest --preset debug -L debug --output-on-failure
 ```
 
 No proprietary ROM, BIOS, or ROM-derived image is stored by these tests.

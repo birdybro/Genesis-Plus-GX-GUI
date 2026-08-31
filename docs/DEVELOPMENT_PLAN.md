@@ -81,10 +81,11 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 67 Cross-platform shader evidence | COMPLETE | Close the shader feature against exact native logs and distributable artifacts | final report and milestone ledger | ten-job exact CI; six checksums; four architectures; real XCB archive launch | Shader behavior and package closure are traceable on every supported host | pending |
 | 68 Native Wayland presentation | COMPLETE | Fix valid accelerated frames compositing as black on native Wayland | pre-application OpenGL surface setup, render regression, docs | Phantasy Star IV native Wayland captures; 77-test Release/Debug/ASan suites | Normal and CRT-filtered frames reach the Wayland compositor without changing core output | pending |
 | 69 Full option regression | COMPLETE | Fix shader orientation and exercise every exposed option domain | final presentation pass, exhaustive core/UI matrices, external-ROM runner, docs | synthetic full suites plus 113-case Phantasy Star IV native-Wayland acceptance | Shader output remains upright; video/audio/input/system options have explicit bounded runtime coverage | pending |
-| 70 Debug inspection API | COMPLETE | Add thread-owned CPU, memory, VDP, sound, and input snapshots plus safe edits | core debug bridge, adapter/worker protocol, tests/docs | generated-ROM snapshot, byte-order, write-bound and concurrency tests | No GUI thread accesses core globals; all transfers remain bounded | pending |
-| 71 Hidden debug workspace | COMPLETE | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | pending |
-| 72 Debug analysis tools | COMPLETE | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | pending |
-| 73 Debug hardening | PLANNED | Exercise debugger workflows with synthetic and supplied external ROMs across all gates | real-ROM acceptance, stress/sanitizer/CI/docs | clean Debug/Release/ASan, external acceptance, hosted matrix | Debug mode does not alter normal emulation and native logs are clean | pending |
+| 70 Debug inspection API | COMPLETE | Add thread-owned CPU, memory, VDP, sound, and input snapshots plus safe edits | core debug bridge, adapter/worker protocol, tests/docs | generated-ROM snapshot, byte-order, write-bound and concurrency tests | No GUI thread accesses core globals; all transfers remain bounded | `038fe623` |
+| 71 Hidden debug workspace | COMPLETE | Add the opt-in debugger shell and every inspection view | versioned developer setting, Qt debug window/views, tests/docs | persistence and headless GUI behavior tests | Debug UI is hidden by default, complete, accessible, and backed by live data | `a219e906` |
+| 72 Debug analysis tools | COMPLETE | Add RAM search/watch, CPU breakpoints, visual explorers, and state controls | debugger models/UI, worker run control, tests/docs | model, GUI, and live workflow tests | Tools are deterministic and edits/run control cannot race emulation | `4182de0a` |
+| 73 Debug hardening | COMPLETE | Exercise debugger workflows across generated 68000/Z80 systems and every local quality gate | active 8-bit RAM bridge, live GUI/worker tests, stress/sanitizer/docs | clean Debug/Release/ASan, native GUI, adversarial review | Debug mode does not alter normal emulation and native logs are clean | pending |
+| 74 Debug hosted evidence | PLANNED | Audit exact-commit Linux, Windows, and macOS builds, tests, and packages | CI evidence and final report | all ten hosted jobs and complete logs | No cross-platform warning, failure, sanitizer issue, or packaging regression | pending |
 
 ## Execution policy
 
@@ -3866,6 +3867,52 @@ byte order; all candidate/display/watch/breakpoint collections have explicit cap
 breakpoint requests are serialized and validated on the owner thread; normal play has
 no program-counter sampling when the list is empty; a match pauses at a documented
 frame boundary; and the UI does not claim unsupported instruction stepping.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 73 detail
+
+**Status:** COMPLETE
+
+**Goal:** Drive the native debugger through its real GUI/worker/core chain, cover both
+CPU families and all 8-bit work-RAM selections, and subject the result to the same
+warning, sanitizer, lifecycle, and native-display gates as normal emulation.
+
+**Files changed:**
+
+- active-system RAM selection in `desktop/core/c_api/desktop_core_debug.c`
+- expanded generated-system assertions in `tests/core/core_debug_test.cpp`
+- `tests/gui/debug_tools_live_test.cpp` and GUI test registration
+- debugger architecture, testing, user, changelog, and milestone documentation
+
+**Tests added:** `gui.debug_tools_live` connects `DebugToolsWindow` directly to an
+`EmulationWorker`, loads legal generated Genesis and Master System programs, installs
+breakpoints through the actual widgets, resumes through the real control sink, observes
+typed pause-on-hit events, and confirms the programs' RAM writes through refreshed live
+snapshots. The core regression now additionally executes SG-1000, Master System, and
+Game Gear programs and verifies that the Z80 memory region selects their active work
+RAM with read/write semantics; this caught and corrected an initial inactive-buffer
+mapping before the test was accepted. A subsequent adversarial pass also made inactive
+68000 RAM fail closed on those systems and verified that new GUI sessions select their
+active CPU/RAM controls automatically.
+
+**Gate evidence:** Warning-gated clean Debug and Release builds each pass all 81 tests.
+The clean ASan/UBSan build also passes 81/81 with leak detection enabled and no finding,
+including the live debugger, real OpenGL shader, and accelerated 20,000-frame stability
+tests. The shader-disabled build passes its complete 79/79 suite. The live debugger
+passes both CPU workflows on the host's native Wayland backend as well as headlessly.
+The Linux package was regenerated, its runtime/resource closure verified, and its
+installed `--version` process exercised. Adversarial searches found no unfinished debug
+production marker, disabled debug test, unbounded debug collection, or direct GUI/core
+access. The supplied external ROM mount is not currently populated on this host, so no
+ROM-derived output is required or claimed; the deterministic generated fixtures
+exercise the same production adapter and worker.
+
+**Acceptance criteria:** The real GUI and worker pause on both CPU families; every
+supported 8-bit family exposes active RAM; all debug transfers and collections remain
+bounded; the hidden/closed debugger adds no normal-play sampling; complete local gates
+pass without warning or sanitizer finding; and the tree contains no ROM-derived data.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

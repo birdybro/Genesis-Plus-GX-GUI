@@ -39,14 +39,17 @@ presentation force the deterministic software display path. Native widget chrome
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
 window layer.
 
-`core.debug_tools` loads the generated CC0 Genesis fixture and verifies owner-thread
-snapshots, logical byte order, immutable publication, bounded reads/writes, paused-only
-mutation, worker serialization, oversized-command rejection, and a live frame-boundary
-breakpoint hit. `unit.debug_analysis` checks endian-aware typed reads, signed values,
-candidate bounds, and exact/change filters. `gui.debug_tools` verifies that the developer
-menu is opt-in and drives the real CPU, memory, VDP, sound, input, search, watch,
-breakpoint, control, and state surfaces using typed responses. Neither test reads a
-commercial ROM or the user's settings.
+`core.debug_tools` loads generated CC0 Genesis, SG-1000, Master System, and Game Gear
+fixtures and verifies owner-thread snapshots, the active CPU/RAM backing store, logical
+byte order, immutable publication, bounded reads/writes, paused-only mutation, worker
+serialization, oversized-command rejection, and a live frame-boundary breakpoint hit.
+`unit.debug_analysis` checks endian-aware typed reads, signed values, candidate bounds,
+and exact/change filters. `gui.debug_tools` verifies that the developer menu is opt-in
+and drives every CPU, memory, VDP, sound, input, search, watch, breakpoint, control, and
+state surface using typed responses. `gui.debug_tools_live` wires that GUI to the real
+emulation worker and executes both generated 68000 and Z80 programs through actual
+breakpoint pause and RAM-inspection workflows. None of these tests reads a commercial
+ROM or the user's settings.
 
 `gui.libretro_shader_render` intentionally uses a real OpenGL context. Linux CI installs
 Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1`, so

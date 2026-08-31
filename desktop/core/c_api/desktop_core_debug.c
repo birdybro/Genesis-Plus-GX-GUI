@@ -7,6 +7,11 @@
 extern uint8 genplusgx_debug_fm_registers[2][0x100];
 extern const int *genplusgx_debug_psg_registers(void);
 
+static int genesis_hardware(void)
+{
+  return (system_hw & SYSTEM_PBC) == SYSTEM_MD;
+}
+
 static uint8 logical_byte(const uint8 *data, uint32_t offset, int word_swapped)
 {
 #ifdef LSB_FIRST
@@ -54,12 +59,17 @@ static uint8 *region_data(unsigned int region, size_t *size, int *word_swapped)
       *word_swapped = 1;
       return cart.rom;
     case GENPLUSGX_DEBUG_M68K_RAM:
+      if (!genesis_hardware())
+      {
+        *size = 0;
+        return NULL;
+      }
       *size = sizeof(work_ram);
       *word_swapped = 1;
       return work_ram;
     case GENPLUSGX_DEBUG_Z80_RAM:
       *size = sizeof(zram);
-      return zram;
+      return genesis_hardware() ? zram : work_ram;
     case GENPLUSGX_DEBUG_VRAM:
       *size = sizeof(vram);
       *word_swapped = 1;
@@ -126,11 +136,14 @@ int genplusgx_debug_capture(genplusgx_debug_snapshot *output)
     return 0;
   }
   memset(output, 0, sizeof(*output));
-  capture_m68k(&output->m68k);
+  if (genesis_hardware())
+  {
+    capture_m68k(&output->m68k);
+  }
   capture_z80(&output->z80);
   output->hardware = system_hw;
   output->rom_size = cart.romsize;
-  output->m68k_active = (system_hw & SYSTEM_MD) != 0;
+  output->m68k_active = genesis_hardware();
   memcpy(output->vdp_registers, reg, sizeof(reg));
   output->vdp_status = status;
   output->dma_length = dma_length;
@@ -166,11 +179,15 @@ int genplusgx_debug_capture(genplusgx_debug_snapshot *output)
     output->input_analog[index][0] = input.analog[index][0];
     output->input_analog[index][1] = input.analog[index][1];
   }
-  for (index = 0; index < sizeof(output->m68k_ram); ++index)
+  if (genesis_hardware())
   {
-    output->m68k_ram[index] = logical_byte(work_ram, (uint32_t)index, 1);
+    for (index = 0; index < sizeof(output->m68k_ram); ++index)
+    {
+      output->m68k_ram[index] = logical_byte(work_ram, (uint32_t)index, 1);
+    }
   }
-  memcpy(output->z80_ram, zram, sizeof(output->z80_ram));
+  memcpy(output->z80_ram,
+    genesis_hardware() ? zram : work_ram, sizeof(output->z80_ram));
   return 1;
 }
 
@@ -183,7 +200,7 @@ int genplusgx_debug_get_program_counters(
   }
   output->m68k = m68k_get_reg(M68K_REG_PC);
   output->z80 = Z80.pc.w.l;
-  output->m68k_active = (system_hw & SYSTEM_MD) != 0;
+  output->m68k_active = genesis_hardware();
   return 1;
 }
 

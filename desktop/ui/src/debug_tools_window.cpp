@@ -837,7 +837,25 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
   if (response.type == CoreDebugRequestType::captureSnapshot) {
     snapshotPending_ = false;
     if (response.snapshot) {
-      snapshot_ = std::move(response.snapshot);
+      const bool firstSnapshot = !snapshot_;
+      auto nextSnapshot = std::move(response.snapshot);
+      if (firstSnapshot) {
+        const auto activeRam = nextSnapshot->m68kActive
+          ? CoreDebugMemoryRegion::m68kRam : CoreDebugMemoryRegion::z80Ram;
+        const auto activeCpu = nextSnapshot->m68kActive
+          ? CoreDebugCpu::m68k : CoreDebugCpu::z80;
+        const auto selectData = [](QComboBox& combo, int itemData) {
+          const auto index = combo.findData(itemData);
+          if (index >= 0) {
+            combo.setCurrentIndex(index);
+          }
+        };
+        selectData(*memoryRegion_, static_cast<int>(activeRam));
+        selectData(*ramSearchRegion_, static_cast<int>(activeRam));
+        selectData(*watchRegion_, static_cast<int>(activeRam));
+        selectData(*breakpointCpu_, static_cast<int>(activeCpu));
+      }
+      snapshot_ = std::move(nextSnapshot);
       updateAllViews();
       setStatus(tr("Frame %1 • %2 • edits %3")
         .arg(static_cast<qulonglong>(snapshot_->frameNumber))

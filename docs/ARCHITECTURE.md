@@ -181,8 +181,11 @@ Save-state buttons deliberately route through the normal asynchronous state mana
 retaining game identity, checksum, atomic-write, and wrong-game protections.
 
 RAM search is pure frontend analysis over the immutable 64 KiB 68000 and 8 KiB Z80
-copies. Candidate storage is capped at 65,536, watches at 256, displayed candidates at
-1,024, and breakpoint configuration at 64. Frame breakpoints live only on the worker.
+copies. The Z80 copy selects the Genesis sound-CPU RAM for Genesis/Sega CD hardware and
+the active work RAM for SG-1000, Master System/Mark III, Game Gear, and Power Base
+Converter sessions. Candidate storage is capped at 65,536, watches at 256, displayed
+candidates at 1,024, and breakpoint configuration at 64. Frame breakpoints live only
+on the worker.
 When the list is nonempty, one lightweight C-host call samples both program counters
 after a complete frame; a match pauses pacing and emits a typed hit event. There is no
 CPU instruction hook, no GUI-side core access, and no normal-play per-frame cost while

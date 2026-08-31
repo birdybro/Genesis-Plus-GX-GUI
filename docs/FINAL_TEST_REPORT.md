@@ -2,7 +2,7 @@
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader
-feature verification through 2026-08-27 (America/Denver).
+and debugger verification through 2026-08-31 (America/Denver).
 
 ## Candidate identity
 
@@ -61,17 +61,27 @@ ASan/UBSan builds plus 75/75 with shader support disabled. The same 113-case nat
 Wayland workload passes with ASan/UBSan address and undefined-behavior instrumentation;
 the required real-context shader test supplies the leak-detecting GPU gate.
 
+The opt-in debugger is hidden for new and migrated configurations and sends every
+request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,
+sound, and input snapshots; paused edits; validated states; typed RAM search/watch; and
+68000/Z80 frame-boundary breakpoints. A live GUI/worker regression executes generated
+Genesis and Master System programs, installs breakpoints through the widgets, observes
+real worker pauses, and reads their written RAM. Core coverage additionally executes
+SG-1000 and Game Gear programs. That coverage found and fixed the 8-bit Z80 RAM view
+initially selecting the inactive Genesis sound-CPU buffer instead of console work RAM.
+
 ## Build configurations tested
 
-Every local configuration was rebuilt with `--clean-first`. Newly authored frontend
-code produced no compiler warning.
+The primary Debug, Release, and sanitizer configurations were rebuilt with
+`--clean-first`; the shader-disabled graph was reconfigured and rebuilt. Newly authored
+frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 77/77 | Passed |
-| Release | Optimized native x86-64 | 77/77 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 77/77 | Passed; no project finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 75/75 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 81/81 | Passed |
+| Release | Optimized native x86-64 | 81/81 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 81/81 | Passed; no project finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 79/79 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -81,20 +91,20 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-The default shader-enabled build registers 77 distinct tests:
+The default shader-enabled build registers 81 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
-| Core | 18 |
+| Core | 19 |
 | Integration | 1 |
-| Unit | 31 |
-| GUI/smoke | 19 |
-| **Total** | **77** |
+| Unit | 32 |
+| GUI/smoke | 21 |
+| **Total** | **81** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 49 `unit`, 19 `core`, 29 `integration`, and 19 `gui`. Focused
-coverage also includes persistence (24), fixtures (22), concurrency (13), settings
+layers. Label counts are 51 `unit`, 20 `core`, 32 `integration`, and 21 `gui`. Focused
+coverage also includes persistence (24), fixtures (24), concurrency (15), settings
 (12), input (9), video (8), audio (5), timing (4), release (4), fuzz/property (3),
 shader (2), and packaging (3).
 
@@ -113,6 +123,8 @@ system values. UI inventory checks require every corresponding choice, range, an
 29 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
 mute/volume/device/latency, keyboard/controller event paths, persistence, states,
 library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
+Four debugger-labeled tests cover the analysis model, core/worker bridge, semantic GUI,
+and live GUI/worker/core workflow; the latter runs both CPU families.
 
 Exact option-regression CI run
 [`33125797973`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33125797973)
@@ -283,6 +295,8 @@ correction; the sanitizer suite reports no finding.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,
   sparse per-game overrides, themes, accessibility, metadata, cheats, diagnostics, and
   privacy-filtered structured logs.
+- [x] Hidden-by-default native debugger with CPU/RAM/VDP/sound/input inspection, paused
+  edits, RAM search/watch, validated states, and bounded frame-boundary breakpoints.
 - [x] Recoverable asynchronous SQLite game library with scanning, CUE-owned track
   suppression, search/filter/sort, favorites, play history, launch, and user-provided
   local artwork.
@@ -323,6 +337,10 @@ directories.
   fetched. Real Sega CD boot testing needs a user-supplied regional BIOS and is an
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
+- The previously supplied external-ROM mount was present but unpopulated during the
+  debugger hardening run, so that optional workload was not repeated. The required live
+  debugger test uses legal generated 68000 and Z80 programs through the same production
+  GUI/worker/core route; earlier real-ROM option acceptance remains recorded above.
 - Controller and audio hot-plug behavior is deterministically tested with injected SDL
   events and the SDL dummy audio driver. Maintainers should still smoke-test target
   hardware and vendor drivers before a public release.
@@ -332,8 +350,9 @@ directories.
   CI distribution's base graphics, window-system, C/C++ runtime, and libc libraries.
 - Archive formats are offered only when the authoritative core/build loader supports
   them; this build does not claim ZIP loading. Physical optical drives, netplay,
-  achievements, cloud sync, online scraping/downloading, TAS/debugger tooling, and
-  streaming remain intentionally outside scope.
+  achievements, cloud sync, online scraping/downloading, instruction-level stepping,
+  an external debugger server, TAS tooling, and streaming remain intentionally outside
+  scope.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.

@@ -4,6 +4,7 @@
 
 #include <chrono>
 #include <cstdint>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <thread>
@@ -72,6 +73,15 @@ int main()
 {
   const genplusgx::test::TemporaryFixture fixture{
     genplusgx::test::makeGenesisRamMarkerRom(), ".bin"};
+  constexpr std::uint8_t z80Marker = 0xA7U;
+  const genplusgx::test::TemporaryFixture z80Fixture{
+    genplusgx::test::makeZ80RamMarkerRom(z80Marker), ".sms"};
+  constexpr std::uint8_t sgMarker = 0xB6U;
+  const genplusgx::test::TemporaryFixture sgFixture{
+    genplusgx::test::makeZ80RamMarkerRom(sgMarker), ".sg"};
+  constexpr std::uint8_t ggMarker = 0xC5U;
+  const genplusgx::test::TemporaryFixture ggFixture{
+    genplusgx::test::makeZ80RamMarkerRom(ggMarker), ".gg"};
   genplusgx::CoreAdapter adapter;
   genplusgx::CoreDebugResponse response;
 
@@ -180,6 +190,57 @@ int main()
     return 6;
   }
 
+  genplusgx::CoreDebugRequest readZ80Ram;
+  readZ80Ram.type = genplusgx::CoreDebugRequestType::readMemory;
+  readZ80Ram.region = genplusgx::CoreDebugMemoryRegion::z80Ram;
+  readZ80Ram.offset = 0U;
+  readZ80Ram.size = 1U;
+  genplusgx::CoreDebugRequest writeZ80Ram;
+  writeZ80Ram.type = genplusgx::CoreDebugRequestType::writeMemory;
+  writeZ80Ram.region = genplusgx::CoreDebugMemoryRegion::z80Ram;
+  writeZ80Ram.offset = 1U;
+  writeZ80Ram.bytes = {0x3CU};
+  auto inactiveM68kRead = readZ80Ram;
+  inactiveM68kRead.region = genplusgx::CoreDebugMemoryRegion::m68kRam;
+  if (!check(adapter.unloadGame(), "Genesis fixture unload failed") ||
+      !check(adapter.loadGame(z80Fixture.path()), "Z80 fixture load failed") ||
+      !check(adapter.runFrame(true), "Z80 fixture execution failed") ||
+      !check(adapter.debugRequest(capture, response),
+        "Z80 debug snapshot failed") ||
+      !check(response.snapshot && !response.snapshot->m68kActive &&
+          response.snapshot->z80.programCounter == 0x0009U &&
+          response.snapshot->z80Ram[0] == z80Marker &&
+          response.snapshot->m68kRam[0] == 0U,
+        "The active 8-bit system RAM or CPU identity was not captured") ||
+      !check(adapter.debugRequest(inactiveM68kRead, response).error ==
+          genplusgx::CoreError::invalidDebugRequest,
+        "An inactive 68000 RAM region aliased the 8-bit system RAM") ||
+      !check(adapter.debugRequest(readZ80Ram, response) &&
+          response.bytes == std::vector<std::uint8_t>({z80Marker}),
+        "The active 8-bit system RAM was not exposed through Z80 RAM") ||
+      !check(adapter.debugRequest(writeZ80Ram, response),
+        "The active 8-bit system RAM write failed") ||
+      !check(adapter.debugRequest(capture, response) && response.snapshot &&
+          response.snapshot->z80Ram[1] == 0x3CU,
+        "The active 8-bit system RAM write was not reflected in a snapshot")) {
+    return 7;
+  }
+
+  const auto verifyEightBitDebugMemory = [&adapter, &capture, &response](
+    const std::filesystem::path& path, std::uint8_t marker) {
+    return adapter.unloadGame() && adapter.loadGame(path) &&
+      adapter.runFrame(true) && adapter.debugRequest(capture, response) &&
+      response.snapshot && !response.snapshot->m68kActive &&
+      response.snapshot->z80.programCounter == 0x0009U &&
+      response.snapshot->z80Ram[0] == marker;
+  };
+  if (!check(verifyEightBitDebugMemory(sgFixture.path(), sgMarker),
+        "SG-1000 debug memory did not use its active Z80 work RAM") ||
+      !check(verifyEightBitDebugMemory(ggFixture.path(), ggMarker),
+        "Game Gear debug memory did not use its active Z80 work RAM")) {
+    return 8;
+  }
+
   genplusgx::CoreResult wrongThreadResult;
   std::thread wrongThread{[&] {
     genplusgx::CoreDebugResponse crossThreadResponse;
@@ -189,7 +250,7 @@ int main()
   if (!check(wrongThreadResult.error == genplusgx::CoreError::wrongThread,
         "A foreign thread read core debug globals") ||
       !check(adapter.shutdown(), "Core shutdown failed")) {
-    return 7;
+    return 9;
   }
 
   genplusgx::EmulationWorker worker;
@@ -231,7 +292,7 @@ int main()
             genplusgx::EmulationCommandType::pause, 15U), event) &&
           event.succeeded(),
         "Worker did not pause before breakpoint configuration")) {
-    return 8;
+    return 10;
   }
 
   genplusgx::CoreDebugRequest breakpoints;
@@ -251,7 +312,7 @@ int main()
             genplusgx::EmulationCommandType::resume, 17U), event) &&
           event.succeeded(),
         "Worker did not resume for breakpoint test")) {
-    return 9;
+    return 11;
   }
   auto breakpoint = waitForBreakpoint(worker);
   if (!check(breakpoint.has_value() && breakpoint->debug.breakpointHit.has_value(),
@@ -264,7 +325,7 @@ int main()
       !check(worker.state() == genplusgx::EmulationWorkerState::paused,
         "Worker continued after a breakpoint hit") ||
       !check(worker.stop(), "Worker shutdown failed")) {
-    return 10;
+    return 12;
   }
 
   const auto regions = genplusgx::coreDebugMemoryRegions(0x1234U);
@@ -273,5 +334,5 @@ int main()
         genplusgx::coreDebugCramColor(0x01FFU) == 0xFFFFFFFFU,
       "Debug region metadata or CRAM color conversion is incorrect")
     ? 0
-    : 11;
+    : 13;
 }
