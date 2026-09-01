@@ -99,7 +99,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
-| 88 Overlays and bezels | IN PROGRESS | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
+| 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
@@ -3929,7 +3929,7 @@ hosted regression passes.
 
 ## Milestone 88 detail
 
-**Status:** IN PROGRESS — HOSTED IMPLEMENTATION GATE
+**Status:** COMPLETE
 
 **Goal:** Add safe local bezel and foreground-overlay composition without allowing
 artwork to alter core output, infer input geometry, allocate per frame, or introduce an
@@ -3966,8 +3966,33 @@ manifest verify, and the strict Unix libretro target builds, links as x86-64 ELF
 cleans without a diagnostic. The user-provided `/mnt/qnapraid` mount is not present in
 the current host session, so the optional Phantasy Star IV runner cannot be repeated;
 the same runner source carries the 108-case artwork matrix and required tests use legal
-generated frames. Exact hosted CI, complete-log inspection, and native artifact audit
-remain pending before this status can become COMPLETE.
+generated frames.
+
+Initial exact run
+[`33532258126`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33532258126)
+then exposed one Windows-only test-fixture defect: `/absolute/bezel.png` is absolute on
+Unix but correctly rejected by the production validator on Windows. Debug and Release
+both failed only `unit.artwork`; every other executed Windows test and every completed
+Linux/macOS job passed. The fixture now obtains a native absolute path from
+`QTemporaryDir`, and all six complete local graphs passed again before the correction
+was pushed.
+
+Exact corrective run
+[`33533895912`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33533895912)
+passes all ten jobs against `1698eaa49b7ac362bb31d615b0dcee5a51d04220`.
+Each of the nine CMake configurations registers 100 tests. Linux and both macOS
+architectures pass all 100 and execute the real 108-case OpenGL artwork matrix;
+Windows passes every supported test and capability-skips only the established real
+OpenGL test on its hosted software renderer. Linux ASan/UBSan and the strict legacy
+build/link/clean pass.
+
+All 14,782 complete hosted log lines (1,978,858 bytes) were inspected. No workflow
+annotation, authored compiler/linker warning, sanitizer finding, runtime error,
+timeout, failed test, or unexpected skip remains. All six checksums, four extracted
+package layouts, archive/DMG integrity and safe paths, application/runtime
+architectures, DMG contents, the installed artwork guide, 22 Linux ELF dependency
+graphs, downloaded CLI/offscreen/real-XCB OpenGL startup and clean shutdown, and the
+prohibited game/firmware/save/patch/playlist/artwork/secret payload scan pass.
 
 **Acceptance criteria:** Off is the migration/default state; bezel draws behind and
 alpha overlay draws in front with identical upright OpenGL/software semantics; decoded
@@ -3975,7 +4000,8 @@ files and dimensions are bounded and cached; explicit apertures never silently c
 input/core geometry; failed transactions retain working video; global/per-game settings,
 menus, diagnostics, docs, packages, and tests agree; and all local/hosted gates pass.
 
-**Commit SHA:** pending
+**Commit SHA:** implementation `632cfbcbb62303b206f01922fb4d58a94cbefc9b`;
+Windows test-path correction `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
 
 ## Milestone 83 detail
 

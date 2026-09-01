@@ -36,9 +36,10 @@ synchronization, and local bezel/overlay verification through 2026-09-01
   `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
 - Exact display-synchronization implementation and hosted evidence baseline:
   `b84af114bef3b087978b0c269268ed1b59358213`
-- Local bezel/overlay implementation under test: the current commit containing this
-  report; use `git log -1 -- docs/FINAL_TEST_REPORT.md` until hosted closure records an
-  exact implementation SHA
+- Exact local bezel/overlay implementation baseline:
+  `632cfbcbb62303b206f01922fb4d58a94cbefc9b`
+- Exact cross-platform artwork test-path correction and hosted evidence baseline:
+  `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -795,10 +796,29 @@ inverted composition. Offscreen tests sample real software-rendered pixels and c
 quick actions, the settings editor, injected file selection, rejected transactions,
 schema-3 migration, sparse per-game persistence, diagnostics, alpha/format validation,
 fully opaque overlay rejection, bounded decode, and overflow-safe aperture math. A
-fresh staged Linux install and TGZ,
-package verifier, checksum, installed guide, and strict legacy libretro build/link/clean
-also pass. Exact hosted cross-platform logs and native artifacts remain the final gate
-before this milestone is marked complete.
+fresh staged Linux install and TGZ, package verifier, checksum, installed guide, and
+strict legacy libretro build/link/clean also pass.
+
+Initial hosted run
+[`33532258126`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33532258126)
+found that the unit test's Unix literal `/absolute/bezel.png` was not an absolute
+Windows path. The production validator behaved correctly; both Windows configurations
+failed only that assertion while every other executed test passed. The test now uses a
+native `QTemporaryDir` absolute path. Corrective run
+[`33533895912`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33533895912)
+passes all ten jobs against `1698eaa49b7ac362bb31d615b0dcee5a51d04220`.
+All nine CMake configurations register 100 tests. Seven Linux/macOS configurations
+execute the real OpenGL matrix; Windows passes every supported test and capability-
+skips only that known OpenGL 3.3 test. Linux ASan/UBSan and the strict legacy gate pass.
+
+All 14,782 hosted log lines (1,978,858 bytes) were inspected. No actionable compiler,
+linker, CMake, sanitizer, test, runtime, or packaging diagnostic remains. Downloaded
+artifacts are Linux x86-64 40,191,419 bytes, Windows x86-64 52,682,836 bytes, macOS
+arm64 ZIP/DMG 32,095,990/32,033,381 bytes, and macOS x86_64 ZIP/DMG
+32,923,314/32,850,724 bytes. All six checksums, archive/DMG integrity and safe paths,
+four package layouts, application/runtime architectures, DMG contents, the artwork
+guide, 22 Linux ELF dependency graphs, downloaded Linux CLI/offscreen/real-XCB OpenGL
+startup and clean shutdown, and prohibited-payload scans pass.
 
 ## Final feature checklist
 
