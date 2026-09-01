@@ -36,9 +36,15 @@ int main(int argc, char** argv)
   QCoreApplication application(argc, argv);
   using namespace genplusgx::video;
 
+  QTemporaryDir directory;
+  if (!check(directory.isValid(),
+        "Temporary artwork directory is unavailable")) {
+    return 1;
+  }
+
   ArtworkConfiguration bezel{
     .mode = ArtworkMode::bezel,
-    .imagePath = std::filesystem::path{"/absolute/bezel.png"},
+    .imagePath = fixturePath(directory, "bezel.png"),
     .opacityPercent = 65U,
     .constrainVideoToViewport = true,
     .viewportInsets = {
@@ -89,11 +95,6 @@ int main(int argc, char** argv)
     return 4;
   }
 
-  QTemporaryDir directory;
-  if (!check(directory.isValid(),
-        "Temporary artwork directory is unavailable")) {
-    return 5;
-  }
   const auto overlayPath = fixturePath(directory, "overlay.png");
   QImage overlay(16, 12, QImage::Format_ARGB32);
   overlay.fill(QColor{0, 0, 0, 0});
