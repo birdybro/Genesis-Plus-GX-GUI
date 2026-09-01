@@ -146,8 +146,16 @@ portable documentation, and prohibited-payload scanning. The actual extracted bi
 starts and stops through native XCB in portable mode, creates exactly the eight
 documented data directories plus its SQLite database and structured log, and records
 the Portable mode. The archive itself contains no `portable-data` entry. Exact hosted
-Linux, Windows, Apple Silicon, and Intel macOS evidence is added after the pushed
-implementation run completes.
+run
+[`33552490344`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33552490344)
+passes the legacy job plus Linux Debug, Windows Debug/Release, and Apple Silicon/Intel
+Debug/Release, including every installed-package portable startup. The Linux sanitizer
+job passes 101/102 with no ASan/UBSan finding; only the unchanged 108-case software-
+OpenGL matrix reaches its old 30-second per-test timeout under hosted instrumentation.
+The complete matrix remains required, with a sanitizer-only 90-second allowance.
+Five consecutive focused local sanitizer runs and the complete 102-test ASan/UBSan
+graph pass after that correction. Exact corrected hosted and artifact/log evidence is
+added after the pushed correction run completes.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,

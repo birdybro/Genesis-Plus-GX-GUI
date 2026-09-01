@@ -4106,8 +4106,20 @@ and extracted TGZ pass package verification, checksum and safe-path inspection, 
 ELF dependency graphs, prohibited-payload scanning, installed documentation checks,
 and a real native-XCB portable event-loop startup/shutdown using the packaged
 executable. The resulting archive contains no pre-created `portable-data` entry.
-Cross-platform completion requires the exact pushed implementation CI and artifact/log
-audit; its traceable evidence is recorded in the closure commit after that run passes.
+Initial exact run
+[`33552490344`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33552490344)
+against `538eedb8b4be7aa305ffbaca3091044a6870be3a` passed the legacy gate and eight
+of nine native configurations. All 102 tests, including both portable process tests,
+passed on Linux Debug, Windows Debug/Release, and both macOS architectures in
+Debug/Release; every Release package also completed its new native portable startup
+before artifact creation. Linux ASan/UBSan passed 101 tests and reported no sanitizer
+finding, but its complete 108-case software-OpenGL matrix reached the old 30-second
+test timeout after initializing several cases. The full matrix remains enabled; only
+its sanitizer timeout is now 90 seconds to accommodate instrumentation and shared-runner
+software rendering. Five consecutive focused ASan/UBSan matrix runs and the complete
+102-test local sanitizer graph pass after that correction. Cross-platform completion
+requires the exact corrected CI and artifact/log audit; its traceable evidence is
+recorded in the closure commit after that run passes.
 
 **Acceptance criteria:** Portable selection is explicit per process; placement is
 executable-relative and independent of the working directory; macOS data remains

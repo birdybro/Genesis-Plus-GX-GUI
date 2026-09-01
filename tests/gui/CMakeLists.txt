@@ -501,6 +501,10 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     )
   endif()
   if(GENPLUSGX_ENABLE_SANITIZERS)
+    # The complete 108-case artwork/presentation matrix runs through Mesa's
+    # software OpenGL path in hosted CI. Keep the full matrix under ASan/UBSan,
+    # but allow for sanitizer and shared-runner instrumentation overhead.
+    set_property(TEST gui.libretro_shader_render PROPERTY TIMEOUT 90)
     set_property(
       TEST gui.libretro_shader_render
       APPEND PROPERTY ENVIRONMENT
