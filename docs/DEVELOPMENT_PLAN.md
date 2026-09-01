@@ -97,7 +97,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
-| 86 Run-ahead | IN PROGRESS | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | determinism, audio/input/recording, lifecycle/stress, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
+| 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
@@ -3785,8 +3785,7 @@ cannot contain its own SHA)
 
 ## Milestone 86 detail
 
-**Status:** IN PROGRESS (implementation and local gates; hosted exact-commit gate
-required before completion)
+**Status:** COMPLETE
 
 **Goal:** Add optional latency-reducing run-ahead for cartridge systems without
 allowing speculative execution to alter authoritative state, input, audio, persistence,
@@ -3821,8 +3820,39 @@ The adversarial pre-commit review found that pad multitaps also require the priv
 Player protocol counter; the rollback context and direct save/mutate/restore test now
 cover it. The supplied NAS path is currently mounted without files, so the optional
 Phantasy Star IV acceptance runner is unavailable; required generated programs exercise
-the same worker/core path. Exact hosted CI, full-log, and artifact evidence remain
-required before the milestone changes to COMPLETE.
+the same worker/core path.
+
+The first exact hosted attempt,
+[`33516570708`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33516570708),
+correctly stopped the milestone after the existing timing integration test failed on
+macOS arm64 Debug and macOS x86-64 Debug/Release. Every run-ahead test passed; the
+failure was a contradictory test-only gate that accepted 30 normal-speed frames in
+400--800 ms (37.5--75 fps) and then independently rejected the accepted 750--800 ms
+range below 40 fps. One consistent elapsed-time gate now retains the intended gross
+cadence protection without a platform-load-dependent contradiction. The corrected
+executable passed 60 consecutive local timing runs before every full local matrix was
+rerun.
+
+Exact corrective run
+[`33518798577`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33518798577)
+passes all ten jobs against `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`. Each of
+the nine native configurations registers and completes 98 tests. Linux Debug/Release,
+Linux ASan/UBSan, and macOS arm64/x86-64 Debug/Release pass 98/98; Windows Debug/Release
+pass every supported test and capability-skip only the established real-OpenGL shader
+test. The strict legacy target builds, links, and cleans. The complete 14,694-line,
+1,960,355-byte log contains no workflow annotation, authored compiler/linker warning,
+sanitizer finding, runtime error, timeout, failed test, or unexpected skip. Normal
+Windows pthread probes, absent optional Vulkan headers, checkout hints, and fail-closed
+script source text are non-actionable.
+
+All four artifacts and six package checksum manifests pass. The application and
+librashader binaries identify as Linux ELF x86-64, Windows PE32+ x86-64, macOS Mach-O
+arm64, and macOS Mach-O x86-64; both DMGs and every archive pass structural and unsafe-
+path checks. Required Qt, SDL3, SQLite, librashader, CRT assets, run-ahead documentation,
+licenses, and the Windows redistributable are present. All 22 Linux ELF objects resolve,
+packaged help/version and a real XCB/OpenGL 3.3 event-loop startup/shutdown pass from an
+isolated data root, and no game, disc, firmware, save/state, credential, or private-key
+payload is distributed.
 
 **Acceptance criteria:** Disabled behavior is unchanged; all core access remains on the
 single worker thread; one through four speculative frames use bounded reusable storage;
@@ -3830,8 +3860,8 @@ only final speculative video is published while authoritative audio/state advanc
 incompatible modes suspend safely; Sega CD remains authoritative-only; a determinism
 mismatch fails closed; and every local/hosted/package regression passes.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Commit SHA:** implementation `967500fdc9608fbce0ec123ac3f0eff0d8965d30`;
+hosted-gate correction `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
 
 ## Milestone 83 detail
 

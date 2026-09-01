@@ -29,6 +29,10 @@ cartridge soft-patch, enhanced save-state, bounded-recording, and run-ahead veri
   `30ed5d7e378c7107db3be844fc80cfd0c96deec2`
 - Exact bounded-recording implementation and hosted evidence baseline:
   `59beedd1f9b1e0a08a2ec0e28f0f9293cd29fe20`
+- Exact run-ahead implementation:
+  `967500fdc9608fbce0ec123ac3f0eff0d8965d30`
+- Exact run-ahead hosted evidence and timing-gate correction baseline:
+  `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -149,39 +153,40 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 95/95 | Passed |
-| Release | Optimized native x86-64 | 95/95 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 95/95 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 93/93 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 95/95 | Passed |
-| Clang 22 | Warning-gated Debug | 95/95 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 98/98 | Passed |
+| Release | Optimized native x86-64 | 98/98 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 98/98 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 96/96 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 98/98 | Passed |
+| Clang 22 | Warning-gated Debug | 98/98 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
-All three CMake suites include legal generated cartridge, disc, and firmware inputs;
+All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
 core lifecycle, adapter, persistence, and save-state paths; bounded parser/property
 corpora; worker lifecycle; semantic GUI workflows; actual-process startup/shutdown; and
 the accelerated 20,000-frame stability test. The two recording-labeled tests cover the
-bounded writer in isolation and through the real core/worker path. No suppression was
-added for project code.
+bounded writer in isolation and through the real core/worker path. Three run-ahead tests
+cover settings, the GUI, and bounded speculative execution through the real core/worker
+path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 95 distinct tests:
+The default shader-enabled build registers 98 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
-| Integration | 4 |
-| Unit | 38 |
-| GUI/smoke | 25 |
-| **Total** | **95** |
+| Integration | 5 |
+| Unit | 39 |
+| GUI/smoke | 26 |
+| **Total** | **98** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 60 `unit`, 24 `core`, 39 `integration`, and 25 `gui`. Focused
-coverage also includes persistence (31), fixtures (28), concurrency (16), settings
-(18), input (9), video (8), audio (6), timing (6), rewind (4), state (8), release (4),
-fuzz/property (4), shader (2), recording (2), and packaging (3).
+layers. Label counts are 62 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
+coverage also includes persistence (33), fixtures (30), concurrency (19), settings
+(20), input (10), video (11), audio (9), timing (6), rewind (4), run-ahead (3), state
+(9), release (4), fuzz/property (4), shader (2), recording (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -292,9 +297,9 @@ worker, GUI, migration, and long-running boundedness regressions pass on every h
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`33499366503`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33499366503)
-completed successfully against the exact enhanced save-state implementation and current
-native-package baseline.
+[`33518798577`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33518798577)
+completed successfully against the exact run-ahead hosted-gate correction and current
+native-package baseline `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -309,8 +314,8 @@ native-package baseline.
 | macOS Intel x86-64 | Debug | Passed |
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
-Each hosted CMake job registered all 93 tests. Linux and both macOS architectures pass
-93/93, including real OpenGL/librashader rendering. Windows passes 92 and reports only
+Each hosted CMake job registered all 98 tests. Linux and both macOS architectures pass
+98/98, including real OpenGL/librashader rendering. Windows passes 97 and reports only
 the intentional capability skip for that render test because the hosted software
 OpenGL context is below desktop 3.3; the application retains normal unshaded video in
 that condition. Package jobs staged and verified native runtimes before uploading
@@ -322,11 +327,11 @@ libretro build also links and cleans without a diagnostic.
 ## Packaging results
 
 The local Release install was staged without a deployment warning in a fresh temporary
-root, verified by `cmake/VerifyPackage.cmake`, and exercised with an installed
-`--version` process smoke. The tree contains 55 files, including the matched XCB QPA
-and ICU runtimes, XCB EGL and GLX integration plugins, librashader runtime, built-in CRT
-preset/source, shader license, and shader guide, with no cartridge, disc, firmware,
-SRAM, BRAM, or state payload. Every copied Qt plugin has a package-relative RUNPATH;
+root, verified by `cmake/VerifyPackage.cmake`, and exercised with installed help,
+version, and real XCB/OpenGL event-loop process smokes. The tree includes the matched
+XCB QPA and ICU runtimes, XCB EGL and GLX integration plugins, librashader runtime,
+built-in CRT preset/source, shader license, shader guide, and run-ahead guide, with no
+cartridge, disc, firmware, SRAM, BRAM, or state payload. Every copied Qt plugin has a package-relative RUNPATH;
 the real XCB smoke clears `LD_LIBRARY_PATH`, and loader tracing resolves XCB QPA from
 inside the extracted archive.
 CPack produces the versioned
@@ -379,6 +384,19 @@ as the four advertised native architectures; all 22 Linux ELF objects resolve; p
 help, version, and real XCB event-loop smokes pass. Required Qt, SDL3, SQLite,
 librashader, CRT, license/documentation, and Windows redistributable resources are
 present, with no ROM, disc, BIOS, save/state, credential, or private-key payload.
+
+Exact run-ahead run `33518798577` supersedes those tester artifacts with Linux x86-64
+(40,149,728 bytes), Windows x86-64 (52,647,966 bytes), macOS arm64 (64,077,522 bytes),
+and macOS x86-64 (65,709,044 bytes). Its contained packages are a 40,149,216-byte Linux
+TGZ, 52,647,458-byte Windows ZIP, 32,066,909/32,009,651-byte macOS arm64 ZIP/DMG, and
+32,889,172/32,818,900-byte macOS x86-64 ZIP/DMG. All six SHA-256 manifests and archive
+integrity/path-safety checks pass; both DMGs identify as Apple DMG version 4 and pass
+structural tests. Linux/Windows/each macOS archive contains 88/77/125 entries. The
+applications and librashader runtimes match their advertised architectures; required
+Qt, SDL3, SQLite, CRT, documentation, notices, and Windows redistributable resources
+are present. All 22 Linux ELF dependencies resolve, packaged CLI and real XCB/OpenGL
+3.3 event-loop smokes pass, and no prohibited game, firmware, persistence, credential,
+or private-key payload is present.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows
@@ -682,8 +700,33 @@ suspension, Sega CD exclusion, and stable allocation through 120 maximum-depth h
 frames. The strict legacy libretro build/link/clean and a fresh staged Linux package
 also pass. All 22 staged ELF dependency graphs resolve; installed CLI and real
 XCB/OpenGL event-loop smokes pass; the package contains no prohibited runtime payload;
-and its TGZ checksum verifies. Exact hosted native logs and artifacts remain pending
-until the implementation commit is pushed; Milestone 86 cannot close before that audit.
+and its TGZ checksum verifies.
+
+The first exact hosted attempt, run
+[`33516570708`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33516570708),
+passed every run-ahead test but exposed an inconsistent pre-existing timing integration
+gate on macOS arm64 Debug and macOS x86-64 Debug/Release. Its documented 400--800 ms
+window for 30 frames already represented 37.5--75 fps, but a redundant assertion
+rejected the accepted 750--800 ms interval below 40 fps. The test now uses the one
+documented elapsed-time bound while the exact rational pacer remains covered by its
+deterministic unit test. The corrected binary passed 60 consecutive local timing runs
+plus every complete local matrix.
+
+Exact corrective run
+[`33518798577`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33518798577)
+passes all ten jobs against `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`. Each of
+the nine CMake configurations registers 98 tests; Linux and macOS pass 98/98, while
+Windows completes every supported test and capability-skips only its documented real
+OpenGL shader test. `integration.run_ahead`, `unit.run_ahead_settings`, and
+`gui.run_ahead_settings` pass in all nine configurations. Linux ASan/UBSan and the
+strict legacy libretro build/link/clean pass.
+
+All 14,694 complete hosted log lines (1,960,355 bytes) were inspected. No workflow
+annotation, authored compiler/linker warning, sanitizer finding, runtime error, timeout,
+failed test, or unexpected skip remains. All four artifact families, six package
+checksums, archive and DMG structural checks, application/librashader architectures,
+required runtime/legal resources, 22 Linux ELF dependency graphs, packaged CLI, real
+XCB/OpenGL event-loop startup/shutdown, and prohibited-payload scans pass.
 
 ## Final feature checklist
 
