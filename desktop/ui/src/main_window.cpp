@@ -83,14 +83,21 @@ QLabel* statusLabel(
   return label;
 }
 
+QString applicationTitle(bool portable)
+{
+  return QStringLiteral("%1 %2%3").arg(
+    QString::fromLatin1(GENPLUSGX_APP_NAME),
+    QString::fromLatin1(GENPLUSGX_VERSION),
+    portable ? QObject::tr(" — Portable") : QString{});
+}
+
 } // namespace
 
 MainWindow::MainWindow(QWidget* parent)
   : QMainWindow(parent), dialogService_(std::make_shared<QtDialogService>())
 {
   setObjectName(QStringLiteral("mainWindow"));
-  setWindowTitle(QStringLiteral("%1 %2").arg(
-    QString::fromLatin1(GENPLUSGX_APP_NAME), QString::fromLatin1(GENPLUSGX_VERSION)));
+  setWindowTitle(applicationTitle(false));
   setMinimumSize(800, 600);
   resize(1080, 720);
   setAcceptDrops(true);
@@ -1841,6 +1848,7 @@ void MainWindow::setApplicationPaths(ApplicationPaths paths)
 {
   applicationPathsAvailable_ = !paths.root().empty();
   applicationPaths_ = std::move(paths);
+  setWindowTitle(applicationTitle(applicationPaths_.portable()));
   updateRecordingAction();
   refreshSettingsDialog();
 }

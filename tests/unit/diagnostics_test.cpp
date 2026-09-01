@@ -73,6 +73,7 @@ int main()
   }
 
   auto snapshot = staticDiagnosticsSnapshot();
+  snapshot.applicationDataMode = "Portable";
   snapshot.renderer = "OpenGL";
   snapshot.presentationSync =
     "Adaptive requested; effective swap interval -1";
@@ -134,6 +135,7 @@ int main()
   if (!check(!snapshot.applicationName.empty() && !snapshot.version.empty() &&
                !snapshot.qtVersion.empty() && !snapshot.sdlVersion.empty() &&
                report.find("OpenGL") != std::string::npos &&
+               report.find("Application data mode: Portable") != std::string::npos &&
                report.find("Presentation sync: Adaptive") != std::string::npos &&
                report.find("Video artwork: Overlay active") != std::string::npos &&
                report.find("Video artwork dimensions: 1920 x 1080") != std::string::npos &&

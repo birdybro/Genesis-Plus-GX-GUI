@@ -39,6 +39,7 @@ if(VERIFY_PLATFORM STREQUAL "windows")
     "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
+  set(portable_data_directory "${package_root}/bin/portable-data")
 elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(bundle "${package_root}/genesis-plus-gx-gui.app")
   require_file(
@@ -53,6 +54,7 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(shader_directory "${bundle}/Contents/Resources/shaders")
   set(librashader_license
     "${bundle}/Contents/Resources/licenses/librashader-MPL-2.0.md")
+  set(portable_data_directory "${package_root}/portable-data")
 elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_file(
     "${package_root}/bin/genesis-plus-gx-gui"
@@ -100,8 +102,14 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
     "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
+  set(portable_data_directory "${package_root}/bin/portable-data")
 else()
   message(FATAL_ERROR "Unsupported VERIFY_PLATFORM value: ${VERIFY_PLATFORM}")
+endif()
+
+if(EXISTS "${portable_data_directory}")
+  message(FATAL_ERROR
+    "Package contains pre-created portable user data: ${portable_data_directory}")
 endif()
 
 require_file(

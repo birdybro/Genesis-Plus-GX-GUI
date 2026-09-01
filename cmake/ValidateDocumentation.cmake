@@ -31,6 +31,7 @@ set(required_documents
   docs/GAME_LIBRARY.md
   docs/SAVE_STATES.md
   docs/PACKAGING.md
+  docs/PORTABLE_MODE.md
   docs/RELEASES.md
   docs/UPSTREAM_MAINTENANCE.md
   docs/DEVELOPMENT_PLAN.md

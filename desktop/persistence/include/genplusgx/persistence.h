@@ -34,14 +34,31 @@ struct PersistenceStatus final {
   [[nodiscard]] operator bool() const noexcept { return ok(); }
 };
 
+enum class ApplicationDataMode {
+  custom,
+  platform,
+  portable,
+};
+
+[[nodiscard]] std::string_view applicationDataModeName(
+  ApplicationDataMode mode) noexcept;
+[[nodiscard]] std::filesystem::path portableApplicationDataRoot(
+  const std::filesystem::path& executablePath);
+
 class ApplicationPaths final {
 public:
-  explicit ApplicationPaths(std::filesystem::path root = {});
+  explicit ApplicationPaths(
+    std::filesystem::path root = {},
+    ApplicationDataMode mode = ApplicationDataMode::custom);
 
   [[nodiscard]] static ApplicationPaths fromPlatform();
+  [[nodiscard]] static ApplicationPaths fromPortableExecutable(
+    const std::filesystem::path& executablePath);
   [[nodiscard]] PersistenceStatus initialize() const;
 
   [[nodiscard]] const std::filesystem::path& root() const noexcept;
+  [[nodiscard]] ApplicationDataMode mode() const noexcept;
+  [[nodiscard]] bool portable() const noexcept;
   [[nodiscard]] std::filesystem::path configDirectory() const;
   [[nodiscard]] std::filesystem::path savesDirectory() const;
   [[nodiscard]] std::filesystem::path statesDirectory() const;
@@ -53,6 +70,7 @@ public:
 
 private:
   std::filesystem::path root_;
+  ApplicationDataMode mode_{ApplicationDataMode::custom};
 };
 
 struct GameIdentity final {

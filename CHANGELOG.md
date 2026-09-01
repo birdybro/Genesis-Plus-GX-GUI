@@ -9,6 +9,11 @@ platform documentation.
 
 ### Added
 
+- Explicit `--portable` application-data isolation beside the executable (or beside a
+  macOS app bundle), with fail-closed startup, visible mode reporting, relocation-safe
+  paths, native-package event-loop verification, and no implicit migration or fallback
+  to the normal user profile.
+
 - Bounded, atomic import of emulator-handled RetroArch `.cht` and simple local
   plain-text cheat lists, plus a system-aware live RAM search that creates disabled
   reviewable codes without exposing core globals or implicitly patching memory.

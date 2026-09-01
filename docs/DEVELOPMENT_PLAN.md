@@ -101,7 +101,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
-| 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
+| 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 102-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
@@ -4066,6 +4066,57 @@ on its owner thread; normal cheat and hidden debugger traffic cannot consume one
 another; every local and hosted gate passes.
 
 **Commit SHA:** implementation `63eaa554634b138f8f0ce2025a7d28f88324b9d6`
+
+## Milestone 90 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add an explicit relocatable application-data mode without implicitly changing,
+copying, merging, or falling back to the platform-standard user profile.
+
+**Files changed:**
+
+- mode-aware platform/portable path resolution under `desktop/persistence`
+- `--portable` parsing and composition-root selection before logging, settings,
+  services, workers, or UI construction
+- mode visibility in the title, Paths settings page, structured log, and redacted
+  diagnostics
+- installed-package startup gates and portable-payload rejection in CMake and both
+  GitHub workflows
+- process, unit, GUI, package-fixture, architecture, user, testing, changelog, and
+  README coverage
+
+**Tests added:** `unit.persistence` covers Windows/Linux-style executable placement,
+macOS bundle placement, relocation, hierarchy initialization, unsafe relative/root
+locations, and stable mode reporting. `unit.command_line`, `unit.diagnostics`, and
+`gui.settings` cover explicit selection and all user-visible reporting.
+`gui.desktop_portable_startup_smoke` enters the real application event loop, derives
+an isolated executable-relative root, initializes all eight directories and SQLite,
+checks the structured mode/startup/shutdown record, and exits cleanly.
+`gui.desktop_portable_failure_smoke` blocks that root with a regular file and requires
+a descriptive status-2 failure without replacement or fallback. Package fixtures prove
+that pre-created portable user data is rejected.
+
+**Gate evidence:** Complete warning-as-error Debug and optimized Release builds pass
+102/102 tests. Leak-detecting ASan/UBSan, fresh warning-as-error Clang 22, and
+CHD-disabled graphs also pass 102/102; the shader-disabled graph passes all 100
+applicable tests. The required native OpenGL regression passes. A strict inherited
+Unix libretro build/link/clean passes without a diagnostic. A fresh Linux staged install
+and extracted TGZ pass package verification, checksum and safe-path inspection, all 22
+ELF dependency graphs, prohibited-payload scanning, installed documentation checks,
+and a real native-XCB portable event-loop startup/shutdown using the packaged
+executable. The resulting archive contains no pre-created `portable-data` entry.
+Cross-platform completion requires the exact pushed implementation CI and artifact/log
+audit; its traceable evidence is recorded in the closure commit after that run passes.
+
+**Acceptance criteria:** Portable selection is explicit per process; placement is
+executable-relative and independent of the working directory; macOS data remains
+outside the signed app bundle; initialization failure is fatal and descriptive;
+normal profile data is never redirected or migrated; packages contain no user data;
+and local plus exact hosted gates pass.
+
+**Commit SHA:** pending (resolve with `git log -1 -- desktop/persistence/src/persistence.cpp`;
+a commit cannot contain its own SHA)
 
 ## Milestone 83 detail
 

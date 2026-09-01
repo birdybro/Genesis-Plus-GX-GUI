@@ -63,6 +63,13 @@ Normal packages must also contain the platform librashader runtime, the original
 treats each as required. Custom user shader packs are never copied into or downloaded
 by packaging.
 
+Verification also rejects a pre-created `portable-data` directory. The Release jobs
+then launch each installed application through a complete `--portable` event-loop smoke,
+requiring all eight data subdirectories, the SQLite library, mode-tagged structured log,
+and clean shutdown before CPack runs. Those temporary checks occur in the CI staging
+tree and are not included in the generated archive. See
+[PORTABLE_MODE.md](PORTABLE_MODE.md) for the user-facing behavior.
+
 ## Platform notes
 
 Windows packages are portable directories and do not modify the registry. The staged

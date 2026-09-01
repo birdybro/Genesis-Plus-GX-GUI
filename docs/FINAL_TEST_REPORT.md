@@ -4,7 +4,8 @@ This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
-synchronization, and local bezel/overlay verification through 2026-09-01
+synchronization, local bezel/overlay, cheat import/search, and portable-mode
+verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -42,6 +43,9 @@ synchronization, and local bezel/overlay verification through 2026-09-01
   `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
 - Exact cheat import/RAM-search implementation and hosted evidence baseline:
   `63eaa554634b138f8f0ce2025a7d28f88324b9d6`
+- Exact portable-mode implementation: the current commit containing the
+  `ApplicationPaths::fromPortableExecutable()` change; the subsequent evidence closure
+  records its immutable SHA and exact hosted run
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -120,6 +124,30 @@ diagnostic. Six checksums, four extracted package layouts, all archive/DMG integ
 and safe-path checks, expected executable/shader architectures, DMG contents, installed
 cheat documentation, 22 Linux ELF dependency graphs, downloaded Linux offscreen and
 real XCB/OpenGL startup/shutdown, and the prohibited-payload scan pass.
+
+## Portable-mode verification
+
+Milestone 90 adds explicit `--portable` startup. Windows and Linux derive
+`portable-data` beside the actual executable; a recognized macOS
+`.app/Contents/MacOS` launch derives it beside the app bundle so user writes never
+modify signed bundle contents. Mode selection occurs before logging, settings,
+SQLite, worker, audio, controller, and UI initialization. Empty, relative, and
+filesystem-root placements are rejected, and a failed portable initialization exits
+with a specific diagnostic instead of touching the normal profile. The title, Paths
+page, structured log, and privacy-safe diagnostics expose the active mode.
+
+Warning-as-error Debug and optimized Release, leak-detecting ASan/UBSan, fresh Clang
+22, and CHD-disabled builds pass 102/102 tests; the shader-disabled graph passes all
+100 applicable tests. Positive and blocked-root process tests verify complete
+event-loop startup/shutdown and fail-closed behavior. The strict legacy Unix libretro
+target builds, links, and cleans. A fresh Linux install and extracted TGZ pass package
+verification, SHA-256 and safe-path checks, all 22 ELF dependency graphs, installed
+portable documentation, and prohibited-payload scanning. The actual extracted binary
+starts and stops through native XCB in portable mode, creates exactly the eight
+documented data directories plus its SQLite database and structured log, and records
+the Portable mode. The archive itself contains no `portable-data` entry. Exact hosted
+Linux, Windows, Apple Silicon, and Intel macOS evidence is added after the pushed
+implementation run completes.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,
@@ -875,8 +903,9 @@ startup and clean shutdown, and prohibited-payload scans pass.
 - [x] Non-destructive IPS/BPS/UPS cartridge soft patching through explicit GUI/CLI,
   two-file drop, and unambiguous sidecars with checksummed patched-content identity.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
-  automatic load/flush, platform-standard application-data paths, and composite CUE
-  identities covering the sheet plus every validated track without path dependence.
+  automatic load/flush, platform-standard paths, explicit fail-closed executable-
+  relative portable data, and composite CUE identities covering the sheet plus every
+  validated track without path dependence.
 - [x] State slots 0-9, quick operations, names, native-frame previews, a complete
   browser, validated manual import/export, timestamps, delete, schema migration,
   corruption/wrong-game rejection, and deterministic restoration.

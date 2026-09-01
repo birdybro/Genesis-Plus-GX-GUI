@@ -12,6 +12,7 @@ struct CommandLineOptions final {
   bool showHelp{false};
   bool showVersion{false};
   bool fullscreen{false};
+  bool portable{false};
   std::optional<QString> gamePath;
   std::optional<QString> patchPath;
   QString error;

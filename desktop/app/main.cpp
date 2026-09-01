@@ -282,6 +282,8 @@ int main(int argc, char* argv[])
   genplusgx::ApplicationPaths applicationPaths;
   if (automatedTestMode) {
     const auto testRoot = qEnvironmentVariable("GENPLUSGX_TEST_DATA_ROOT");
+    const auto portableExecutableOverride =
+      qEnvironmentVariable("GENPLUSGX_TEST_PORTABLE_EXECUTABLE");
     const auto readyQuitMode =
       qEnvironmentVariable("GENPLUSGX_TEST_QUIT_WHEN_GAME_READY");
     bool quitDelayValid = false;
@@ -291,16 +293,36 @@ int main(int argc, char* argv[])
     if (testRoot.isEmpty() || !root.is_absolute() || !quitDelayValid ||
         (!readyQuitMode.isEmpty() &&
          readyQuitMode != QStringLiteral("1")) ||
-        quitDelay < 1 || quitDelay > 10'000) {
+        quitDelay < 1 || quitDelay > 10'000 ||
+        (!commandLine.portable && !portableExecutableOverride.isEmpty())) {
       QTextStream{stderr}
         << "Invalid automated startup-test environment. The data root must be "
            "absolute, the quit delay must be between 1 and 10000 ms, and the "
-           "optional ready-quit mode must be 1.\n";
+           "optional ready-quit mode must be 1. A portable executable override "
+           "is valid only with --portable.\n";
       return 2;
     }
-    applicationPaths = genplusgx::ApplicationPaths{root};
+    if (commandLine.portable) {
+      const auto executablePath = portableExecutableOverride.isEmpty()
+        ? genplusgx::ui::pathFromQString(
+            QCoreApplication::applicationFilePath())
+        : genplusgx::ui::pathFromQString(portableExecutableOverride);
+      applicationPaths =
+        genplusgx::ApplicationPaths::fromPortableExecutable(executablePath);
+      if (applicationPaths.root() != root.lexically_normal()) {
+        QTextStream{stderr}
+          << "Invalid automated portable-mode root. The expected data root does "
+             "not match the executable-relative portable-data directory.\n";
+        return 2;
+      }
+    } else {
+      applicationPaths = genplusgx::ApplicationPaths{root};
+    }
     automatedQuitMilliseconds = quitDelay;
     automatedQuitWhenGameReady = !readyQuitMode.isEmpty();
+  } else if (commandLine.portable) {
+    applicationPaths = genplusgx::ApplicationPaths::fromPortableExecutable(
+      genplusgx::ui::pathFromQString(QCoreApplication::applicationFilePath()));
   } else {
     applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
   }
@@ -314,8 +336,21 @@ int main(int argc, char* argv[])
   };
   const auto pathsInitialized = applicationPaths.initialize();
   if (!pathsInitialized) {
-    qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
     if (automatedTestMode) {
+      QTextStream{stderr}
+        << QString::fromStdString(pathsInitialized.message) << '\n';
+      return 2;
+    }
+    qWarning().noquote() << QString::fromStdString(pathsInitialized.message);
+    if (commandLine.portable) {
+      QMessageBox::critical(
+        nullptr,
+        QObject::tr("Portable Mode Unavailable"),
+        QObject::tr(
+          "The portable-data directory beside this application could not be "
+          "created or opened. Move the application to a writable folder or "
+          "start it without --portable.\n\n%1")
+          .arg(QString::fromStdString(pathsInitialized.message)));
       return 2;
     }
     recordStartupIssue("Application data", pathsInitialized.message);
@@ -332,6 +367,11 @@ int main(int argc, char* argv[])
   }
   qInfo().noquote() << "Application startup:" << GENPLUSGX_APP_NAME
                     << GENPLUSGX_VERSION << '(' << GENPLUSGX_GIT_COMMIT << ')';
+  const auto applicationDataMode =
+    genplusgx::applicationDataModeName(applicationPaths.mode());
+  qInfo().noquote() << "Application data mode:"
+                    << QString::fromLatin1(applicationDataMode.data(),
+                         static_cast<qsizetype>(applicationDataMode.size()));
   genplusgx::settings::AppearanceSettingsStore appearanceSettingsStore{
     applicationPaths.configDirectory() / "appearance-settings.json"};
   auto loadedAppearanceSettings = appearanceSettingsStore.load();
@@ -1668,11 +1708,14 @@ int main(int argc, char* argv[])
     });
   std::optional<std::uint64_t> pendingScreenshot;
   window.setDiagnosticsSnapshotProvider(
-    [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
+    [&applicationPaths, &audioOutput, &biosManager, &controllerInput,
+     &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
      &recordingService, &rewindSettings, &runAheadSettings, &speedSettings,
      &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
+      snapshot.applicationDataMode = std::string{
+        genplusgx::applicationDataModeName(applicationPaths.mode())};
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
         : "Qt software painter";

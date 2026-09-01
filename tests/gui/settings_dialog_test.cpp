@@ -46,7 +46,8 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .runAhead = genplusgx::settings::defaultRunAheadSettings(),
     .session = genplusgx::settings::defaultSessionSettings(),
     .speed = genplusgx::settings::defaultSpeedSettings(),
-    .paths = genplusgx::ApplicationPaths{root},
+    .paths = genplusgx::ApplicationPaths{
+      root, genplusgx::ApplicationDataMode::portable},
     .connectedControllerCount = 2U,
     .pathsAvailable = true,
     .gameLoaded = false,
@@ -94,6 +95,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   const auto pathsText = dialog.findChild<QLabel*>(
     QStringLiteral("pathsSettingsSummary"))->text();
   QVERIFY(pathsText.contains(directory.path()));
+  QVERIFY(pathsText.contains(QStringLiteral("Portable")));
   QVERIFY(pathsText.contains(QStringLiteral("Recordings:")));
   dialog.openPage(genplusgx::ui::SettingsPage::advanced);
   QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("advancedSettingsSummary"))
@@ -138,7 +140,9 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
   QVERIFY(directory.isValid());
   genplusgx::ui::MainWindow window;
   window.setApplicationPaths(genplusgx::ApplicationPaths{
-    std::filesystem::path{directory.path().toStdString()}});
+    std::filesystem::path{directory.path().toStdString()},
+    genplusgx::ApplicationDataMode::portable});
+  QVERIFY(window.windowTitle().contains(QStringLiteral("Portable")));
   window.show();
 
   auto* settingsAction =

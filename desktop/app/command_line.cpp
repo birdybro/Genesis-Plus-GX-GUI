@@ -31,6 +31,10 @@ CommandLineOptions parseCommandLine(const QStringList& arguments)
       options.fullscreen = true;
       continue;
     }
+    if (!positionalOnly && argument == QStringLiteral("--portable")) {
+      options.portable = true;
+      continue;
+    }
     if (!positionalOnly && argument == QStringLiteral("--patch")) {
       if (options.patchPath) {
         options.valid = false;
@@ -96,6 +100,7 @@ QString commandLineHelp()
     "  -h, --help        Show this help text.\n"
     "  -v, --version     Show application version.\n"
     "  -f, --fullscreen  Start in fullscreen mode.\n"
+    "      --portable    Store all application data beside the executable.\n"
     "      --patch FILE  Apply an IPS, BPS, or UPS soft patch.\n\n"
     "Arguments:\n"
     "  game              Game cartridge or disc image to open.")

@@ -54,4 +54,26 @@ if(NOT complete_result EQUAL 0)
     "Complete Windows package fixture was rejected:\n${complete_output}${complete_error}")
 endif()
 
+file(MAKE_DIRECTORY "${fixture_directory}/bin/portable-data")
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DPACKAGE_ROOT=${fixture_directory}"
+    -DVERIFY_PLATFORM=windows
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyPackage.cmake"
+  RESULT_VARIABLE portable_payload_result
+  OUTPUT_VARIABLE portable_payload_output
+  ERROR_VARIABLE portable_payload_error
+)
+if(portable_payload_result EQUAL 0)
+  message(FATAL_ERROR
+    "Package verification accepted pre-created portable user data")
+endif()
+if(NOT "${portable_payload_output}${portable_payload_error}" MATCHES
+   "pre-created portable user data")
+  message(FATAL_ERROR
+    "Portable-data rejection was not descriptive:\n"
+    "${portable_payload_output}${portable_payload_error}")
+endif()
+
 file(REMOVE_RECURSE "${fixture_directory}")

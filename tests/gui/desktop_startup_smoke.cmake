@@ -20,6 +20,10 @@ if(NOT smoke_root_is_scoped OR
    "${GENPLUSGX_SMOKE_ROOT}" STREQUAL "${GENPLUSGX_SMOKE_BASE}")
   message(FATAL_ERROR "The desktop smoke-test root is outside its build directory")
 endif()
+if(DEFINED GENPLUSGX_SMOKE_PORTABLE_EXECUTABLE AND
+   NOT IS_ABSOLUTE "${GENPLUSGX_SMOKE_PORTABLE_EXECUTABLE}")
+  message(FATAL_ERROR "The portable executable test seam must be absolute")
+endif()
 
 file(REMOVE_RECURSE "${GENPLUSGX_SMOKE_ROOT}")
 file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}")
@@ -36,16 +40,31 @@ if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
     "{ this is intentionally invalid startup-test JSON")
 endif()
 
-execute_process(
-  COMMAND
-    "${CMAKE_COMMAND}" -E env
-    "QT_QPA_PLATFORM=offscreen"
+set(smoke_command
+  "${CMAKE_COMMAND}" -E env)
+if(GENPLUSGX_SMOKE_NATIVE_PLATFORM)
+  list(APPEND smoke_command "--unset=QT_QPA_PLATFORM")
+else()
+  list(APPEND smoke_command "QT_QPA_PLATFORM=offscreen")
+endif()
+list(APPEND smoke_command
     "SDL_AUDIODRIVER=dummy"
     "GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
     "GENPLUSGX_TEST_MODE=1"
     "GENPLUSGX_TEST_DATA_ROOT=${GENPLUSGX_SMOKE_ROOT}"
     "GENPLUSGX_TEST_AUTO_QUIT_MS=250"
-    "${GENPLUSGX_SMOKE_EXECUTABLE}"
+)
+if(DEFINED GENPLUSGX_SMOKE_PORTABLE_EXECUTABLE)
+  list(APPEND smoke_command
+    "GENPLUSGX_TEST_PORTABLE_EXECUTABLE=${GENPLUSGX_SMOKE_PORTABLE_EXECUTABLE}")
+endif()
+list(APPEND smoke_command "${GENPLUSGX_SMOKE_EXECUTABLE}")
+if(GENPLUSGX_SMOKE_PORTABLE)
+  list(APPEND smoke_command "--portable")
+endif()
+
+execute_process(
+  COMMAND ${smoke_command}
   RESULT_VARIABLE smoke_result
   OUTPUT_VARIABLE smoke_stdout
   ERROR_VARIABLE smoke_stderr
@@ -72,11 +91,17 @@ if(NOT EXISTS "${frontend_log}")
   message(FATAL_ERROR "Desktop startup did not create its structured log")
 endif()
 file(READ "${frontend_log}" frontend_log_text)
-foreach(required_message IN ITEMS
+set(required_messages
     "Application startup:"
     "Renderer selected:"
     "Automated startup smoke test entered the event loop."
     "Application shutdown complete.")
+if(GENPLUSGX_SMOKE_PORTABLE)
+  list(APPEND required_messages "Application data mode: Portable")
+else()
+  list(APPEND required_messages "Application data mode: Custom")
+endif()
+foreach(required_message IN LISTS required_messages)
   string(FIND "${frontend_log_text}" "${required_message}" message_position)
   if(message_position EQUAL -1)
     message(FATAL_ERROR

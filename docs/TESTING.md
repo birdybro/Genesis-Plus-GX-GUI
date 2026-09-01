@@ -34,6 +34,15 @@ Hosted builds enable `GENPLUSGX_WARNINGS_AS_ERRORS`, so a new frontend/test comp
 warning fails the relevant platform job before CTest. This is intentionally not applied
 wholesale to inherited core or bundled third-party sources.
 
+`unit.command_line` and `unit.persistence` cover explicit portable selection,
+executable-relative and macOS-bundle placement, relocation, unsafe roots, and stable
+mode reporting. `gui.desktop_portable_startup_smoke` enters the complete event loop in
+an isolated derived root and verifies every data directory, SQLite initialization,
+mode-tagged logging, and shutdown. `gui.desktop_portable_failure_smoke` blocks that root
+with a regular file and requires a descriptive status-2 failure with no fallback.
+Release package jobs repeat the positive startup against each actual installed
+Linux/Windows/macOS layout before creating artifacts.
+
 `unit.rewind_buffer` proves strict byte-cap eviction and backward ordering;
 `unit.rewind_settings` covers defaults, atomic persistence, validation, and corruption;
 `core.rewind_worker` runs a generated Genesis program forward, rewinds to lower frame

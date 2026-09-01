@@ -98,15 +98,62 @@ void addUnsigned64(QCryptographicHash& hash, std::uint64_t value)
 
 } // namespace
 
-ApplicationPaths::ApplicationPaths(std::filesystem::path root)
-  : root_(std::move(root))
+std::string_view applicationDataModeName(ApplicationDataMode mode) noexcept
+{
+  switch (mode) {
+    case ApplicationDataMode::custom:
+      return "Custom";
+    case ApplicationDataMode::platform:
+      return "Platform standard";
+    case ApplicationDataMode::portable:
+      return "Portable";
+  }
+  return "Unknown";
+}
+
+std::filesystem::path portableApplicationDataRoot(
+  const std::filesystem::path& executablePath)
+{
+  if (executablePath.empty() || !executablePath.is_absolute()) {
+    return {};
+  }
+  const auto normalized = executablePath.lexically_normal();
+  auto base = normalized.parent_path();
+  if (base.empty() || base == base.root_path()) {
+    return {};
+  }
+
+  const auto contents = base.parent_path();
+  const auto bundle = contents.parent_path();
+  if (base.filename() == "MacOS" && contents.filename() == "Contents" &&
+      bundle.extension() == ".app") {
+    base = bundle.parent_path();
+  }
+  if (base.empty() || base == base.root_path()) {
+    return {};
+  }
+  return (base / "portable-data").lexically_normal();
+}
+
+ApplicationPaths::ApplicationPaths(
+  std::filesystem::path root,
+  ApplicationDataMode mode)
+  : root_(std::move(root)), mode_(mode)
 {
 }
 
 ApplicationPaths ApplicationPaths::fromPlatform()
 {
   const auto location = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
-  return ApplicationPaths{std::filesystem::path{location.toStdString()}};
+  return ApplicationPaths{
+    std::filesystem::path{location.toStdString()}, ApplicationDataMode::platform};
+}
+
+ApplicationPaths ApplicationPaths::fromPortableExecutable(
+  const std::filesystem::path& executablePath)
+{
+  return ApplicationPaths{
+    portableApplicationDataRoot(executablePath), ApplicationDataMode::portable};
 }
 
 PersistenceStatus ApplicationPaths::initialize() const
@@ -132,6 +179,16 @@ PersistenceStatus ApplicationPaths::initialize() const
 const std::filesystem::path& ApplicationPaths::root() const noexcept
 {
   return root_;
+}
+
+ApplicationDataMode ApplicationPaths::mode() const noexcept
+{
+  return mode_;
+}
+
+bool ApplicationPaths::portable() const noexcept
+{
+  return mode_ == ApplicationDataMode::portable;
 }
 
 std::filesystem::path ApplicationPaths::configDirectory() const

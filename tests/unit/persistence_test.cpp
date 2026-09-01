@@ -63,6 +63,50 @@ int main()
     return 2;
   }
 
+  const auto launchDirectory =
+    std::filesystem::path{temporaryRoot.path().toStdString()} / "relocated" / "bin";
+  const auto launchPath = launchDirectory / "genesis-plus-gx-gui";
+  const auto portablePaths =
+    genplusgx::ApplicationPaths::fromPortableExecutable(launchPath);
+  const auto secondLaunchPath =
+    std::filesystem::path{temporaryRoot.path().toStdString()} /
+    "another-copy" / "bin" / "genesis-plus-gx-gui";
+  const auto macBundleLaunchPath =
+    std::filesystem::path{temporaryRoot.path().toStdString()} /
+    "Mac package" / "genesis-plus-gx-gui.app" / "Contents" / "MacOS" /
+    "genesis-plus-gx-gui";
+  if (!check(portablePaths.portable() &&
+          portablePaths.mode() == genplusgx::ApplicationDataMode::portable &&
+          portablePaths.root() == launchDirectory / "portable-data",
+        "Portable mode did not resolve beside the executable") ||
+      !check(genplusgx::portableApplicationDataRoot(secondLaunchPath) ==
+          secondLaunchPath.parent_path() / "portable-data" &&
+          genplusgx::portableApplicationDataRoot(secondLaunchPath) !=
+            portablePaths.root(),
+        "Relocating the executable did not relocate its isolated data root") ||
+      !check(genplusgx::portableApplicationDataRoot(macBundleLaunchPath) ==
+          macBundleLaunchPath.parent_path().parent_path().parent_path()
+            .parent_path() / "portable-data",
+        "A macOS bundle did not place portable data beside the app") ||
+      !check(genplusgx::portableApplicationDataRoot("relative/app").empty() &&
+          genplusgx::portableApplicationDataRoot(
+            std::filesystem::path{"/"} / "app").empty(),
+        "Unsafe relative or filesystem-root portable launch paths were accepted") ||
+      !check(portablePaths.initialize() &&
+          std::filesystem::is_directory(portablePaths.configDirectory()) &&
+          std::filesystem::is_directory(portablePaths.savesDirectory()) &&
+          std::filesystem::is_directory(portablePaths.cacheDirectory()),
+        "The executable-relative portable hierarchy could not initialize") ||
+      !check(genplusgx::applicationDataModeName(
+          genplusgx::ApplicationDataMode::platform) == "Platform standard" &&
+          genplusgx::applicationDataModeName(
+            genplusgx::ApplicationDataMode::portable) == "Portable" &&
+          genplusgx::ApplicationPaths::fromPlatform().mode() ==
+            genplusgx::ApplicationDataMode::platform,
+        "Application-data mode names were unstable")) {
+    return 15;
+  }
+
   if (!check(genplusgx::sanitizeFilename(" Sonic 2: The / Game?.bin ") ==
           "Sonic_2_The_Game_.bin",
         "Unsafe title sanitization was incorrect") ||

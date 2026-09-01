@@ -113,7 +113,7 @@ Open a cartridge or disc with **File → Open Game**, drag a supported file onto
 window, launch it from the game library, or pass it on the command line:
 
 ```bash
-genesis-plus-gx-gui [--fullscreen] path/to/game.bin
+genesis-plus-gx-gui [--fullscreen] [--portable] path/to/game.bin
 genesis-plus-gx-gui --patch path/to/translation.bps path/to/game.bin
 genesis-plus-gx-gui --help
 genesis-plus-gx-gui --version
@@ -197,6 +197,12 @@ Single-file games use their raw SHA-256. CUE games use one domain-separated SHA-
 over the validated sheet and every referenced track, so matching sheet text cannot
 make different discs share saves, states, cheats, or settings.
 Tests always inject temporary roots and never touch this real directory.
+
+Pass `--portable` to keep that same hierarchy in `portable-data` beside the executable
+(or beside the `.app` on macOS). Portable mode is explicit for each launch: it never
+redirects, copies, or merges normal user data, and startup fails instead of falling back
+if the portable location is unwritable. See [PORTABLE_MODE.md](docs/PORTABLE_MODE.md)
+for platform launch examples and relocation rules.
 
 ## Building from source
 

@@ -590,6 +590,41 @@ set_tests_properties(
 )
 
 add_test(
+  NAME gui.desktop_portable_startup_smoke
+  COMMAND
+    "${CMAKE_COMMAND}"
+    "-DGENPLUSGX_SMOKE_EXECUTABLE=$<TARGET_FILE:genplusgx_desktop>"
+    "-DGENPLUSGX_SMOKE_BASE=${CMAKE_CURRENT_BINARY_DIR}"
+    "-DGENPLUSGX_SMOKE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/portable-smoke-launch-$<CONFIG>/portable-data"
+    "-DGENPLUSGX_SMOKE_PORTABLE_EXECUTABLE=${CMAKE_CURRENT_BINARY_DIR}/portable-smoke-launch-$<CONFIG>/genesis-plus-gx-gui"
+    "-DGENPLUSGX_SMOKE_PORTABLE=ON"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/desktop_startup_smoke.cmake"
+)
+set_tests_properties(
+  gui.desktop_portable_startup_smoke
+  PROPERTIES
+    LABELS "gui;integration;smoke;lifecycle;filesystem;logging;portable"
+    TIMEOUT 40
+)
+
+add_test(
+  NAME gui.desktop_portable_failure_smoke
+  COMMAND
+    "${CMAKE_COMMAND}"
+    "-DGENPLUSGX_SMOKE_EXECUTABLE=$<TARGET_FILE:genplusgx_desktop>"
+    "-DGENPLUSGX_SMOKE_BASE=${CMAKE_CURRENT_BINARY_DIR}"
+    "-DGENPLUSGX_SMOKE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/portable-smoke-blocked-$<CONFIG>/portable-data"
+    "-DGENPLUSGX_SMOKE_PORTABLE_EXECUTABLE=${CMAKE_CURRENT_BINARY_DIR}/portable-smoke-blocked-$<CONFIG>/genesis-plus-gx-gui"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/desktop_portable_failure_smoke.cmake"
+)
+set_tests_properties(
+  gui.desktop_portable_failure_smoke
+  PROPERTIES
+    LABELS "gui;integration;smoke;error-handling;filesystem;portable"
+    TIMEOUT 40
+)
+
+add_test(
   NAME gui.desktop_startup_error_smoke
   COMMAND
     "${CMAKE_COMMAND}"

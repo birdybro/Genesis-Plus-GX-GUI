@@ -803,6 +803,16 @@ bounded before allocation. The content stream checks cooperative cancellation be
 backup ownership, so shutdown can interrupt a large disc identity without racing core
 globals.
 
+An explicit `--portable` request instead calls
+`ApplicationPaths::fromPortableExecutable()`. Windows/Linux roots are the executable's
+sibling `portable-data`; a recognized macOS `Contents/MacOS` executable climbs outside
+the `.app` first. Resolution is lexical, absolute, independent of the current working
+directory, and rejects a filesystem-root placement. Mode selection happens before any
+logger, settings store, library connection, worker, or UI is constructed. Initialization
+failure is fatal in portable mode, so the composition root cannot mix portable and
+platform-standard stores. `ApplicationPaths` carries its mode into the Paths page and
+privacy-safe diagnostics without exposing the root there.
+
 Live backup-memory ownership remains inside the core worker:
 
 ```text

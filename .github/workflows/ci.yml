@@ -90,6 +90,13 @@ jobs:
               <<< "$package_smoke_output"; then
             exit 1
           fi
+          env -u QT_QPA_PLATFORM xvfb-run -a cmake \
+            -DGENPLUSGX_SMOKE_EXECUTABLE="$PWD/build/package-root/bin/genesis-plus-gx-gui" \
+            -DGENPLUSGX_SMOKE_BASE="$PWD/build/package-root" \
+            -DGENPLUSGX_SMOKE_ROOT="$PWD/build/package-root/bin/portable-data" \
+            -DGENPLUSGX_SMOKE_PORTABLE=ON \
+            -DGENPLUSGX_SMOKE_NATIVE_PLATFORM=ON \
+            -P tests/gui/desktop_startup_smoke.cmake
           cpack --config build/ci-Release/CPackConfig.cmake \
             -G TGZ -B build/packages
 
@@ -277,6 +284,13 @@ jobs:
             -DVERIFY_PLATFORM=windows -P cmake/VerifyPackage.cmake
           & ./build/package-root/bin/genesis-plus-gx-gui.exe --version
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake "-DGENPLUSGX_SMOKE_EXECUTABLE=$pwd/build/package-root/bin/genesis-plus-gx-gui.exe" `
+            "-DGENPLUSGX_SMOKE_BASE=$pwd/build/package-root" `
+            "-DGENPLUSGX_SMOKE_ROOT=$pwd/build/package-root/bin/portable-data" `
+            -DGENPLUSGX_SMOKE_PORTABLE=ON `
+            -DGENPLUSGX_SMOKE_NATIVE_PLATFORM=ON `
+            -P tests/gui/desktop_startup_smoke.cmake
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cpack --config build/ci-windows/CPackConfig.cmake `
             -C Release -G ZIP -B build/packages
 
@@ -365,6 +379,13 @@ jobs:
             -DVERIFY_PLATFORM=macos -P cmake/VerifyPackage.cmake
           build/package-root/genesis-plus-gx-gui.app/Contents/MacOS/genesis-plus-gx-gui \
             --version
+          cmake \
+            -DGENPLUSGX_SMOKE_EXECUTABLE="$PWD/build/package-root/genesis-plus-gx-gui.app/Contents/MacOS/genesis-plus-gx-gui" \
+            -DGENPLUSGX_SMOKE_BASE="$PWD/build/package-root" \
+            -DGENPLUSGX_SMOKE_ROOT="$PWD/build/package-root/portable-data" \
+            -DGENPLUSGX_SMOKE_PORTABLE=ON \
+            -DGENPLUSGX_SMOKE_NATIVE_PLATFORM=ON \
+            -P tests/gui/desktop_startup_smoke.cmake
           cpack --config build/ci-Release/CPackConfig.cmake \
             -G ZIP -B build/packages
           cpack --config build/ci-Release/CPackConfig.cmake \

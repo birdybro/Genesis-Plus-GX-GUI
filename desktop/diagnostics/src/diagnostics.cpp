@@ -373,6 +373,7 @@ std::string formatDiagnostics(
   field("SDL", snapshot.sdlVersion);
   field("Operating system", snapshot.operatingSystem);
   field("Architecture", snapshot.architecture);
+  field("Application data mode", snapshot.applicationDataMode);
   field("Renderer", snapshot.renderer);
   field("Presentation sync", snapshot.presentationSync);
   field("Presentation buffering", snapshot.presentationBuffering);

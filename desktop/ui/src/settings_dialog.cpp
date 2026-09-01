@@ -36,6 +36,19 @@ QString pathText(const std::filesystem::path& path)
 #endif
 }
 
+QString dataModeName(ApplicationDataMode mode)
+{
+  switch (mode) {
+    case ApplicationDataMode::custom:
+      return QObject::tr("Custom or isolated");
+    case ApplicationDataMode::platform:
+      return QObject::tr("Platform standard");
+    case ApplicationDataMode::portable:
+      return QObject::tr("Portable (explicit for this launch)");
+  }
+  return QObject::tr("Unknown");
+}
+
 QString themeName(settings::ThemeMode theme)
 {
   switch (theme) {
@@ -261,7 +274,8 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
       {tr("BIOS Settings…"), "configureBiosButton", SettingsPageAction::bios},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Paths"),
-    tr("Review platform application-data locations and configure user-selectable paths."),
+    tr("Review active application-data locations and configure user-selectable "
+       "paths. Portable mode is enabled explicitly with --portable at startup."),
     "pathsSettingsPage", "pathsSettingsSummary", pathsSummary_, {
       {tr("Screenshot Directory…"), "configureScreenshotPathButton",
         SettingsPageAction::screenshotPath},
@@ -385,9 +399,10 @@ void SettingsDialog::refresh()
 
   if (overview_.pathsAvailable) {
     pathsSummary_->setText(
-      tr("Application data: %1\nConfiguration: %2\nSaves: %3\nStates: %4\n"
-         "Screenshots: %5\nRecordings: %6\nLibrary: %7\nLogs: %8")
-        .arg(pathText(overview_.paths.root()),
+      tr("Mode: %1\nApplication data: %2\nConfiguration: %3\nSaves: %4\n"
+         "States: %5\nScreenshots: %6\nRecordings: %7\nLibrary: %8\nLogs: %9")
+        .arg(dataModeName(overview_.paths.mode()),
+          pathText(overview_.paths.root()),
           pathText(overview_.paths.configDirectory()),
           pathText(overview_.paths.savesDirectory()),
           pathText(overview_.paths.statesDirectory()),

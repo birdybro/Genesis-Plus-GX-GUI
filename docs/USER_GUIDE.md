@@ -13,6 +13,7 @@ forms are:
 genesis-plus-gx-gui
 genesis-plus-gx-gui game.md
 genesis-plus-gx-gui --fullscreen game.md
+genesis-plus-gx-gui --portable game.md
 genesis-plus-gx-gui --patch translation.bps game.md
 genesis-plus-gx-gui --help
 genesis-plus-gx-gui --version
@@ -21,6 +22,12 @@ genesis-plus-gx-gui --version
 Only one startup game is accepted. Unknown options and multiple positional files print
 a diagnostic and exit with status 2. `--patch` requires both an IPS/BPS/UPS file and a
 startup game. Use `--` before a filename beginning with `-`.
+
+`--portable` keeps the complete application-data hierarchy beside this application
+copy for that launch. It never changes or imports the normal user profile. The active
+mode appears in the title, Paths page, log, and diagnostics; an unwritable portable
+location stops startup rather than falling back. See [PORTABLE_MODE.md](PORTABLE_MODE.md)
+for exact Windows/Linux/macOS placement and relocation guidance.
 
 ## Opening and closing games
 
@@ -479,8 +486,8 @@ after hot-unplug is likewise shown instead of being accepted silently.
 Choose **Tools → Settings…** (the platform Preferences shortcut) to open the unified
 settings center. Its stable categories are **General**, **Video**, **Audio**, **Input**,
 **System**, **BIOS**, **Paths**, and **Advanced**. Each page summarizes the live values
-and opens the corresponding complete editor; the Paths page also shows the resolved
-platform directories for configuration, saves, states, screenshots, recordings,
+and opens the corresponding complete editor; the Paths page also shows the active
+standard/portable mode and resolved directories for configuration, saves, states, screenshots, recordings,
 library data, and logs. Existing category menu entries remain direct shortcuts to those
 same editors.
 

@@ -41,6 +41,7 @@ foreach(document IN ITEMS
     INPUT_CONFIGURATION.md
     LIBRETRO_SHADERS.md
     RUN_AHEAD.md
+    PORTABLE_MODE.md
     SAVE_STATES.md)
   string(FIND "${install_script}" "${document}" position)
   if(position EQUAL -1)

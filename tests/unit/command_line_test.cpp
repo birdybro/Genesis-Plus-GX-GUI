@@ -28,7 +28,8 @@ int main(int argc, char** argv)
   bool passed = true;
 
   const auto empty = genplusgx::app::parseCommandLine({});
-  passed &= check(empty.valid && !empty.gamePath && !empty.fullscreen,
+  passed &= check(empty.valid && !empty.gamePath && !empty.fullscreen &&
+      !empty.portable,
     "an empty command line uses normal windowed startup");
 
   const auto startup = genplusgx::app::parseCommandLine(
@@ -36,6 +37,16 @@ int main(int argc, char** argv)
   passed &= check(startup.valid && startup.fullscreen && startup.gamePath &&
       *startup.gamePath == QStringLiteral("game.md"),
     "fullscreen and a positional game parse together");
+
+  const auto portable = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--portable"), QStringLiteral("game.md")});
+  passed &= check(portable.valid && portable.portable && portable.gamePath &&
+      *portable.gamePath == QStringLiteral("game.md"),
+    "portable mode is an explicit option and retains the startup game");
+  const auto repeatedPortable = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--portable"), QStringLiteral("--portable")});
+  passed &= check(repeatedPortable.valid && repeatedPortable.portable,
+    "repeating the stateless portable option is harmless");
 
   const auto patched = genplusgx::app::parseCommandLine(
     {QStringLiteral("--patch"), QStringLiteral("translation.bps"),
@@ -89,6 +100,7 @@ int main(int argc, char** argv)
 
   const auto help = genplusgx::app::commandLineHelp();
   passed &= check(help.contains(QStringLiteral("--fullscreen")) &&
+      help.contains(QStringLiteral("--portable")) &&
       help.contains(QStringLiteral("--patch FILE")) &&
       help.contains(QStringLiteral("[game]")),
     "help documents startup behavior");

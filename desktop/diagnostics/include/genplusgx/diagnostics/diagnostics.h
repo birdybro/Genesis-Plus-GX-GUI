@@ -87,6 +87,7 @@ struct DiagnosticsSnapshot final {
   std::string sdlVersion;
   std::string operatingSystem;
   std::string architecture;
+  std::string applicationDataMode;
   std::string renderer;
   std::string presentationSync;
   std::string presentationBuffering;
