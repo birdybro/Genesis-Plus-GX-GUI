@@ -2,6 +2,12 @@
 
 #include <filesystem>
 #include <optional>
+#include <string>
+#include <vector>
+
+namespace genplusgx {
+struct ArchivedGameEntry;
+}
 
 class QString;
 class QWidget;
@@ -27,6 +33,10 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseShaderPreset(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::string> chooseArchiveEntry(
+    QWidget* parent,
+    const std::filesystem::path& archivePath,
+    const std::vector<ArchivedGameEntry>& entries);
   virtual void showError(QWidget* parent, const QString& title, const QString& message) = 0;
 };
 
@@ -47,6 +57,10 @@ public:
   [[nodiscard]] std::optional<std::filesystem::path> chooseShaderPreset(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::string> chooseArchiveEntry(
+    QWidget* parent,
+    const std::filesystem::path& archivePath,
+    const std::vector<ArchivedGameEntry>& entries) override;
   void showError(QWidget* parent, const QString& title, const QString& message) override;
 };
 

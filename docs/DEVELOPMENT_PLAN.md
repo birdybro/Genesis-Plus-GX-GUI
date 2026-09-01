@@ -4256,6 +4256,61 @@ local gates pass; and the exact hosted matrix and logs are clean.
 
 **Commit SHA:** `253c04352a762dfaf2c920fa6b107b6a983f4ecd`
 
+## Milestone 82 detail
+
+**Status:** IMPLEMENTED — AWAITING HOSTED VERIFICATION
+
+**Goal:** Add safe ZIP cartridge browsing and local M3U/M3U8 Sega CD playlists while
+preserving source-file identity, keeping core input as an ordinary validated path, and
+never parsing containers on the emulation thread.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/game_archive.h`
+- `desktop/core/src/game_archive.cpp`
+- `desktop/core/include/genplusgx/game_file.h`
+- `desktop/core/src/game_file.cpp`
+- `desktop/core/CMakeLists.txt`
+- application composition, persistence paths, dialog service, MainWindow, archive
+  chooser, and CMake manifests under `desktop/`
+- generated ZIP fixture support and archive/playlist unit, core-integration, GUI,
+  startup, persistence, and full-process session tests under `tests/`
+- README, changelog, architecture, user, library, shortcuts, testing, fixture, legal,
+  audit, matrix, plan, and final-report documentation
+
+**Tests added:** `unit.game_file` creates real stored/deflated ZIPs and exercises sorted
+member discovery, exact extraction, cache reuse/collision behavior, CRC failure,
+traversal, stale selection, compression-ratio limits, malformed archives, and strict
+M3U UTF-8/path/line/disc/duplicate/missing/fuzz boundaries. New
+`integration.archive_playlist` executes extracted Genesis and Master System fixtures,
+then loads and changes generated Sega CD discs through an M3U and the real core adapter.
+GUI coverage drives single/multiple member selection, cancellation, stable accessible
+controls, source/runtime identity, playlist action gating/navigation, and an isolated
+command-line ZIP session-resume workflow.
+
+**Local gate evidence:** Warning-gated Debug and optimized Release builds each pass
+91/91 tests. ASan/UBSan passes the same 91/91 with leak detection and immediate failure
+enabled and reports no finding. A fresh shader-disabled build passes all 89 applicable
+tests. A fresh Clang 22 warning-as-error build passes 91/91; its only diagnostics are
+the established inherited libchdr/Tremor warnings outside the authored-code gate. The
+new archive zlib/MiniZip namespace has no colliding global symbol with libchdr. A staged
+self-contained Linux install passes structural/runtime verification, CPack creates an
+integrity- and checksum-verified 0.1.1 x86-64 TGZ with 86 entries, and the preserved
+Unix libretro target builds, links, identifies as x86-64 ELF, and cleans. A fresh
+CHD-disabled graph independently passes 91/91, proving ZIP support does not depend on
+the optional CHD decoder.
+
+**Acceptance criteria:** Only bounded stored/deflated cartridge members are advertised;
+unsafe, encrypted, unsupported, oversized, suspiciously compressed, truncated, or
+CRC-invalid entries fail closed; one-member archives load without prompting and
+multi-member archives use a testable accessible browser; M3U paths are relative,
+canonicalized beneath the playlist root, unique, existing, and limited to 32; playlist
+disc order has correctly gated previous/next controls; source paths drive recents,
+sessions, and diagnostics while validated runtime paths drive core/persistence; every
+local and hosted regression passes; and the exact hosted logs and artifacts are clean.
+
+**Commit SHA:** Pending
+
 ## Milestone 65 detail
 
 **Status:** COMPLETE

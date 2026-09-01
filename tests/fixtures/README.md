@@ -197,3 +197,21 @@ the original test program does not touch. `unit.cheats` generates no binary data
 fixed examples and 10,000-case deterministic bounded text corpus exercise the cheat
 decoder and temporary JSON store. No commercial cheat database, game code, or copied
 code list is included.
+
+## Generated ZIP and M3U container fixtures
+
+`unit.game_file`, `integration.archive_playlist`, `gui.game_loading`, and
+`gui.session_resume_application` create ZIP archives at runtime with the bundled MiniZip
+writer. Members contain only the original CC0 Genesis, Master System, or SG-1000 byte
+fixtures documented above. Cases use both stored and DEFLATE methods and generate
+multi-member, nested-name, traversal-name, unsupported-content, stale-selection,
+truncated, and cache-reuse conditions. No archive or extracted member survives its
+temporary test directory.
+
+The same tests write original UTF-8 M3U/M3U8 text that references generated Sega CD
+disc images in a temporary directory. Valid cases prove declared order, content
+enumeration, first-disc loading, and disc changes. Negative cases cover invalid UTF-8,
+absolute/drive/URL/parent paths, symlink escape, duplicate or missing discs, excessive
+line/disc counts, and a fixed-seed bounded parser corpus. These playlists contain no
+commercial filenames, disc data, firmware, or copied metadata; all generated container
+fixtures are dedicated to CC0-1.0 with the underlying project-authored fixtures.

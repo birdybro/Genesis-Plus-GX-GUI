@@ -1,5 +1,7 @@
 #include "genplusgx/game_file.h"
 
+#include "genplusgx/game_archive.h"
+
 #include <algorithm>
 #include <array>
 #include <cctype>
@@ -21,12 +23,15 @@ constexpr std::array baseExtensions{
   std::string_view{".gen"},
   std::string_view{".gg"},
   std::string_view{".iso"},
+  std::string_view{".m3u"},
+  std::string_view{".m3u8"},
   std::string_view{".md"},
   std::string_view{".mdx"},
   std::string_view{".sg"},
   std::string_view{".sgd"},
   std::string_view{".smd"},
   std::string_view{".sms"},
+  std::string_view{".zip"},
 #if defined(GENPLUSGX_HAVE_CHD)
   std::string_view{".chd"},
 #endif
@@ -156,6 +161,102 @@ bool pathIsWithin(const std::filesystem::path& child,
     }
   }
   return true;
+}
+
+bool validUtf8(std::string_view text)
+{
+  std::size_t index = 0U;
+  while (index < text.size()) {
+    const auto first = static_cast<unsigned char>(text[index]);
+    std::size_t continuation = 0U;
+    std::uint32_t value = 0U;
+    if (first < 0x80U) {
+      ++index;
+      continue;
+    }
+    if ((first & 0xe0U) == 0xc0U) {
+      continuation = 1U;
+      value = first & 0x1fU;
+      if (value < 2U) {
+        return false;
+      }
+    } else if ((first & 0xf0U) == 0xe0U) {
+      continuation = 2U;
+      value = first & 0x0fU;
+    } else if ((first & 0xf8U) == 0xf0U) {
+      continuation = 3U;
+      value = first & 0x07U;
+      if (value > 4U) {
+        return false;
+      }
+    } else {
+      return false;
+    }
+    if (index + continuation >= text.size()) {
+      return false;
+    }
+    for (std::size_t offset = 1U; offset <= continuation; ++offset) {
+      const auto byte = static_cast<unsigned char>(text[index + offset]);
+      if ((byte & 0xc0U) != 0x80U) {
+        return false;
+      }
+      value = (value << 6U) | (byte & 0x3fU);
+    }
+    if ((continuation == 2U && value < 0x800U) ||
+        (continuation == 3U && value < 0x10000U) ||
+        value > 0x10ffffU || (value >= 0xd800U && value <= 0xdfffU)) {
+      return false;
+    }
+    index += continuation + 1U;
+  }
+  return true;
+}
+
+std::filesystem::path pathFromUtf8(std::string_view text)
+{
+  std::u8string value;
+  value.reserve(text.size());
+  for (const char character : text) {
+    value.push_back(static_cast<char8_t>(character));
+  }
+  return std::filesystem::path{value};
+}
+
+GameFileStatus inspectDiscPlaylist(
+  const std::filesystem::path& path,
+  DiscPlaylistInfo& information)
+{
+  information = {};
+  std::error_code error;
+  const auto size = std::filesystem::file_size(path, error);
+  if (error) {
+    return failure(GameFileError::unreadable,
+      "The M3U playlist size cannot be read.");
+  }
+  if (size == 0U || size > maximumDiscPlaylistBytes) {
+    return failure(GameFileError::fileTooLarge,
+      "The M3U playlist is empty or exceeds the 256 KiB safety limit.");
+  }
+  std::ifstream stream(path, std::ios::binary);
+  if (!stream) {
+    return failure(GameFileError::unreadable,
+      "The M3U playlist cannot be read.");
+  }
+  std::string text(static_cast<std::size_t>(size), '\0');
+  stream.read(text.data(), static_cast<std::streamsize>(text.size()));
+  if (static_cast<std::size_t>(stream.gcount()) != text.size()) {
+    return failure(GameFileError::unreadable,
+      "The M3U playlist changed while it was being read.");
+  }
+  auto directory = path.parent_path();
+  if (directory.empty()) {
+    directory = std::filesystem::current_path(error);
+    if (error) {
+      return failure(GameFileError::unreadable,
+        "The M3U playlist directory cannot be resolved.");
+    }
+  }
+  return validateDiscPlaylistText(text, directory, information);
 }
 
 GameFileStatus validateRegularGameFile(const std::filesystem::path& path)
@@ -298,6 +399,12 @@ bool hasSupportedDiscExtension(const std::filesystem::path& path)
 {
   const auto extension = lowercase(path.extension().string());
   return std::ranges::find(discExtensions, extension) != discExtensions.end();
+}
+
+bool hasDiscPlaylistExtension(const std::filesystem::path& path) noexcept
+{
+  const auto extension = lowercase(path.extension().string());
+  return extension == ".m3u" || extension == ".m3u8";
 }
 
 GameFileStatus validateCueSheetText(
@@ -510,10 +617,124 @@ GameFileStatus validateCueSheetFile(const std::filesystem::path& path)
   return inspectCueSheetFile(path, nullptr);
 }
 
+GameFileStatus validateDiscPlaylistText(
+  std::string_view text,
+  const std::filesystem::path& playlistDirectory,
+  DiscPlaylistInfo& information)
+{
+  information = {};
+  if (text.starts_with("\xef\xbb\xbf")) {
+    text.remove_prefix(3U);
+  }
+  if (text.empty() || text.size() > maximumDiscPlaylistBytes ||
+      !validUtf8(text)) {
+    return failure(GameFileError::invalidDiscPlaylist,
+      "The M3U playlist is empty, too large, or not valid UTF-8.");
+  }
+  std::error_code error;
+  const auto parent = std::filesystem::weakly_canonical(
+    playlistDirectory, error);
+  if (error || !std::filesystem::is_directory(parent, error)) {
+    return failure(GameFileError::unreadable,
+      "The M3U playlist directory cannot be resolved safely.");
+  }
+
+  std::size_t lineNumber = 0U;
+  std::size_t offset = 0U;
+  while (offset < text.size()) {
+    const auto end = text.find('\n', offset);
+    const auto rawLength =
+      (end == std::string_view::npos ? text.size() : end) - offset;
+    ++lineNumber;
+    if (rawLength > maximumDiscPlaylistLineBytes) {
+      return failure(GameFileError::invalidDiscPlaylist,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": the line exceeds 1024 bytes.");
+    }
+    auto line = trim(text.substr(offset, rawLength));
+    offset = end == std::string_view::npos ? text.size() : end + 1U;
+    if (line.empty() || line.front() == '#') {
+      continue;
+    }
+    if (line.front() == '/' || line.front() == '\\' ||
+        line.find(':') != std::string_view::npos ||
+        std::ranges::any_of(line, [](unsigned char character) {
+          return character < 0x20U || character == 0x7fU;
+        })) {
+      return failure(GameFileError::unsafePlaylistReference,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": only local relative disc paths are allowed.");
+    }
+    std::string portable{line};
+    std::ranges::replace(portable, '\\', '/');
+    const auto relative = pathFromUtf8(portable);
+    if (relative.is_absolute() || relative.has_root_name() ||
+        relative.has_root_directory() ||
+        std::ranges::any_of(relative, [](const auto& component) {
+          return component == "..";
+        })) {
+      return failure(GameFileError::unsafePlaylistReference,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": the path escapes the playlist directory.");
+    }
+    if (information.discs.size() >= maximumDiscPlaylistEntries) {
+      return failure(GameFileError::invalidDiscPlaylist,
+        "The M3U playlist exceeds the 32-disc limit.");
+    }
+    const auto candidate = playlistDirectory / relative;
+    const auto resolved = std::filesystem::weakly_canonical(candidate, error);
+    if (error || !pathIsWithin(resolved, parent)) {
+      return failure(GameFileError::unsafePlaylistReference,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": the path escapes through a link or missing parent.");
+    }
+    if (std::ranges::find(information.discs, resolved) !=
+        information.discs.end()) {
+      return failure(GameFileError::invalidDiscPlaylist,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": duplicate discs are not allowed.");
+    }
+    if (auto status = validateDiscImageFile(resolved); !status) {
+      return failure(GameFileError::missingPlaylistDisc,
+        "Invalid M3U playlist at line " + std::to_string(lineNumber) +
+          ": " + status.message);
+    }
+    information.discs.push_back(resolved);
+  }
+  if (information.discs.empty()) {
+    return failure(GameFileError::invalidDiscPlaylist,
+      "The M3U playlist does not contain a disc image.");
+  }
+  return {};
+}
+
+GameFileStatus validateDiscPlaylistFile(
+  const std::filesystem::path& path,
+  DiscPlaylistInfo& information)
+{
+  if (!hasDiscPlaylistExtension(path)) {
+    information = {};
+    return failure(GameFileError::invalidDiscPlaylist,
+      "The selected file is not an M3U playlist.");
+  }
+  if (auto status = validateRegularGameFile(path); !status) {
+    information = {};
+    return status;
+  }
+  return inspectDiscPlaylist(path, information);
+}
+
 GameFileStatus validateGameFile(const std::filesystem::path& path)
 {
   if (auto status = validateRegularGameFile(path); !status) {
     return status;
+  }
+  if (hasZipArchiveExtension(path)) {
+    return inspectZipArchive(path).status;
+  }
+  if (hasDiscPlaylistExtension(path)) {
+    DiscPlaylistInfo information;
+    return inspectDiscPlaylist(path, information);
   }
   if (lowercase(path.extension().string()) == ".cue") {
     return validateCueSheetFile(path);
@@ -550,6 +771,13 @@ GameContentFilesResult gameContentFiles(const std::filesystem::path& path)
     if (auto status = inspectCueSheetFile(path, &files); !status) {
       return {.status = std::move(status), .files = {}};
     }
+  }
+  if (hasDiscPlaylistExtension(path)) {
+    DiscPlaylistInfo information;
+    if (auto status = inspectDiscPlaylist(path, information); !status) {
+      return {.status = std::move(status), .files = {}};
+    }
+    files.insert(files.end(), information.discs.begin(), information.discs.end());
   }
   return {.status = {}, .files = std::move(files)};
 }

@@ -760,11 +760,25 @@ still joined before the storage and audio services are destroyed.
 The implemented preflight service checks that a selected path uses a format enabled in
 the desktop build, is representable by the core's 255-byte host ABI, exists, is a
 regular file, and can be opened for reading. It does not inspect untrusted offsets or
-duplicate the emulator's content interpretation. The direct host currently accepts
-`.68k`, `.bin`, `.bms`, `.cue`, `.gen`, `.gg`, `.iso`, `.md`, `.mdx`, `.sg`, `.sgd`,
-`.smd`, and `.sms`; `.chd` is added only when bundled libchdr support is compiled. ZIP
-and M3U are intentionally not advertised because archive/playlist enumeration is not
-yet present in this desktop host.
+duplicate the emulator's content interpretation. The direct core host accepts `.68k`,
+`.bin`, `.bms`, `.cue`, `.gen`, `.gg`, `.iso`, `.md`, `.mdx`, `.sg`, `.sgd`, `.smd`,
+and `.sms`; `.chd` is added only when bundled libchdr support is compiled.
+`GameLaunchTarget` keeps that runtime path separate from the user-selected source path.
+The source resolver adds two bounded container layers:
+
+```text
+ZIP source -> validated central directory -> selected cartridge -> cache/runtime path
+M3U source -> validated ordered local discs -> first/current disc runtime path
+```
+
+ZIP enumeration is capped at 4,096 entries and 512 MiB per archive. Only stored or
+deflated cartridge members are accepted; names, encryption, compression method, ratio,
+uncompressed size, exact byte count, trailing stream status, and CRC are validated
+before a collision-safe cache publish. M3U text is capped at 256 KiB, 1,024 bytes per
+line, and 32 unique discs. It must be valid UTF-8 and may reference only existing,
+validated relative disc paths that remain beneath the playlist directory after
+canonicalization. Container parsing never runs the emulator core or dereferences an
+untrusted offset directly.
 
 Native file selection is abstracted behind `DialogService`, enabling production Qt
 dialogs and deterministic GUI tests. Open actions, one-local-file drops, and the single

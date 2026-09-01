@@ -50,6 +50,10 @@ scanner validates every CUE candidate and records its resolved payload files. A 
 only, preventing one disc from appearing as both a sheet and a raw track; unrelated
 standalone files with the same extensions remain normal library games.
 
+ZIP and M3U/M3U8 containers are discoverable and launch through the same source resolver
+as Open, drag/drop, and command-line requests. The library indexes each container as one
+offline source row; it does not duplicate ZIP members into separate database rows.
+
 ## Stored game data
 
 The versioned schema stores each selected path, titles, detected system and region,

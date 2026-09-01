@@ -1,6 +1,7 @@
 add_library(genplusgx_ui STATIC
   include/genplusgx/ui/appearance_settings_dialog.h
   include/genplusgx/ui/audio_settings_dialog.h
+  include/genplusgx/ui/archive_entry_dialog.h
   include/genplusgx/ui/about_dialog.h
   include/genplusgx/ui/bios_settings_dialog.h
   include/genplusgx/ui/binding_capture_button.h
@@ -25,6 +26,7 @@ add_library(genplusgx_ui STATIC
   src/appearance_settings_dialog.cpp
   src/about_dialog.cpp
   src/audio_settings_dialog.cpp
+  src/archive_entry_dialog.cpp
   src/bios_settings_dialog.cpp
   src/binding_capture_button.cpp
   src/cheat_manager_dialog.cpp

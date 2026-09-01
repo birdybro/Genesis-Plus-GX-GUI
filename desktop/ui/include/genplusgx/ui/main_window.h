@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/game_file.h"
 #include "genplusgx/cheats/cheat_manager.h"
 #include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/input/input_profile.h"
@@ -31,6 +32,7 @@
 #include <functional>
 #include <filesystem>
 #include <memory>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -90,7 +92,7 @@ public:
     std::function<PersistenceStatus(const input::InputConfiguration&)>;
   using ControllerAssignmentSink =
     std::function<PersistenceStatus(std::uint32_t, std::size_t)>;
-  using GameLoadSink = std::function<void(const std::filesystem::path&)>;
+  using GameLoadSink = std::function<void(const GameLaunchTarget&)>;
   using GameCloseSink = std::function<void()>;
   using ClearRecentGamesSink = std::function<PersistenceStatus()>;
   using StateOperationSink =
@@ -155,6 +157,7 @@ public:
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(const std::string& detail);
   void setGameLoadSink(GameLoadSink sink);
+  void setArchiveCacheDirectory(std::filesystem::path directory);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
   void setStateOperationSink(StateOperationSink sink);
@@ -273,6 +276,7 @@ public:
   [[nodiscard]] bool requestGameLoad(const std::filesystem::path& path);
   void setGameLoading(const std::filesystem::path& path);
   void setGameLoaded(const std::filesystem::path& path);
+  void setGameLoaded(const GameLaunchTarget& target);
   void setGameRuntimeIdentity(std::string system, std::string region);
   void setMeasuredFrameRate(double framesPerSecond);
   void setNominalVideoRate(double framesPerSecond);
@@ -286,6 +290,8 @@ public:
   [[nodiscard]] bool isGameLoaded() const noexcept;
   [[nodiscard]] bool isGameLoading() const noexcept;
   [[nodiscard]] const std::filesystem::path& loadedGamePath() const noexcept;
+  [[nodiscard]] const std::filesystem::path& loadedRuntimePath() const noexcept;
+  [[nodiscard]] const GameLaunchTarget& loadedGameTarget() const noexcept;
   [[nodiscard]] bool captureControllerButton(SDL_GamepadButton button);
   [[nodiscard]] bool presentLatestFrame();
   [[nodiscard]] video::DisplayWidget* displayWidget() const noexcept;
@@ -309,6 +315,7 @@ private:
   void chooseGame();
   void closeGame();
   void chooseDisc();
+  void requestPlaylistDisc(int direction);
   void chooseShaderPreset();
   void requestDiscEjected(bool ejected);
   void updateDiscActions();
@@ -400,7 +407,11 @@ private:
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   std::filesystem::path loadedGamePath_;
+  std::filesystem::path loadedRuntimePath_;
+  GameLaunchTarget loadedGameTarget_;
+  GameLaunchTarget pendingGameTarget_;
   std::filesystem::path pendingGamePath_;
+  std::filesystem::path archiveCacheDirectory_;
   bool hasRecentGames_{false};
   bool gameLoading_{false};
   bool stateSessionReady_{false};
@@ -431,6 +442,7 @@ private:
   std::string gameLibraryUnavailableDetail_;
   std::string discRegion_;
   std::filesystem::path currentDiscPath_;
+  std::optional<std::size_t> playlistDiscIndex_;
   std::uint32_t selectedStateSlot_{0};
 };
 

@@ -9,6 +9,12 @@ platform documentation.
 
 ### Added
 
+- Bounded ZIP browsing for stored/deflated cartridge images, with deterministic member
+  selection, safe cached extraction, CRC/size/ratio validation, source-aware recents,
+  and command-line, drag/drop, session-resume, core, integration, and GUI coverage.
+- Strict local M3U/M3U8 Sega CD playlists with traversal/symlink escape rejection,
+  ordered previous/next disc controls, composite content identity, and generated
+  multi-disc workflow tests.
 - Configurable exact-rational emulation pacing with 50–200% normal speed, 25–75%
   slow motion, 200–1600% fast forward, normal-speed presets, a persistent accessible
   editor, live status/diagnostics, mutually exclusive rewind/slow/fast modes, and

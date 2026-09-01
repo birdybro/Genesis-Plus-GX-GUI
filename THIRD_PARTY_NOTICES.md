@@ -27,7 +27,8 @@ is responsible for supplying all notices/source offers required by its chosen Qt
 | Component | Use | Bundled location/version | License |
 | --- | --- | --- | --- |
 | libchdr | CHD v1-v5 disc-image reader | `core/cd_hw/libchdr`, project version 0.2 | BSD 3-Clause; see `core/cd_hw/libchdr/LICENSE.txt` |
-| zlib | DEFLATE decoding used by libchdr | `core/cd_hw/libchdr/deps/zlib-1.3.1` | zlib license |
+| zlib | DEFLATE decoding used by libchdr and the ZIP cartridge browser | `core/cd_hw/libchdr/deps/zlib-1.3.1` | zlib license |
+| MiniZip | Bounded ZIP directory reading and cartridge extraction | `core/cd_hw/libchdr/deps/zlib-1.3.1/contrib/minizip`; Gilles Vollant and contributors | zlib license retained in the bundled sources |
 | zstd | Zstandard decoding used by libchdr | `core/cd_hw/libchdr/deps/zstd-1.5.6` | BSD license selected for this distribution; upstream also supplies GPLv2 terms |
 | LZMA SDK | LZMA decoding used by libchdr | `core/cd_hw/libchdr/deps/lzma-24.05` | Public domain |
 | dr_flac | FLAC decoding used by libchdr | `core/cd_hw/libchdr/include/dr_libs/dr_flac.h`, 0.12.42 | Public-domain or MIT-0 dual choice |

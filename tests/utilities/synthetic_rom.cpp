@@ -1,5 +1,9 @@
 #include "synthetic_rom.h"
 
+extern "C" {
+#include "zip.h"
+}
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -289,6 +293,42 @@ std::vector<std::uint8_t> makeSegaCdDiscImage(SyntheticSegaCdRegion region)
       break;
   }
   return image;
+}
+
+bool writeZipFixture(
+  const std::filesystem::path& path,
+  std::vector<SyntheticZipEntry> entries,
+  bool compressed)
+{
+  const auto native = path.string();
+  zipFile archive = zipOpen64(native.c_str(), APPEND_STATUS_CREATE);
+  if (archive == nullptr) {
+    return false;
+  }
+  bool success = !entries.empty();
+  for (const auto& entry : entries) {
+    const int method = compressed ? Z_DEFLATED : 0;
+    const int level = compressed ? Z_BEST_COMPRESSION : 0;
+    if (entry.name.empty() ||
+        zipOpenNewFileInZip64(archive, entry.name.c_str(), nullptr,
+          nullptr, 0U, nullptr, 0U, nullptr, method, level,
+          entry.data.size() >= 0xffffffffU ? 1 : 0) != ZIP_OK) {
+      success = false;
+      break;
+    }
+    if (!entry.data.empty() &&
+        zipWriteInFileInZip(archive, entry.data.data(),
+          static_cast<unsigned int>(entry.data.size())) != ZIP_OK) {
+      success = false;
+    }
+    if (zipCloseFileInZip(archive) != ZIP_OK) {
+      success = false;
+    }
+    if (!success) {
+      break;
+    }
+  }
+  return zipClose(archive, nullptr) == ZIP_OK && success;
 }
 
 TemporaryFixture::TemporaryFixture(

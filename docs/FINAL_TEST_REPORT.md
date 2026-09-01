@@ -438,6 +438,27 @@ first condition mandatory, while renderer preflight protects users from missing 
 broken graphics drivers. Debug, Release, and ASan/UBSan each pass 74/74 after the
 correction; the sanitizer suite reports no finding.
 
+## Archive and multi-disc playlist verification
+
+Milestone 82 adds a separately linked, symbol-isolated MiniZip/zlib reader for bounded
+ZIP cartridge discovery and exact cached extraction, plus strict UTF-8 M3U/M3U8 Sega CD
+playlist resolution. Debug and optimized Release each pass 91/91 tests. ASan/UBSan
+passes 91/91 without a finding; a fresh shader-disabled graph passes all 89 applicable
+tests; and a fresh Clang 22 warning-as-error graph passes 91/91 with no authored-code
+diagnostic. The new integration test executes extracted Genesis and Master System
+members and changes between generated Sega CD discs declared by an M3U. GUI and
+full-process tests cover selection, cancellation, source/runtime identity, disc action
+gating, command-line loading, and session resume.
+
+A fresh CHD-disabled graph also passes 91/91, proving that ZIP browsing remains usable
+when the optional CHD decoder is excluded and that its prefixed zlib copy is independent.
+
+The staged Linux installation passes package verification. Its 0.1.1 x86-64 TGZ has a
+valid SHA-256 manifest, valid gzip/tar structure, 86 entries, and the expected binary,
+Qt/SDL/librashader runtime, CRT assets, documentation, and notices. The inherited Unix
+libretro target also builds, links, and cleans. Exact hosted cross-platform evidence is
+pending the milestone implementation push.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -454,7 +475,8 @@ correction; the sanitizer suite reports no finding.
   capture, deadzones, profiles, specialized devices, multitaps, and configurable
   conflict-checked hotkeys including independent fast-forward hold/toggle.
 - [x] Open/replace/close, drag/drop, command line, strict bounded CUE preflight,
-  descriptive malformed-file errors, and persistent recent-game history.
+  bounded ZIP cartridge browsing, strict M3U multi-disc playlists, descriptive
+  malformed-file errors, and persistent source-aware recent-game history.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
   automatic load/flush, platform-standard application-data paths, and composite CUE
   identities covering the sheet plus every validated track without path dependence.
@@ -523,8 +545,8 @@ directories.
   notarization, and any Windows installer signing require project-owned credentials.
 - Linux ships a relocatable TGZ rather than an AppImage and intentionally relies on the
   CI distribution's base graphics, window-system, C/C++ runtime, and libc libraries.
-- Archive formats are offered only when the authoritative core/build loader supports
-  them; this build does not claim ZIP loading. Physical optical drives, netplay,
+- ZIP support is intentionally limited to stored/deflated cartridge members; archived
+  Sega CD workflows and formats other than ZIP remain unsupported. Physical optical drives, netplay,
   achievements, cloud sync, online scraping/downloading, instruction-level stepping,
   an external debugger server, TAS tooling, and streaming remain intentionally outside
   scope.

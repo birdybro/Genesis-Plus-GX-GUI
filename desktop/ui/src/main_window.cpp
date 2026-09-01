@@ -1,6 +1,7 @@
 #include "genplusgx/ui/main_window.h"
 
 #include "genplusgx/game_file.h"
+#include "genplusgx/game_archive.h"
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
@@ -302,6 +303,18 @@ void MainWindow::buildMenus()
   auto* changeDisc = addAction(
     *emulation, tr("Change &Disc…"), "changeDiscAction");
   connect(changeDisc, &QAction::triggered, this, &MainWindow::chooseDisc);
+  auto* previousDisc = addAction(
+    *emulation, tr("Pre&vious Playlist Disc"), "previousDiscAction",
+    QKeySequence{tr("Ctrl+Shift+PageUp")});
+  connect(previousDisc, &QAction::triggered, this, [this] {
+    requestPlaylistDisc(-1);
+  });
+  auto* nextDisc = addAction(
+    *emulation, tr("Ne&xt Playlist Disc"), "nextDiscAction",
+    QKeySequence{tr("Ctrl+Shift+PageDown")});
+  connect(nextDisc, &QAction::triggered, this, [this] {
+    requestPlaylistDisc(1);
+  });
   auto* ejectDisc = addAction(
     *emulation, tr("&Eject Disc"), "ejectDiscAction");
   ejectDisc->setCheckable(true);
@@ -1190,7 +1203,7 @@ void MainWindow::requestGameInformation()
     return;
   }
   setGameInformationBusy(true);
-  gameInformationRequestSink_(loadedGamePath_);
+  gameInformationRequestSink_(loadedRuntimePath_);
 }
 
 void MainWindow::updateGameInformationAction()
@@ -2184,6 +2197,15 @@ void MainWindow::setSegaCdSession(
   segaCdSession_ = enabled && isGameLoaded();
   discRegion_ = std::move(region);
   currentDiscPath_ = std::move(discPath);
+  playlistDiscIndex_.reset();
+  if (segaCdSession_) {
+    const auto playlistDisc = std::ranges::find(
+      loadedGameTarget_.playlistDiscs, currentDiscPath_);
+    if (playlistDisc != loadedGameTarget_.playlistDiscs.end()) {
+      playlistDiscIndex_ = static_cast<std::size_t>(
+        std::distance(loadedGameTarget_.playlistDiscs.begin(), playlistDisc));
+    }
+  }
   discEjected_ = segaCdSession_ && ejected;
   discPresent_ = segaCdSession_ && discPresent;
   discOperationBusy_ = false;
@@ -2194,6 +2216,7 @@ void MainWindow::setSegaCdSession(
   } else {
     discRegion_.clear();
     currentDiscPath_.clear();
+    playlistDiscIndex_.reset();
     systemStatus_->setText(tr("System: —"));
     regionStatus_->setText(tr("Region: —"));
   }
@@ -2449,6 +2472,11 @@ void MainWindow::setGameLoadSink(GameLoadSink sink)
   gameLoadSink_ = std::move(sink);
 }
 
+void MainWindow::setArchiveCacheDirectory(std::filesystem::path directory)
+{
+  archiveCacheDirectory_ = std::move(directory);
+}
+
 void MainWindow::setGameCloseSink(GameCloseSink sink)
 {
   gameCloseSink_ = std::move(sink);
@@ -2606,8 +2634,43 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
     presentGameLoadError(path, "Another game operation is still in progress.");
     return false;
   }
-  const auto status = validateGameFile(path);
-  if (!status) {
+  GameLaunchTarget target{
+    .sourcePath = path,
+    .runtimePath = path,
+    .archiveEntry = {},
+    .playlistDiscs = {},
+  };
+  if (hasZipArchiveExtension(path)) {
+    const auto inspection = inspectZipArchive(path);
+    if (!inspection.status) {
+      presentGameLoadError(path, inspection.status.message);
+      return false;
+    }
+    std::optional<std::string> entry;
+    if (inspection.entries.size() == 1U) {
+      entry = inspection.entries.front().name;
+    } else {
+      entry = dialogService_->chooseArchiveEntry(this, path, inspection.entries);
+      if (!entry) {
+        return false;
+      }
+    }
+    const auto extracted = extractZipGame(path, *entry, archiveCacheDirectory_);
+    if (!extracted.status) {
+      presentGameLoadError(path, extracted.status.message);
+      return false;
+    }
+    target.runtimePath = extracted.path;
+    target.archiveEntry = std::move(*entry);
+  } else if (hasDiscPlaylistExtension(path)) {
+    DiscPlaylistInfo playlist;
+    if (const auto status = validateDiscPlaylistFile(path, playlist); !status) {
+      presentGameLoadError(path, status.message);
+      return false;
+    }
+    target.runtimePath = playlist.discs.front();
+    target.playlistDiscs = std::move(playlist.discs);
+  } else if (const auto status = validateGameFile(path); !status) {
     presentGameLoadError(path, status.message);
     return false;
   }
@@ -2615,8 +2678,9 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
     presentGameLoadError(path, "The emulation service is not available.");
     return false;
   }
+  pendingGameTarget_ = target;
   setGameLoading(path);
-  gameLoadSink_(path);
+  gameLoadSink_(target);
   return true;
 }
 
@@ -2666,6 +2730,14 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   rewindToggled_ = false;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
+  if (!pendingGameTarget_.valid() || pendingGameTarget_.sourcePath != path) {
+    pendingGameTarget_ = {
+      .sourcePath = path,
+      .runtimePath = path,
+      .archiveEntry = {},
+      .playlistDiscs = {},
+    };
+  }
   displayWidget_->clearFrame();
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
@@ -2689,7 +2761,21 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
 
 void MainWindow::setGameLoaded(const std::filesystem::path& path)
 {
-  if (loadedGamePath_ != path) {
+  setGameLoaded(GameLaunchTarget{
+    .sourcePath = path,
+    .runtimePath = path,
+    .archiveEntry = {},
+    .playlistDiscs = {},
+  });
+}
+
+void MainWindow::setGameLoaded(const GameLaunchTarget& target)
+{
+  if (!target.valid()) {
+    setNoGameLoaded();
+    return;
+  }
+  if (loadedRuntimePath_ != target.runtimePath) {
     stateSessionReady_ = false;
     stateOperationBusy_ = false;
     for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
@@ -2697,7 +2783,10 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
       stateSlotViews_[slot].slot = slot;
     }
   }
-  loadedGamePath_ = path;
+  loadedGameTarget_ = target;
+  loadedGamePath_ = target.sourcePath;
+  loadedRuntimePath_ = target.runtimePath;
+  pendingGameTarget_ = {};
   pendingGamePath_.clear();
   gameLoading_ = false;
   gameInformationBusy_ = false;
@@ -2705,7 +2794,11 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(true);
   updateStateSlotPresentation();
-  gameStatus_->setText(pathToQString(path.filename()));
+  gameStatus_->setText(target.isArchive()
+    ? tr("%1 — %2")
+        .arg(pathToQString(target.sourcePath.filename()),
+          QString::fromUtf8(target.archiveEntry))
+    : pathToQString(target.sourcePath.filename()));
   statusBar()->showMessage(tr("Game loaded"), 3000);
   refreshSettingsDialog();
   if (auto* debugger = findChild<DebugToolsWindow*>(
@@ -2759,6 +2852,9 @@ void MainWindow::setNoGameLoaded()
     information->close();
   }
   loadedGamePath_.clear();
+  loadedRuntimePath_.clear();
+  loadedGameTarget_ = {};
+  pendingGameTarget_ = {};
   pendingGamePath_.clear();
   gameLoading_ = false;
   gameInformationBusy_ = false;
@@ -2783,6 +2879,7 @@ void MainWindow::setNoGameLoaded()
   discOperationBusy_ = false;
   discRegion_.clear();
   currentDiscPath_.clear();
+  playlistDiscIndex_.reset();
   for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
     stateSlotViews_[slot] = StateSlotView{};
     stateSlotViews_[slot].slot = slot;
@@ -2829,6 +2926,31 @@ void MainWindow::chooseDisc()
   discOperationSink_(DiscUiOperation::change, *selected, false);
 }
 
+void MainWindow::requestPlaylistDisc(int direction)
+{
+  if (!segaCdSession_ || discOperationBusy_ || !discOperationSink_ ||
+      !playlistDiscIndex_ || direction == 0 ||
+      loadedGameTarget_.playlistDiscs.size() < 2U) {
+    updateDiscActions();
+    return;
+  }
+  const auto current = static_cast<std::ptrdiff_t>(*playlistDiscIndex_);
+  const auto next = current + static_cast<std::ptrdiff_t>(direction);
+  if (next < 0 || next >= static_cast<std::ptrdiff_t>(
+        loadedGameTarget_.playlistDiscs.size())) {
+    updateDiscActions();
+    return;
+  }
+  const auto& path = loadedGameTarget_.playlistDiscs[
+    static_cast<std::size_t>(next)];
+  if (const auto status = validateDiscImageFile(path); !status) {
+    showDiscOperationError(DiscUiOperation::change, status.message);
+    return;
+  }
+  setDiscOperationBusy(true);
+  discOperationSink_(DiscUiOperation::change, path, false);
+}
+
 void MainWindow::requestDiscEjected(bool ejected)
 {
   if (!segaCdSession_ || discOperationBusy_ || !discOperationSink_) {
@@ -2843,13 +2965,27 @@ void MainWindow::updateDiscActions()
 {
   auto* change = findChild<QAction*>(QStringLiteral("changeDiscAction"));
   auto* eject = findChild<QAction*>(QStringLiteral("ejectDiscAction"));
-  if (change == nullptr || eject == nullptr) {
+  auto* previous = findChild<QAction*>(QStringLiteral("previousDiscAction"));
+  auto* next = findChild<QAction*>(QStringLiteral("nextDiscAction"));
+  if (change == nullptr || eject == nullptr || previous == nullptr ||
+      next == nullptr) {
     return;
   }
   const bool available = isGameLoaded() && !sessionResumeBusy_ &&
     segaCdSession_ && !discOperationBusy_;
   change->setEnabled(available);
   eject->setEnabled(available);
+  const bool playlistAvailable = available && playlistDiscIndex_.has_value();
+  previous->setEnabled(playlistAvailable && *playlistDiscIndex_ > 0U);
+  next->setEnabled(playlistAvailable &&
+    *playlistDiscIndex_ + 1U < loadedGameTarget_.playlistDiscs.size());
+  const auto playlistPosition = playlistDiscIndex_
+    ? tr("Disc %1 of %2")
+        .arg(*playlistDiscIndex_ + 1U)
+        .arg(loadedGameTarget_.playlistDiscs.size())
+    : tr("No active M3U playlist");
+  previous->setToolTip(playlistPosition);
+  next->setToolTip(playlistPosition);
   change->setToolTip(discPresent_ && !currentDiscPath_.empty()
     ? tr("Current disc: %1").arg(pathToQString(currentDiscPath_))
     : tr("No disc inserted"));
@@ -2863,8 +2999,8 @@ void MainWindow::showGameLoadError(
   const std::string& detail,
   bool gameWasUnloaded)
 {
-  const auto previousGame = loadedGamePath_;
-  if (gameWasUnloaded || previousGame.empty()) {
+  const auto previousGame = loadedGameTarget_;
+  if (gameWasUnloaded || !previousGame.valid()) {
     setNoGameLoaded();
   } else {
     setGameLoaded(previousGame);
@@ -2912,6 +3048,16 @@ bool MainWindow::isGameLoading() const noexcept
 const std::filesystem::path& MainWindow::loadedGamePath() const noexcept
 {
   return loadedGamePath_;
+}
+
+const std::filesystem::path& MainWindow::loadedRuntimePath() const noexcept
+{
+  return loadedRuntimePath_;
+}
+
+const GameLaunchTarget& MainWindow::loadedGameTarget() const noexcept
+{
+  return loadedGameTarget_;
 }
 
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)

@@ -7,6 +7,29 @@ target_link_libraries(
 add_test(NAME core.library_link COMMAND genplusgx_core_link_test)
 set_tests_properties(core.library_link PROPERTIES LABELS "core;smoke")
 
+add_executable(
+  genplusgx_archive_playlist_workflow_test archive_playlist_workflow_test.cpp
+)
+target_link_libraries(
+  genplusgx_archive_playlist_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(
+  NAME integration.archive_playlist
+  COMMAND genplusgx_archive_playlist_workflow_test
+)
+set_tests_properties(
+  integration.archive_playlist
+  PROPERTIES
+    LABELS "core;integration;archive;zip;m3u;sega-cd;fixture;lifecycle"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_core_debug_test core_debug_test.cpp)
 target_link_libraries(
   genplusgx_core_debug_test

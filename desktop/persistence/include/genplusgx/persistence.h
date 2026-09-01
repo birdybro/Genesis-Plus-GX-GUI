@@ -48,6 +48,7 @@ public:
   [[nodiscard]] std::filesystem::path screenshotsDirectory() const;
   [[nodiscard]] std::filesystem::path libraryDirectory() const;
   [[nodiscard]] std::filesystem::path logsDirectory() const;
+  [[nodiscard]] std::filesystem::path cacheDirectory() const;
 
 private:
   std::filesystem::path root_;

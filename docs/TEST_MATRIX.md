@@ -18,7 +18,7 @@ ctest --preset debug -L gui --output-on-failure
 | Shell and menus | Window visibility, stable menu/action IDs, empty state, action gating, loaded system/region, measured/invalid FPS, bounded/deduplicated startup issues, audio and emulation runtime errors, About, exit | `gui.main_window`, `unit.frame_pacer` |
 | Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, typed editor routing, loaded-game gating, visible rejection with prior snapshot/menu preservation | `gui.settings`, `gui.main_window`, `gui.input_configuration`, `gui.appearance_accessibility` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
-| Loading | Injected Open dialog, invalid input errors, drag/drop, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `gui.game_loading`, `gui.main_window` |
+| Loading | Injected Open dialog, invalid input errors, drag/drop, bounded ZIP member browser/extraction, M3U disc navigation, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `unit.game_file`, `integration.archive_playlist`, `gui.game_loading`, `gui.main_window` |
 | Emulation controls and speed | Live Pause/Resume, hard/soft reset, configurable exact normal/slow/fast rates, independent hold/toggle composition, focus-safe release, mutually exclusive rewind/slow/fast modes, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `unit.speed_settings`, `unit.frame_pacer`, `core.timing_pacing`, `gui.speed_settings`, `gui.emulation_controls` |
 | Save states | Slots 0–9, save/load/delete, timestamps, changed execution, deterministic restore, wrong-game rejection, cancellable identity activation | `unit.state_storage_service`, `gui.save_state_workflow`, `gui.main_window` |
 | Session resume | Opt-in/defaults, absolute Unicode path persistence, invalid-data rejection, dedicated state save/load/delete, four-process checkpoint creation/restore, explicit command-line precedence, and corruption fallback | `unit.session_settings`, `unit.state_manager`, `unit.state_storage_service`, `gui.session_settings`, `gui.session_resume_application` |
@@ -27,7 +27,7 @@ ctest --preset debug -L gui --output-on-failure
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
 | Controller/input UI | Gameplay/hotkey capture, separate fast-forward and slow-motion hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
 | BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
-| Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state, bounded CUE syntax/reference preflight, composite sheet/track identity, and invalid preflight without mounted-disc mutation | `unit.game_file`, `unit.persistence`, `unit.game_metadata`, `core.sega_cd_workflow`, `gui.main_window` |
+| Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state, bounded CUE syntax/reference preflight, strict M3U/M3U8 ordering/navigation, composite sheet/track/playlist identity, and invalid preflight without mounted-disc mutation | `unit.game_file`, `unit.persistence`, `unit.game_metadata`, `integration.archive_playlist`, `core.sega_cd_workflow`, `gui.main_window` |
 | Game library | Directory add/remove, async scan/cancellation, CUE-track deduplication, search/system filter, favorite, sorting, local art, launch | `unit.game_library_scanner`, `gui.game_library` |
 | Game information | Asynchronous request, bounded parsed metadata fields, failure recovery | `gui.main_window` |
 | Screenshots | Native frame capture request, busy/error/success states, directory chooser and settings | `gui.main_window` |
@@ -43,6 +43,13 @@ placeholders. `core.eight_bit_systems` loads and executes SG-1000, forced Mark I
 Master System II, and Game Gear sessions, verifies a semantic work-RAM write, and checks
 256×192 or 160×144 native geometry. Genesis and Sega CD retain their independent
 generated 68000/disc workflow tests.
+
+`integration.archive_playlist` creates real stored/deflated ZIPs with MiniZip, validates
+and extracts exact members, executes generated Genesis and Master System cartridges,
+then resolves a generated M3U and changes between two generated Sega CD images through
+the production adapter. GUI coverage drives single- and multi-member archives,
+selection cancellation, source/runtime identity, playlist navigation, and a full-process
+ZIP command-line/session-resume cycle.
 
 The GUI layer deliberately avoids platform-native pixel goldens. Presentation geometry
 and emulator pixels are validated independently by deterministic unit/core hashes, while

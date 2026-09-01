@@ -25,9 +25,11 @@ to all essential actions.
 - Sega CD / Mega CD
 
 The desktop file picker recognizes `.68k`, `.bin`, `.bms`, `.cue`, `.gen`, `.gg`,
-`.iso`, `.md`, `.mdx`, `.sg`, `.sgd`, `.smd`, and `.sms`. CMake builds enable `.chd`
-by default through the bundled libchdr decoder. A Sega CD game needs a legally obtained,
-region-appropriate BIOS supplied by the user.
+`.iso`, `.md`, `.mdx`, `.m3u`, `.m3u8`, `.sg`, `.sgd`, `.smd`, `.sms`, and `.zip`.
+CMake builds enable `.chd` by default through the bundled libchdr decoder. ZIP browsing
+supports stored or deflated cartridge images; M3U playlists provide ordered local Sega
+CD disc sets. A Sega CD game needs a legally obtained, region-appropriate BIOS supplied
+by the user.
 
 ## Features
 
@@ -49,6 +51,7 @@ region-appropriate BIOS supplied by the user.
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
+- Bounded ZIP cartridge browser and traversal-safe M3U/M3U8 multi-disc playlists
 - Recent games, searchable asynchronous SQLite library, favorites, play history, and
   user-provided local artwork
 - Header metadata and SHA-256 game information, Game Genie/PAR cheats, and sparse
@@ -100,6 +103,11 @@ genesis-plus-gx-gui [--fullscreen] path/to/game.bin
 genesis-plus-gx-gui --help
 genesis-plus-gx-gui --version
 ```
+
+A ZIP containing one compatible cartridge opens directly; a multi-game ZIP presents a
+keyboard-accessible member chooser. Opening an M3U starts its first disc and enables the
+previous/next playlist-disc commands. Archived Sega CD sets are intentionally not
+supported; keep CUE/BIN/CHD disc files beside a relative-path M3U instead.
 
 Use **Input → Controller Configuration** to assign or remap keyboard and SDL controllers.
 Default keyboard controls and application hotkeys are listed in

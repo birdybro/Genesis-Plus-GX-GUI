@@ -53,6 +53,8 @@ shortcuts.
 | Select state slot 0–9 | Ctrl+0 through Ctrl+9 |
 | Previous / next state slot | Ctrl+[ / Ctrl+] |
 | Delete selected state | Ctrl+Delete |
+| Previous playlist disc | Ctrl+Shift+PageUp |
+| Next playlist disc | Ctrl+Shift+PageDown |
 | Screenshot | F12 |
 | Mute | M |
 | Volume up / down | + / - |

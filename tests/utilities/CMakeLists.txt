@@ -3,5 +3,6 @@ target_include_directories(genplusgx_test_utilities PUBLIC ${CMAKE_CURRENT_SOURC
 target_link_libraries(
   genplusgx_test_utilities
   PUBLIC genplusgx_project_options
+  PRIVATE genplusgx_archive_zlib
   PRIVATE genplusgx_project_warnings
 )

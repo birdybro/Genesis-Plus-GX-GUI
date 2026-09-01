@@ -1,6 +1,7 @@
 #include "genplusgx/ui/dialog_service.h"
 
 #include "genplusgx/game_file.h"
+#include "genplusgx/ui/archive_entry_dialog.h"
 
 #include <QFileDialog>
 #include <QMessageBox>
@@ -69,6 +70,14 @@ std::optional<std::filesystem::path> DialogService::chooseArtwork(
 std::optional<std::filesystem::path> DialogService::chooseShaderPreset(
   QWidget*,
   const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::string> DialogService::chooseArchiveEntry(
+  QWidget*,
+  const std::filesystem::path&,
+  const std::vector<ArchivedGameEntry>&)
 {
   return std::nullopt;
 }
@@ -143,6 +152,16 @@ std::optional<std::filesystem::path> QtDialogService::chooseShaderPreset(
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::string> QtDialogService::chooseArchiveEntry(
+  QWidget* parent,
+  const std::filesystem::path& archivePath,
+  const std::vector<ArchivedGameEntry>& entries)
+{
+  ArchiveEntryDialog dialog{archivePath, entries, parent};
+  return dialog.exec() == QDialog::Accepted
+    ? dialog.selectedEntry() : std::nullopt;
 }
 
 void QtDialogService::showError(

@@ -590,6 +590,8 @@ int main(int argc, char* argv[])
   }
 
   genplusgx::ui::MainWindow window;
+  window.setArchiveCacheDirectory(
+    applicationPaths.cacheDirectory() / "archives");
   window.displayWidget()->setRendererFailureSink(
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
@@ -1441,7 +1443,7 @@ int main(int argc, char* argv[])
   struct PendingLoad final {
     std::uint64_t operationId{0};
     std::uint64_t metadataOperationId{0};
-    std::filesystem::path path;
+    genplusgx::GameLaunchTarget target;
     std::optional<genplusgx::GameIdentity> identity;
     genplusgx::settings::PerGameSettings overrides;
     genplusgx::settings::EffectiveGameSettings effective;
@@ -1469,7 +1471,7 @@ int main(int argc, char* argv[])
   };
   std::uint64_t discOperationId = 2'500'000U;
   std::optional<PendingDisc> pendingDisc;
-  std::filesystem::path closingGamePath;
+  genplusgx::GameLaunchTarget closingGameTarget;
   enum class PendingStatePhase {
     capturing,
     saving,
@@ -1649,7 +1651,7 @@ int main(int argc, char* argv[])
      &applyEffectiveSettings, &automaticResumePath, &globalGameSettings,
      &lifecycleOperationId, &loadMetadataOperationId, &metadataService,
      &pendingAutomaticResume, &pendingLoad, &window, &worker](
-      const std::filesystem::path& path) {
+      const genplusgx::GameLaunchTarget& target) {
       if (pendingAutomaticResume) {
         pendingAutomaticResume.reset();
         automaticResumePath.reset();
@@ -1659,7 +1661,7 @@ int main(int argc, char* argv[])
       pendingLoad = PendingLoad{
         .operationId = 0U,
         .metadataOperationId = metadataId,
-        .path = path,
+        .target = target,
         .identity = std::nullopt,
         .overrides = {},
         .effective = genplusgx::settings::resolvePerGameSettings(
@@ -1673,7 +1675,8 @@ int main(int argc, char* argv[])
         .warning = {},
         .phase = PendingLoadPhase::metadata,
       };
-      const auto requested = metadataService.request(metadataId, path);
+      const auto requested = metadataService.request(
+        metadataId, target.runtimePath);
       if (requested) {
         return;
       }
@@ -1686,30 +1689,30 @@ int main(int argc, char* argv[])
         const auto previous = pendingLoad->previousEffective;
         pendingLoad.reset();
         static_cast<void>(applyEffectiveSettings(previous));
-        window.showGameLoadError(path, applied.message, false);
+        window.showGameLoadError(target.sourcePath, applied.message, false);
         return;
       }
       pendingLoad->operationId = ++lifecycleOperationId;
       pendingLoad->phase = PendingLoadPhase::coreLoad;
       const auto submitted = worker.submit(genplusgx::EmulationCommand::load(
-        pendingLoad->operationId, path));
+        pendingLoad->operationId, target.runtimePath));
       if (!submitted) {
         const auto previous = pendingLoad->previousEffective;
         pendingLoad.reset();
         static_cast<void>(applyEffectiveSettings(previous));
-        window.showGameLoadError(path, submitted.message, false);
+        window.showGameLoadError(target.sourcePath, submitted.message, false);
       }
     });
   window.setGameCloseSink(
-    [&closingGamePath, &lifecycleOperationId, &pendingUnload, &window, &worker] {
-      closingGamePath = window.loadedGamePath();
+    [&closingGameTarget, &lifecycleOperationId, &pendingUnload, &window, &worker] {
+      closingGameTarget = window.loadedGameTarget();
       const auto operationId = ++lifecycleOperationId;
       pendingUnload = operationId;
       const auto submitted = worker.submit(genplusgx::EmulationCommand::simple(
         genplusgx::EmulationCommandType::unloadGame, operationId));
       if (!submitted) {
         pendingUnload.reset();
-        window.setGameLoaded(closingGamePath);
+        window.setGameLoaded(closingGameTarget);
         window.showGameCloseError(submitted.message);
         qWarning().noquote() << QString::fromStdString(submitted.message);
       }
@@ -1937,7 +1940,7 @@ int main(int argc, char* argv[])
      &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
      &pendingCheatMetadata, &pendingCheatOperation, &perGameSettingsStore,
      &pendingScreenshot, &screenshotService,
-     &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
+     &closingGameTarget, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
      &sessionSettings, &sessionSettingsStore, &startLoadedGame,
      &stateOperationId,
@@ -2125,7 +2128,8 @@ int main(int argc, char* argv[])
           event->operationId == pendingLoad->operationId &&
           event->command == genplusgx::EmulationCommandType::loadGame) {
         const auto completedLoad = std::move(*pendingLoad);
-        const auto loadedPath = completedLoad.path;
+        const auto loadedPath = completedLoad.target.sourcePath;
+        const auto runtimePath = completedLoad.target.runtimePath;
         pendingLoad.reset();
         if (event->succeeded()) {
           runtimeFailureReported = false;
@@ -2147,7 +2151,7 @@ int main(int argc, char* argv[])
           diagnosticLoadedRegion = event->disc.segaCd
             ? discRegionName(event->disc.region)
             : completedLoad.diagnosticRegion;
-          window.setGameLoaded(loadedPath);
+          window.setGameLoaded(completedLoad.target);
           window.setEmulationControlState(
             true, event->fastForward, event->slowMotion, event->speedPercent,
             event->rewinding, event->rewindAvailable);
@@ -2182,7 +2186,7 @@ int main(int argc, char* argv[])
           stateActivationOperation = activationId;
           const auto stateActivated = stateStorage.submit(
             genplusgx::StateStorageCommand::activate(
-              activationId, gameGeneration, loadedPath, event->hardware));
+              activationId, gameGeneration, runtimePath, event->hardware));
           const bool automaticResumeCandidate = automaticResumePath &&
             *automaticResumePath == loadedPath;
           if (!stateActivated) {
@@ -2245,11 +2249,11 @@ int main(int argc, char* argv[])
           const auto cheatMetadataId = ++cheatMetadataOperationId;
           pendingCheatMetadata = PendingCheatMetadata{
             .operationId = cheatMetadataId,
-            .path = loadedPath,
+            .path = runtimePath,
             .system = cheatSystem(event->hardware),
           };
           const auto cheatMetadataSubmitted = metadataService.request(
-            cheatMetadataId, loadedPath);
+            cheatMetadataId, runtimePath);
           if (!cheatMetadataSubmitted) {
             pendingCheatMetadata.reset();
             window.showCheatError(
@@ -2389,9 +2393,9 @@ int main(int argc, char* argv[])
           activeCheatConfiguration = {};
           pendingCheatMetadata.reset();
           pendingCheatOperation.reset();
-          closingGamePath.clear();
+          closingGameTarget = {};
         } else {
-          window.setGameLoaded(closingGamePath);
+          window.setGameLoaded(closingGameTarget);
           window.setSegaCdSession(
             event->disc.segaCd,
             discRegionName(event->disc.region),
@@ -2705,7 +2709,7 @@ int main(int argc, char* argv[])
         constexpr auto stoppedDetail =
           "The game metadata service stopped before completing the request.";
         if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata) {
-          const auto path = pendingLoad->path;
+          const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
           pendingLoad.reset();
           const auto restored = applyEffectiveSettings(previous);
@@ -2729,7 +2733,7 @@ int main(int argc, char* argv[])
       }
       if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata &&
           event->operationId == pendingLoad->metadataOperationId &&
-          event->path == pendingLoad->path) {
+          event->path == pendingLoad->target.runtimePath) {
         if (event->succeeded()) {
           pendingLoad->diagnosticGame = event->metadata.displayTitle();
           pendingLoad->diagnosticSystem = std::string{
@@ -2777,7 +2781,7 @@ int main(int argc, char* argv[])
         }
         const auto applied = applyEffectiveSettings(pendingLoad->effective);
         if (!applied) {
-          const auto path = pendingLoad->path;
+          const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
           pendingLoad.reset();
           static_cast<void>(applyEffectiveSettings(previous));
@@ -2787,9 +2791,9 @@ int main(int argc, char* argv[])
         pendingLoad->operationId = ++lifecycleOperationId;
         pendingLoad->phase = PendingLoadPhase::coreLoad;
         const auto submitted = worker.submit(genplusgx::EmulationCommand::load(
-          pendingLoad->operationId, pendingLoad->path));
+          pendingLoad->operationId, pendingLoad->target.runtimePath));
         if (!submitted) {
-          const auto path = pendingLoad->path;
+          const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
           pendingLoad.reset();
           static_cast<void>(applyEffectiveSettings(previous));
@@ -2805,7 +2809,7 @@ int main(int argc, char* argv[])
         pendingCheatMetadata.reset();
         const bool belongsToVisibleGame =
           !window.isGameLoading() && window.isGameLoaded() &&
-          window.loadedGamePath() == requestedPath;
+          window.loadedRuntimePath() == requestedPath;
         if (!belongsToVisibleGame) {
           continue;
         }
@@ -2864,7 +2868,7 @@ int main(int argc, char* argv[])
       }
       const bool belongsToVisibleGame =
         !window.isGameLoading() && window.isGameLoaded() &&
-        window.loadedGamePath() == event->path;
+        window.loadedRuntimePath() == event->path;
       pendingMetadata.reset();
       if (!belongsToVisibleGame) {
         window.setGameInformationBusy(false);

@@ -35,16 +35,28 @@ Recent Games** at the bottom of the submenu to erase the list; doing so does not
 the game currently running. If the history file cannot be committed, the existing menu
 is retained and a Recent Games Error explains the filesystem failure.
 
-The desktop host currently opens these files directly:
+The desktop host accepts these files:
 
 ```text
-.68k .bin .bms .cue .gen .gg .iso .md .mdx .sg .sgd .smd .sms
+.68k .bin .bms .cue .gen .gg .iso .md .mdx .m3u .m3u8 .sg .sgd .smd .sms .zip
 ```
 
-CHD appears when the build includes libchdr (the default presets do). ZIP archives and
-M3U playlists are not yet accepted by the standalone host and therefore are not shown
-in its file picker. A `.bin` file may be a cartridge or part of a disc workflow; the
-Genesis Plus GX core makes the final content decision.
+CHD appears when the build includes libchdr (the default presets do). ZIP browsing is
+limited to stored or deflated cartridge members supported by the core; encrypted
+members, unsafe names, excessive compression ratios, members over 32 MiB, and archived
+disc workflows are rejected. A one-game ZIP opens automatically. For multiple games,
+choose the member in the accessible archive browser. The validated cartridge is cached
+beneath the application cache directory; the original ZIP remains the recent/session
+source and the cache may be deleted while the application is closed.
+
+M3U and UTF-8 M3U8 playlists describe up to 32 local Sega CD images, one relative path
+per non-comment line. Absolute paths, URLs, parent traversal, duplicate discs, missing
+files, and paths that escape through a symlink are rejected. The first disc loads at
+startup. Use **Emulation → Previous Playlist Disc** (`Ctrl+Shift+PageUp`) or **Next
+Playlist Disc** (`Ctrl+Shift+PageDown`) to move through the declared order; ordinary
+Change Disc and Eject remain available. Keep a playlist and all referenced CUE/ISO/CHD
+files within the playlist directory tree. A `.bin` file may be a cartridge or part of a
+disc workflow; the Genesis Plus GX core makes the final content decision.
 
 Missing files, directories, unsupported extensions, unreadable files, overlong paths,
 and core-rejected images produce a concise error dialog instead of crashing. Selecting

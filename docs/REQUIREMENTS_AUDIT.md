@@ -16,7 +16,7 @@ or final test report.
 | 7. Video | Implemented | `DisplayWidget`, `VideoFrameExchange`, and geometry/settings tests cover dynamic viewports, DPI, resize, aspect, integer scaling, filtering, overscan, Game Gear, PAL/NTSC, interlace, fullscreen, and native capture. |
 | 8. Audio | Implemented | SDL3 stereo output, the bounded ring, device/latency reconfiguration, gain/mute, reconnect handling, metrics, and every exposed core mixer/chip option are tested. |
 | 9. Timing | Implemented | Rational `steady_clock` pacing covers NTSC, PAL, Sega CD, pause, frame advance, bounded catch-up, configurable 25–1600% slow/normal/fast rates, and focus-safe mode changes without a GUI timer or busy loop. |
-| 10. Game loading | Implemented | Native Open, one-file drag/drop, command-line loading, recent history, replacement, typed validation, and conditional CHD are covered. ZIP is not advertised because this build has no archive enumerator. |
+| 10. Game loading | Implemented | Native Open, one-file drag/drop, command-line loading, recent history, replacement, typed validation, conditional CHD, bounded ZIP cartridge browsing, and strict M3U/M3U8 playlists are covered. |
 | 11. Sega CD | Implemented | Regional BIOS, CUE/BIN/ISO/conditional CHD, CDDA, eject/change, BRAM, RAM cartridge, metadata, and optional external-firmware testing are documented in [BIOS.md](BIOS.md). |
 | 12. BIOS manager | Implemented | Eight firmware slots expose path, existence, detected type/region, SHA-256, validation, and local selection without downloading firmware. |
 | 13. Save RAM | Implemented | Platform paths, collision-resistant identities, atomic per-game SRAM/internal-BRAM/RAM-cartridge writes, automatic load/flush, and corruption guards are tested. |
@@ -69,8 +69,9 @@ or final test report.
 ## Explicit limitations
 
 The Linux artifact is a relocatable TGZ rather than an AppImage. macOS development
-artifacts are unsigned; signing and notarization require project credentials. ZIP is
-not claimed by the raw desktop loader. Real proprietary Sega CD firmware and physical
+artifacts are unsigned; signing and notarization require project credentials. ZIP
+support is intentionally cartridge-only; archived Sega CD sets remain unsupported.
+Real proprietary Sega CD firmware and physical
 controller/audio hardware remain opt-in/manual smoke inputs; CI uses generated legal
 fixtures and injected SDL events. These are capability or credential boundaries, not
 inert advertised controls.

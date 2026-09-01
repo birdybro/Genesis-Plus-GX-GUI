@@ -50,6 +50,15 @@ Genesis program and requires alternate-speed audio to remain empty;
 `gui.speed_settings` and `gui.emulation_controls` cover presets, transactions,
 accessibility, status, mutual exclusion, and configurable hold/toggle semantics.
 
+`unit.game_file` creates stored and deflated ZIPs and strict M3U playlists in temporary
+directories. It verifies bounded member enumeration, exact/CRC-checked cached extraction,
+unsafe-name and stale-selection rejection, cache reuse, UTF-8 and line/disc limits,
+absolute/URL/traversal/symlink rejection, missing/duplicate discs, and deterministic
+parser fuzzing. `integration.archive_playlist` runs extracted Genesis and Master System
+members plus an M3U-driven generated Sega CD disc change through the real core adapter.
+The GUI suite covers archive selection, cancellation, drag/drop/open source identity,
+playlist action gating, and an isolated executable ZIP resume workflow.
+
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the

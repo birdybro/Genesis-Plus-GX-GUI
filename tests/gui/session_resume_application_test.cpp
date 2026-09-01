@@ -227,5 +227,30 @@ int main(int argc, char** argv)
         "Frontend log did not explain the corruption fallback")) {
     return 16;
   }
+
+  const auto archivePath =
+    std::filesystem::path{temporary.path().toStdString()} / "single-game.zip";
+  const bool archiveWritten = genplusgx::test::writeZipFixture(archivePath, {
+        {.name = "Archived Fixture.md",
+          .data = genplusgx::test::makeGenesisRamMarkerRom()},
+      });
+  if (!check(archiveWritten, "Could not create the command-line ZIP fixture") ||
+      !check(runDesktop(executable, root, archivePath),
+        "Single-entry ZIP command-line launch did not shut down cleanly")) {
+    return 17;
+  }
+  settings = settingsStore.load();
+  if (!check(settings.status &&
+        isAbsolutePathTo(settings.settings.lastGamePath, archivePath),
+      "ZIP launch did not retain the archive source for session resume")) {
+    return 18;
+  }
+  std::error_code cacheError;
+  const auto archiveCache = paths.cacheDirectory() / "archives";
+  if (!check(std::filesystem::is_directory(archiveCache, cacheError) &&
+        !cacheError && !std::filesystem::is_empty(archiveCache, cacheError),
+      "ZIP launch did not create a bounded per-user extraction cache")) {
+    return 19;
+  }
   return 0;
 }

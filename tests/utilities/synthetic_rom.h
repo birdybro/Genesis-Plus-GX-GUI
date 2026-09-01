@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -23,6 +24,16 @@ enum class SyntheticSegaCdRegion : std::uint8_t {
 [[nodiscard]] std::vector<std::uint8_t> makeSegaCdBios();
 [[nodiscard]] std::vector<std::uint8_t> makeSegaCdDiscImage(
   SyntheticSegaCdRegion region = SyntheticSegaCdRegion::usa);
+
+struct SyntheticZipEntry final {
+  std::string name;
+  std::vector<std::uint8_t> data;
+};
+
+[[nodiscard]] bool writeZipFixture(
+  const std::filesystem::path& path,
+  std::vector<SyntheticZipEntry> entries,
+  bool compressed = true);
 
 class TemporaryFixture final {
 public:

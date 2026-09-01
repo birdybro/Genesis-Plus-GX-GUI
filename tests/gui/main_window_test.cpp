@@ -177,7 +177,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
     "softResetAction", "fastForwardAction", "slowMotionAction",
     "frameAdvanceAction", "saveStateAction",
-    "loadStateAction", "changeDiscAction", "ejectDiscAction", "cheatsAction",
+    "loadStateAction", "changeDiscAction", "previousDiscAction",
+    "nextDiscAction", "ejectDiscAction", "cheatsAction",
     "gameInformationAction"};
   for (const auto* name : gameOnlyNames) {
     auto* action = window.findChild<QAction*>(QString::fromLatin1(name));
@@ -1221,9 +1222,13 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
 
   auto* change = window.findChild<QAction*>(QStringLiteral("changeDiscAction"));
   auto* eject = window.findChild<QAction*>(QStringLiteral("ejectDiscAction"));
-  QVERIFY(change != nullptr && eject != nullptr);
+  auto* previous = window.findChild<QAction*>(QStringLiteral("previousDiscAction"));
+  auto* next = window.findChild<QAction*>(QStringLiteral("nextDiscAction"));
+  QVERIFY(change != nullptr && eject != nullptr && previous != nullptr &&
+    next != nullptr);
   QVERIFY(eject->isCheckable());
-  QVERIFY(!change->isEnabled() && !eject->isEnabled());
+  QVERIFY(!change->isEnabled() && !eject->isEnabled() &&
+    !previous->isEnabled() && !next->isEnabled());
 
   using Request = std::tuple<
     genplusgx::ui::DiscUiOperation, std::filesystem::path, bool>;
@@ -1234,6 +1239,7 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
     });
   window.setSegaCdSession(true, "USA", disc.path(), false, true);
   QVERIFY(change->isEnabled() && eject->isEnabled());
+  QVERIFY(!previous->isEnabled() && !next->isEnabled());
   QVERIFY(change->toolTip().contains(
     genplusgx::ui::pathToQString(disc.path())));
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),

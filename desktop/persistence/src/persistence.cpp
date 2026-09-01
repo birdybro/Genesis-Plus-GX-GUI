@@ -117,7 +117,7 @@ PersistenceStatus ApplicationPaths::initialize() const
 
   const std::array directories{
     root_, configDirectory(), savesDirectory(), statesDirectory(), screenshotsDirectory(),
-    libraryDirectory(), logsDirectory()};
+    libraryDirectory(), logsDirectory(), cacheDirectory()};
   for (const auto& directory : directories) {
     std::error_code error;
     if (!createDirectory(directory, error)) {
@@ -162,6 +162,11 @@ std::filesystem::path ApplicationPaths::libraryDirectory() const
 std::filesystem::path ApplicationPaths::logsDirectory() const
 {
   return root_ / "logs";
+}
+
+std::filesystem::path ApplicationPaths::cacheDirectory() const
+{
+  return root_ / "cache";
 }
 
 bool GameIdentity::valid() const noexcept

@@ -254,12 +254,56 @@ set_target_properties(
     OUTPUT_NAME genplusgx_core
 )
 
-add_library(genplusgx_game_files STATIC src/game_file.cpp)
+set(GENPLUSGX_MINIZIP_ROOT
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/contrib/minizip
+)
+add_library(
+  genplusgx_archive_zlib STATIC
+  ${GENPLUSGX_MINIZIP_ROOT}/ioapi.c
+  ${GENPLUSGX_MINIZIP_ROOT}/unzip.c
+  ${GENPLUSGX_MINIZIP_ROOT}/zip.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/adler32.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/crc32.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/deflate.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inffast.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inflate.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inftrees.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/trees.c
+  ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/zutil.c
+)
+if(WIN32)
+  target_sources(genplusgx_archive_zlib PRIVATE ${GENPLUSGX_MINIZIP_ROOT}/iowin32.c)
+endif()
+target_include_directories(
+  genplusgx_archive_zlib
+  PUBLIC
+    ${GENPLUSGX_MINIZIP_ROOT}
+    ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1
+)
+target_compile_definitions(
+  genplusgx_archive_zlib PRIVATE Z_PREFIX z_errmsg=genplusgx_archive_z_errmsg
+)
+if(MSVC)
+  target_compile_definitions(
+    genplusgx_archive_zlib PRIVATE _CRT_SECURE_NO_WARNINGS
+  )
+endif()
+set_target_properties(
+  genplusgx_archive_zlib
+  PROPERTIES C_STANDARD 99 C_STANDARD_REQUIRED YES C_EXTENSIONS NO
+)
+
+add_library(
+  genplusgx_game_files STATIC
+  include/genplusgx/game_archive.h
+  src/game_archive.cpp
+  src/game_file.cpp
+)
 add_library(GenesisPlusGX::GameFiles ALIAS genplusgx_game_files)
 target_link_libraries(
   genplusgx_game_files
   PUBLIC GenesisPlusGX::FrontendTypes
-  PRIVATE genplusgx_project_warnings
+  PRIVATE genplusgx_archive_zlib genplusgx_project_warnings
 )
 if(GENPLUSGX_ENABLE_CHD)
   target_compile_definitions(genplusgx_game_files PUBLIC GENPLUSGX_HAVE_CHD=1)

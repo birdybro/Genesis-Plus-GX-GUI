@@ -56,7 +56,8 @@ int main()
           std::filesystem::is_directory(store.paths().statesDirectory()) &&
           std::filesystem::is_directory(store.paths().screenshotsDirectory()) &&
           std::filesystem::is_directory(store.paths().libraryDirectory()) &&
-          std::filesystem::is_directory(store.paths().logsDirectory()),
+          std::filesystem::is_directory(store.paths().logsDirectory()) &&
+          std::filesystem::is_directory(store.paths().cacheDirectory()),
         "Application-data hierarchy was incomplete")) {
     return 2;
   }
