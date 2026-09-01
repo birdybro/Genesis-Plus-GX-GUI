@@ -23,6 +23,8 @@ cartridge soft-patch verification through 2026-09-01
   `253c04352a762dfaf2c920fa6b107b6a983f4ecd`
 - Exact archive/playlist implementation and hosted evidence baseline:
   `3b828babc13e9a620161a556e1984221358b771d`
+- Exact cartridge soft-patch implementation and hosted evidence baseline:
+  `da80552964855fe5ab7ec17689526b8cabdb7d8c`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -536,12 +538,31 @@ its intentionally bundled XCB backend on a Wayland/XWayland desktop. Package sta
 now selects XCB before `QApplication` only for the relocatable XCB-only layout, while
 preserving explicit overrides and native Wayland source builds. The unit test covers
 XCB-only, native-Wayland, and explicit-override cases; CI and release package smokes
-now simulate Wayland auto-selection and reject the old diagnostic. Post-correction
-GCC Debug/Release/ASan, Clang 22, and CHD-disabled suites pass 93/93, the shader-off
-suite passes 91/91, the legacy target builds/links/cleans, and a fresh Linux stage
-passes automatic backend, dependency, package-layout, TGZ, and checksum checks. The
-final exact hosted replacement run and artifact audit remain required before this
-milestone closes.
+now simulate Wayland auto-selection and reject the old diagnostic. Post-correction GCC
+Debug/Release/ASan, Clang 22, and CHD-disabled suites pass 93/93, the shader-off suite
+passes 91/91, the legacy target builds/links/cleans, and a fresh Linux stage passes
+automatic backend, dependency, package-layout, TGZ, and checksum checks.
+
+Final exact run
+[`33494058639`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33494058639)
+passes all ten jobs against `da80552964855fe5ab7ec17689526b8cabdb7d8c`.
+All nine desktop/sanitizer configurations pass 93/93 tests; Windows capability-skips
+only the established real-OpenGL shader test, and the inherited Linux libretro target
+builds and cleans. The complete 14,385-line, 1,918,607-byte log is free of authored
+compiler/linker warnings, sanitizer findings, runtime errors, timeouts, and failures.
+The duplicate-library and missing-platform-plugin findings from the preceding audit do
+not recur.
+
+The four downloaded artifacts are Linux x86-64 (40,052,846 bytes), Windows x86-64
+(52,577,028 bytes), macOS arm64 (63,924,570 bytes), and macOS x86_64 (65,553,913
+bytes). All six package checksum manifests, every ZIP/gzip/tar integrity check, and
+both DMG format checks pass. The applications and librashader runtimes identify with
+their advertised architectures. Extracted payloads contain the expected Qt, SDL3,
+SQLite, librashader, CRT, documentation, notices, and Windows redistributable files;
+the scan finds no ROM, disc, BIOS, save/state, fixture, credential, or private key.
+All 22 Linux ELF objects resolve their dependencies, `--help` and `--version` run from
+the archive, and a simulated Wayland-session plugin trace directly loads bundled XCB
+without the former missing-Wayland diagnostic.
 
 ## Final feature checklist
 

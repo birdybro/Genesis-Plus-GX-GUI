@@ -94,7 +94,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
-| 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test Debug/Release/ASan suites; reduced-feature/compiler/package/libretro gates; final exact hosted audit pending | Every format is bounded; patched bytes own persistence identity; source paths remain intact | pending |
+| 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
 | 84 Enhanced save-state UX | PLANNED | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
 | 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
@@ -3839,8 +3839,23 @@ an explicit platform choice. The unit test covers each branch and CI/release smo
 reproduce a Wayland session without forcing XCB. After both audit corrections, GCC
 Debug, Release, and ASan/UBSan plus Clang 22 and CHD-disabled builds pass 93/93; the
 shader-disabled graph passes 91/91; the warning-clean legacy target and a fresh staged
-Linux package/automatic-backend smoke pass. A final exact hosted run and complete
-replacement artifact audit remain required.
+Linux package/automatic-backend smoke pass. Final exact run
+[`33494058639`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33494058639)
+then passed all ten jobs against `da80552964855fe5ab7ec17689526b8cabdb7d8c`.
+Each of its nine native configurations passed all 93 tests, including ASan/UBSan;
+Windows capability-skipped only the established real-OpenGL shader test. The complete
+14,385-line, 1,918,607-byte log contains no authored compiler/linker warning, sanitizer
+finding, runtime error, timeout, or failure, and specifically contains neither the
+duplicate macOS library diagnostic nor the missing-platform-plugin diagnostic.
+
+All four replacement artifacts and six package checksum manifests pass integrity
+verification. Their applications and shader runtimes identify as Linux ELF x86-64,
+Windows PE32+ x86-64, macOS Mach-O arm64, and macOS Mach-O x86-64. Extracted payloads
+contain the expected Qt, SDL3, SQLite, librashader, CRT, documentation, notices, and
+Windows redistributable resources, with no ROM, disc, BIOS, save/state, fixture,
+credential, or private-key payload. All 22 Linux ELF objects resolve their runtime
+dependencies; installed `--help`/`--version` smokes pass; and a Wayland-session plugin
+trace loads the bundled XCB backend directly without probing an absent Wayland plugin.
 
 **Acceptance criteria:** IPS/BPS/UPS are parsed without unchecked offsets or unbounded
 output; BPS/UPS checksums and source identity are enforced; the source file is never
@@ -3848,7 +3863,7 @@ modified; automatic selection is unambiguous; manual GUI/CLI/drop selection work
 patched content has independent saves/states/cheats/settings; patched session resume is
 exact; all local/hosted gates pass; and full hosted logs/artifacts contain no new issue.
 
-**Commit SHA:** pending
+**Commit SHA:** `da80552964855fe5ab7ec17689526b8cabdb7d8c`
 
 ## Milestone 70 detail
 
