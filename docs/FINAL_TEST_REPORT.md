@@ -1,8 +1,9 @@
 # Final Test Report
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
-Linux startup correction, tagged-release audits, and the post-release Libretro shader
-debugger, and rewind verification through 2026-08-31 (America/Denver).
+Linux startup correction, tagged-release audits, and the post-release Libretro shader,
+debugger, rewind, and automatic-session-resume verification through 2026-08-31
+(America/Denver).
 
 ## Candidate identity
 
@@ -15,6 +16,8 @@ debugger, and rewind verification through 2026-08-31 (America/Denver).
   `2799b3c88572314ac576af34c3b9fd06c8666467`
 - Exact rewind implementation and hosted evidence baseline:
   `e44d4c2e6aeee926603e4318b28641888ada4909`
+- Exact automatic-resume implementation and hosted evidence baseline:
+  `3cce4030f83c1ee7c057113eab1a811129c02858`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -107,7 +110,11 @@ duplicate test-only static-library link. The ready-gated test seam and dependenc
 were corrected. A third run isolated the remaining macOS `/var` versus `/private/var`
 alias: the stored path was absolute and identified the same file, but the test required
 lexical equality. The workflow now verifies filesystem identity and carries a Unix
-directory-symlink regression; cross-platform hosted verification is pending.
+directory-symlink regression. Exact hosted run `33472190327` passes all ten jobs and
+every registered CTest at that implementation commit. Its first attempt had one
+pre-build GitHub API connection failure while the SDL setup action ran on Intel macOS;
+retrying the same job and SHA passed dependency setup, compilation, 88/88 tests,
+packaging, and upload.
 
 ## Build configurations tested
 
@@ -217,6 +224,25 @@ Normal Windows pthread probes, absent optional Vulkan headers, checkout default-
 hints, fail-closed script source text, and artifact uploader policy text are benign and
 did not execute as failures.
 
+### Exact automatic-resume cross-platform verification
+
+Continuous Integration run
+[`33472190327`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33472190327)
+passes all ten jobs against exact commit
+`3cce4030f83c1ee7c057113eab1a811129c02858`. All nine CMake jobs register and complete
+88/88 tests. Linux Debug/Release/ASan+UBSan and macOS arm64/x86-64 Debug/Release
+execute the complete supported suite. Windows MSVC Debug/Release retain only the
+documented in-test real-OpenGL capability skip on their software renderer. The legacy
+libretro warning gate builds, links, and cleans.
+
+The first attempt's Intel macOS Release job could not connect to `api.github.com` while
+the SDL setup action queried its releases, before project configuration or compilation.
+The failed-job retry used the identical SHA and completed SDL setup, compilation,
+88/88 tests, package verification, ZIP/DMG creation, and upload. The final combined
+13,950-line log corpus contains no compiler/linker warning, sanitizer signature, crash,
+runtime error, timeout, failed test, invalid generated path, or deployment failure.
+Normal checkout hints and Windows pthread feature probes are non-actionable.
+
 ## Operating-system CI matrix
 
 Continuous Integration run
@@ -279,6 +305,15 @@ x86-64 (39,885,530 bytes), Windows x86-64 (52,462,222 bytes), macOS arm64 (63,71
 bytes), and macOS x86-64 (65,316,304 bytes). Each native Release job verified its
 self-contained staged layout and generated neighboring package checksums before the
 artifact upload.
+
+Exact automatic-resume run `33472190327` supersedes those tester artifacts with Linux
+x86-64 (39,909,784 bytes), Windows x86-64 (52,482,706 bytes), macOS arm64 (63,748,492
+bytes), and macOS x86-64 (65,357,924 bytes). The six contained package SHA-256 files
+verify; ZIP and TGZ integrity checks pass; both DMGs identify as Apple DMG version 4.
+The Linux TGZ has 86 entries, Windows ZIP 75, and each macOS app ZIP 123. Required Qt,
+SDL3, librashader, platform-plugin, CRT-preset, license, and Windows redistributable
+payloads are present, with no ROM, disc, BIOS, save/state, secret-key, or environment
+payload.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows

@@ -90,6 +90,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 76 Intel debug snapshot alignment | COMPLETE | Fix optimized Intel macOS debugger snapshot crashes | scalar CRAM/VSRAM word capture and stress regression | optimized Clang reproduction, 50-run core/live-GUI stress, full local gates | Debug capture never assumes stronger alignment than inherited core storage provides | `4b06089` |
 | 77 macOS debug link closure | COMPLETE | Eliminate duplicate core-adapter linkage found by full successful-run log inspection | GUI integration target link ordering | one adapter occurrence per link command; 81-test Debug/Release/ASan suites | Successful hosted logs remain free of authored linker warnings | `2799b3c` |
 | 78 Debug hosted evidence | COMPLETE | Audit exact-commit Linux, Windows, and macOS builds, tests, packages, and complete logs | CI evidence and final report | all ten hosted jobs, 13,564 log lines, and four artifacts | No cross-platform warning, failure, sanitizer issue, or packaging regression remains | pending |
+| 79 Bounded rewind | COMPLETE | Add owner-thread rewind with strict time and memory limits | core rewind buffer/worker, settings, UI, input, diagnostics, tests/docs | 85-test local and ten-job hosted matrices; package and full-log audit | Reverse playback is bounded, audio-silent, conflict-safe, and invalidated by incompatible state changes | `e44d4c2` |
+| 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
 
 ## Execution policy
 
@@ -4076,7 +4078,7 @@ bytes).
 
 ## Milestone 80 detail
 
-**Status:** IMPLEMENTED; LOCAL GATES PASS; HOSTED VERIFICATION PENDING
+**Status:** COMPLETE
 
 **Goal:** Add opt-in automatic resume of the last cleanly closed application session
 without weakening save-state identity checks or core-thread ownership.
@@ -4119,8 +4121,7 @@ consecutive loaded Clang runs before every complete local matrix was repeated. A
 self-contained Linux install passes structural verification and reports version
 0.1.1; CPack produces a checksum-verified
 `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`; and the preserved Unix libretro target
-builds, links, and cleans. Exact cross-platform hosted verification remains required
-before this milestone is marked complete.
+builds, links, and cleans.
 
 Corrective hosted run `33470249066` compiled the desktop past the Apple Clang finding,
 then its four macOS jobs exposed an ambiguous process-test assertion after a fixed
@@ -4134,6 +4135,31 @@ below the equivalent `/private/var` path. The test now requires an absolute mark
 resolves to the same existing game instead of requiring lexical path equality, and
 deliberately launches through a directory symlink on Unix to regress that behavior.
 
+Exact Continuous Integration run
+[`33472190327`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33472190327)
+passes all ten jobs at implementation commit
+`3cce4030f83c1ee7c057113eab1a811129c02858`. All nine CMake jobs register and complete
+88/88 tests; Windows capability-skips only the established real-OpenGL shader exercise
+inside that passing suite because the hosted software context is below OpenGL 3.3.
+Linux Debug, Release, and ASan/UBSan; Windows Debug/Release; and macOS arm64/x86-64
+Debug/Release otherwise complete the same graph. The legacy libretro warning gate also
+builds, links, and cleans.
+
+The first attempt's only failure occurred before configuration when SDL's setup action
+could not connect to GitHub's API in the macOS Intel Release job. Retrying that failed
+job against the same SHA completed SDL setup, the build, all 88 tests, package
+verification, ZIP/DMG creation, and artifact upload. The final 13,950-line log corpus
+contains no compiler/linker warning, sanitizer finding, crash, runtime error, timeout,
+failed test, invalid generated path, or deployment failure. Checkout default-branch
+hints and the normal Windows pthread feature probe are benign.
+
+All six downloaded package checksums and ZIP/TGZ integrity checks pass. Payloads contain
+the appropriate Qt platform/runtime libraries, SDL3, librashader, built-in CRT assets,
+license/documentation files, and the Windows redistributable, with no ROM, disc, BIOS,
+state, save, private-key, or environment payload. Workflow artifacts are Linux x86-64
+(39,909,784 bytes), Windows x86-64 (52,482,706 bytes), macOS arm64 (63,748,492 bytes),
+and macOS x86-64 (65,357,924 bytes).
+
 **Acceptance criteria:** The feature is disabled by default and persists transactionally;
 clean shutdown pauses/captures through the core owner and waits for atomic storage
 confirmation; startup does not run the core until identity/hardware validation and
@@ -4141,8 +4167,7 @@ restore complete; an explicit game wins; explicit close clears the marker; stale
 missing, or corrupt data falls back safely; queues and payloads stay bounded; every
 local and hosted regression passes; and complete CI logs contain no actionable issue.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Commit SHA:** `3cce4030f83c1ee7c057113eab1a811129c02858`
 
 ## Milestone 65 detail
 
