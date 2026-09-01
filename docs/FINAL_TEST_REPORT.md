@@ -104,7 +104,10 @@ a test-only rewind-metrics observation race; the command event remains the autho
 invalidation result. A second hosted attempt compiled past that issue and exposed a
 macOS process-test timer that began before asynchronous game/state readiness plus a
 duplicate test-only static-library link. The ready-gated test seam and dependency graph
-were corrected; cross-platform hosted verification of the corrections is pending.
+were corrected. A third run isolated the remaining macOS `/var` versus `/private/var`
+alias: the stored path was absolute and identified the same file, but the test required
+lexical equality. The workflow now verifies filesystem identity and carries a Unix
+directory-symlink regression; cross-platform hosted verification is pending.
 
 ## Build configurations tested
 

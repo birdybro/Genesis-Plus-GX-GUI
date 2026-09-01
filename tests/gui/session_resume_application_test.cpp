@@ -36,6 +36,18 @@ QString pathText(const std::filesystem::path& path)
 #endif
 }
 
+bool isAbsolutePathTo(
+  const std::optional<std::filesystem::path>& actual,
+  const std::filesystem::path& expected)
+{
+  if (!actual || !actual->is_absolute()) {
+    return false;
+  }
+  std::error_code error;
+  const bool equivalent = std::filesystem::equivalent(*actual, expected, error);
+  return equivalent && !error;
+}
+
 bool runDesktop(
   const QString& executable,
   const std::filesystem::path& root,
@@ -104,19 +116,36 @@ int main(int argc, char** argv)
 
   genplusgx::test::TemporaryFixture first{
     genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  auto firstLaunchPath = first.path();
+#if !defined(_WIN32)
+  const auto aliasedFixtureDirectory =
+    std::filesystem::path{temporary.path().toStdString()} / "rom-directory-link";
+  std::error_code symlinkError;
+  std::filesystem::create_directory_symlink(
+    first.path().parent_path(), aliasedFixtureDirectory, symlinkError);
+  if (!check(!symlinkError, "Could not create the path-alias fixture")) {
+    return 4;
+  }
+  firstLaunchPath = aliasedFixtureDirectory / first.path().filename();
+#endif
   auto secondBytes = genplusgx::test::makeGenesisRamMarkerRom();
   secondBytes.back() ^= 0x01U;
   genplusgx::test::TemporaryFixture second{std::move(secondBytes), ".md"};
   const QString executable = QString::fromLocal8Bit(argv[1]);
 
-  if (!check(runDesktop(executable, root, first.path(), true),
+  if (!check(runDesktop(executable, root, firstLaunchPath, true),
         "Initial session did not shut down cleanly")) {
     return 4;
   }
   auto settings = settingsStore.load();
   if (!check(settings.status && settings.settings.resumeOnLaunch &&
-        settings.settings.lastGamePath == first.path(),
-      "Clean shutdown did not record the resumable game")) {
+        isAbsolutePathTo(settings.settings.lastGamePath, firstLaunchPath),
+      "Clean shutdown did not record the absolute resumable game identity")) {
+    if (settings.settings.lastGamePath) {
+      std::cerr << "Recorded path: "
+                << settings.settings.lastGamePath->generic_string() << '\n'
+                << "Expected file: " << firstLaunchPath.generic_string() << '\n';
+    }
     return 5;
   }
   const auto identity = genplusgx::identifyGame(first.path());
@@ -155,7 +184,8 @@ int main(int argc, char** argv)
     return 10;
   }
   settings = settingsStore.load();
-  if (!check(settings.status && settings.settings.lastGamePath == second.path(),
+  if (!check(settings.status &&
+        isAbsolutePathTo(settings.settings.lastGamePath, second.path()),
       "Explicit command-line game did not take precedence over automatic resume")) {
     return 11;
   }

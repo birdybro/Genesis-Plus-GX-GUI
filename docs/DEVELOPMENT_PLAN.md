@@ -4123,13 +4123,16 @@ builds, links, and cleans. Exact cross-platform hosted verification remains requ
 before this milestone is marked complete.
 
 Corrective hosted run `33470249066` compiled the desktop past the Apple Clang finding,
-then its Apple Silicon Debug test exposed that the process workflow's fixed 1.2-second
-quit timer could fire before an asynchronously loaded game and state session became
-ready. The production checkpoint correctly refused that incomplete shutdown. The test
-seam now starts its bounded quit delay only after the game is running, state storage is
-ready, and any automatic restore has completed. The same job log also exposed a
-duplicate static persistence-library link warning in the new process-test target; its
-redundant direct dependency was removed.
+then its four macOS jobs exposed an ambiguous process-test assertion after a fixed
+1.2-second startup timer. The test seam now starts its bounded quit delay only after the
+game is running, state storage is ready, and any automatic restore has completed. The
+same logs also exposed a duplicate static persistence-library link warning in the new
+process-test target; its redundant direct dependency was removed. Run `33471160102`
+then passed those points without the link warning and isolated the remaining macOS
+difference: a relative path launched below `/var` can be reported by the child process
+below the equivalent `/private/var` path. The test now requires an absolute marker that
+resolves to the same existing game instead of requiring lexical path equality, and
+deliberately launches through a directory symlink on Unix to regress that behavior.
 
 **Acceptance criteria:** The feature is disabled by default and persists transactionally;
 clean shutdown pauses/captures through the core owner and waits for atomic storage
