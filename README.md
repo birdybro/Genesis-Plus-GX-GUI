@@ -40,6 +40,9 @@ rewritten.
 - Dedicated emulation thread with bounded video, audio, input, and command exchanges
 - Dynamic viewport rendering, aspect/integer scaling, overscan, interlace modes,
   nearest/bilinear filtering, fullscreen, high-DPI support, and native PNG screenshots
+- Runtime-selectable off/on/adaptive vertical synchronization and double/triple swap
+  buffering with newest-frame-only queuing, cadence/drop instrumentation, and safe
+  software fallback
 - Built-in adjustable CRT presentation plus modern Libretro `.slangp` shader presets,
   including multi-pass pipelines, lookup textures, history, and runtime parameters
 - SDL3 stereo audio with live output-device/latency changes, plus hot-pluggable
@@ -241,6 +244,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [User guide](docs/USER_GUIDE.md)
 - [Debug tools](docs/DEBUG_TOOLS.md)
 - [Libretro shaders](docs/LIBRETRO_SHADERS.md)
+- [Display synchronization](docs/DISPLAY_SYNCHRONIZATION.md)
 - [Lossless recording](docs/RECORDING.md)
 - [Run-ahead](docs/RUN_AHEAD.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)

@@ -374,11 +374,27 @@ std::string formatDiagnostics(
   field("Operating system", snapshot.operatingSystem);
   field("Architecture", snapshot.architecture);
   field("Renderer", snapshot.renderer);
+  field("Presentation sync", snapshot.presentationSync);
+  field("Presentation buffering", snapshot.presentationBuffering);
   field("Audio device", snapshot.audioDevice);
   field("Loaded game", snapshot.loadedGame);
   field("Loaded system", snapshot.loadedSystem);
   field("Loaded region", snapshot.loadedRegion);
   output << "Controllers: " << snapshot.controllerCount << '\n'
+         << "Video exchange: " << snapshot.videoCopiedFrames << " copied / "
+         << snapshot.videoPublishedFrames << " published, "
+         << snapshot.videoSkippedFrames << " skipped, "
+         << snapshot.videoProducerDrops << " producer drops\n"
+         << "Video presentation: " << snapshot.videoRenderedFrames
+         << " rendered, " << snapshot.videoSwappedFrames << " swapped, "
+         << snapshot.videoCoalescedFrames << " coalesced, "
+         << snapshot.videoDuplicateRenders << " duplicate renders\n"
+         << "Video pending frames: " << snapshot.videoPendingFrames << " / "
+         << snapshot.videoMaximumPendingFrames << " maximum\n"
+         << "Presentation cadence: "
+         << snapshot.measuredPresentationFramesPerSecond << " FPS, "
+         << snapshot.averageSwapIntervalMicroseconds << " us average, "
+         << snapshot.maximumSwapIntervalMicroseconds << " us maximum\n"
          << "Audio buffered frames: " << snapshot.audioBufferedFrames << " / "
          << snapshot.audioCapacityFrames << '\n'
          << "Audio underruns: " << snapshot.audioUnderruns << '\n'

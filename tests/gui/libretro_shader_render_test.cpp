@@ -424,5 +424,51 @@ int main(int argc, char** argv)
     std::cerr << "The complete built-in CRT parameter matrix did not execute.\n";
     return 11;
   }
+  const std::array synchronizationModes{
+    genplusgx::video::PresentationSyncMode::disabled,
+    genplusgx::video::PresentationSyncMode::synchronized,
+    genplusgx::video::PresentationSyncMode::adaptive,
+  };
+  const std::array bufferingModes{
+    genplusgx::video::PresentationBufferingMode::doubleBuffer,
+    genplusgx::video::PresentationBufferingMode::tripleBuffer,
+  };
+  std::size_t synchronizationCases = 0U;
+  for (const auto sync : synchronizationModes) {
+    for (const auto buffering : bufferingModes) {
+      const genplusgx::video::PresentationConfiguration configuration{
+        .sync = sync,
+        .buffering = buffering,
+      };
+      widget.setPresentationConfiguration(configuration);
+      QTest::qWait(75);
+      canvas = widget.findChild<QOpenGLWidget*>(QStringLiteral("openGLCanvas"));
+      const auto metrics = widget.presentationMetrics();
+      if (canvas == nullptr || !widget.usesAcceleratedRenderer() ||
+          !metrics.rendererInitialized || metrics.requested != configuration ||
+          metrics.telemetry.maximumPendingFrames > 1U ||
+          (metrics.effectiveBuffering !=
+             genplusgx::video::PresentationBufferingMode::doubleBuffer &&
+           metrics.effectiveBuffering !=
+             genplusgx::video::PresentationBufferingMode::tripleBuffer)) {
+        std::cerr << "Presentation synchronization case "
+                  << synchronizationCases
+                  << " did not rebuild into an observable bounded renderer.\n";
+        return 12;
+      }
+      const auto synchronizedImage = canvas->grabFramebuffer();
+      if (synchronizedImage.isNull() ||
+          !quadrantsAreUpright(synchronizedImage, widget.currentLayout())) {
+        std::cerr << "Presentation synchronization case "
+                  << synchronizationCases << " corrupted the displayed frame.\n";
+        return 12;
+      }
+      ++synchronizationCases;
+    }
+  }
+  if (synchronizationCases != 6U) {
+    std::cerr << "The complete synchronization/buffering matrix did not execute.\n";
+    return 12;
+  }
   return 0;
 }

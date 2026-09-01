@@ -98,7 +98,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
-| 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
+| 87 Display synchronization | IN PROGRESS | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
@@ -3862,6 +3862,58 @@ mismatch fails closed; and every local/hosted/package regression passes.
 
 **Commit SHA:** implementation `967500fdc9608fbce0ec123ac3f0eff0d8965d30`;
 hosted-gate correction `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
+
+## Milestone 87 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Add explicit low-latency host presentation controls and observable cadence
+without allowing the renderer, Qt event loop, or window-system compositor to become a
+second emulation clock.
+
+**Files changed:**
+
+- pure presentation configuration and deterministic bounded telemetry under
+  `desktop/video`
+- runtime-recreatable OpenGL display surface with requested/effective swap reporting
+- schema-3 global video settings plus backward-compatible sparse per-game settings
+- quick Video menu, accessible Video Settings controls, diagnostics, and structured logs
+- focused unit/offscreen GUI/real OpenGL tests and user/architecture/testing/package docs
+
+**Tests added:** `unit.presentation` verifies all swap mappings, invalid enum rejection,
+one-frame maximum pending depth under repeated producer replacement, render/duplicate
+accounting, exact 60 Hz-class deterministic cadence, backward-clock safety, cancellation,
+and reset. Existing video settings tests now cover schema-2 migration, exact nondefault
+round trips, and corruption rejection; per-game tests round-trip the new settings.
+Offscreen display/MainWindow tests exercise stable object names, Apply/Cancel/defaults,
+quick actions, software fallback metrics, and the one-frame bound. The native
+`gui.libretro_shader_render` test adds all three synchronization modes times both
+buffering modes, rebuilding the actual `QOpenGLWidget` and recapturing an upright,
+nonblack shader frame after every change while accepting only explicitly reported host
+substitution.
+
+**Gate evidence:** Complete warning-as-error Debug, optimized Release, leak-detecting
+ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 99/99 tests; the
+shader-disabled graph passes all 97 applicable tests. The six-case real OpenGL matrix
+passes on the development host's XCB display. A fresh staged Linux installation passes
+package verification, its real OpenGL event-loop smoke, all 22 ELF dependency graphs,
+archive path/content/integrity checks, and its SHA-256 manifest. The inherited Unix
+libretro target also builds, links, identifies as x86-64 ELF, and cleans. The unpacked
+staging-prefix smoke emits one classified host-portal registration warning because its
+desktop entry is intentionally not installed into the host's system application
+database; renderer initialization and structured clean shutdown both succeed. Exact
+hosted CI, complete log inspection, and native artifact audit remain required before
+this status can become complete.
+
+**Acceptance criteria:** Off/on/adaptive and double/triple requests are persistent,
+runtime-selectable, accessible, and independently report effective host behavior; live
+surface changes retain the latest frame and safe renderer fallback; the GUI keeps no
+more than one pending generation; skipped/coalesced/dropped/swap-cadence metrics remain
+bounded; the worker's rational frame pacer stays authoritative; and every local and
+hosted regression passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
 
 ## Milestone 83 detail
 

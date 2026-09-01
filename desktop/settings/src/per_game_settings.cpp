@@ -155,10 +155,31 @@ std::optional<VideoSettings> readVideo(const QJsonObject& object)
     }
     shader = *parsed;
   }
+  auto presentationConfiguration = video::PresentationConfiguration{};
+  const bool hasSync = object.contains(QStringLiteral("presentationSync"));
+  const bool hasBuffering =
+    object.contains(QStringLiteral("presentationBuffering"));
+  if (hasSync != hasBuffering) {
+    return std::nullopt;
+  }
+  if (hasSync) {
+    const auto sync =
+      enumeration<video::PresentationSyncMode>(object, "presentationSync");
+    const auto buffering = enumeration<video::PresentationBufferingMode>(
+      object, "presentationBuffering");
+    if (!sync || !buffering) {
+      return std::nullopt;
+    }
+    presentationConfiguration = {
+      .sync = *sync,
+      .buffering = *buffering,
+    };
+  }
   VideoSettings value{
     .aspect = *aspect,
     .scaling = *scaling,
     .presentationFilter = *presentation,
+    .presentation = presentationConfiguration,
     .shader = std::move(shader),
     .core =
       {
@@ -177,6 +198,10 @@ QJsonObject writeVideo(const VideoSettings& value)
     {QStringLiteral("aspect"), static_cast<int>(value.aspect)},
     {QStringLiteral("scaling"), static_cast<int>(value.scaling)},
     {QStringLiteral("presentationFilter"), static_cast<int>(value.presentationFilter)},
+    {QStringLiteral("presentationSync"),
+      static_cast<int>(value.presentation.sync)},
+    {QStringLiteral("presentationBuffering"),
+      static_cast<int>(value.presentation.buffering)},
     {QStringLiteral("shader"), writeShader(value.shader)},
     {QStringLiteral("overscan"), static_cast<int>(value.core.overscan)},
     {QStringLiteral("ntscFilter"), static_cast<int>(value.core.ntscFilter)},

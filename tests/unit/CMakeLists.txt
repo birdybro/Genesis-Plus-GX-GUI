@@ -1,5 +1,16 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_presentation_test presentation_test.cpp)
+target_link_libraries(
+  genplusgx_presentation_test
+  PRIVATE GenesisPlusGX::VideoExchange genplusgx_project_warnings
+)
+add_test(NAME unit.presentation COMMAND genplusgx_presentation_test)
+set_tests_properties(
+  unit.presentation
+  PROPERTIES LABELS "unit;video;presentation;timing;bounded" TIMEOUT 30
+)
+
 add_executable(genplusgx_game_patch_test game_patch_test.cpp)
 target_link_libraries(
   genplusgx_game_patch_test

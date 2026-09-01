@@ -69,6 +69,30 @@ QString presentationFilterName(video::VideoFilter filter)
   return {};
 }
 
+QString presentationSyncName(video::PresentationSyncMode mode)
+{
+  switch (mode) {
+    case video::PresentationSyncMode::disabled:
+      return QStringLiteral("disabled");
+    case video::PresentationSyncMode::synchronized:
+      return QStringLiteral("synchronized");
+    case video::PresentationSyncMode::adaptive:
+      return QStringLiteral("adaptive");
+  }
+  return {};
+}
+
+QString presentationBufferingName(video::PresentationBufferingMode mode)
+{
+  switch (mode) {
+    case video::PresentationBufferingMode::doubleBuffer:
+      return QStringLiteral("double-buffer");
+    case video::PresentationBufferingMode::tripleBuffer:
+      return QStringLiteral("triple-buffer");
+  }
+  return {};
+}
+
 QString shaderModeName(video::ShaderMode mode)
 {
   switch (mode) {
@@ -189,7 +213,8 @@ VideoSettingsLoadResult invalidResult(std::string message)
 
 std::optional<VideoSettings> readCurrent(
   const QJsonObject& videoObject,
-  bool hasShader)
+  bool hasShader,
+  bool hasPresentation)
 {
   const auto aspect = enumFromString<video::AspectMode>(videoObject,
     QStringLiteral("aspect"), {{"native", video::AspectMode::native},
@@ -230,10 +255,31 @@ std::optional<VideoSettings> readCurrent(
   if (!shader) {
     return std::nullopt;
   }
+  auto presentationConfiguration = video::PresentationConfiguration{};
+  if (hasPresentation) {
+    const auto sync = enumFromString<video::PresentationSyncMode>(videoObject,
+      QStringLiteral("presentationSync"),
+      {{"disabled", video::PresentationSyncMode::disabled},
+        {"synchronized", video::PresentationSyncMode::synchronized},
+        {"adaptive", video::PresentationSyncMode::adaptive}});
+    const auto buffering =
+      enumFromString<video::PresentationBufferingMode>(videoObject,
+        QStringLiteral("presentationBuffering"),
+        {{"double-buffer", video::PresentationBufferingMode::doubleBuffer},
+          {"triple-buffer", video::PresentationBufferingMode::tripleBuffer}});
+    if (!sync || !buffering) {
+      return std::nullopt;
+    }
+    presentationConfiguration = {
+      .sync = *sync,
+      .buffering = *buffering,
+    };
+  }
   return VideoSettings{
     .aspect = *aspect,
     .scaling = *scaling,
     .presentationFilter = *presentation,
+    .presentation = presentationConfiguration,
     .shader = *shader,
     .core = {
       .overscan = *overscan,
@@ -269,6 +315,7 @@ std::optional<VideoSettings> readLegacy(const QJsonObject& root)
                                      : video::ScaleMode::fit,
     .presentationFilter = bilinear.toBool() ? video::VideoFilter::bilinear
                                             : video::VideoFilter::nearest,
+    .presentation = {},
     .shader = {},
     .core = {
       .overscan = static_cast<CoreOverscanMode>(overscanValue),
@@ -297,6 +344,7 @@ bool validateVideoSettings(const VideoSettings& settings) noexcept
       static_cast<unsigned>(video::ScaleMode::integer) &&
     static_cast<unsigned>(settings.presentationFilter) <=
       static_cast<unsigned>(video::VideoFilter::bilinear) &&
+    video::validatePresentationConfiguration(settings.presentation) &&
     video::validateShaderConfiguration(settings.shader) &&
     validateCoreVideoSettings(settings.core);
 }
@@ -341,13 +389,14 @@ VideoSettingsLoadResult VideoSettingsStore::load() const
     return {.status = {}, .settings = *settings, .migrated = true};
   }
   const auto schemaVersionValue = schema.toInt(-1);
-  if (schemaVersionValue != 1 &&
+  if (schemaVersionValue != 1 && schemaVersionValue != 2 &&
       schemaVersionValue != static_cast<int>(schemaVersion)) {
     return invalidResult("The video settings schema version is not supported.");
   }
   const auto videoObject = root.value(QStringLiteral("video"));
   const auto settings = videoObject.isObject()
     ? readCurrent(videoObject.toObject(),
+        schemaVersionValue >= 2,
         schemaVersionValue == static_cast<int>(schemaVersion))
     : std::nullopt;
   if (!settings || !validateVideoSettings(*settings)) {
@@ -379,6 +428,10 @@ PersistenceStatus VideoSettingsStore::save(const VideoSettings& settings) const
     {QStringLiteral("scaling"), scalingName(settings.scaling)},
     {QStringLiteral("presentationFilter"),
       presentationFilterName(settings.presentationFilter)},
+    {QStringLiteral("presentationSync"),
+      presentationSyncName(settings.presentation.sync)},
+    {QStringLiteral("presentationBuffering"),
+      presentationBufferingName(settings.presentation.buffering)},
     {QStringLiteral("shader"), shaderObject},
     {QStringLiteral("overscan"), overscanName(settings.core.overscan)},
     {QStringLiteral("ntscFilter"), ntscName(settings.core.ntscFilter)},

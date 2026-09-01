@@ -420,6 +420,14 @@ the published slot as read while copying into its one preallocated receive surfa
 remaining slots keep the producer nonblocking. If no slot is safe, that presentation
 frame is dropped and instrumented rather than queued or allocated.
 
+`PresentationTelemetry` makes the consumer-side bound explicit. A copied generation
+replaces any still-pending generation, so the GUI retains exactly zero or one pending
+frame and counts the replacement as coalescing. Rendering and actual `frameSwapped`
+notifications are counted separately; monotonic swap intervals provide average FPS,
+average interval, and worst interval without allocating a sample history. Exchange
+publication/copy/skip/drop counters are combined with these GUI-thread metrics in the
+diagnostics report and five-second anomaly logging.
+
 `DisplayWidget` selects an accelerated `QOpenGLWidget` canvas on normal window-system
 platforms. A persistent RGB565 texture is allocated only for geometry changes and each
 new generation uses `glTexSubImage2D`; a small presentation program draws the texture
@@ -433,6 +441,16 @@ Wayland. Context, program, VAO, or texture failure
 switches asynchronously to Qt's portable backing-store painter. The same deterministic
 software path is selected for offscreen/minimal platforms and by the explicit
 `GENPLUSGX_FORCE_SOFTWARE_VIDEO` diagnostic override.
+
+The presentation configuration requests OpenGL swap interval 0, 1, or -1 for off, on,
+or adaptive synchronization and requests Qt double or triple buffering. The OpenGL
+profile is established before `QApplication`; persisted swap policy is refreshed before
+the first window, and a live change recreates only the `QOpenGLWidget` surface. The
+context's effective interval and buffering are reported independently because Qt, the
+window compositor, or the driver may substitute unsupported requests. Surface rebuild
+retains the owned framebuffer and shader/settings snapshot. Failure is associated with
+the exact canvas generation, preventing a delayed failure callback from deleting a
+newer replacement, and falls back to software rendering.
 
 When enabled, `LibretroShaderRuntime` dynamically resolves the pinned librashader C API
 and builds one OpenGL chain from the built-in or user-selected `.slangp` preset. It
@@ -462,8 +480,10 @@ the same notification and horizontal-border policy as the libretro host. No Qt t
 settings-file concern crosses this boundary.
 
 Shader selection and parameter values are frontend-only members of `VideoSettings`.
-The schema-1 to schema-2 migration adds a disabled default without altering prior video
-behavior; sparse per-game Video overrides carry the same validated configuration.
+The schema-1 to schema-2 migration adds a disabled shader default; schema 3 adds
+synchronized double-buffer presentation defaults without altering prior video behavior.
+Sparse per-game Video overrides carry the same validated configuration and accept old
+files that predate the two presentation members.
 No shader concern enters `CoreAdapter` or modifies Genesis Plus GX output algorithms.
 
 The GUI changes its display policy immediately, then submits the typed core subset as a

@@ -53,6 +53,10 @@ int main()
   PerGameSettings overrides;
   auto overrideVideo = global.video;
   overrideVideo.aspect = video::AspectMode::fourThree;
+  overrideVideo.presentation = {
+    .sync = video::PresentationSyncMode::adaptive,
+    .buffering = video::PresentationBufferingMode::tripleBuffer,
+  };
   overrideVideo.shader = {
     .mode = video::ShaderMode::builtinCrt,
     .presetPath = {},

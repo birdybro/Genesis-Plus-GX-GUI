@@ -196,7 +196,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "fileMenu", "emulationMenu", "videoMenu", "audioMenu", "inputMenu",
     "toolsMenu", "helpMenu", "openRecentMenu", "stateSlotMenu", "videoScaleMenu",
     "aspectRatioMenu", "filteringMenu", "overscanMenu", "ntscFilterMenu",
-    "interlacedRenderMenu", "shaderMenu", "emulationSpeedMenu"};
+    "interlacedRenderMenu", "shaderMenu", "videoSynchronizationMenu",
+    "emulationSpeedMenu"};
   for (const auto* name : menuNames) {
     QVERIFY2(window.findChild<QMenu*>(QString::fromLatin1(name)) != nullptr, name);
   }
@@ -210,6 +211,9 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction", "shaderDisabledAction", "builtinCrtShaderAction",
+    "presentationSyncOffAction", "presentationSyncOnAction",
+    "presentationSyncAdaptiveAction", "doubleBufferAction",
+    "tripleBufferAction",
     "loadShaderPresetAction", "speedSettingsAction", "runAheadSettingsAction",
     "emulationSpeed50Action",
     "emulationSpeed75Action", "emulationSpeed100Action",
@@ -477,13 +481,24 @@ void MainWindowTest::videoActionsDriveDisplayPolicy()
   QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::stretch);
   window.findChild<QAction*>(QStringLiteral("bilinearFilterAction"))->trigger();
   QCOMPARE(display->videoFilter(), genplusgx::video::VideoFilter::bilinear);
+  window.findChild<QAction*>(
+    QStringLiteral("presentationSyncAdaptiveAction"))->trigger();
+  QCOMPARE(display->presentationConfiguration().sync,
+    genplusgx::video::PresentationSyncMode::adaptive);
+  window.findChild<QAction*>(QStringLiteral("tripleBufferAction"))->trigger();
+  QCOMPARE(display->presentationConfiguration().buffering,
+    genplusgx::video::PresentationBufferingMode::tripleBuffer);
 
   window.findChild<QAction*>(QStringLiteral("fitScaleAction"))->trigger();
   window.findChild<QAction*>(QStringLiteral("nativeAspectAction"))->trigger();
   window.findChild<QAction*>(QStringLiteral("nearestFilterAction"))->trigger();
+  window.findChild<QAction*>(QStringLiteral("presentationSyncOnAction"))->trigger();
+  window.findChild<QAction*>(QStringLiteral("doubleBufferAction"))->trigger();
   QCOMPARE(display->scaleMode(), genplusgx::video::ScaleMode::fit);
   QCOMPARE(display->aspectMode(), genplusgx::video::AspectMode::native);
   QCOMPARE(display->videoFilter(), genplusgx::video::VideoFilter::nearest);
+  QCOMPARE(display->presentationConfiguration(),
+    genplusgx::video::PresentationConfiguration{});
 
   window.findChild<QAction*>(QStringLiteral("overscanFullAction"))->trigger();
   QCOMPARE(window.videoSettings().core.overscan,
@@ -537,6 +552,10 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
     QStringLiteral("videoPresentationFilterCombo"));
   auto* shaderMode = dialog->findChild<QComboBox*>(
     QStringLiteral("shaderModeCombo"));
+  auto* sync = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationSyncCombo"));
+  auto* buffering = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationBufferingCombo"));
   auto* overscan = dialog->findChild<QComboBox*>(QStringLiteral("coreOverscanCombo"));
   auto* ntsc = dialog->findChild<QComboBox*>(QStringLiteral("coreNtscFilterCombo"));
   auto* render = dialog->findChild<QComboBox*>(
@@ -548,7 +567,7 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   auto* restore = dialog->findChild<QPushButton*>(
     QStringLiteral("restoreVideoDefaultsButton"));
   QVERIFY(aspect != nullptr && scaling != nullptr && filter != nullptr);
-  QVERIFY(shaderMode != nullptr);
+  QVERIFY(shaderMode != nullptr && sync != nullptr && buffering != nullptr);
   QVERIFY(overscan != nullptr && ntsc != nullptr && render != nullptr);
   QVERIFY(gameGear != nullptr && apply != nullptr && restore != nullptr);
   QCOMPARE(aspect->currentData().toInt(),
@@ -559,6 +578,8 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   QCOMPARE(scaling->count(), 2);
   QCOMPARE(filter->count(), 2);
   QCOMPARE(shaderMode->count(), 3);
+  QCOMPARE(sync->count(), 3);
+  QCOMPARE(buffering->count(), 2);
   QCOMPARE(overscan->count(), 4);
   QCOMPARE(ntsc->count(), 5);
   QCOMPARE(render->count(), 2);
@@ -578,6 +599,10 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
   scaling = dialog->findChild<QComboBox*>(QStringLiteral("videoScalingCombo"));
   filter = dialog->findChild<QComboBox*>(
     QStringLiteral("videoPresentationFilterCombo"));
+  sync = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationSyncCombo"));
+  buffering = dialog->findChild<QComboBox*>(
+    QStringLiteral("videoPresentationBufferingCombo"));
   ntsc = dialog->findChild<QComboBox*>(QStringLiteral("coreNtscFilterCombo"));
   render = dialog->findChild<QComboBox*>(
     QStringLiteral("coreInterlacedRenderCombo"));
@@ -591,6 +616,11 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
     static_cast<int>(genplusgx::video::ScaleMode::integer)));
   filter->setCurrentIndex(filter->findData(
     static_cast<int>(genplusgx::video::VideoFilter::bilinear)));
+  sync->setCurrentIndex(sync->findData(
+    static_cast<int>(genplusgx::video::PresentationSyncMode::disabled)));
+  buffering->setCurrentIndex(buffering->findData(
+    static_cast<int>(
+      genplusgx::video::PresentationBufferingMode::tripleBuffer)));
   ntsc->setCurrentIndex(ntsc->findData(
     static_cast<int>(genplusgx::CoreNtscFilter::rgb)));
   render->setCurrentIndex(render->findData(
@@ -602,6 +632,10 @@ void MainWindowTest::videoSettingsDialogAppliesCancelsAndRestores()
     genplusgx::video::ScaleMode::integer);
   QCOMPARE(window.videoSettings().presentationFilter,
     genplusgx::video::VideoFilter::bilinear);
+  QCOMPARE(window.videoSettings().presentation.sync,
+    genplusgx::video::PresentationSyncMode::disabled);
+  QCOMPARE(window.videoSettings().presentation.buffering,
+    genplusgx::video::PresentationBufferingMode::tripleBuffer);
   QCOMPARE(window.videoSettings().core.ntscFilter,
     genplusgx::CoreNtscFilter::rgb);
   QVERIFY(window.videoSettings().core.gameGearExtendedScreen);

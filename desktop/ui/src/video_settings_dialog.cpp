@@ -57,7 +57,7 @@ VideoSettingsDialog::VideoSettingsDialog(
   setObjectName(QStringLiteral("videoSettingsDialog"));
   setWindowTitle(tr("Video Settings"));
   setModal(false);
-  resize(520, 460);
+  resize(560, 560);
 
   auto* root = new QVBoxLayout(this);
   auto* presentationGroup = new QGroupBox(tr("Presentation"), this);
@@ -76,6 +76,26 @@ VideoSettingsDialog::VideoSettingsDialog(
   addChoice(*presentationFilter_, tr("Nearest neighbor"), video::VideoFilter::nearest);
   addChoice(*presentationFilter_, tr("Bilinear"), video::VideoFilter::bilinear);
   presentationForm->addRow(tr("Texture filtering:"), presentationFilter_);
+  presentationSync_ = combo(*presentationGroup, "videoPresentationSyncCombo");
+  addChoice(*presentationSync_, tr("Off (allow tearing)"),
+    video::PresentationSyncMode::disabled);
+  addChoice(*presentationSync_, tr("On"),
+    video::PresentationSyncMode::synchronized);
+  addChoice(*presentationSync_, tr("Adaptive (when supported)"),
+    video::PresentationSyncMode::adaptive);
+  presentationSync_->setAccessibleDescription(tr(
+    "Requests the OpenGL swap interval; the compositor and graphics driver "
+    "may substitute a supported mode."));
+  presentationForm->addRow(tr("Vertical synchronization:"), presentationSync_);
+  presentationBuffering_ = combo(
+    *presentationGroup, "videoPresentationBufferingCombo");
+  addChoice(*presentationBuffering_, tr("Double buffer (lower latency)"),
+    video::PresentationBufferingMode::doubleBuffer);
+  addChoice(*presentationBuffering_, tr("Triple buffer (smoother cadence)"),
+    video::PresentationBufferingMode::tripleBuffer);
+  presentationBuffering_->setAccessibleDescription(tr(
+    "Requests one or two back buffers without adding a frontend frame queue."));
+  presentationForm->addRow(tr("Swap buffering:"), presentationBuffering_);
   root->addWidget(presentationGroup);
 
   auto* shaderGroup = new QGroupBox(tr("CRT and Libretro shaders"), this);
@@ -215,6 +235,11 @@ settings::VideoSettings VideoSettingsDialog::settings() const
     .aspect = choice<video::AspectMode>(*aspect_),
     .scaling = choice<video::ScaleMode>(*scaling_),
     .presentationFilter = choice<video::VideoFilter>(*presentationFilter_),
+    .presentation = {
+      .sync = choice<video::PresentationSyncMode>(*presentationSync_),
+      .buffering = choice<video::PresentationBufferingMode>(
+        *presentationBuffering_),
+    },
     .shader = std::move(shader),
     .core = {
       .overscan = choice<CoreOverscanMode>(*overscan_),
@@ -234,6 +259,8 @@ void VideoSettingsDialog::setSettings(const settings::VideoSettings& value)
   select(*aspect_, value.aspect);
   select(*scaling_, value.scaling);
   select(*presentationFilter_, value.presentationFilter);
+  select(*presentationSync_, value.presentation.sync);
+  select(*presentationBuffering_, value.presentation.buffering);
   shaderConfiguration_ = value.shader;
   select(*shaderMode_, value.shader.mode);
   select(*overscan_, value.core.overscan);

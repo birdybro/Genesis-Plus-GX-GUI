@@ -74,6 +74,22 @@ int main()
 
   auto snapshot = staticDiagnosticsSnapshot();
   snapshot.renderer = "OpenGL";
+  snapshot.presentationSync =
+    "Adaptive requested; effective swap interval -1";
+  snapshot.presentationBuffering =
+    "Double buffer requested; Double buffer effective";
+  snapshot.videoPublishedFrames = 600U;
+  snapshot.videoCopiedFrames = 590U;
+  snapshot.videoSkippedFrames = 10U;
+  snapshot.videoProducerDrops = 0U;
+  snapshot.videoRenderedFrames = 580U;
+  snapshot.videoSwappedFrames = 580U;
+  snapshot.videoCoalescedFrames = 10U;
+  snapshot.videoDuplicateRenders = 2U;
+  snapshot.videoMaximumPendingFrames = 1U;
+  snapshot.measuredPresentationFramesPerSecond = 59.923;
+  snapshot.averageSwapIntervalMicroseconds = 16'688U;
+  snapshot.maximumSwapIntervalMicroseconds = 18'000U;
   snapshot.audioDevice = "Default";
   snapshot.loadedGame = "/users/alex/private.bin";
   snapshot.loadedSystem = "Genesis";
@@ -113,6 +129,10 @@ int main()
   if (!check(!snapshot.applicationName.empty() && !snapshot.version.empty() &&
                !snapshot.qtVersion.empty() && !snapshot.sdlVersion.empty() &&
                report.find("OpenGL") != std::string::npos &&
+               report.find("Presentation sync: Adaptive") != std::string::npos &&
+               report.find("Video exchange: 590 copied / 600 published, 10 skipped, 0 producer drops") != std::string::npos &&
+               report.find("Video presentation: 580 rendered, 580 swapped, 10 coalesced, 2 duplicate renders") != std::string::npos &&
+               report.find("Video pending frames: 0 / 1 maximum") != std::string::npos &&
                report.find("Sega CD USA: Valid") != std::string::npos &&
                report.find("Rewind: Enabled (active)") != std::string::npos &&
                report.find("Rewind snapshots: 12") != std::string::npos &&

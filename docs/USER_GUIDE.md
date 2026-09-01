@@ -360,11 +360,23 @@ The bundled NTSC filter offers monochrome, composite, S-Video, and RGB presets i
 addition to disabled. Interlaced games may use the core's single-field or double-field
 output, and Game Gear software can opt into the extended 256×192 viewport.
 
+**Video → Synchronization** selects off, on, or adaptive vertical synchronization and
+double- or triple-buffered host presentation. On plus double buffering is the default.
+Off can reduce latency at the cost of tearing; adaptive requires graphics-driver
+support; triple buffering can smooth host cadence at the cost of another display
+interval. Applying a change rebuilds the OpenGL presentation surface without restarting
+the game. The GUI still keeps only the newest complete frame, so no option creates an
+unbounded queue or becomes a second clock. The diagnostics report both requested and
+effective behavior because a compositor or driver may substitute unsupported requests.
+See [DISPLAY_SYNCHRONIZATION.md](DISPLAY_SYNCHRONIZATION.md) for the exact contract and
+troubleshooting guidance.
+
 Choose **Video → Video Settings…** to edit the same controls in one dialog. **Apply**
 updates a running game without closing the dialog, **OK**
 applies and closes, **Cancel** discards changes not already applied, and **Restore
-Defaults** stages the native/fit/nearest presentation with all optional core processing
-disabled. Every quick menu item and dialog control reflects the same active snapshot.
+Defaults** stages native/fit/nearest, synchronized double-buffered presentation with all
+optional core processing disabled. Every quick menu item and dialog control reflects
+the same active snapshot.
 Settings are saved atomically as `config/video-settings.json` beneath the platform
 application-data directory and restored on the next launch. A malformed or unsupported
 settings file is ignored with a diagnostic and safe defaults; it is not silently

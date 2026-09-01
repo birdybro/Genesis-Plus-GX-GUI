@@ -464,6 +464,54 @@ void MainWindow::buildMenus()
     settings.presentationFilter = video::VideoFilter::bilinear;
     applyVideoSettings(settings, true);
   });
+  auto* synchronization = video->addMenu(tr("S&ynchronization"));
+  synchronization->setObjectName(QStringLiteral("videoSynchronizationMenu"));
+  auto* syncGroup = new QActionGroup(this);
+  syncGroup->setObjectName(QStringLiteral("videoSynchronizationActionGroup"));
+  const std::array syncChoices{
+    std::pair{tr("&Off (Allow Tearing)"),
+      video::PresentationSyncMode::disabled},
+    std::pair{tr("&On"), video::PresentationSyncMode::synchronized},
+    std::pair{tr("&Adaptive"), video::PresentationSyncMode::adaptive},
+  };
+  const std::array syncNames{
+    "presentationSyncOffAction", "presentationSyncOnAction",
+    "presentationSyncAdaptiveAction"};
+  for (std::size_t index = 0U; index < syncChoices.size(); ++index) {
+    const auto [label, mode] = syncChoices[index];
+    auto* action = addAction(*synchronization, label, syncNames[index]);
+    action->setCheckable(true);
+    syncGroup->addAction(action);
+    connect(action, &QAction::triggered, this, [this, mode] {
+      auto settings = videoSettings_;
+      settings.presentation.sync = mode;
+      applyVideoSettings(settings, true);
+    });
+  }
+  synchronization->addSeparator();
+  auto* doubleBuffer = addAction(*synchronization,
+    tr("&Double Buffer (Lower Latency)"), "doubleBufferAction");
+  auto* tripleBuffer = addAction(*synchronization,
+    tr("&Triple Buffer (Smoother Cadence)"), "tripleBufferAction");
+  auto* bufferingGroup = new QActionGroup(this);
+  bufferingGroup->setObjectName(
+    QStringLiteral("videoBufferingActionGroup"));
+  for (auto* action : {doubleBuffer, tripleBuffer}) {
+    action->setCheckable(true);
+    bufferingGroup->addAction(action);
+  }
+  connect(doubleBuffer, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.presentation.buffering =
+      video::PresentationBufferingMode::doubleBuffer;
+    applyVideoSettings(settings, true);
+  });
+  connect(tripleBuffer, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.presentation.buffering =
+      video::PresentationBufferingMode::tripleBuffer;
+    applyVideoSettings(settings, true);
+  });
   auto* shaders = video->addMenu(tr("&Shaders"));
   shaders->setObjectName(QStringLiteral("shaderMenu"));
   auto* shaderGroup = new QActionGroup(this);
@@ -2604,6 +2652,7 @@ bool MainWindow::applyVideoSettings(
   displayWidget_->setAspectMode(settings.aspect);
   displayWidget_->setScaleMode(settings.scaling);
   displayWidget_->setVideoFilter(settings.presentationFilter);
+  displayWidget_->setPresentationConfiguration(settings.presentation);
   displayWidget_->setShaderConfiguration(settings.shader);
   updateVideoActionChecks();
   if (auto* dialog = findChild<VideoSettingsDialog*>(
@@ -2630,6 +2679,22 @@ void MainWindow::updateVideoActionChecks()
     videoSettings_.presentationFilter == video::VideoFilter::nearest);
   findChild<QAction*>(QStringLiteral("bilinearFilterAction"))->setChecked(
     videoSettings_.presentationFilter == video::VideoFilter::bilinear);
+  findChild<QAction*>(QStringLiteral("presentationSyncOffAction"))->setChecked(
+    videoSettings_.presentation.sync ==
+      video::PresentationSyncMode::disabled);
+  findChild<QAction*>(QStringLiteral("presentationSyncOnAction"))->setChecked(
+    videoSettings_.presentation.sync ==
+      video::PresentationSyncMode::synchronized);
+  findChild<QAction*>(
+    QStringLiteral("presentationSyncAdaptiveAction"))->setChecked(
+      videoSettings_.presentation.sync ==
+        video::PresentationSyncMode::adaptive);
+  findChild<QAction*>(QStringLiteral("doubleBufferAction"))->setChecked(
+    videoSettings_.presentation.buffering ==
+      video::PresentationBufferingMode::doubleBuffer);
+  findChild<QAction*>(QStringLiteral("tripleBufferAction"))->setChecked(
+    videoSettings_.presentation.buffering ==
+      video::PresentationBufferingMode::tripleBuffer);
   findChild<QAction*>(QStringLiteral("shaderDisabledAction"))->setChecked(
     videoSettings_.shader.mode == video::ShaderMode::disabled);
   findChild<QAction*>(QStringLiteral("builtinCrtShaderAction"))->setChecked(

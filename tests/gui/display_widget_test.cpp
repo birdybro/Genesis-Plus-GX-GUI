@@ -89,6 +89,22 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   widget.setVideoFilter(genplusgx::video::VideoFilter::nearest);
   QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::nearest);
   QCOMPARE(widget.sourceFramesPerSecond(), 60.0);
+  QCOMPARE(widget.presentationConfiguration(),
+    genplusgx::video::PresentationConfiguration{});
+  widget.setPresentationConfiguration({
+    .sync = genplusgx::video::PresentationSyncMode::adaptive,
+    .buffering = genplusgx::video::PresentationBufferingMode::tripleBuffer,
+  });
+  QCOMPARE(widget.presentationConfiguration().sync,
+    genplusgx::video::PresentationSyncMode::adaptive);
+  QCOMPARE(widget.presentationConfiguration().buffering,
+    genplusgx::video::PresentationBufferingMode::tripleBuffer);
+  auto invalidPresentation = widget.presentationConfiguration();
+  invalidPresentation.sync =
+    static_cast<genplusgx::video::PresentationSyncMode>(99);
+  widget.setPresentationConfiguration(invalidPresentation);
+  QCOMPARE(widget.presentationConfiguration().sync,
+    genplusgx::video::PresentationSyncMode::adaptive);
   widget.setSourceFramesPerSecond(50.0);
   QCOMPARE(widget.sourceFramesPerSecond(), 50.0);
   widget.setSourceFramesPerSecond(0.0);
@@ -104,11 +120,24 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   QCOMPARE(rendered.pixelColor(80, 320), QColor(Qt::red));
   QCOMPARE(rendered.pixelColor(240, 320), QColor(Qt::green));
   QCOMPARE(widget.currentGeneration(), 1U);
+  const auto presentation = widget.presentationMetrics();
+  QCOMPARE(presentation.requested, widget.presentationConfiguration());
+  QVERIFY(!presentation.accelerated);
+  QVERIFY(!presentation.rendererInitialized);
+  QCOMPARE(presentation.exchange.publishedFrames, 1U);
+  QCOMPARE(presentation.exchange.copiedFrames, 1U);
+  QCOMPARE(presentation.telemetry.receivedFrames, 1U);
+  QCOMPARE(presentation.telemetry.maximumPendingFrames, std::size_t{1U});
+  QCOMPARE(presentation.telemetry.pendingFrames, std::size_t{0U});
+  QVERIFY(presentation.telemetry.renderedFrames >= 1U);
+  QVERIFY(presentation.telemetry.swappedFrames >= 1U);
 
   widget.clearFrame();
   QApplication::processEvents();
   QVERIFY(!widget.hasFrame());
   QVERIFY(prompt->isVisible());
+  QCOMPARE(widget.presentationMetrics().telemetry.pendingFrames,
+    std::size_t{0U});
 }
 
 } // namespace

@@ -220,7 +220,7 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::session},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Video"),
-    tr("Presentation geometry, scaling, CRT shaders, and Genesis Plus GX video output."),
+    tr("Presentation geometry, synchronization, scaling, CRT shaders, and Genesis Plus GX video output."),
     "videoSettingsPage", "videoSettingsSummary", videoSummary_, {
       {tr("Video Settings…"), "configureVideoButton", SettingsPageAction::video},
     }));

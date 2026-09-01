@@ -195,6 +195,53 @@ std::string biosValidationStateName(
   return "Unknown";
 }
 
+std::string presentationSyncDescription(
+  const genplusgx::video::DisplayPresentationMetrics& metrics)
+{
+  using Mode = genplusgx::video::PresentationSyncMode;
+  std::string result;
+  switch (metrics.requested.sync) {
+    case Mode::disabled: result = "Off"; break;
+    case Mode::synchronized: result = "On"; break;
+    case Mode::adaptive: result = "Adaptive"; break;
+  }
+  if (!metrics.accelerated) {
+    return result + " requested; software renderer active";
+  }
+  if (!metrics.rendererInitialized) {
+    return result + " requested; renderer initialization pending";
+  }
+  result += " requested; effective swap interval " +
+    std::to_string(metrics.effectiveSwapInterval);
+  if (!metrics.swapIntervalHonored) {
+    result += " (host substituted)";
+  }
+  return result;
+}
+
+std::string presentationBufferingDescription(
+  const genplusgx::video::DisplayPresentationMetrics& metrics)
+{
+  using Mode = genplusgx::video::PresentationBufferingMode;
+  const auto name = [](Mode mode) {
+    return mode == Mode::tripleBuffer ? "Triple buffer" : "Double buffer";
+  };
+  std::string result = std::string{name(metrics.requested.buffering)} +
+    " requested";
+  if (metrics.accelerated && metrics.rendererInitialized) {
+    result += "; " + std::string{name(metrics.effectiveBuffering)} +
+      " effective";
+    if (!metrics.bufferingHonored) {
+      result += " (host substituted)";
+    }
+  } else if (!metrics.accelerated) {
+    result += "; software renderer active";
+  } else {
+    result += "; renderer initialization pending";
+  }
+  return result;
+}
+
 } // namespace
 
 int main(int argc, char* argv[])
@@ -385,6 +432,10 @@ int main(int argc, char* argv[])
       recordStartupIssue("Video settings migration", migrated.message);
     }
   }
+  // The OpenGL profile was established before QApplication for context
+  // sharing. Refresh the swap request before the first window/context exists
+  // so persisted presentation policy also reaches Qt's top-level compositor.
+  genplusgx::video::configureOpenGLSurfaceFormat(videoSettings.presentation);
 
   genplusgx::settings::AudioSettingsStore audioSettingsStore{
     applicationPaths.configDirectory() / "audio-settings.json"};
@@ -1625,6 +1676,29 @@ int main(int argc, char* argv[])
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
         : "Qt software painter";
+      const auto presentation =
+        window.displayWidget()->presentationMetrics();
+      snapshot.presentationSync = presentationSyncDescription(presentation);
+      snapshot.presentationBuffering =
+        presentationBufferingDescription(presentation);
+      snapshot.videoPublishedFrames = presentation.exchange.publishedFrames;
+      snapshot.videoCopiedFrames = presentation.exchange.copiedFrames;
+      snapshot.videoSkippedFrames = presentation.exchange.skippedFrames;
+      snapshot.videoProducerDrops = presentation.exchange.producerDrops;
+      snapshot.videoRenderedFrames = presentation.telemetry.renderedFrames;
+      snapshot.videoSwappedFrames = presentation.telemetry.swappedFrames;
+      snapshot.videoCoalescedFrames = presentation.telemetry.coalescedFrames;
+      snapshot.videoDuplicateRenders =
+        presentation.telemetry.duplicateRenders;
+      snapshot.videoPendingFrames = presentation.telemetry.pendingFrames;
+      snapshot.videoMaximumPendingFrames =
+        presentation.telemetry.maximumPendingFrames;
+      snapshot.measuredPresentationFramesPerSecond =
+        presentation.telemetry.measuredFramesPerSecond;
+      snapshot.averageSwapIntervalMicroseconds =
+        presentation.telemetry.averageSwapIntervalMicroseconds;
+      snapshot.maximumSwapIntervalMicroseconds =
+        presentation.telemetry.maximumSwapIntervalMicroseconds;
       snapshot.audioDevice = audioOutput.isInitialized()
         ? audioOutput.deviceName()
         : "Unavailable";
@@ -2085,6 +2159,9 @@ int main(int argc, char* argv[])
     std::chrono::seconds{5};
   std::uint64_t loggedAudioUnderruns = 0U;
   std::uint64_t loggedAudioOverruns = 0U;
+  std::uint64_t loggedVideoProducerDrops = 0U;
+  std::uint64_t loggedVideoSkippedFrames = 0U;
+  std::uint64_t loggedPresentationCoalesces = 0U;
   std::uint64_t loggedLateFrames = 0U;
   std::uint64_t loggedPacingResynchronizations = 0U;
   bool audioControlFailureReported = false;
@@ -2104,6 +2181,8 @@ int main(int argc, char* argv[])
      &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
      &controllerInput,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
+     &loggedPresentationCoalesces, &loggedVideoProducerDrops,
+     &loggedVideoSkippedFrames,
      &loggedPacingResynchronizations, &nextInstrumentationLog,
      &frameRateSampler, &nextFrameRateSample,
      &deferredLibraryLaunches, &flushDeferredLibraryLaunches, &gameGeneration,
@@ -2177,6 +2256,33 @@ int main(int argc, char* argv[])
       }
       loggedAudioUnderruns = audioMetrics.underrunCount;
       loggedAudioOverruns = audioMetrics.overrunCount;
+      const auto videoMetrics =
+        window.displayWidget()->presentationMetrics();
+      if (videoMetrics.exchange.producerDrops > loggedVideoProducerDrops) {
+        qWarning().noquote()
+          << "Video producer drop: total="
+          << static_cast<qulonglong>(videoMetrics.exchange.producerDrops)
+          << "pending="
+          << static_cast<qulonglong>(
+               videoMetrics.telemetry.pendingFrames);
+      }
+      if (videoMetrics.exchange.skippedFrames > loggedVideoSkippedFrames ||
+          videoMetrics.telemetry.coalescedFrames >
+            loggedPresentationCoalesces) {
+        qInfo().noquote()
+          << "Video presentation coalescing: source skipped="
+          << static_cast<qulonglong>(videoMetrics.exchange.skippedFrames)
+          << "GUI coalesced="
+          << static_cast<qulonglong>(
+               videoMetrics.telemetry.coalescedFrames)
+          << "maximum pending="
+          << static_cast<qulonglong>(
+               videoMetrics.telemetry.maximumPendingFrames);
+      }
+      loggedVideoProducerDrops = videoMetrics.exchange.producerDrops;
+      loggedVideoSkippedFrames = videoMetrics.exchange.skippedFrames;
+      loggedPresentationCoalesces =
+        videoMetrics.telemetry.coalescedFrames;
       if (!runtimeMetrics) {
         runtimeMetrics = worker.metrics();
       }

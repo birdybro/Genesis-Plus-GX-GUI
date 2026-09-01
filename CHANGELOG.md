@@ -9,6 +9,10 @@ platform documentation.
 
 ### Added
 
+- Off/on/adaptive vertical-synchronization and double/triple-buffer presentation
+  controls with live surface recreation, schema migration, per-game overrides,
+  newest-frame-only pending behavior, swap-cadence/drop diagnostics, and a real OpenGL
+  six-case regression matrix.
 - Optional one-to-four-frame bounded run-ahead for cartridge systems, with exact
   owner-thread rollback context, authoritative audio/input/state preservation,
   recording isolation, deterministic fail-closed verification, Sega CD exclusion,

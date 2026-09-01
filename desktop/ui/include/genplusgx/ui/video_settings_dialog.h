@@ -47,6 +47,8 @@ private:
   QComboBox* aspect_{nullptr};
   QComboBox* scaling_{nullptr};
   QComboBox* presentationFilter_{nullptr};
+  QComboBox* presentationSync_{nullptr};
+  QComboBox* presentationBuffering_{nullptr};
   QComboBox* overscan_{nullptr};
   QComboBox* ntscFilter_{nullptr};
   QComboBox* interlacedRender_{nullptr};

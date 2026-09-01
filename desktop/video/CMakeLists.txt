@@ -1,5 +1,7 @@
 add_library(genplusgx_video_exchange STATIC
+  include/genplusgx/video/presentation.h
   include/genplusgx/video/shader_configuration.h
+  src/presentation.cpp
   src/frame_exchange.cpp
   src/shader_configuration.cpp
   src/video_geometry.cpp

@@ -22,6 +22,7 @@
 #include <QTimer>
 
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <limits>
 #include <utility>
@@ -30,20 +31,25 @@ namespace genplusgx::video {
 
 namespace {
 
-QSurfaceFormat acceleratedSurfaceFormat()
+QSurfaceFormat acceleratedSurfaceFormat(
+  const PresentationConfiguration& configuration)
 {
   auto format = QSurfaceFormat::defaultFormat();
   format.setRenderableType(QSurfaceFormat::OpenGL);
   format.setVersion(3, 3);
   format.setProfile(QSurfaceFormat::CoreProfile);
-  format.setSwapBehavior(QSurfaceFormat::DoubleBuffer);
+  format.setSwapBehavior(
+    configuration.buffering == PresentationBufferingMode::tripleBuffer
+      ? QSurfaceFormat::TripleBuffer
+      : QSurfaceFormat::DoubleBuffer);
+  format.setSwapInterval(requestedSwapInterval(configuration.sync));
   return format;
 }
 
-bool canCreateOpenGLRenderer()
+bool canCreateOpenGLRenderer(const PresentationConfiguration& configuration)
 {
   QOpenGLContext context;
-  context.setFormat(acceleratedSurfaceFormat());
+  context.setFormat(acceleratedSurfaceFormat(configuration));
   if (!context.create() || !context.isValid()) {
     return false;
   }
@@ -60,9 +66,12 @@ bool canCreateOpenGLRenderer()
 
 } // namespace
 
-void configureOpenGLSurfaceFormat()
+void configureOpenGLSurfaceFormat(
+  const PresentationConfiguration& configuration)
 {
-  QSurfaceFormat::setDefaultFormat(acceleratedSurfaceFormat());
+  const auto effective = validatePresentationConfiguration(configuration)
+    ? configuration : PresentationConfiguration{};
+  QSurfaceFormat::setDefaultFormat(acceleratedSurfaceFormat(effective));
 }
 
 class OpenGLCanvas final : public QOpenGLWidget, protected QOpenGLFunctions {
@@ -70,9 +79,12 @@ public:
   explicit OpenGLCanvas(DisplayWidget& owner)
     : QOpenGLWidget(&owner), owner_(owner)
   {
-    setFormat(acceleratedSurfaceFormat());
+    setFormat(acceleratedSurfaceFormat(owner.presentationConfiguration_));
     setObjectName(QStringLiteral("openGLCanvas"));
     setAttribute(Qt::WA_TransparentForMouseEvents);
+    QObject::connect(this, &QOpenGLWidget::frameSwapped, this, [this] {
+      owner_.noteFrameSwapped(submittedGeneration_);
+    });
   }
 
   ~OpenGLCanvas() override
@@ -122,7 +134,7 @@ protected:
     if (!program_.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexSource) ||
         !program_.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentSource) ||
         !program_.link()) {
-      owner_.scheduleSoftwareFallback();
+      owner_.scheduleSoftwareFallback(this);
       return;
     }
 
@@ -132,7 +144,7 @@ protected:
       -1.0F,  1.0F, 0.0F, 0.0F,
        1.0F,  1.0F, 1.0F, 0.0F};
     if (!vertexBuffer_.create() || !vertexArray_.create()) {
-      owner_.scheduleSoftwareFallback();
+      owner_.scheduleSoftwareFallback(this);
       return;
     }
 
@@ -147,7 +159,7 @@ protected:
       program_.release();
       vertexBuffer_.release();
       vertexArray_.release();
-      owner_.scheduleSoftwareFallback();
+      owner_.scheduleSoftwareFallback(this);
       return;
     }
     program_.enableAttributeArray(position);
@@ -164,11 +176,23 @@ protected:
     glGenTextures(1, &shaderOutputTexture_);
     initialized_ = texture_ != 0U && shaderOutputTexture_ != 0U;
     if (!initialized_) {
-      owner_.scheduleSoftwareFallback();
+      owner_.scheduleSoftwareFallback(this);
     } else {
+      const auto actualFormat = context()->format();
+      const auto actualBuffering =
+        actualFormat.swapBehavior() == QSurfaceFormat::TripleBuffer
+          ? PresentationBufferingMode::tripleBuffer
+          : PresentationBufferingMode::doubleBuffer;
+      owner_.noteRendererInitialized(
+        actualFormat.swapInterval(), actualBuffering);
       qInfo().noquote() << "OpenGL renderer initialized:"
                         << context()->format().majorVersion() << '.'
-                        << context()->format().minorVersion();
+                        << context()->format().minorVersion()
+                        << "swap interval" << actualFormat.swapInterval()
+                        << "buffering"
+                        << (actualBuffering ==
+                              PresentationBufferingMode::tripleBuffer
+                            ? "triple" : "double");
     }
   }
 
@@ -287,6 +311,8 @@ protected:
     program_.release();
     vertexArray_.release();
     glBindTexture(GL_TEXTURE_2D, 0);
+    submittedGeneration_ = owner_.generation_;
+    owner_.noteFrameRendered(submittedGeneration_);
   }
 
 private:
@@ -336,6 +362,7 @@ private:
   std::uint64_t uploadedGeneration_{0U};
   std::uint64_t appliedShaderGeneration_{std::numeric_limits<std::uint64_t>::max()};
   std::uint64_t failedShaderGeneration_{std::numeric_limits<std::uint64_t>::max()};
+  std::uint64_t submittedGeneration_{0U};
   std::uint32_t shaderOutputWidth_{0U};
   std::uint32_t shaderOutputHeight_{0U};
   LibretroShaderRuntime shaderRuntime_;
@@ -355,29 +382,16 @@ DisplayWidget::DisplayWidget(QWidget* parent)
   setMinimumSize(320, 240);
   setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
 
-  auto* layout = new QStackedLayout(this);
-  layout->setContentsMargins(0, 0, 0, 0);
-  layout->setStackingMode(QStackedLayout::StackAll);
-  const auto platform = QGuiApplication::platformName();
-  const bool forceSoftware = qEnvironmentVariableIsSet(
-    "GENPLUSGX_FORCE_SOFTWARE_VIDEO");
-  if (!forceSoftware && platform != QStringLiteral("offscreen") &&
-      platform != QStringLiteral("minimal")) {
-    if (canCreateOpenGLRenderer()) {
-      openGLCanvas_ = new OpenGLCanvas(*this);
-      layout->addWidget(openGLCanvas_);
-    } else {
-      qWarning().noquote()
-        << "OpenGL context preflight failed; using Qt software rendering.";
-    }
-  }
+  stackedLayout_ = new QStackedLayout(this);
+  stackedLayout_->setContentsMargins(0, 0, 0, 0);
+  stackedLayout_->setStackingMode(QStackedLayout::StackAll);
   emptyLabel_ = new QLabel(tr("Open or drop a game to begin"), this);
   emptyLabel_->setObjectName(QStringLiteral("emptyCanvasLabel"));
   emptyLabel_->setAlignment(Qt::AlignCenter);
   emptyLabel_->setStyleSheet(QStringLiteral("color: #b8b8b8; font-size: 16px;"));
   emptyLabel_->setAttribute(Qt::WA_TransparentForMouseEvents);
-  layout->addWidget(emptyLabel_);
-  emptyLabel_->setVisible(openGLCanvas_ == nullptr);
+  stackedLayout_->addWidget(emptyLabel_);
+  rebuildAcceleratedRenderer();
 }
 
 void DisplayWidget::setFrameExchange(std::shared_ptr<VideoFrameExchange> exchange)
@@ -404,6 +418,7 @@ bool DisplayWidget::presentLatestFrame()
   }
   frame_ = nextFrame;
   generation_ = nextGeneration;
+  presentationTelemetry_.frameReceived(generation_);
   hasFrame_ = true;
   emptyLabel_->hide();
   requestRepaint();
@@ -415,6 +430,7 @@ void DisplayWidget::clearFrame()
   hasFrame_ = false;
   frame_ = {};
   generation_ = 0;
+  presentationTelemetry_.cancelPending();
   emptyLabel_->setVisible(openGLCanvas_ == nullptr);
   requestRepaint();
 }
@@ -441,6 +457,17 @@ void DisplayWidget::setVideoFilter(VideoFilter filter)
     videoFilter_ = filter;
     requestRepaint();
   }
+}
+
+void DisplayWidget::setPresentationConfiguration(
+  PresentationConfiguration configuration)
+{
+  if (!validatePresentationConfiguration(configuration) ||
+      presentationConfiguration_ == configuration) {
+    return;
+  }
+  presentationConfiguration_ = configuration;
+  rebuildAcceleratedRenderer();
 }
 
 void DisplayWidget::setShaderConfiguration(ShaderConfiguration configuration)
@@ -516,6 +543,32 @@ VideoFilter DisplayWidget::videoFilter() const noexcept
   return videoFilter_;
 }
 
+const PresentationConfiguration&
+DisplayWidget::presentationConfiguration() const noexcept
+{
+  return presentationConfiguration_;
+}
+
+DisplayPresentationMetrics DisplayWidget::presentationMetrics() const
+{
+  const auto exchangeMetrics = exchange_ != nullptr
+    ? exchange_->metrics() : VideoExchangeMetrics{};
+  return {
+    .requested = presentationConfiguration_,
+    .effectiveBuffering = effectiveBuffering_,
+    .exchange = exchangeMetrics,
+    .telemetry = presentationTelemetry_.snapshot(),
+    .effectiveSwapInterval = effectiveSwapInterval_,
+    .rendererInitialized = rendererInitialized_,
+    .accelerated = openGLCanvas_ != nullptr,
+    .swapIntervalHonored = rendererInitialized_ &&
+      effectiveSwapInterval_ == requestedSwapInterval(
+        presentationConfiguration_.sync),
+    .bufferingHonored = rendererInitialized_ &&
+      effectiveBuffering_ == presentationConfiguration_.buffering,
+  };
+}
+
 const ShaderConfiguration& DisplayWidget::shaderConfiguration() const noexcept
 {
   return shaderConfiguration_;
@@ -549,19 +602,52 @@ void DisplayWidget::requestRepaint()
   }
 }
 
-void DisplayWidget::scheduleSoftwareFallback()
+void DisplayWidget::rebuildAcceleratedRenderer()
 {
-  if (openGLCanvas_ == nullptr) {
+  if (openGLCanvas_ != nullptr) {
+    auto* previous = openGLCanvas_;
+    openGLCanvas_ = nullptr;
+    stackedLayout_->removeWidget(previous);
+    delete previous;
+  }
+  rendererInitialized_ = false;
+  effectiveSwapInterval_ = 0;
+  effectiveBuffering_ = PresentationBufferingMode::doubleBuffer;
+
+  const auto platform = QGuiApplication::platformName();
+  const bool forceSoftware = qEnvironmentVariableIsSet(
+    "GENPLUSGX_FORCE_SOFTWARE_VIDEO");
+  if (!forceSoftware && platform != QStringLiteral("offscreen") &&
+      platform != QStringLiteral("minimal")) {
+    if (canCreateOpenGLRenderer(presentationConfiguration_)) {
+      openGLCanvas_ = new OpenGLCanvas(*this);
+      stackedLayout_->insertWidget(0, openGLCanvas_);
+      openGLCanvas_->show();
+    } else {
+      qWarning().noquote()
+        << "OpenGL context preflight failed; using Qt software rendering.";
+    }
+  }
+  if (emptyLabel_ != nullptr) {
+    emptyLabel_->setVisible(openGLCanvas_ == nullptr && !hasFrame_);
+  }
+  requestRepaint();
+}
+
+void DisplayWidget::scheduleSoftwareFallback(OpenGLCanvas* failedCanvas)
+{
+  if (openGLCanvas_ == nullptr || openGLCanvas_ != failedCanvas) {
     return;
   }
-  QTimer::singleShot(0, this, [this] {
-    if (openGLCanvas_ != nullptr) {
+  QTimer::singleShot(0, this, [this, failedCanvas] {
+    if (openGLCanvas_ == failedCanvas) {
       constexpr auto detail =
         "OpenGL renderer initialization failed; using Qt software rendering.";
       qWarning() << detail;
       openGLCanvas_->hide();
       openGLCanvas_->deleteLater();
       openGLCanvas_ = nullptr;
+      rendererInitialized_ = false;
       emptyLabel_->setVisible(!hasFrame_);
       update();
       if (rendererFailureSink_) {
@@ -569,6 +655,36 @@ void DisplayWidget::scheduleSoftwareFallback()
       }
     }
   });
+}
+
+void DisplayWidget::noteFrameRendered(std::uint64_t generation)
+{
+  if (hasFrame_ && generation != 0U) {
+    presentationTelemetry_.frameRendered(generation);
+  }
+}
+
+void DisplayWidget::noteFrameSwapped(std::uint64_t generation)
+{
+  if (!hasFrame_ || generation == 0U) {
+    return;
+  }
+  const auto now = std::chrono::steady_clock::now().time_since_epoch();
+  const auto microseconds = std::chrono::duration_cast<
+    std::chrono::microseconds>(now).count();
+  if (microseconds > 0) {
+    presentationTelemetry_.frameSwapped(
+      generation, static_cast<std::uint64_t>(microseconds));
+  }
+}
+
+void DisplayWidget::noteRendererInitialized(
+  int swapInterval,
+  PresentationBufferingMode buffering)
+{
+  effectiveSwapInterval_ = swapInterval;
+  effectiveBuffering_ = buffering;
+  rendererInitialized_ = true;
 }
 
 void DisplayWidget::reportShaderFailure(std::string detail)
@@ -624,6 +740,8 @@ void DisplayWidget::paintSoftwareFrame(QPainter& painter)
   painter.setRenderHint(
     QPainter::SmoothPixmapTransform, videoFilter_ == VideoFilter::bilinear);
   painter.drawImage(target, image);
+  noteFrameRendered(generation_);
+  noteFrameSwapped(generation_);
 }
 
 } // namespace genplusgx::video
