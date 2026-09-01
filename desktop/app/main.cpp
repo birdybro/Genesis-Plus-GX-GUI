@@ -1,5 +1,6 @@
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/app/command_line.h"
+#include "genplusgx/app/platform_bootstrap.h"
 #include "genplusgx/app/shutdown_report.h"
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
@@ -192,6 +193,9 @@ std::string biosValidationStateName(
 
 int main(int argc, char* argv[])
 {
+  if (argc > 0 && argv[0] != nullptr) {
+    static_cast<void>(genplusgx::app::configureBundledLinuxQtPlatform(argv[0]));
+  }
   genplusgx::ui::configureHighDpiPolicy();
   genplusgx::video::configureOpenGLSurfaceFormat();
   QApplication application(argc, argv);

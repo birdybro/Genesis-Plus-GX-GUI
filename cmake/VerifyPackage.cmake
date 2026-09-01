@@ -57,6 +57,9 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_file(
     "${package_root}/bin/genesis-plus-gx-gui"
     "Linux application executable")
+  require_file(
+    "${package_root}/bin/qt.conf"
+    "Linux relocatable Qt configuration")
   require_match("*libQt6Core.so*" "deployed Qt Core runtime")
   require_match("*libQt6XcbQpa.so*" "deployed Qt XCB platform runtime")
   require_match("*libSDL3.so*" "deployed SDL3 runtime")

@@ -144,6 +144,12 @@ enter the event loop, and emit the final clean-shutdown record. The hook is igno
 normal launches unless the explicit test sentinel is present; malformed, relative, or
 overly long-lived test requests fail before services are constructed.
 
+Linux Release packaging additionally launches the staged executable with
+`XDG_SESSION_TYPE=wayland` while leaving `QT_QPA_PLATFORM` unset. The XCB-only portable
+layout must select its bundled backend before Qt startup, print no missing-Wayland-plugin
+diagnostic, and still honor an explicit platform choice; `unit.command_line` exercises
+the corresponding XCB-only, bundled-Wayland, and override branches directly.
+
 ## Sanitizers
 
 Linux and compatible Clang/GCC hosts can run AddressSanitizer and

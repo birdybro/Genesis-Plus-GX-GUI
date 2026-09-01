@@ -57,6 +57,11 @@ platform documentation.
 
 ### Fixed
 
+- Relocatable Linux packages now select their bundled XCB backend before Qt startup
+  when no platform override is present, avoiding a missing-Wayland-plugin diagnostic
+  on Wayland/XWayland desktops while preserving native Wayland source builds.
+- The soft-patch core workflow no longer supplies the game-file static library twice,
+  eliminating the duplicate-library linker warning found in all hosted macOS logs.
 - Debug snapshots now use scalar byte assembly for inherited CRAM/VSRAM storage,
   preventing optimized Intel macOS builds from issuing a falsely aligned SIMD read and
   crashing the CPU/VDP inspection workflows.

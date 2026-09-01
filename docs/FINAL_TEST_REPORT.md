@@ -515,9 +515,33 @@ identity. A same-inode hard-link regression reproduces the alias on case-sensiti
 hosts and also covers native case-insensitive spelling. Windows additionally exposed a
 test-only issue where the schema-1 migration fixture concatenated an unescaped
 backslash path into JSON; the fixture now uses Qt's JSON writer. Corrected Debug,
-Release, and ASan/UBSan suites each pass 93/93 again. A new exact Windows, Linux, Apple
-Silicon, and Intel macOS run is required and will be recorded after it passes and is
-fully audited.
+Release, and ASan/UBSan suites each pass 93/93 again.
+
+Exact corrective run
+[`33490884217`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33490884217)
+passes all ten jobs and every registered test on Linux, Windows, Apple Silicon, and
+Intel macOS. All six downloaded package checksums and archive integrity checks pass;
+the four applications identify as the expected ELF x86-64, PE32+ x86-64, Mach-O arm64,
+and Mach-O x86-64 architectures. Required Qt, SDL3, librashader, shader, documentation,
+license, SQLite, and Windows redistributable payloads are present. Linux dependencies,
+`--help`, and `--version` resolve from the extracted archive, and no ROM, disc, BIOS,
+save/state, fixture, credential, or private key is included.
+
+The complete 14,413-line, 1,921,484-byte log audit found one actionable warning in all
+four macOS builds: `integration.soft_patch` linked `genplusgx_game_files` both directly
+and transitively. Its target now relies on the adapter/persistence dependency graph and
+the generated link line contains one correctly ordered copy. The downloaded Linux
+archive also emitted a non-fatal missing-Wayland-plugin probe before falling back to
+its intentionally bundled XCB backend on a Wayland/XWayland desktop. Package startup
+now selects XCB before `QApplication` only for the relocatable XCB-only layout, while
+preserving explicit overrides and native Wayland source builds. The unit test covers
+XCB-only, native-Wayland, and explicit-override cases; CI and release package smokes
+now simulate Wayland auto-selection and reject the old diagnostic. Post-correction
+GCC Debug/Release/ASan, Clang 22, and CHD-disabled suites pass 93/93, the shader-off
+suite passes 91/91, the legacy target builds/links/cleans, and a fresh Linux stage
+passes automatic backend, dependency, package-layout, TGZ, and checksum checks. The
+final exact hosted replacement run and artifact audit remain required before this
+milestone closes.
 
 ## Final feature checklist
 

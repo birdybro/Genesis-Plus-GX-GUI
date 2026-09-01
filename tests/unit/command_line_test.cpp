@@ -1,7 +1,12 @@
 #include "genplusgx/app/command_line.h"
+#include "genplusgx/app/platform_bootstrap.h"
 
 #include <QCoreApplication>
+#include <QDir>
+#include <QFile>
+#include <QTemporaryDir>
 
+#include <filesystem>
 #include <iostream>
 #include <string_view>
 
@@ -87,5 +92,60 @@ int main(int argc, char** argv)
       help.contains(QStringLiteral("--patch FILE")) &&
       help.contains(QStringLiteral("[game]")),
     "help documents startup behavior");
+
+  QTemporaryDir packageRoot;
+  passed &= check(packageRoot.isValid(),
+    "a temporary package root is available");
+  const auto binaryDirectory = packageRoot.path() + QStringLiteral("/bin");
+  const auto platformDirectory =
+    packageRoot.path() + QStringLiteral("/lib/qt6/plugins/platforms");
+  passed &= check(QDir{}.mkpath(binaryDirectory) &&
+      QDir{}.mkpath(platformDirectory),
+    "the temporary Linux package layout can be created");
+  QFile qtConfiguration{binaryDirectory + QStringLiteral("/qt.conf")};
+  QFile xcbPlugin{platformDirectory + QStringLiteral("/libqxcb.so")};
+  passed &= check(qtConfiguration.open(QIODevice::WriteOnly) &&
+      qtConfiguration.write("[Paths]\n") > 0 && qtConfiguration.flush() &&
+      xcbPlugin.open(QIODevice::WriteOnly) && xcbPlugin.flush(),
+    "the temporary Linux package markers can be written");
+  qtConfiguration.close();
+  xcbPlugin.close();
+
+  const auto previousPlatform = qgetenv("QT_QPA_PLATFORM");
+  const bool platformWasSet = qEnvironmentVariableIsSet("QT_QPA_PLATFORM");
+  qunsetenv("QT_QPA_PLATFORM");
+  const auto executablePath = std::filesystem::path{
+    binaryDirectory.toStdString()} / "genesis-plus-gx-gui";
+#if defined(Q_OS_LINUX)
+  passed &= check(
+    genplusgx::app::configureBundledLinuxQtPlatform(executablePath) &&
+      qgetenv("QT_QPA_PLATFORM") == QByteArrayLiteral("xcb"),
+    "an XCB-only relocatable Linux package selects its bundled backend");
+  qputenv("QT_QPA_PLATFORM", QByteArrayLiteral("offscreen"));
+  passed &= check(
+    !genplusgx::app::configureBundledLinuxQtPlatform(executablePath) &&
+      qgetenv("QT_QPA_PLATFORM") == QByteArrayLiteral("offscreen"),
+    "an explicit Qt platform selection is preserved");
+  qunsetenv("QT_QPA_PLATFORM");
+  QFile waylandPlugin{
+    platformDirectory + QStringLiteral("/libqwayland-egl.so")};
+  passed &= check(waylandPlugin.open(QIODevice::WriteOnly) &&
+      waylandPlugin.flush(),
+    "the temporary Wayland plugin marker can be written");
+  waylandPlugin.close();
+  passed &= check(
+    !genplusgx::app::configureBundledLinuxQtPlatform(executablePath) &&
+      qEnvironmentVariableIsEmpty("QT_QPA_PLATFORM"),
+    "a package with a native Wayland backend keeps Qt auto-selection");
+#else
+  passed &= check(
+    !genplusgx::app::configureBundledLinuxQtPlatform(executablePath),
+    "Linux package selection is inert on other operating systems");
+#endif
+  if (platformWasSet) {
+    qputenv("QT_QPA_PLATFORM", previousPlatform);
+  } else {
+    qunsetenv("QT_QPA_PLATFORM");
+  }
   return passed ? 0 : 1;
 }

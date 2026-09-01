@@ -14,7 +14,6 @@ target_link_libraries(
   genplusgx_soft_patch_workflow_test
   PRIVATE
     GenesisPlusGX::CoreAdapter
-    GenesisPlusGX::GameFiles
     GenesisPlusGX::Persistence
     genplusgx_project_warnings
     genplusgx_test_utilities

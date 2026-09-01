@@ -91,8 +91,16 @@ jobs:
           cmake --install build/release --prefix "$PWD/build/package-root"
           cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
             -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
-          env -u LD_LIBRARY_PATH QT_QPA_PLATFORM=xcb xvfb-run -a \
-            build/package-root/bin/genesis-plus-gx-gui --version
+          package_smoke_output="$(
+            env -u LD_LIBRARY_PATH -u QT_QPA_PLATFORM \
+              XDG_SESSION_TYPE=wayland xvfb-run -a \
+              build/package-root/bin/genesis-plus-gx-gui --version 2>&1
+          )"
+          printf '%s\n' "$package_smoke_output"
+          if grep -F "Could not find the Qt platform plugin" \
+              <<< "$package_smoke_output"; then
+            exit 1
+          fi
           cpack --config build/release/CPackConfig.cmake \
             -G TGZ -B build/packages
 

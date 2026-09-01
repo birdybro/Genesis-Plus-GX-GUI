@@ -94,7 +94,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
-| 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, tests/docs | 93-test Debug/Release/ASan suites; reduced-feature/compiler/package/libretro gates; exact hosted matrix pending push | Every format is bounded; patched bytes own persistence identity; source paths remain intact | pending |
+| 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test Debug/Release/ASan suites; reduced-feature/compiler/package/libretro gates; final exact hosted audit pending | Every format is bounded; patched bytes own persistence identity; source paths remain intact | pending |
 | 84 Enhanced save-state UX | PLANNED | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
 | 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
@@ -3796,6 +3796,7 @@ the exact patched bytes.
 - `desktop/core/include/genplusgx/game_patch.h`
 - `desktop/core/src/game_patch.cpp`
 - game launch, dialog, command-line, and session settings composition under `desktop/`
+- Linux package bootstrap and CI/release package smokes
 - unit, core, GUI, process, and optional external-ROM tests under `tests/`
 - README, changelog, architecture, user, state, fixture, and testing documentation
 
@@ -3821,8 +3822,25 @@ probes of one IPS file were counted as two sidecars. Sidecar deduplication now u
 filesystem identity, and a same-inode/case-alias regression reproduces the condition on
 every host. The same run also showed that the new schema-1 migration test hand-built
 invalid JSON from an unescaped Windows path; it now uses Qt's JSON writer. Corrected
-Debug, Release, and ASan/UBSan suites again pass 93/93. A new exact hosted run is
-required after the corrective commit is pushed.
+Debug, Release, and ASan/UBSan suites again pass 93/93. Exact corrective run
+[`33490884217`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33490884217)
+then passed all ten jobs and all 93 tests on Linux, Windows, Apple Silicon, and Intel
+macOS. Its six package manifests, archive structures, four executable architectures,
+required runtimes/assets/notices, Linux dependencies/CLI, and prohibited-payload scan
+all passed. Reading all 14,413 lines (1,921,484 bytes) nevertheless found one warning
+in each macOS configuration: the new soft-patch workflow test named the game-file
+static library directly and through the core adapter. Removing the redundant direct
+edge leaves one correctly ordered library entry. Exercising the downloaded Linux
+archive under the host's Wayland/XWayland session also found a non-fatal missing
+Wayland-plugin probe before Qt fell back to the intentionally packaged XCB backend.
+The pre-application package bootstrap now selects bundled XCB only when `qt.conf` and
+the XCB plugin are present, no bundled Wayland plugin exists, and the user has not made
+an explicit platform choice. The unit test covers each branch and CI/release smokes
+reproduce a Wayland session without forcing XCB. After both audit corrections, GCC
+Debug, Release, and ASan/UBSan plus Clang 22 and CHD-disabled builds pass 93/93; the
+shader-disabled graph passes 91/91; the warning-clean legacy target and a fresh staged
+Linux package/automatic-backend smoke pass. A final exact hosted run and complete
+replacement artifact audit remain required.
 
 **Acceptance criteria:** IPS/BPS/UPS are parsed without unchecked offsets or unbounded
 output; BPS/UPS checksums and source identity are enforced; the source file is never

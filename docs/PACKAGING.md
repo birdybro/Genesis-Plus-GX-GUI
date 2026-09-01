@@ -44,8 +44,8 @@ To inspect the self-contained install tree before archiving:
 cmake --install build/release --prefix build/package-root
 cmake -DPACKAGE_ROOT="$PWD/build/package-root" \
   -DVERIFY_PLATFORM=linux -P cmake/VerifyPackage.cmake
-env -u LD_LIBRARY_PATH QT_QPA_PLATFORM=xcb xvfb-run -a \
-  build/package-root/bin/genesis-plus-gx-gui --version
+env -u LD_LIBRARY_PATH -u QT_QPA_PLATFORM XDG_SESSION_TYPE=wayland \
+  xvfb-run -a build/package-root/bin/genesis-plus-gx-gui --version
 ```
 
 Use `windows` or `macos` for `VERIFY_PLATFORM` on those hosts. Verification requires the
@@ -90,6 +90,11 @@ search directories as package inputs.
 The archive includes Qt's XCB EGL and GLX integration plugins. Runtime rendering also
 preflights a context and surface before creating the accelerated display, automatically
 retaining the complete software-rendered shell if host OpenGL is unavailable.
+Because this portable archive intentionally carries XCB rather than the much larger Qt
+Wayland dependency closure, startup selects the bundled XCB backend before constructing
+`QApplication` when no explicit `QT_QPA_PLATFORM` is set. This avoids probing a missing
+Wayland plugin on Wayland/XWayland desktops. Source builds with a native Wayland plugin
+and explicit user platform selections continue to use those choices.
 
 Packages contain the root license/notices plus the complete user, BIOS, input, save,
 build, test, packaging, and maintenance guides under the platform documentation
