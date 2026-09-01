@@ -96,7 +96,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
-| 85 Recording and frame dumps | IN PROGRESS | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local matrices, encoder, timing, lifecycle, GUI; hosted matrix pending | Recording cannot stall or grow queues without bound | pending |
+| 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
@@ -3924,7 +3924,7 @@ logs and packages are inspected before completion.
 
 ## Milestone 85 detail
 
-**Status:** IN PROGRESS (local gates complete; exact hosted verification pending)
+**Status:** COMPLETE
 
 **Goal:** Capture native emulation video and stereo PCM audio without blocking the
 emulation owner thread, with deterministic frame dumps suitable for editing,
@@ -3959,9 +3959,23 @@ fresh Clang 22, and CHD-disabled builds each pass 95/95 without a finding. The f
 shader-disabled graph passes all 93 applicable tests. A fresh Release stage passes
 self-contained package verification, installed help/version, the real XCB event loop
 with isolated application data, and dependency inspection across all 22 ELF objects.
-Hosted Windows, Linux, Apple Silicon, and Intel macOS evidence remains pending until the
-implementation commit is pushed; no later feature may begin before that exact run and
-its complete logs and artifacts pass review.
+Exact run
+[`33506923671`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33506923671)
+passes all ten jobs against implementation commit
+`59beedd1f9b1e0a08a2ec0e28f0f9293cd29fe20`. All nine native configurations register
+95 tests and pass every supported test; the two Windows configurations capability-skip
+only the established real-OpenGL shader test. Both new recording tests pass in all nine
+configurations, including hosted ASan/UBSan. The complete 14,523-line,
+1,937,071-byte log contains no authored compiler/linker warning, sanitizer finding,
+runtime error, crash, timeout, test failure, or unexpected skip.
+
+All six downloaded package checksum manifests pass. Both DMGs pass structural checks;
+the Linux, Windows, Apple Silicon, and Intel macOS executables and librashader libraries
+identify with the advertised architectures. Required Qt, SDL3, SQLite, librashader,
+CRT shader, recording documentation, legal notices, and Windows redistributable
+payloads are present. All 22 Linux ELF objects resolve, installed `--help`/`--version`
+and a real bundled-XCB/OpenGL event loop pass, and the extracted payloads contain no
+ROM, disc, BIOS, save/state, credential, or private-key files.
 
 **Acceptance criteria:** The emulation thread performs only bounded copies into eight
 preallocated slots; a dedicated writer produces sequential native PNG files, stereo
@@ -3970,7 +3984,7 @@ file, and total-output limits are enforced and measured; rewind preserves A/V ca
 with silence; start, stop, game replacement, and shutdown drain safely; every local and
 exact hosted gate passes before completion.
 
-**Commit SHA:** pending
+**Commit SHA:** `59beedd1f9b1e0a08a2ec0e28f0f9293cd29fe20`
 
 ## Milestone 70 detail
 

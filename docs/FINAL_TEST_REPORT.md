@@ -3,7 +3,7 @@
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
-cartridge soft-patch, and enhanced save-state verification through 2026-09-01
+cartridge soft-patch, enhanced save-state, and bounded-recording verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -27,6 +27,8 @@ cartridge soft-patch, and enhanced save-state verification through 2026-09-01
   `da80552964855fe5ab7ec17689526b8cabdb7d8c`
 - Exact enhanced save-state implementation and hosted evidence baseline:
   `30ed5d7e378c7107db3be844fc80cfd0c96deec2`
+- Exact bounded-recording implementation and hosted evidence baseline:
+  `59beedd1f9b1e0a08a2ec0e28f0f9293cd29fe20`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -147,37 +149,39 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 93/93 | Passed |
-| Release | Optimized native x86-64 | 93/93 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 93/93 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 91/91 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 93/93 | Passed |
-| Clang 22 | Warning-gated Debug | 93/93 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 95/95 | Passed |
+| Release | Optimized native x86-64 | 95/95 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 95/95 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 93/93 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 95/95 | Passed |
+| Clang 22 | Warning-gated Debug | 95/95 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
 core lifecycle, adapter, persistence, and save-state paths; bounded parser/property
 corpora; worker lifecycle; semantic GUI workflows; actual-process startup/shutdown; and
-the accelerated 20,000-frame stability test. No suppression was added for project code.
+the accelerated 20,000-frame stability test. The two recording-labeled tests cover the
+bounded writer in isolation and through the real core/worker path. No suppression was
+added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 93 distinct tests:
+The default shader-enabled build registers 95 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
-| Integration | 3 |
-| Unit | 37 |
+| Integration | 4 |
+| Unit | 38 |
 | GUI/smoke | 25 |
-| **Total** | **93** |
+| **Total** | **95** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 59 `unit`, 23 `core`, 38 `integration`, and 25 `gui`. Focused
+layers. Label counts are 60 `unit`, 24 `core`, 39 `integration`, and 25 `gui`. Focused
 coverage also includes persistence (31), fixtures (28), concurrency (16), settings
 (18), input (9), video (8), audio (6), timing (6), rewind (4), state (8), release (4),
-fuzz/property (4), shader (2), and packaging (3).
+fuzz/property (4), shader (2), recording (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -191,7 +195,7 @@ project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal
 Option-domain coverage is also explicit rather than inferred: core tests execute all
 13 video values, 35 audio enumerations/endpoints, 12 emulated device types, and 24
 system values. UI inventory checks require every corresponding choice, range, and all
-32 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
+33 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
 mute/volume/device/latency, keyboard/controller event paths, persistence, states,
 library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
 Four debugger-labeled tests cover the analysis model, core/worker bridge, semantic GUI,
@@ -612,6 +616,46 @@ finding, runtime error, timeout, failure, or unexpected skip. All four downloade
 artifact families, six checksum manifests, archives, application architectures, Linux
 dependencies, required runtime/legal resources, and prohibited-payload scans pass.
 
+## Bounded recording verification
+
+Milestone 85 adds a capture tap after each completed core frame without allowing the
+GUI or writer to access core globals. The emulation owner copies native tightly packed
+RGB565 video and matching stereo samples into one of eight preallocated slots; a
+dedicated writer emits sequential PNG frames, PCM WAV audio, a JSONL frame index, and
+a final manifest. Rewind frames retain cadence with silence. Queue, frame, per-image,
+per-frame-audio, and total-output limits are hard bounded and surfaced in diagnostics.
+An exclusive `.partial` directory becomes visible as a completed recording only after
+all accepted frames drain and final metadata is durable.
+
+The recording service unit test covers exact pixel conversion, dynamic geometry, WAV
+headers/sample counts, JSON metadata, collisions, saturation/drop accounting, invalid
+geometry and rates, restart, shutdown draining, and 24 immediate start/stop races. The
+integration test executes a generated legal Genesis program through the real core,
+worker capture tap, and writer, then validates all four recorded frames and output
+files. Worker, GUI, process, settings, migration, and diagnostics regressions also cover
+owner-thread delivery, disabled capture, native-dialog injection, transition gating,
+close-game finalization, the standard recordings directory, and the configurable
+hotkey.
+
+Local warning-as-error Debug, optimized Release, ASan/UBSan, Clang 22, and CHD-disabled
+graphs pass 95/95; the shader-disabled graph passes 93/93. The staged Linux package,
+legacy libretro build/link/clean, dependencies, CLI, and real XCB/OpenGL event-loop
+smokes pass. Exact hosted run
+[`33506923671`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33506923671)
+passes all ten jobs against `59beedd1f9b1e0a08a2ec0e28f0f9293cd29fe20`.
+All nine native configurations pass every supported test and both recording tests;
+Windows capability-skips only the established OpenGL 3.3 shader-render test.
+
+The complete 14,523-line, 1,937,071-byte hosted log has no authored compiler/linker
+warning, sanitizer finding, runtime error, crash, timeout, failure, or unexpected skip.
+The downloaded packages are Linux TGZ 40,130,666 bytes, Windows ZIP 52,627,291 bytes,
+macOS arm64 ZIP/DMG 32,049,001/31,999,649 bytes, and macOS x86_64 ZIP/DMG
+32,869,328/32,790,054 bytes. All six checksum manifests and both DMG structural checks
+pass. Executables and librashader libraries match their advertised architectures;
+required Qt, SDL3, SQLite, shaders, documentation, notices, and redistributable files
+are present; all 22 Linux ELF dependencies resolve; and no prohibited game, firmware,
+save/state, fixture, credential, or private-key payload is present.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -638,6 +682,9 @@ dependencies, required runtime/legal resources, and prohibited-payload scans pas
 - [x] State slots 0-9, quick operations, names, native-frame previews, a complete
   browser, validated manual import/export, timestamps, delete, schema migration,
   corruption/wrong-game rejection, and deterministic restoration.
+- [x] Bounded lossless native-frame recording with stereo PCM audio, deterministic
+  PNG/JSON frame dumps, collision-safe output directories, drop instrumentation,
+  lifecycle-safe draining, and a configurable hotkey.
 - [x] Opt-in automatic clean-shutdown session checkpoint, identity-checked restore,
   command-line precedence, explicit-close clearing, and safe normal-launch fallback.
 - [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
@@ -690,10 +737,10 @@ directories.
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
 - The previously supplied external-ROM mount was unmounted/empty during the
-  configurable-speed, soft-patch, and enhanced save-state runs, so its speed workflows,
-  temporary header-only IPS case, and optional real-game state browser smoke were not
-  executed locally. The required suites use legal
-  generated 68000 and Z80 programs through the same production GUI/worker/core route;
+  configurable-speed, soft-patch, enhanced save-state, and recording runs, so its speed
+  workflows, temporary header-only IPS case, optional real-game state browser smoke,
+  and optional real-game recording smoke were not executed locally. The required suites
+  use legal generated 68000 and Z80 programs through the same production GUI/worker/core route;
   the earlier 113-case Phantasy Star IV option acceptance remains recorded above. No
   degraded RAID assembly or mount was attempted.
 - Controller and audio hot-plug behavior is deterministically tested with injected SDL
