@@ -388,8 +388,10 @@ jobs:
             -P tests/gui/desktop_startup_smoke.cmake
           cpack --config build/ci-Release/CPackConfig.cmake \
             -G ZIP -B build/packages
-          cpack --config build/ci-Release/CPackConfig.cmake \
-            -G DragNDrop -B build/packages
+          cmake \
+            -DCPACK_CONFIG="$PWD/build/ci-Release/CPackConfig.cmake" \
+            -DPACKAGE_DIRECTORY="$PWD/build/packages" \
+            -P cmake/PackageMacDmg.cmake
 
       - name: Upload native macOS packages
         if: matrix.build_type == 'Release'

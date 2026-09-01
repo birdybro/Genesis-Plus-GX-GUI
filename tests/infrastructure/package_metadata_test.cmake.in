@@ -13,6 +13,18 @@ foreach(required IN ITEMS
   endif()
 endforeach()
 
+if(NOT EXISTS "@PROJECT_SOURCE_DIR@/cmake/PackageMacDmg.cmake")
+  message(FATAL_ERROR "The bounded macOS DMG packager is missing")
+endif()
+foreach(workflow IN ITEMS ci.yml release.yml)
+  file(READ "@PROJECT_SOURCE_DIR@/.github/workflows/${workflow}" workflow_text)
+  string(FIND "${workflow_text}" "cmake/PackageMacDmg.cmake" helper_position)
+  if(helper_position EQUAL -1)
+    message(FATAL_ERROR
+      "${workflow} bypasses the bounded macOS DMG packaging helper")
+  endif()
+endforeach()
+
 set(expected
   "Genesis-Plus-GX-GUI-${package_version}-${package_platform}-${package_architecture}")
 if(NOT package_basename STREQUAL expected)

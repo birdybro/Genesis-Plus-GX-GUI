@@ -101,7 +101,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
-| 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 102-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
+| 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
@@ -4083,6 +4083,7 @@ copying, merging, or falling back to the platform-standard user profile.
   diagnostics
 - installed-package startup gates and portable-payload rejection in CMake and both
   GitHub workflows
+- bounded transient-only macOS DMG packaging recovery with scoped cleanup
 - process, unit, GUI, package-fixture, architecture, user, testing, changelog, and
   README coverage
 
@@ -4096,10 +4097,12 @@ checks the structured mode/startup/shutdown record, and exits cleanly.
 `gui.desktop_portable_failure_smoke` blocks that root with a regular file and requires
 a descriptive status-2 failure without replacement or fallback. Package fixtures prove
 that pre-created portable user data is rejected.
+`infrastructure.mac_dmg_retry` simulates a transient recovery, three-attempt
+exhaustion, permanent failure, and an unsafe filesystem-root cleanup request.
 
 **Gate evidence:** Complete warning-as-error Debug and optimized Release builds pass
-102/102 tests. Leak-detecting ASan/UBSan, fresh warning-as-error Clang 22, and
-CHD-disabled graphs also pass 102/102; the shader-disabled graph passes all 100
+103/103 tests. Leak-detecting ASan/UBSan, fresh warning-as-error Clang 22, and
+CHD-disabled graphs also pass 103/103; the shader-disabled graph passes all 101
 applicable tests. The required native OpenGL regression passes. A strict inherited
 Unix libretro build/link/clean passes without a diagnostic. A fresh Linux staged install
 and extracted TGZ pass package verification, checksum and safe-path inspection, all 22
@@ -4114,12 +4117,25 @@ passed on Linux Debug, Windows Debug/Release, and both macOS architectures in
 Debug/Release; every Release package also completed its new native portable startup
 before artifact creation. Linux ASan/UBSan passed 101 tests and reported no sanitizer
 finding, but its complete 108-case software-OpenGL matrix reached the old 30-second
-test timeout after initializing several cases. The full matrix remains enabled; only
-its sanitizer timeout is now 90 seconds to accommodate instrumentation and shared-runner
+test timeout after initializing several cases. The full matrix remained enabled; its
+sanitizer timeout was initially raised to accommodate instrumentation and shared-runner
 software rendering. Five consecutive focused ASan/UBSan matrix runs and the complete
-102-test local sanitizer graph pass after that correction. Cross-platform completion
-requires the exact corrected CI and artifact/log audit; its traceable evidence is
-recorded in the closure commit after that run passes.
+local sanitizer graph passed after that correction.
+
+Exact corrective run
+[`33554594160`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33554594160)
+against `a30bbdf6005acdaf31a2758fa13ab53c6b7a7000` confirmed all 102 sanitizer tests
+in 53 seconds with no finding. It also exposed the same 30-second software-OpenGL
+variance in unsanitized Linux Debug, whose other 101 tests passed, so the bounded
+90-second allowance now applies to that one exhaustive matrix on every host. All 102
+Intel macOS Release tests, its installed portable startup, and ZIP creation passed;
+DMG creation then encountered a transient `hdiutil: create failed - Resource busy`.
+DMG packaging now retries only that condition at most three times, waits five/ten
+seconds, removes only its normalized CPack staging subtree, and fails permanent errors
+immediately. The deterministic infrastructure test covers every branch. All six
+updated local graphs pass at the counts above. Cross-platform completion requires the
+exact second corrective CI and artifact/log audit; its traceable evidence is recorded
+in the closure commit after that run passes.
 
 **Acceptance criteria:** Portable selection is explicit per process; placement is
 executable-relative and independent of the working directory; macOS data remains

@@ -479,7 +479,9 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     PROPERTIES
       SKIP_RETURN_CODE 77
       LABELS "gui;integration;video;shader;artwork;opengl"
-      TIMEOUT 30
+      # The complete 108-case matrix runs through host software OpenGL on CI.
+      # Keep every case while allowing for shared-runner rendering variance.
+      TIMEOUT 90
   )
   if(WIN32)
     set_tests_properties(
@@ -501,10 +503,6 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     )
   endif()
   if(GENPLUSGX_ENABLE_SANITIZERS)
-    # The complete 108-case artwork/presentation matrix runs through Mesa's
-    # software OpenGL path in hosted CI. Keep the full matrix under ASan/UBSan,
-    # but allow for sanitizer and shared-runner instrumentation overhead.
-    set_property(TEST gui.libretro_shader_render PROPERTY TIMEOUT 90)
     set_property(
       TEST gui.libretro_shader_render
       APPEND PROPERTY ENVIRONMENT

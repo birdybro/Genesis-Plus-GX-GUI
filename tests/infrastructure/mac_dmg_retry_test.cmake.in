@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.25)
+
+set(fixture_directory "@CMAKE_CURRENT_BINARY_DIR@/mac-dmg-retry-fixture")
+file(REMOVE_RECURSE "${fixture_directory}")
+file(MAKE_DIRECTORY "${fixture_directory}/packages")
+set(config "${fixture_directory}/CPackConfig.cmake")
+set(driver "@PROJECT_SOURCE_DIR@/tests/infrastructure/fake_mac_dmg_packager.cmake")
+file(WRITE "${config}" "# Generated retry-test placeholder.\n")
+
+function(run_retry_case name succeed_on transient expected_result expected_attempts)
+  set(state "${fixture_directory}/${name}-attempts.txt")
+  execute_process(
+    COMMAND
+      "@CMAKE_COMMAND@"
+      "-DCPACK_CONFIG=${config}"
+      "-DPACKAGE_DIRECTORY=${fixture_directory}/packages"
+      "-DGENPLUSGX_DMG_TEST_DRIVER=${driver}"
+      "-DGENPLUSGX_DMG_TEST_STATE=${state}"
+      "-DGENPLUSGX_DMG_TEST_SUCCEED_ON=${succeed_on}"
+      "-DGENPLUSGX_DMG_TEST_TRANSIENT=${transient}"
+      -P "@PROJECT_SOURCE_DIR@/cmake/PackageMacDmg.cmake"
+    RESULT_VARIABLE result
+    OUTPUT_VARIABLE output
+    ERROR_VARIABLE error)
+  if(expected_result STREQUAL "success" AND NOT result EQUAL 0)
+    message(FATAL_ERROR "${name} failed unexpectedly:\n${output}${error}")
+  elseif(expected_result STREQUAL "failure" AND result EQUAL 0)
+    message(FATAL_ERROR "${name} succeeded unexpectedly")
+  endif()
+  file(READ "${state}" attempts)
+  if(NOT attempts EQUAL expected_attempts)
+    message(FATAL_ERROR
+      "${name} used ${attempts} attempts instead of ${expected_attempts}")
+  endif()
+endfunction()
+
+run_retry_case(transient-success 2 ON success 2)
+run_retry_case(transient-exhausted 4 ON failure 3)
+run_retry_case(permanent-failure 4 OFF failure 1)
+
+cmake_path(GET fixture_directory ROOT_PATH filesystem_root)
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DCPACK_CONFIG=${config}"
+    "-DPACKAGE_DIRECTORY=${filesystem_root}"
+    "-DGENPLUSGX_DMG_TEST_DRIVER=${driver}"
+    "-DGENPLUSGX_DMG_TEST_STATE=${fixture_directory}/unsafe-attempts.txt"
+    -DGENPLUSGX_DMG_TEST_SUCCEED_ON=1
+    -DGENPLUSGX_DMG_TEST_TRANSIENT=ON
+    -P "@PROJECT_SOURCE_DIR@/cmake/PackageMacDmg.cmake"
+  RESULT_VARIABLE unsafe_result
+  OUTPUT_VARIABLE unsafe_output
+  ERROR_VARIABLE unsafe_error)
+if(unsafe_result EQUAL 0 OR
+   NOT "${unsafe_output}${unsafe_error}" MATCHES "cannot be a filesystem root")
+  message(FATAL_ERROR
+    "The DMG retry helper did not reject an unsafe cleanup root:\n"
+    "${unsafe_output}${unsafe_error}")
+endif()
+
+file(REMOVE_RECURSE "${fixture_directory}")

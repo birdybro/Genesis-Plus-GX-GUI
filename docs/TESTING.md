@@ -42,6 +42,9 @@ mode-tagged logging, and shutdown. `gui.desktop_portable_failure_smoke` blocks t
 with a regular file and requires a descriptive status-2 failure with no fallback.
 Release package jobs repeat the positive startup against each actual installed
 Linux/Windows/macOS layout before creating artifacts.
+`infrastructure.mac_dmg_retry` deterministically verifies bounded recovery from a
+transient macOS `hdiutil` resource-busy condition, three-attempt exhaustion, immediate
+permanent-error failure, and rejection of a filesystem-root cleanup target.
 
 `unit.rewind_buffer` proves strict byte-cap eviction and backward ordering;
 `unit.rewind_settings` covers defaults, atomic persistence, validation, and corruption;

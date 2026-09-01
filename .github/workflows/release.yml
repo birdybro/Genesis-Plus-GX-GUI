@@ -283,8 +283,10 @@ jobs:
             -P tests/gui/desktop_startup_smoke.cmake
           cpack --config build/release/CPackConfig.cmake \
             -G ZIP -B build/packages
-          cpack --config build/release/CPackConfig.cmake \
-            -G DragNDrop -B build/packages
+          cmake \
+            -DCPACK_CONFIG="$PWD/build/release/CPackConfig.cmake" \
+            -DPACKAGE_DIRECTORY="$PWD/build/packages" \
+            -P cmake/PackageMacDmg.cmake
 
       - name: Upload macOS packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0

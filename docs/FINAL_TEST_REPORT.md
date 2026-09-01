@@ -137,8 +137,8 @@ with a specific diagnostic instead of touching the normal profile. The title, Pa
 page, structured log, and privacy-safe diagnostics expose the active mode.
 
 Warning-as-error Debug and optimized Release, leak-detecting ASan/UBSan, fresh Clang
-22, and CHD-disabled builds pass 102/102 tests; the shader-disabled graph passes all
-100 applicable tests. Positive and blocked-root process tests verify complete
+22, and CHD-disabled builds pass 103/103 tests; the shader-disabled graph passes all
+101 applicable tests. Positive and blocked-root process tests verify complete
 event-loop startup/shutdown and fail-closed behavior. The strict legacy Unix libretro
 target builds, links, and cleans. A fresh Linux install and extracted TGZ pass package
 verification, SHA-256 and safe-path checks, all 22 ELF dependency graphs, installed
@@ -152,10 +152,21 @@ passes the legacy job plus Linux Debug, Windows Debug/Release, and Apple Silicon
 Debug/Release, including every installed-package portable startup. The Linux sanitizer
 job passes 101/102 with no ASan/UBSan finding; only the unchanged 108-case software-
 OpenGL matrix reaches its old 30-second per-test timeout under hosted instrumentation.
-The complete matrix remains required, with a sanitizer-only 90-second allowance.
-Five consecutive focused local sanitizer runs and the complete 102-test ASan/UBSan
-graph pass after that correction. Exact corrected hosted and artifact/log evidence is
-added after the pushed correction run completes.
+The complete matrix remains required. Five consecutive focused local sanitizer runs
+and the complete local ASan/UBSan graph pass after the first correction.
+
+Exact corrective run
+[`33554594160`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33554594160)
+then passes all 102 sanitizer tests in 53 seconds with no finding. Shared-runner
+variance moves the unchanged 30-second matrix timeout to Linux Debug while every other
+Linux Debug test passes, so that one exhaustive test now has a bounded 90-second
+allowance in every configuration. Intel macOS Release passes all tests, installed
+portable startup, and ZIP generation before `hdiutil` reports a transient
+`Resource busy` during DMG creation. Both workflows now use a tested three-attempt
+transient-only wrapper with scoped staging cleanup, bounded waits, immediate permanent-
+error failure, and filesystem-root rejection. All six current local graphs pass at
+the 103/101 counts above. Exact second-correction hosted and artifact/log evidence is
+added after the pushed run completes.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,
@@ -227,12 +238,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 100/100 | Passed |
-| Release | Optimized native x86-64 | 100/100 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 100/100 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 98/98 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 100/100 | Passed |
-| Clang 22 | Warning-gated Debug | 100/100 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 103/103 | Passed |
+| Release | Optimized native x86-64 | 103/103 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 103/103 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 101/101 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 103/103 | Passed |
+| Clang 22 | Warning-gated Debug | 103/103 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -245,23 +256,23 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 100 distinct tests:
+The default shader-enabled build registers 103 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
-| Infrastructure | 8 |
+| Infrastructure | 9 |
 | Core | 20 |
 | Integration | 5 |
 | Unit | 41 |
-| GUI/smoke | 26 |
-| **Total** | **100** |
+| GUI/smoke | 28 |
+| **Total** | **103** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 64 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
+layers. Label counts are 65 `unit`, 25 `core`, 43 `integration`, and 28 `gui`. Focused
 coverage also includes persistence (33), fixtures (30), concurrency (19), settings
-(20), input (10), video (12), audio (9), timing (7), presentation (1), rewind (4),
-run-ahead (3), state (9), release (4), fuzz/property (4), shader (2), recording (2),
-and packaging (3).
+(20), input (10), video (13), audio (9), timing (7), presentation (1), rewind (4),
+run-ahead (3), state (9), release (5), fuzz/property (4), shader (2), recording (2),
+packaging (4), and portable mode (2).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,

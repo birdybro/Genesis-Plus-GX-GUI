@@ -100,6 +100,22 @@ set_tests_properties(
   PROPERTIES LABELS "unit;infrastructure;packaging;release"
 )
 
+configure_file(
+  mac_dmg_retry_test.cmake.in
+  "${CMAKE_CURRENT_BINARY_DIR}/mac_dmg_retry_test.cmake"
+  @ONLY
+)
+add_test(
+  NAME infrastructure.mac_dmg_retry
+  COMMAND
+    "${CMAKE_COMMAND}"
+    -P "${CMAKE_CURRENT_BINARY_DIR}/mac_dmg_retry_test.cmake"
+)
+set_tests_properties(
+  infrastructure.mac_dmg_retry
+  PROPERTIES LABELS "unit;infrastructure;packaging;release"
+)
+
 add_test(
   NAME infrastructure.documentation
   COMMAND

@@ -86,6 +86,9 @@ platform documentation.
 
 ### Fixed
 
+- Cross-platform release gates retain the complete 108-case software-OpenGL matrix
+  with a realistic bounded timeout, and macOS DMG creation retries only the transient
+  `hdiutil` resource-busy condition with scoped staging cleanup.
 - Relocatable Linux packages now select their bundled XCB backend before Qt startup
   when no platform override is present, avoiding a missing-Wayland-plugin diagnostic
   on Wayland/XWayland desktops while preserving native Wayland source builds.

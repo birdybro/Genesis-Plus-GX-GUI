@@ -70,6 +70,13 @@ and clean shutdown before CPack runs. Those temporary checks occur in the CI sta
 tree and are not included in the generated archive. See
 [PORTABLE_MODE.md](PORTABLE_MODE.md) for the user-facing behavior.
 
+macOS ZIP creation remains a direct CPack gate. DMG creation runs through
+`cmake/PackageMacDmg.cmake`, which retries at most three times only when `hdiutil`
+reports the known transient `Resource busy` host condition. It removes only the
+normalized CPack DragNDrop staging subtree and waits five then ten seconds; permanent
+errors fail immediately and a third transient failure remains fatal. The infrastructure
+suite simulates recovery, exhaustion, permanent failure, and unsafe cleanup roots.
+
 ## Platform notes
 
 Windows packages are portable directories and do not modify the registry. The staged
