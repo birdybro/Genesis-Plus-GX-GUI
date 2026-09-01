@@ -98,7 +98,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
-| 87 Display synchronization | IN PROGRESS | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
+| 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
@@ -3865,7 +3865,7 @@ hosted-gate correction `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
 
 ## Milestone 87 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Add explicit low-latency host presentation controls and observable cadence
 without allowing the renderer, Qt event loop, or window-system compositor to become a
@@ -3902,8 +3902,21 @@ libretro target also builds, links, identifies as x86-64 ELF, and cleans. The un
 staging-prefix smoke emits one classified host-portal registration warning because its
 desktop entry is intentionally not installed into the host's system application
 database; renderer initialization and structured clean shutdown both succeed. Exact
-hosted CI, complete log inspection, and native artifact audit remain required before
-this status can become complete.
+hosted CI, complete log inspection, and native artifact audit were then completed by
+exact run
+[`33525028599`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33525028599)
+against `b84af114bef3b087978b0c269268ed1b59358213`. All ten jobs pass. Each of the
+nine CMake configurations registers 99 tests; Linux and both macOS architectures run
+and pass all 99, while Windows passes every supported test and capability-skips only
+the established real-OpenGL test on its hosted software renderer. All seven other
+native configurations execute the real six-case synchronization/buffering rebuild.
+
+All 14,718 hosted log lines (1,964,851 bytes) were inspected. No workflow annotation,
+authored compiler/linker warning, sanitizer finding, runtime error, timeout, failed
+test, or unexpected skip remains. All six package checksums, every archive and both
+DMGs, four application and librashader architectures, required deployment/legal
+resources, all 22 Linux ELF dependency graphs, packaged CLI, downloaded-package real
+XCB/OpenGL startup and clean shutdown, DMG contents, and prohibited-payload scans pass.
 
 **Acceptance criteria:** Off/on/adaptive and double/triple requests are persistent,
 runtime-selectable, accessible, and independently report effective host behavior; live
@@ -3912,8 +3925,7 @@ more than one pending generation; skipped/coalesced/dropped/swap-cadence metrics
 bounded; the worker's rational frame pacer stays authoritative; and every local and
 hosted regression passes.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Commit SHA:** implementation `b84af114bef3b087978b0c269268ed1b59358213`
 
 ## Milestone 83 detail
 

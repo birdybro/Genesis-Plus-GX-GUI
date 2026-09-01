@@ -3,7 +3,8 @@
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
-cartridge soft-patch, enhanced save-state, bounded-recording, and run-ahead verification through 2026-09-01
+cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, and display
+synchronization verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -33,6 +34,8 @@ cartridge soft-patch, enhanced save-state, bounded-recording, and run-ahead veri
   `967500fdc9608fbce0ec123ac3f0eff0d8965d30`
 - Exact run-ahead hosted evidence and timing-gate correction baseline:
   `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
+- Exact display-synchronization implementation and hosted evidence baseline:
+  `b84af114bef3b087978b0c269268ed1b59358213`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -153,12 +156,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 98/98 | Passed |
-| Release | Optimized native x86-64 | 98/98 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 98/98 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 96/96 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 98/98 | Passed |
-| Clang 22 | Warning-gated Debug | 98/98 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 99/99 | Passed |
+| Release | Optimized native x86-64 | 99/99 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 99/99 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 97/97 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 99/99 | Passed |
+| Clang 22 | Warning-gated Debug | 99/99 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -171,22 +174,23 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 98 distinct tests:
+The default shader-enabled build registers 99 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
 | Integration | 5 |
-| Unit | 39 |
+| Unit | 40 |
 | GUI/smoke | 26 |
-| **Total** | **98** |
+| **Total** | **99** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 62 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
+layers. Label counts are 63 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
 coverage also includes persistence (33), fixtures (30), concurrency (19), settings
-(20), input (10), video (11), audio (9), timing (6), rewind (4), run-ahead (3), state
-(9), release (4), fuzz/property (4), shader (2), recording (2), and packaging (3).
+(20), input (10), video (12), audio (9), timing (7), presentation (1), rewind (4),
+run-ahead (3), state (9), release (4), fuzz/property (4), shader (2), recording (2),
+and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -728,13 +732,58 @@ checksums, archive and DMG structural checks, application/librashader architectu
 required runtime/legal resources, 22 Linux ELF dependency graphs, packaged CLI, real
 XCB/OpenGL event-loop startup/shutdown, and prohibited-payload scans pass.
 
+## Display synchronization verification
+
+Milestone 87 adds persistent off/on/adaptive synchronization and double/triple host
+buffering requests without making display presentation a second emulation clock. The
+worker's exact rational PAL/NTSC pacer remains authoritative. Changing presentation
+policy recreates only the `QOpenGLWidget`; the newest complete frame, current shader,
+geometry, and running emulation session remain intact. Qt/driver substitutions are
+reported explicitly in diagnostics rather than being presented as accepted settings.
+
+The GUI-side presentation path retains at most one pending generation and always
+coalesces toward the newest completed exchange frame. Deterministic telemetry records
+published/copied/skipped/dropped, received/rendered/swapped/coalesced/duplicate frames,
+maximum pending depth, and measured swap cadence without retaining frame history. A
+new schema-3 global configuration migrates schema 0--2 to safe on/double defaults;
+sparse per-game settings remain backward compatible.
+
+Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan, fresh Clang 22,
+and CHD-disabled builds pass 99/99 tests; the shader-disabled graph passes all 97
+applicable tests. The native OpenGL regression rebuilds the actual display widget for
+all three synchronization modes times both buffering modes, requires observable
+effective host state and a one-frame pending bound, and recaptures an upright nonblack
+shader image after every rebuild. A fresh Linux stage/package, all 22 ELF dependency
+graphs, real OpenGL startup/shutdown, archive safety, checksum, and legacy libretro
+build/link/clean gates also pass.
+
+Exact hosted run
+[`33525028599`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33525028599)
+passes all ten jobs against `b84af114bef3b087978b0c269268ed1b59358213`. Each of
+the nine CMake configurations registers 99 tests. Linux and both macOS architectures
+run all 99; Windows passes every supported test and capability-skips only its documented
+real-OpenGL test because the hosted software renderer cannot create desktop OpenGL 3.3.
+The other seven native configurations execute the complete synchronization/buffering
+matrix, and Linux ASan/UBSan reports no finding.
+
+All 14,718 hosted log lines (1,964,851 bytes) were inspected. No workflow annotation,
+authored compiler/linker warning, sanitizer finding, runtime error, timeout, failed
+test, or unexpected skip remains. Downloaded packages are Linux x86-64 40,164,906
+bytes, Windows x86-64 52,659,091 bytes, macOS arm64 ZIP/DMG 32,079,405/32,009,211
+bytes, and macOS x86_64 ZIP/DMG 32,899,664/32,822,679 bytes. All six checksums,
+archive/DMG integrity and safe paths, application/runtime architectures, deployment and
+legal resources, Linux dependency graphs and real downloaded-package OpenGL launch,
+DMG contents, and prohibited-payload scans pass.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
   CD run through the separated desktop adapter and owner-thread emulation worker.
 - [x] Dynamic high-DPI OpenGL/software video, aspect/integer scaling, overscan, filters,
   interlace, Game Gear viewport, fullscreen, runtime FPS, native PNG screenshots,
-  adjustable built-in CRT output, and modern Libretro Slang preset chains.
+  adjustable built-in CRT output, modern Libretro Slang preset chains, explicit
+  off/on/adaptive synchronization, double/triple buffering, and bounded presentation
+  telemetry.
 - [x] Bounded stereo audio, core mixing options, device/latency selection, live
   transactional reconfiguration, instrumentation, pause, and disconnect recovery.
 - [x] Exact configurable normal, slow-motion, and fast-forward pacing; mutually
