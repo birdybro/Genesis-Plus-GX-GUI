@@ -34,6 +34,11 @@ struct SaveStateStatus final {
   [[nodiscard]] operator bool() const noexcept { return ok(); }
 };
 
+struct SaveStatePresentation final {
+  std::string name;
+  std::vector<std::uint8_t> thumbnailPng;
+};
+
 struct SaveStateMetadata final {
   std::uint32_t schemaVersion{0};
   std::uint32_t slot{0};
@@ -41,6 +46,8 @@ struct SaveStateMetadata final {
   std::uint64_t emulatedFrameNumber{0};
   std::chrono::system_clock::time_point timestamp{};
   std::size_t payloadBytes{0};
+  std::string name;
+  std::vector<std::uint8_t> thumbnailPng;
 };
 
 struct SaveStateLoadResult final {
@@ -51,11 +58,16 @@ struct SaveStateLoadResult final {
 
 class SaveStateManager final {
 public:
-  static constexpr std::uint32_t currentSchemaVersion = 1U;
+  static constexpr std::uint32_t currentSchemaVersion = 2U;
+  static constexpr std::uint32_t legacySchemaVersion = 1U;
   static constexpr std::uint32_t minimumSlot = 0U;
   static constexpr std::uint32_t maximumSlot = 9U;
   static constexpr std::uint32_t resumeSlot = 0xFFFF'FFFFU;
   static constexpr std::size_t maximumPayloadBytes = 2U * 1024U * 1024U;
+  static constexpr std::size_t maximumDisplayNameBytes = 96U;
+  static constexpr std::size_t maximumThumbnailBytes = 512U * 1024U;
+  static constexpr std::size_t maximumFileBytes =
+    maximumPayloadBytes + maximumThumbnailBytes + maximumDisplayNameBytes + 192U;
 
   explicit SaveStateManager(ApplicationPaths paths);
 
@@ -76,6 +88,15 @@ public:
     std::span<const std::uint8_t> rawPayload,
     std::chrono::system_clock::time_point timestamp =
       std::chrono::system_clock::now()) const;
+  [[nodiscard]] SaveStateStatus saveSlot(
+    const GameIdentity& identity,
+    std::uint32_t slot,
+    std::uint32_t hardware,
+    std::uint64_t emulatedFrameNumber,
+    std::span<const std::uint8_t> rawPayload,
+    const SaveStatePresentation& presentation,
+    std::chrono::system_clock::time_point timestamp =
+      std::chrono::system_clock::now()) const;
   [[nodiscard]] SaveStateLoadResult loadSlot(
     const GameIdentity& identity,
     std::uint32_t slot,
@@ -84,6 +105,21 @@ public:
     const std::filesystem::path& path,
     const GameIdentity& expectedIdentity,
     std::uint32_t expectedHardware) const;
+  [[nodiscard]] SaveStateStatus importSlot(
+    const std::filesystem::path& source,
+    const GameIdentity& identity,
+    std::uint32_t slot,
+    std::uint32_t expectedHardware) const;
+  [[nodiscard]] SaveStateStatus exportSlot(
+    const GameIdentity& identity,
+    std::uint32_t slot,
+    std::uint32_t expectedHardware,
+    const std::filesystem::path& destination) const;
+  [[nodiscard]] SaveStateStatus renameSlot(
+    const GameIdentity& identity,
+    std::uint32_t slot,
+    std::uint32_t expectedHardware,
+    std::string name) const;
   [[nodiscard]] SaveStateStatus saveResumeState(
     const GameIdentity& identity,
     std::uint32_t hardware,
@@ -108,6 +144,7 @@ private:
     std::uint32_t hardware,
     std::uint64_t emulatedFrameNumber,
     std::span<const std::uint8_t> rawPayload,
+    const SaveStatePresentation& presentation,
     std::chrono::system_clock::time_point timestamp) const;
   [[nodiscard]] SaveStateLoadResult loadFile(
     const std::filesystem::path& path,

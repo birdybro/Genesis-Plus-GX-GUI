@@ -63,8 +63,12 @@ std::array<genplusgx::ui::StateSlotView, 10> stateSlotViews(
     const auto& summary = summaries[index];
     auto& view = views[index];
     view.slot = summary.slot;
+    view.schemaVersion = summary.metadata.schemaVersion;
     view.timestamp = summary.metadata.timestamp;
     view.emulatedFrameNumber = summary.metadata.emulatedFrameNumber;
+    view.payloadBytes = summary.metadata.payloadBytes;
+    view.name = summary.metadata.name;
+    view.thumbnailPng = summary.metadata.thumbnailPng;
     view.detail = summary.message;
     switch (summary.availability) {
       case genplusgx::StateSlotAvailability::empty:
@@ -1504,6 +1508,9 @@ int main(int argc, char* argv[])
     loading,
     restoring,
     deleting,
+    importing,
+    exporting,
+    renaming,
   };
   struct PendingState final {
     std::uint64_t operationId{0};
@@ -1512,6 +1519,9 @@ int main(int argc, char* argv[])
     genplusgx::ui::StateUiOperation operation{
       genplusgx::ui::StateUiOperation::save};
     PendingStatePhase phase{PendingStatePhase::capturing};
+    std::filesystem::path path;
+    std::string name;
+    std::vector<std::uint8_t> thumbnailPng;
   };
   std::optional<PendingState> pendingState;
   std::optional<std::uint64_t> stateActivationOperation;
@@ -1814,8 +1824,8 @@ int main(int argc, char* argv[])
     });
   window.setStateOperationSink(
     [&gameGeneration, &pendingState, &stateOperationId, &stateStorage,
-     &window, &worker](genplusgx::ui::StateUiOperation operation,
-                       std::uint32_t slot) {
+     &window, &worker](genplusgx::ui::StateUiRequest request) {
+      const auto operation = request.operation;
       if (gameGeneration == 0U || pendingState) {
         window.setStateOperationBusy(false);
         window.showStateOperationError(
@@ -1826,12 +1836,16 @@ int main(int argc, char* argv[])
       PendingState pending{
         .operationId = operationId,
         .gameGeneration = gameGeneration,
-        .slot = slot,
+        .slot = request.slot,
         .operation = operation,
         .phase = PendingStatePhase::capturing,
+        .path = std::move(request.path),
+        .name = std::move(request.name),
+        .thumbnailPng = {},
       };
       genplusgx::StateStorageStatus submitted;
       if (operation == genplusgx::ui::StateUiOperation::save) {
+        pending.thumbnailPng = window.captureStateThumbnailPng();
         const auto workerSubmitted = worker.submit(
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::captureState, operationId));
@@ -1841,12 +1855,13 @@ int main(int argc, char* argv[])
           return;
         }
         pending.phase = PendingStatePhase::capturing;
-      } else {
+      } else if (operation == genplusgx::ui::StateUiOperation::load ||
+                 operation == genplusgx::ui::StateUiOperation::remove) {
         const auto commandType = operation == genplusgx::ui::StateUiOperation::load
           ? genplusgx::StateStorageCommandType::loadSlot
           : genplusgx::StateStorageCommandType::deleteSlot;
         submitted = stateStorage.submit(genplusgx::StateStorageCommand::simple(
-          commandType, operationId, gameGeneration, slot));
+          commandType, operationId, gameGeneration, request.slot));
         if (!submitted) {
           window.setStateOperationBusy(false);
           window.showStateOperationError(operation, submitted.message);
@@ -1855,6 +1870,31 @@ int main(int argc, char* argv[])
         pending.phase = operation == genplusgx::ui::StateUiOperation::load
           ? PendingStatePhase::loading
           : PendingStatePhase::deleting;
+      } else if (operation == genplusgx::ui::StateUiOperation::importFile ||
+                 operation == genplusgx::ui::StateUiOperation::exportFile) {
+        const auto commandType =
+          operation == genplusgx::ui::StateUiOperation::importFile
+          ? genplusgx::StateStorageCommandType::importSlot
+          : genplusgx::StateStorageCommandType::exportSlot;
+        submitted = stateStorage.submit(genplusgx::StateStorageCommand::file(
+          commandType, operationId, gameGeneration, request.slot, pending.path));
+        if (!submitted) {
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, submitted.message);
+          return;
+        }
+        pending.phase = operation == genplusgx::ui::StateUiOperation::importFile
+          ? PendingStatePhase::importing
+          : PendingStatePhase::exporting;
+      } else {
+        submitted = stateStorage.submit(genplusgx::StateStorageCommand::rename(
+          operationId, gameGeneration, request.slot, pending.name));
+        if (!submitted) {
+          window.setStateOperationBusy(false);
+          window.showStateOperationError(operation, submitted.message);
+          return;
+        }
+        pending.phase = PendingStatePhase::renaming;
       }
       pendingState = std::move(pending);
     });
@@ -2126,7 +2166,9 @@ int main(int argc, char* argv[])
                 gameGeneration,
                 pendingState->slot,
                 event->frameNumber,
-                std::move(event->rawState)));
+                std::move(event->rawState),
+                pendingState->name,
+                pendingState->thumbnailPng));
             if (!submitted) {
               const auto operation = pendingState->operation;
               pendingState.reset();
@@ -2714,6 +2756,23 @@ int main(int argc, char* argv[])
         window.setStateOperationBusy(false);
         window.showStateOperationSuccess(operation, slot);
         qInfo().noquote() << "Save state deleted: slot"
+                          << static_cast<qulonglong>(slot);
+      } else if ((event->type ==
+                    genplusgx::StateStorageEventType::slotImported &&
+                   pendingState->phase == PendingStatePhase::importing) ||
+                 (event->type ==
+                    genplusgx::StateStorageEventType::slotExported &&
+                   pendingState->phase == PendingStatePhase::exporting) ||
+                 (event->type ==
+                    genplusgx::StateStorageEventType::slotRenamed &&
+                   pendingState->phase == PendingStatePhase::renaming)) {
+        const auto operation = pendingState->operation;
+        const auto slot = pendingState->slot;
+        window.setStateSlotViews(stateSlotViews(event->slotSummaries));
+        pendingState.reset();
+        window.setStateOperationBusy(false);
+        window.showStateOperationSuccess(operation, slot);
+        qInfo().noquote() << "Save-state management operation completed: slot"
                           << static_cast<qulonglong>(slot);
       }
     }

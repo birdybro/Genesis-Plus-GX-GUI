@@ -57,6 +57,11 @@ QString patchFileDialogFilter()
     .arg(patterns.join(u' '));
 }
 
+QString stateFileDialogFilter()
+{
+  return QObject::tr("Genesis Plus GX GUI states (*.gpgxstate);;All files (*)");
+}
+
 std::optional<std::filesystem::path> DialogService::chooseDisc(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -86,6 +91,20 @@ std::optional<std::filesystem::path> DialogService::chooseArtwork(
 }
 
 std::optional<std::filesystem::path> DialogService::chooseShaderPreset(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseStateImport(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseStateExport(
   QWidget*,
   const std::filesystem::path&)
 {
@@ -184,6 +203,38 @@ std::optional<std::filesystem::path> QtDialogService::chooseShaderPreset(
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseStateImport(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Import Save State"),
+    pathToQString(initialDirectory),
+    stateFileDialogFilter());
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseStateExport(
+  QWidget* parent,
+  const std::filesystem::path& suggestedPath)
+{
+  auto selected = QFileDialog::getSaveFileName(
+    parent,
+    QObject::tr("Export Save State"),
+    pathToQString(suggestedPath),
+    stateFileDialogFilter());
+  if (selected.isEmpty()) {
+    return std::nullopt;
+  }
+  if (!selected.endsWith(QStringLiteral(".gpgxstate"), Qt::CaseInsensitive)) {
+    selected += QStringLiteral(".gpgxstate");
+  }
+  return pathFromQString(selected);
 }
 
 std::optional<std::string> QtDialogService::chooseArchiveEntry(

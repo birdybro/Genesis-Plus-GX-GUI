@@ -2,6 +2,7 @@
 
 #include "synthetic_rom.h"
 
+#include <QByteArray>
 #include <QTemporaryDir>
 
 #include <algorithm>
@@ -31,6 +32,16 @@ std::vector<std::uint8_t> fakeRawState(std::uint8_t marker)
   std::vector<std::uint8_t> state(512U, marker);
   std::ranges::copy(version, state.begin());
   return state;
+}
+
+std::vector<std::uint8_t> fakePng()
+{
+  const auto bytes = QByteArray::fromBase64(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=");
+  return {
+    reinterpret_cast<const std::uint8_t*>(bytes.constData()),
+    reinterpret_cast<const std::uint8_t*>(bytes.constData()) +
+      static_cast<std::size_t>(bytes.size())};
 }
 
 std::optional<genplusgx::StateStorageEvent> waitForOperation(
@@ -82,7 +93,12 @@ int main()
       !check(service.submit(genplusgx::StateStorageCommand::simple(
         genplusgx::StateStorageCommandType::loadSlot, 1U, 1U, 10U)).error ==
         genplusgx::StateStorageError::invalidCommand,
-      "out-of-range slot was accepted")) {
+      "out-of-range slot was accepted") ||
+      !check(service.submit(genplusgx::StateStorageCommand::file(
+        genplusgx::StateStorageCommandType::importSlot,
+        1U, 1U, 0U, {})).error ==
+        genplusgx::StateStorageError::invalidCommand,
+      "pathless import was accepted")) {
     return 4;
   }
 
@@ -104,7 +120,7 @@ int main()
 
   const auto payload = fakeRawState(0x5AU);
   if (!check(service.submit(genplusgx::StateStorageCommand::save(
-        11U, generation, 3U, 77U, payload)),
+        11U, generation, 3U, 77U, payload, "Boss door", fakePng())),
       "slot save could not be queued")) {
     return 7;
   }
@@ -113,7 +129,9 @@ int main()
         saved->type == genplusgx::StateStorageEventType::slotSaved &&
         saved->slotSummaries[3].availability ==
           genplusgx::StateSlotAvailability::available &&
-        saved->slotSummaries[3].metadata.emulatedFrameNumber == 77U,
+        saved->slotSummaries[3].metadata.emulatedFrameNumber == 77U &&
+        saved->slotSummaries[3].metadata.name == "Boss door" &&
+        saved->slotSummaries[3].metadata.thumbnailPng == fakePng(),
       "slot save did not publish refreshed metadata")) {
     return 8;
   }
@@ -133,6 +151,44 @@ int main()
         loaded->metadata.emulatedFrameNumber == 77U,
       "slot load did not return the validated raw payload")) {
     return 10;
+  }
+
+  const auto exported = paths.statesDirectory() / "manual.gpgxstate";
+  if (!check(service.submit(genplusgx::StateStorageCommand::file(
+        genplusgx::StateStorageCommandType::exportSlot,
+        30U, generation, 3U, exported)),
+      "slot export could not be queued")) {
+    return 25;
+  }
+  const auto exportEvent = waitForOperation(service, 30U);
+  if (!check(exportEvent && exportEvent->succeeded() &&
+        exportEvent->type == genplusgx::StateStorageEventType::slotExported &&
+        exportEvent->path == exported,
+      "slot export did not complete asynchronously") ||
+      !check(service.submit(genplusgx::StateStorageCommand::file(
+        genplusgx::StateStorageCommandType::importSlot,
+        31U, generation, 4U, exported)),
+      "slot import could not be queued")) {
+    return 26;
+  }
+  const auto importEvent = waitForOperation(service, 31U);
+  if (!check(importEvent && importEvent->succeeded() &&
+        importEvent->type == genplusgx::StateStorageEventType::slotImported &&
+        importEvent->slotSummaries[4].metadata.name == "Boss door" &&
+        importEvent->slotSummaries[4].metadata.thumbnailPng == fakePng(),
+      "slot import did not preserve presentation") ||
+      !check(service.submit(genplusgx::StateStorageCommand::rename(
+        32U, generation, 4U, "Final boss cleared")),
+      "slot rename could not be queued")) {
+    return 27;
+  }
+  const auto renameEvent = waitForOperation(service, 32U);
+  if (!check(renameEvent && renameEvent->succeeded() &&
+        renameEvent->type == genplusgx::StateStorageEventType::slotRenamed &&
+        renameEvent->slotSummaries[4].metadata.name == "Final boss cleared" &&
+        renameEvent->slotSummaries[4].metadata.thumbnailPng == fakePng(),
+      "slot rename did not refresh metadata")) {
+    return 28;
   }
 
   if (!check(service.submit(genplusgx::StateStorageCommand::saveResumeState(
@@ -190,7 +246,7 @@ int main()
   genplusgx::SaveStateManager manager{paths};
   auto encoded = genplusgx::readFileBounded(
     manager.statePath(identity.identity, 3U),
-    genplusgx::SaveStateManager::maximumPayloadBytes + 128U);
+    genplusgx::SaveStateManager::maximumFileBytes);
   if (!check(identity.status && encoded.status && encoded.exists,
         "saved state could not be opened for corruption test")) {
     return 13;

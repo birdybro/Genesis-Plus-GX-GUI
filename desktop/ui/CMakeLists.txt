@@ -20,6 +20,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/settings_dialog.h
   include/genplusgx/ui/session_settings_dialog.h
   include/genplusgx/ui/speed_settings_dialog.h
+  include/genplusgx/ui/state_manager_dialog.h
   include/genplusgx/ui/system_settings_dialog.h
   include/genplusgx/ui/theme_controller.h
   include/genplusgx/ui/video_settings_dialog.h
@@ -44,6 +45,7 @@ add_library(genplusgx_ui STATIC
   src/settings_dialog.cpp
   src/session_settings_dialog.cpp
   src/speed_settings_dialog.cpp
+  src/state_manager_dialog.cpp
   src/system_settings_dialog.cpp
   src/theme_controller.cpp
   src/video_settings_dialog.cpp

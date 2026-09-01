@@ -95,7 +95,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
-| 84 Enhanced save-state UX | PLANNED | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
+| 84 Enhanced save-state UX | IN PROGRESS | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
 | 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
@@ -3864,6 +3864,50 @@ patched content has independent saves/states/cheats/settings; patched session re
 exact; all local/hosted gates pass; and full hosted logs/artifacts contain no new issue.
 
 **Commit SHA:** `da80552964855fe5ab7ec17689526b8cabdb7d8c`
+
+## Milestone 84 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Make the ten identity-bound save-state slots easier to understand and manage
+with native-frame previews, optional names, a complete browser, and explicit local-file
+import/export without weakening the emulator/core boundary.
+
+**Files changed:**
+
+- save-state schema, validation, and asynchronous storage protocol under
+  `desktop/persistence`
+- state browser, dialog seams, menu actions, and thumbnail capture under `desktop/ui`
+- state operation composition in `desktop/app/main.cpp`
+- unit and end-to-end GUI workflow tests under `tests/`
+- README, changelog, architecture, save-state, test-matrix, and user documentation
+
+**Tests added:** Existing state-manager, storage-service, MainWindow, live generated-ROM
+workflow, and automatic-resume executables now cover schema-2 presentation data, schema-1
+compatibility, real PNG decoding, corruption and deterministic mutation input, async
+rename/import/export, strict wrong-game rejection, browser semantics, dialog seams, and
+native framebuffer thumbnail capture.
+
+**Gate evidence:** Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan,
+fresh Clang 22, and CHD-disabled builds each pass 93/93 without a finding. A fresh
+shader-disabled build passes all 91 applicable tests. The legacy Unix libretro target
+builds warning-clean under its strict diagnostic gate, links as x86-64 ELF, and cleans.
+A fresh Release stage passes package verification, dependency/prohibited-payload scans,
+installed help/version checks, and a real bundled-XCB event-loop startup/shutdown; CPack
+emits the expected 0.1.1 Linux x86-64 TGZ and a verified SHA-256 manifest. Exact hosted
+validation remains pending. The previously supplied NAS ROM path is not mounted on this
+host; the required end-to-end workflow instead runs the legal generated Genesis program
+through the real core, storage worker, and GUI operation path.
+
+**Acceptance criteria:** Slot previews are captured from the native core framebuffer;
+names and previews are bounded and checksummed; every state is validated before load,
+import, export, or rename; schema-1 states continue to load; the browser and native
+dialogs remain injectable and keyboard accessible; all operations stay off the GUI
+thread where appropriate; every local and exact hosted gate passes; and complete hosted
+logs and packages are inspected before completion.
+
+**Commit SHA:** pending until the tested implementation is committed and exact hosted
+verification succeeds.
 
 ## Milestone 70 detail
 

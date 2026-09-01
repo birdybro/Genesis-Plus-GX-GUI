@@ -5,6 +5,7 @@
 #include "genplusgx/ui/game_information_dialog.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
+#include "genplusgx/ui/state_manager_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 #include "genplusgx/version.h"
@@ -24,15 +25,18 @@
 #include <QPushButton>
 #include <QSpinBox>
 #include <QStatusBar>
+#include <QTableWidget>
 #include <QTest>
 #include <QTemporaryDir>
 
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <cstdint>
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -46,6 +50,8 @@ public:
   std::optional<std::filesystem::path> discSelection;
   std::optional<std::filesystem::path> directorySelection;
   std::optional<std::filesystem::path> shaderSelection;
+  std::optional<std::filesystem::path> stateImportSelection;
+  std::optional<std::filesystem::path> stateExportSelection;
   std::filesystem::path discInitialDirectory;
   std::filesystem::path directoryInitialDirectory;
   std::filesystem::path shaderInitialDirectory;
@@ -54,6 +60,8 @@ public:
   int choosePatchCount{0};
   int chooseDirectoryCount{0};
   int chooseShaderCount{0};
+  int chooseStateImportCount{0};
+  int chooseStateExportCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
@@ -91,6 +99,20 @@ public:
     ++chooseShaderCount;
     shaderInitialDirectory = initialDirectory;
     return shaderSelection;
+  }
+
+  std::optional<std::filesystem::path> chooseStateImport(
+    QWidget*, const std::filesystem::path&) override
+  {
+    ++chooseStateImportCount;
+    return stateImportSelection;
+  }
+
+  std::optional<std::filesystem::path> chooseStateExport(
+    QWidget*, const std::filesystem::path&) override
+  {
+    ++chooseStateExportCount;
+    return stateExportSelection;
   }
 
   void showError(QWidget*, const QString& title, const QString& message) override
@@ -1038,6 +1060,17 @@ void MainWindowTest::screenshotCaptureAndSettingsWorkflow()
   };
   QVERIFY(lease->publish(frame));
   QVERIFY(window.presentLatestFrame());
+  const auto stateThumbnail = window.captureStateThumbnailPng();
+  QVERIFY(stateThumbnail.size() > 8U);
+  QVERIFY(std::ranges::equal(
+    std::array<std::uint8_t, 8>{
+      0x89U, 'P', 'N', 'G', 0x0DU, 0x0AU, 0x1AU, 0x0AU},
+    std::span<const std::uint8_t>{stateThumbnail}.first(8U)));
+  const auto decodedThumbnail = QImage::fromData(
+    reinterpret_cast<const uchar*>(stateThumbnail.data()),
+    static_cast<int>(stateThumbnail.size()), "PNG");
+  QVERIFY(!decodedThumbnail.isNull());
+  QVERIFY(decodedThumbnail.width() <= 256 && decodedThumbnail.height() <= 192);
   QVERIFY(screenshot->isEnabled());
   screenshot->trigger();
   QVERIFY(capturedFrame.has_value());
@@ -1157,13 +1190,15 @@ void MainWindowTest::saveStateActionsExposeSlotSemantics()
   views[0].timestamp = std::chrono::system_clock::time_point{
     std::chrono::milliseconds{1'700'000'000'000LL}};
   views[0].emulatedFrameNumber = 42U;
+  views[0].payloadBytes = 512U;
+  views[0].name = "Boss door";
   views[1].state = genplusgx::ui::StateSlotViewState::invalid;
   views[1].detail = "Checksum mismatch";
   window.setStateSlotViews(views);
 
-  std::vector<std::tuple<genplusgx::ui::StateUiOperation, std::uint32_t>> requests;
-  window.setStateOperationSink([&requests](auto operation, auto slot) {
-    requests.emplace_back(operation, slot);
+  std::vector<genplusgx::ui::StateUiRequest> requests;
+  window.setStateOperationSink([&requests](auto request) {
+    requests.push_back(std::move(request));
   });
   window.setStateSessionReady(true);
   QVERIFY(menu->isEnabled());
@@ -1171,7 +1206,7 @@ void MainWindowTest::saveStateActionsExposeSlotSemantics()
   QVERIFY(load->isEnabled());
   QVERIFY(remove->isEnabled());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("stateSlotAction0"))->text()
-    .contains(QStringLiteral("2023")));
+    .contains(QStringLiteral("Boss door")));
 
   window.findChild<QAction*>(QStringLiteral("stateSlotAction1"))->trigger();
   QCOMPARE(window.selectedStateSlot(), 1U);
@@ -1191,8 +1226,8 @@ void MainWindowTest::saveStateActionsExposeSlotSemantics()
 
   save->trigger();
   QCOMPARE(requests.size(), std::size_t{1});
-  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::save);
-  QCOMPARE(std::get<1>(requests.back()), 0U);
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::save);
+  QCOMPARE(requests.back().slot, 0U);
   QVERIFY(!save->isEnabled());
   QVERIFY(!window.findChild<QAction*>(QStringLiteral("openGameAction"))->isEnabled());
   QVERIFY(!window.findChild<QAction*>(QStringLiteral("closeGameAction"))->isEnabled());
@@ -1203,10 +1238,75 @@ void MainWindowTest::saveStateActionsExposeSlotSemantics()
   QVERIFY(window.findChild<QAction*>(QStringLiteral("openGameAction"))->isEnabled());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("closeGameAction"))->isEnabled());
   load->trigger();
-  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::load);
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::load);
   window.setStateOperationBusy(false);
   remove->trigger();
-  QCOMPARE(std::get<0>(requests.back()), genplusgx::ui::StateUiOperation::remove);
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::remove);
+  window.setStateOperationBusy(false);
+
+  auto* managerAction = window.findChild<QAction*>(
+    QStringLiteral("stateManagerAction"));
+  QVERIFY(managerAction != nullptr && managerAction->isEnabled());
+  managerAction->trigger();
+  QApplication::processEvents();
+  auto* manager = window.findChild<genplusgx::ui::StateManagerDialog*>(
+    QStringLiteral("stateManagerDialog"));
+  QVERIFY(manager != nullptr && manager->isVisible());
+  QCOMPARE(manager->selectedSlot(), 0U);
+  auto* table = manager->findChild<QTableWidget*>(QStringLiteral("stateSlotTable"));
+  auto* name = manager->findChild<QLineEdit*>(QStringLiteral("stateNameEdit"));
+  QVERIFY(table != nullptr && name != nullptr);
+  QCOMPARE(table->rowCount(), 10);
+  QCOMPARE(name->text(), QStringLiteral("Boss door"));
+  name->setText(QStringLiteral("Final boss"));
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserRenameButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::rename);
+  QCOMPARE(requests.back().name, std::string{"Final boss"});
+  QVERIFY(!manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserSaveButton"))->isEnabled());
+  QVERIFY(!manager->findChild<QTableWidget*>(
+    QStringLiteral("stateSlotTable"))->isEnabled());
+  window.setStateOperationBusy(false);
+
+  QTemporaryDir stateTransfer;
+  QVERIFY(stateTransfer.isValid());
+  dialogs->stateImportSelection = std::filesystem::path{
+    stateTransfer.path().toStdString()} / "import.gpgxstate";
+  dialogs->stateExportSelection = std::filesystem::path{
+    stateTransfer.path().toStdString()} / "export.gpgxstate";
+
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserSaveButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::save);
+  QCOMPARE(requests.back().name, std::string{"Final boss"});
+  window.setStateOperationBusy(false);
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserLoadButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::load);
+  window.setStateOperationBusy(false);
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserImportButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::importFile);
+  QCOMPARE(requests.back().path, *dialogs->stateImportSelection);
+  window.setStateOperationBusy(false);
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserExportButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::exportFile);
+  QCOMPARE(requests.back().path, *dialogs->stateExportSelection);
+  window.setStateOperationBusy(false);
+  manager->findChild<QPushButton*>(
+    QStringLiteral("stateBrowserDeleteButton"))->click();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::remove);
+  window.setStateOperationBusy(false);
+
+  window.findChild<QAction*>(QStringLiteral("importStateAction"))->trigger();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::importFile);
+  QCOMPARE(requests.back().path, *dialogs->stateImportSelection);
+  window.setStateOperationBusy(false);
+  window.findChild<QAction*>(QStringLiteral("exportStateAction"))->trigger();
+  QCOMPARE(requests.back().operation, genplusgx::ui::StateUiOperation::exportFile);
+  QCOMPARE(requests.back().path, *dialogs->stateExportSelection);
   window.setStateOperationBusy(false);
 
   window.showStateOperationSuccess(genplusgx::ui::StateUiOperation::save, 0U);

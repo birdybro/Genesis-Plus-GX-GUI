@@ -204,7 +204,7 @@ int main(int argc, char** argv)
     ? manager.resumeStatePath(secondIdentity.identity)
     : std::filesystem::path{};
   auto corrupt = genplusgx::readFileBounded(
-    secondResumePath, genplusgx::SaveStateManager::maximumPayloadBytes + 128U);
+    secondResumePath, genplusgx::SaveStateManager::maximumFileBytes);
   if (!check(secondIdentity.status && corrupt.status && corrupt.exists &&
         !corrupt.data.empty(),
         "Explicit game did not produce its own checkpoint")) {

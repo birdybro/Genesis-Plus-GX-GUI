@@ -36,6 +36,9 @@ enum class StateStorageCommandType {
   saveSlot,
   loadSlot,
   deleteSlot,
+  importSlot,
+  exportSlot,
+  renameSlot,
   refreshSlots,
   saveResume,
   loadResume,
@@ -50,6 +53,8 @@ struct StateStorageCommand final {
   std::uint32_t hardware{0};
   std::uint32_t slot{0};
   std::uint64_t emulatedFrameNumber{0};
+  std::string name;
+  std::vector<std::uint8_t> thumbnailPng;
   std::vector<std::uint8_t> rawPayload;
 
   [[nodiscard]] static StateStorageCommand activate(
@@ -67,7 +72,20 @@ struct StateStorageCommand final {
     std::uint64_t gameGeneration,
     std::uint32_t slot,
     std::uint64_t emulatedFrameNumber,
-    std::vector<std::uint8_t> rawPayload);
+    std::vector<std::uint8_t> rawPayload,
+    std::string name = {},
+    std::vector<std::uint8_t> thumbnailPng = {});
+  [[nodiscard]] static StateStorageCommand file(
+    StateStorageCommandType type,
+    std::uint64_t operationId,
+    std::uint64_t gameGeneration,
+    std::uint32_t slot,
+    std::filesystem::path path);
+  [[nodiscard]] static StateStorageCommand rename(
+    std::uint64_t operationId,
+    std::uint64_t gameGeneration,
+    std::uint32_t slot,
+    std::string name);
   [[nodiscard]] static StateStorageCommand saveResumeState(
     std::uint64_t operationId,
     std::uint64_t gameGeneration,
@@ -109,6 +127,9 @@ enum class StateStorageEventType {
   slotSaved,
   slotLoaded,
   slotDeleted,
+  slotImported,
+  slotExported,
+  slotRenamed,
   slotsRefreshed,
   resumeSaved,
   resumeLoaded,
@@ -123,6 +144,7 @@ struct StateStorageEvent final {
   std::uint64_t operationId{0};
   std::uint64_t gameGeneration{0};
   std::uint32_t slot{0};
+  std::filesystem::path path;
   StateStorageError error{StateStorageError::none};
   SaveStateError saveStateError{SaveStateError::none};
   std::string message;

@@ -51,7 +51,8 @@ rewritten.
 - Bounded rewind with configurable capture interval/memory budget, focus-safe hold and
   menu-toggle controls, muted backward playback, and deterministic forward resume
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
-- Ten metadata-wrapped save-state slots with game-identity validation
+- Ten metadata-wrapped save-state slots with names, native-frame thumbnails, a visual
+  manager, validated import/export, and strict game/hardware identity checks
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows

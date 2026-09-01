@@ -12,6 +12,20 @@ Choose a slot from **Emulation → State Slot**, then use **Save State** (`F5`) 
 shows **Empty**, a local timestamp, or **Invalid** for each slot. Previous/next actions
 wrap at the ends. **Delete Selected State** removes either a valid or invalid file.
 
+Choose **Emulation → State Slot → Manage Save States…** for the visual browser. It
+shows all ten slots with native-frame previews, optional names, timestamps, emulated
+frame numbers, payload sizes, and validation status. A name may contain up to 96 UTF-8
+bytes. **Save / Replace** records the current native core framebuffer as a PNG preview;
+the preview deliberately excludes shaders, bezels, and native window chrome.
+
+**Import…** validates a `.gpgxstate` against the running game's full identity and
+hardware before atomically replacing the selected slot. **Export…** validates the slot
+before writing a self-contained copy chosen by the user. Import never trusts the slot
+number embedded in the source: after validation it rewrites the envelope for the
+selected destination while preserving the payload, name, preview, timestamp, and frame
+number. A wrong-game, wrong-system, corrupt, oversized, or unsupported file is rejected
+without changing the destination slot or reaching the emulator core.
+
 An operation disables other state and game-lifecycle actions until it finishes. A
 successful save, load, or delete is reported in the status bar. A failure opens a
 descriptive error and leaves the current game running whenever safe.
@@ -34,18 +48,26 @@ identical text, while relocating an unchanged sheet/track set preserves its iden
 Save-state activation hashes on its storage thread and checks the service's atomic stop
 request between 64 KiB chunks, so a large disc cannot delay shutdown until EOF.
 
-The `.gpgxstate` file begins with a fixed 128-byte little-endian `GPGXST01` envelope.
-It stores schema/header lengths, millisecond timestamp, hardware identifier, slot,
-frontend frame number, payload length, the full game SHA-256, payload SHA-256, and the
-raw core-version signature. The unchanged Genesis Plus GX state payload follows.
-Payloads are bounded to 2 MiB and writes use the same atomic transaction mechanism as
-save RAM.
+New `.gpgxstate` files use schema 2. They begin with a fixed 176-byte little-endian
+`GPGXST01` envelope, followed by a checksummed bounded presentation block and then the
+unchanged Genesis Plus GX state payload. The envelope stores schema/header lengths,
+millisecond timestamp, hardware identifier, slot, frontend frame number, payload
+length, the full game SHA-256, payload SHA-256, presentation length/SHA-256, and the raw
+core-version signature. The presentation block stores length-framed UTF-8 name and PNG
+preview bytes. Payloads are bounded to 2 MiB, previews to 512 KiB and 1024×1024 pixels,
+and writes use the same atomic transaction mechanism as save RAM. Frontend-generated
+previews are at most 256×192.
+
+Existing schema-1 files retain their original 128-byte header and remain readable,
+loadable, exportable, and importable. Saving or renaming a slot writes schema 2. The
+core payload format itself is neither translated nor modified.
 
 Before loading, the frontend validates the regular file, total length, magic, schema,
-slot, game identity, hardware, timestamp, payload checksum, and core signature on its
-storage thread. Only then is the raw payload submitted to the core-owning emulation
-thread. A failed core restore is transactional: the adapter reloads the state that was
-active before the rejected candidate.
+slot, game identity, hardware, timestamp, payload and presentation checksums, bounded
+UTF-8 name, decodable PNG dimensions, and core signature on its storage thread. Only
+then is the raw payload submitted to the core-owning emulation thread. A failed core
+restore is transactional: the adapter reloads the state that was active before the
+rejected candidate.
 
 ## Automatic session resume
 
@@ -81,6 +103,6 @@ SHA-256 still prevents it from loading. States made by an incompatible future sc
 or core serializer may need the application version that created them. The frontend
 does not weaken validation or regenerate reference data to accept a corrupt file.
 
-Raw-state import/export and thumbnails are optional future extensions. The current
-wrapper deliberately retains the raw payload intact so those features can be added
-without changing the emulator core's serialization algorithm.
+Imported and exported files use the frontend envelope rather than a bare core blob so
+identity, hardware, checksum, and compatibility errors remain explicit. The raw payload
+is still stored intact, which keeps core serialization authoritative.

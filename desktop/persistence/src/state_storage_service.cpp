@@ -68,12 +68,40 @@ StateStorageCommand StateStorageCommand::save(
   std::uint64_t gameGeneration,
   std::uint32_t slot,
   std::uint64_t emulatedFrameNumber,
-  std::vector<std::uint8_t> rawPayload)
+  std::vector<std::uint8_t> rawPayload,
+  std::string name,
+  std::vector<std::uint8_t> thumbnailPng)
 {
   auto command = simple(
     StateStorageCommandType::saveSlot, operationId, gameGeneration, slot);
   command.emulatedFrameNumber = emulatedFrameNumber;
+  command.name = std::move(name);
+  command.thumbnailPng = std::move(thumbnailPng);
   command.rawPayload = std::move(rawPayload);
+  return command;
+}
+
+StateStorageCommand StateStorageCommand::file(
+  StateStorageCommandType type,
+  std::uint64_t operationId,
+  std::uint64_t gameGeneration,
+  std::uint32_t slot,
+  std::filesystem::path path)
+{
+  auto command = simple(type, operationId, gameGeneration, slot);
+  command.path = std::move(path);
+  return command;
+}
+
+StateStorageCommand StateStorageCommand::rename(
+  std::uint64_t operationId,
+  std::uint64_t gameGeneration,
+  std::uint32_t slot,
+  std::string name)
+{
+  auto command = simple(
+    StateStorageCommandType::renameSlot, operationId, gameGeneration, slot);
+  command.name = std::move(name);
   return command;
 }
 
@@ -143,7 +171,10 @@ public:
     }
     const bool slotCommand = command.type == StateStorageCommandType::saveSlot ||
       command.type == StateStorageCommandType::loadSlot ||
-      command.type == StateStorageCommandType::deleteSlot;
+      command.type == StateStorageCommandType::deleteSlot ||
+      command.type == StateStorageCommandType::importSlot ||
+      command.type == StateStorageCommandType::exportSlot ||
+      command.type == StateStorageCommandType::renameSlot;
     if (slotCommand &&
         command.slot > SaveStateManager::maximumSlot) {
       return failure(
@@ -155,6 +186,20 @@ public:
       return failure(
         StateStorageError::invalidCommand,
         "An active save-state session requires a game path.");
+    }
+    const bool fileCommand = command.type == StateStorageCommandType::importSlot ||
+      command.type == StateStorageCommandType::exportSlot;
+    if (fileCommand && command.path.empty()) {
+      return failure(
+        StateStorageError::invalidCommand,
+        "Save-state import and export commands require a file path.");
+    }
+    if (command.name.size() > SaveStateManager::maximumDisplayNameBytes ||
+        command.thumbnailPng.size() > SaveStateManager::maximumThumbnailBytes ||
+        command.rawPayload.size() > SaveStateManager::maximumPayloadBytes) {
+      return failure(
+        StateStorageError::invalidCommand,
+        "Save-state command metadata exceeds a fixed limit.");
     }
 
     std::scoped_lock lock{mutex_};
@@ -264,10 +309,10 @@ private:
       if (!activeIdentity_) {
         continue;
       }
-      const auto loaded = manager_.loadSlot(*activeIdentity_, slot, activeHardware_);
+      auto loaded = manager_.loadSlot(*activeIdentity_, slot, activeHardware_);
       if (loaded.status) {
         summary.availability = StateSlotAvailability::available;
-        summary.metadata = loaded.metadata;
+        summary.metadata = std::move(loaded.metadata);
       } else if (loaded.status.error == SaveStateError::missingState) {
         summary.availability = StateSlotAvailability::empty;
       } else {
@@ -285,6 +330,7 @@ private:
     event.operationId = command.operationId;
     event.gameGeneration = command.gameGeneration;
     event.slot = command.slot;
+    event.path = command.path;
 
     if (command.type == StateStorageCommandType::activateGame) {
       activeIdentity_.reset();
@@ -332,7 +378,11 @@ private:
           command.slot,
           activeHardware_,
           command.emulatedFrameNumber,
-          command.rawPayload);
+          command.rawPayload,
+          SaveStatePresentation{
+            .name = command.name,
+            .thumbnailPng = command.thumbnailPng,
+          });
         if (status) {
           event.type = StateStorageEventType::slotSaved;
           event.slotSummaries = scanSlots();
@@ -344,7 +394,7 @@ private:
         status = loaded.status;
         if (status) {
           event.type = StateStorageEventType::slotLoaded;
-          event.metadata = loaded.metadata;
+          event.metadata = std::move(loaded.metadata);
           event.rawPayload = std::move(loaded.rawPayload);
           event.slotSummaries = scanSlots();
         }
@@ -354,6 +404,30 @@ private:
         status = manager_.deleteSlot(*activeIdentity_, command.slot);
         if (status) {
           event.type = StateStorageEventType::slotDeleted;
+          event.slotSummaries = scanSlots();
+        }
+        break;
+      case StateStorageCommandType::importSlot:
+        status = manager_.importSlot(
+          command.path, *activeIdentity_, command.slot, activeHardware_);
+        if (status) {
+          event.type = StateStorageEventType::slotImported;
+          event.slotSummaries = scanSlots();
+        }
+        break;
+      case StateStorageCommandType::exportSlot:
+        status = manager_.exportSlot(
+          *activeIdentity_, command.slot, activeHardware_, command.path);
+        if (status) {
+          event.type = StateStorageEventType::slotExported;
+          event.slotSummaries = scanSlots();
+        }
+        break;
+      case StateStorageCommandType::renameSlot:
+        status = manager_.renameSlot(
+          *activeIdentity_, command.slot, activeHardware_, std::move(command.name));
+        if (status) {
+          event.type = StateStorageEventType::slotRenamed;
           event.slotSummaries = scanSlots();
         }
         break;
@@ -375,7 +449,7 @@ private:
         status = loaded.status;
         if (status) {
           event.type = StateStorageEventType::resumeLoaded;
-          event.metadata = loaded.metadata;
+          event.metadata = std::move(loaded.metadata);
           event.rawPayload = std::move(loaded.rawPayload);
         }
         break;

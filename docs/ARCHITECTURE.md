@@ -723,12 +723,15 @@ save. An atomic-write failure blocks unload or replacement and preserves the act
 paused/running core. Final shutdown still tears resources down, releases the identity,
 and returns a failed status so the loss cannot be silent.
 
-Save-state files use a fixed 128-byte little-endian `GPGXST01` envelope followed by the
-unchanged raw Genesis Plus GX payload. The envelope records its schema/header lengths,
-millisecond timestamp, hardware, slot, emulated frame number, full game SHA-256, payload
-length and SHA-256, plus the raw core version signature. The manager accepts only slots
-0-9 and payloads up to 2 MiB, validates the entire envelope before exposing bytes, and
-uses the same atomic transaction primitive as RAM persistence. The adapter independently
+Schema-2 save-state files use a fixed 176-byte little-endian `GPGXST01` envelope, a
+checksummed length-framed presentation block, and the unchanged raw Genesis Plus GX
+payload. The envelope records its schema/header lengths, millisecond timestamp,
+hardware, slot, emulated frame number, full game SHA-256, payload length/SHA-256,
+presentation length/SHA-256, and raw core version signature. The presentation block
+holds an optional bounded UTF-8 name and decoded/bounded PNG thumbnail; schema-1
+128-byte states remain readable. The manager accepts only slots 0-9, payloads up to
+2 MiB, and thumbnails up to 512 KiB/1024×1024, validates the entire envelope before
+exposing bytes, and uses the same atomic transaction primitive as RAM persistence. The adapter independently
 asks the running core for its exact hardware-specific state size before calling the
 core's lengthless `state_load()` API. It keeps the current raw snapshot in reusable
 storage and reloads it if the core rejects a candidate, making failed loads transactional.
@@ -737,14 +740,17 @@ Save-state UI file work runs on `StateStorageService`, a dedicated bounded worke
 owns `SaveStateManager`. Activating a successful game computes its content identity and
 scans slots away from the GUI thread; the service's atomic stop request can cancel that
 identity stream between chunks. Each summary is `empty`, fully validated
-`available`, or `invalid`; available summaries carry timestamp and emulated frame
-metadata, while invalid entries retain a safe diagnostic and remain deletable. The GUI
-keeps one state operation in flight:
+`available`, or `invalid`; available summaries carry timestamp, frame, size, name, and
+thumbnail metadata, while invalid entries retain a safe diagnostic and remain
+deletable. The GUI keeps one state operation in flight:
 
 ```text
 quick save: GUI -> core-worker capture -> storage-worker atomic wrap/write -> GUI
 quick load: GUI -> storage-worker validate/read -> core-worker restore -> GUI
 delete:     GUI -> storage-worker remove/refresh -> GUI
+rename:     GUI -> storage-worker validate/rewrite/refresh -> GUI
+import:     GUI -> storage-worker validate/re-slot/atomic write -> GUI
+export:     GUI -> storage-worker validate/atomic copy -> GUI
 ```
 
 Both worker channels use operation IDs. The storage channel also requires a monotonic

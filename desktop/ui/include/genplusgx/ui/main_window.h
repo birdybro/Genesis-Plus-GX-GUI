@@ -21,6 +21,7 @@
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
+#include "genplusgx/ui/state_manager_dialog.h"
 #include "genplusgx/settings/rewind_settings.h"
 
 #include <QMainWindow>
@@ -50,26 +51,6 @@ class DisplayWidget;
 
 namespace genplusgx::ui {
 
-enum class StateSlotViewState {
-  empty,
-  available,
-  invalid,
-};
-
-struct StateSlotView final {
-  std::uint32_t slot{0};
-  StateSlotViewState state{StateSlotViewState::empty};
-  std::chrono::system_clock::time_point timestamp{};
-  std::uint64_t emulatedFrameNumber{0};
-  std::string detail;
-};
-
-enum class StateUiOperation {
-  save,
-  load,
-  remove,
-};
-
 enum class DiscUiOperation {
   change,
   setEjected,
@@ -96,7 +77,7 @@ public:
   using GameCloseSink = std::function<void()>;
   using ClearRecentGamesSink = std::function<PersistenceStatus()>;
   using StateOperationSink =
-    std::function<void(StateUiOperation, std::uint32_t)>;
+    std::function<void(StateUiRequest)>;
   using EmulationControlSink =
     std::function<bool(EmulationUiOperation, bool)>;
   using VideoSettingsSink =
@@ -270,8 +251,10 @@ public:
   void setSessionResumeBusy(bool busy);
   void setStateOperationBusy(bool busy);
   void setStateSlotViews(std::array<StateSlotView, 10> views);
+  void showStateManager();
   void setSelectedStateSlot(std::uint32_t slot);
   [[nodiscard]] std::uint32_t selectedStateSlot() const noexcept;
+  [[nodiscard]] std::vector<std::uint8_t> captureStateThumbnailPng() const;
   void showStateOperationSuccess(StateUiOperation operation, std::uint32_t slot);
   void showStateOperationError(StateUiOperation operation, const std::string& detail);
   [[nodiscard]] bool requestGameLoad(
@@ -325,7 +308,10 @@ private:
   void updateDiscActions();
   void requestGameInformation();
   void updateGameInformationAction();
-  void requestStateOperation(StateUiOperation operation);
+  void requestStateOperation(
+    StateUiOperation operation,
+    std::filesystem::path path = {},
+    std::string name = {});
   bool requestEmulationControl(
     EmulationUiOperation operation,
     bool enabled = false);
@@ -410,6 +396,7 @@ private:
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
+  StateManagerDialog* stateManagerDialog_{nullptr};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path loadedRuntimePath_;
   GameLaunchTarget loadedGameTarget_;

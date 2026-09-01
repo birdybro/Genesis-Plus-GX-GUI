@@ -333,6 +333,7 @@ target_link_libraries(
   PRIVATE
     GenesisPlusGX::Persistence
     genplusgx_project_warnings
+    Qt6::Gui
 )
 
 add_test(NAME unit.state_manager COMMAND genplusgx_state_manager_test)

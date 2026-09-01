@@ -9,6 +9,10 @@ platform documentation.
 
 ### Added
 
+- A visual save-state manager with native-frame PNG previews, optional per-slot names,
+  frame/size/timestamp details, and identity-validated import/export. Schema-2 state
+  envelopes remain backward-compatible with existing schema-1 files and keep all
+  presentation data outside the unchanged Genesis Plus GX payload.
 - Non-destructive IPS, BPS, and bidirectional UPS cartridge soft patching with strict
   bounds and CRC validation, automatic same-stem sidecars, explicit file/CLI/two-file
   drop selection, collision-safe caching, patched-content save/state/settings identity,

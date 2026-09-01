@@ -28,6 +28,7 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QBuffer>
 #include <QDragEnterEvent>
 #include <QDateTime>
 #include <QDebug>
@@ -35,6 +36,7 @@
 #include <QKeyCombination>
 #include <QKeyEvent>
 #include <QKeySequence>
+#include <QImage>
 #include <QLabel>
 #include <QMenu>
 #include <QMenuBar>
@@ -315,6 +317,27 @@ void MainWindow::buildMenus()
   connect(deleteState, &QAction::triggered, this, [this] {
     requestStateOperation(StateUiOperation::remove);
   });
+  stateSlotMenu->addSeparator();
+  auto* importState = addAction(
+    *stateSlotMenu,
+    tr("&Import State to Selected Slot…"),
+    "importStateAction");
+  connect(importState, &QAction::triggered, this, [this] {
+    requestStateOperation(StateUiOperation::importFile);
+  });
+  auto* exportState = addAction(
+    *stateSlotMenu,
+    tr("E&xport Selected State…"),
+    "exportStateAction");
+  connect(exportState, &QAction::triggered, this, [this] {
+    requestStateOperation(StateUiOperation::exportFile);
+  });
+  auto* manageStates = addAction(
+    *stateSlotMenu,
+    tr("&Manage Save States…"),
+    "stateManagerAction");
+  connect(manageStates, &QAction::triggered,
+    this, &MainWindow::showStateManager);
   auto* changeDisc = addAction(
     *emulation, tr("Change &Disc…"), "changeDiscAction");
   connect(changeDisc, &QAction::triggered, this, &MainWindow::chooseDisc);
@@ -2516,12 +2539,18 @@ void MainWindow::setStateOperationSink(StateOperationSink sink)
 void MainWindow::setStateSessionReady(bool ready)
 {
   stateSessionReady_ = ready && isGameLoaded();
+  if (stateManagerDialog_ != nullptr) {
+    stateManagerDialog_->setSessionReady(stateSessionReady_);
+  }
   updateStateActions();
 }
 
 void MainWindow::setStateOperationBusy(bool busy)
 {
   stateOperationBusy_ = busy;
+  if (stateManagerDialog_ != nullptr) {
+    stateManagerDialog_->setBusy(stateOperationBusy_ || sessionResumeBusy_);
+  }
   updateStateActions();
   updateStateSlotPresentation();
 }
@@ -2532,6 +2561,9 @@ void MainWindow::setStateSlotViews(std::array<StateSlotView, 10> views)
     views[slot].slot = slot;
   }
   stateSlotViews_ = std::move(views);
+  if (stateManagerDialog_ != nullptr) {
+    stateManagerDialog_->setViews(stateSlotViews_);
+  }
   updateStateSlotPresentation();
   updateStateActions();
 }
@@ -2542,6 +2574,10 @@ void MainWindow::setSelectedStateSlot(std::uint32_t slot)
     return;
   }
   selectedStateSlot_ = slot;
+  if (stateManagerDialog_ != nullptr &&
+      stateManagerDialog_->selectedSlot() != slot) {
+    stateManagerDialog_->setSelectedSlot(slot);
+  }
   updateStateSlotPresentation();
   updateStateActions();
 }
@@ -2549,6 +2585,59 @@ void MainWindow::setSelectedStateSlot(std::uint32_t slot)
 std::uint32_t MainWindow::selectedStateSlot() const noexcept
 {
   return selectedStateSlot_;
+}
+
+void MainWindow::showStateManager()
+{
+  if (stateManagerDialog_ == nullptr) {
+    stateManagerDialog_ = new StateManagerDialog(this);
+    stateManagerDialog_->setObjectName(QStringLiteral("stateManagerDialog"));
+    stateManagerDialog_->setOperationSink([this](StateUiRequest request) {
+      requestStateOperation(
+        request.operation, std::move(request.path), std::move(request.name));
+    });
+    stateManagerDialog_->setSelectionSink([this](std::uint32_t slot) {
+      setSelectedStateSlot(slot);
+    });
+  }
+  stateManagerDialog_->setViews(stateSlotViews_);
+  stateManagerDialog_->setSelectedSlot(selectedStateSlot_);
+  stateManagerDialog_->setSessionReady(stateSessionReady_ && isGameLoaded());
+  stateManagerDialog_->setBusy(stateOperationBusy_ || sessionResumeBusy_);
+  stateManagerDialog_->show();
+  stateManagerDialog_->raise();
+  stateManagerDialog_->activateWindow();
+}
+
+std::vector<std::uint8_t> MainWindow::captureStateThumbnailPng() const
+{
+  if (displayWidget_ == nullptr || !displayWidget_->hasFrame()) {
+    return {};
+  }
+  const auto& frame = displayWidget_->currentFrameInfo();
+  const auto pixels = displayWidget_->currentPixels();
+  if (frame.format != CorePixelFormat::rgb565 || frame.width == 0U ||
+      frame.height == 0U || pixels.size() < frame.pixelCount()) {
+    return {};
+  }
+  const QImage source{
+    reinterpret_cast<const uchar*>(pixels.data()),
+    static_cast<int>(frame.width),
+    static_cast<int>(frame.height),
+    static_cast<int>(frame.width) * static_cast<int>(sizeof(std::uint16_t)),
+    QImage::Format_RGB16};
+  const auto thumbnail = source.copy().scaled(
+    QSize{256, 192}, Qt::KeepAspectRatio, Qt::SmoothTransformation);
+  QByteArray encoded;
+  QBuffer buffer{&encoded};
+  if (!buffer.open(QIODevice::WriteOnly) || !thumbnail.save(&buffer, "PNG") ||
+      encoded.size() > 512 * 1024) {
+    return {};
+  }
+  return std::vector<std::uint8_t>{
+    reinterpret_cast<const std::uint8_t*>(encoded.constData()),
+    reinterpret_cast<const std::uint8_t*>(encoded.constData()) +
+      static_cast<std::size_t>(encoded.size())};
 }
 
 void MainWindow::showStateOperationSuccess(
@@ -2565,6 +2654,15 @@ void MainWindow::showStateOperationSuccess(
       break;
     case StateUiOperation::remove:
       action = tr("deleted");
+      break;
+    case StateUiOperation::importFile:
+      action = tr("imported");
+      break;
+    case StateUiOperation::exportFile:
+      action = tr("exported");
+      break;
+    case StateUiOperation::rename:
+      action = tr("renamed");
       break;
   }
   statusBar()->showMessage(tr("State slot %1 %2").arg(slot).arg(action), 4000);
@@ -2584,6 +2682,15 @@ void MainWindow::showStateOperationError(
       break;
     case StateUiOperation::remove:
       action = tr("Delete State Failed");
+      break;
+    case StateUiOperation::importFile:
+      action = tr("Import State Failed");
+      break;
+    case StateUiOperation::exportFile:
+      action = tr("Export State Failed");
+      break;
+    case StateUiOperation::rename:
+      action = tr("Rename State Failed");
       break;
   }
   statusBar()->showMessage(action, 5000);
@@ -2735,6 +2842,9 @@ bool MainWindow::requestGameLoad(
 void MainWindow::setSessionResumeBusy(bool busy)
 {
   sessionResumeBusy_ = busy && isGameLoaded();
+  if (stateManagerDialog_ != nullptr) {
+    stateManagerDialog_->setBusy(stateOperationBusy_ || sessionResumeBusy_);
+  }
   setGameActionsEnabled(isGameLoaded() && !sessionResumeBusy_);
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(
     !gameLoading_ && !sessionResumeBusy_);
@@ -2747,6 +2857,7 @@ void MainWindow::setSessionResumeBusy(bool busy)
   } else if (isGameLoaded()) {
     statusBar()->showMessage(tr("Session restoration complete."), 3'000);
   }
+  updateStateActions();
 }
 
 void MainWindow::setGameLoading(const std::filesystem::path& path)
@@ -2834,6 +2945,10 @@ void MainWindow::setGameLoaded(const GameLaunchTarget& target)
     for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
       stateSlotViews_[slot] = StateSlotView{};
       stateSlotViews_[slot].slot = slot;
+    }
+    if (stateManagerDialog_ != nullptr) {
+      stateManagerDialog_->setViews(stateSlotViews_);
+      stateManagerDialog_->setSessionReady(false);
     }
   }
   loadedGameTarget_ = target;
@@ -2942,6 +3057,11 @@ void MainWindow::setNoGameLoaded()
   for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
     stateSlotViews_[slot] = StateSlotView{};
     stateSlotViews_[slot].slot = slot;
+  }
+  if (stateManagerDialog_ != nullptr) {
+    stateManagerDialog_->setViews(stateSlotViews_);
+    stateManagerDialog_->setSessionReady(false);
+    stateManagerDialog_->setBusy(false);
   }
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
@@ -3197,7 +3317,10 @@ void MainWindow::closeGame()
   }
 }
 
-void MainWindow::requestStateOperation(StateUiOperation operation)
+void MainWindow::requestStateOperation(
+  StateUiOperation operation,
+  std::filesystem::path path,
+  std::string name)
 {
   if (!stateOperationSink_ || !stateSessionReady_ || stateOperationBusy_ ||
       !isGameLoaded()) {
@@ -3212,10 +3335,37 @@ void MainWindow::requestStateOperation(StateUiOperation operation)
       state == StateSlotViewState::empty) {
     return;
   }
-  stateOperationBusy_ = true;
-  updateStateActions();
-  updateStateSlotPresentation();
-  stateOperationSink_(operation, selectedStateSlot_);
+  if ((operation == StateUiOperation::exportFile ||
+       operation == StateUiOperation::rename) &&
+      state != StateSlotViewState::available) {
+    return;
+  }
+  if (operation == StateUiOperation::importFile && path.empty()) {
+    const auto selected = dialogService_->chooseStateImport(
+      this, loadedGamePath_.parent_path());
+    if (!selected) {
+      return;
+    }
+    path = *selected;
+  } else if (operation == StateUiOperation::exportFile && path.empty()) {
+    const auto suggested = applicationPaths_.statesDirectory() /
+      ("state-slot-" + std::to_string(selectedStateSlot_) + ".gpgxstate");
+    const auto selected = dialogService_->chooseStateExport(this, suggested);
+    if (!selected) {
+      return;
+    }
+    path = *selected;
+  }
+  if (operation == StateUiOperation::save && name.empty()) {
+    name = stateSlotViews_[selectedStateSlot_].name;
+  }
+  setStateOperationBusy(true);
+  stateOperationSink_({
+    .operation = operation,
+    .slot = selectedStateSlot_,
+    .path = std::move(path),
+    .name = std::move(name),
+  });
 }
 
 void MainWindow::updateStateActions()
@@ -3228,6 +3378,10 @@ void MainWindow::updateStateActions()
     ready && selectedState == StateSlotViewState::available);
   findChild<QAction*>(QStringLiteral("deleteStateAction"))->setEnabled(
     ready && selectedState != StateSlotViewState::empty);
+  findChild<QAction*>(QStringLiteral("importStateAction"))->setEnabled(ready);
+  findChild<QAction*>(QStringLiteral("exportStateAction"))->setEnabled(
+    ready && selectedState == StateSlotViewState::available);
+  findChild<QAction*>(QStringLiteral("stateManagerAction"))->setEnabled(ready);
   findChild<QMenu*>(QStringLiteral("stateSlotMenu"))->setEnabled(ready);
   for (std::uint32_t slot = 0U; slot < stateSlotViews_.size(); ++slot) {
     findChild<QAction*>(QStringLiteral("stateSlotAction%1").arg(slot))
@@ -3268,8 +3422,11 @@ void MainWindow::updateStateSlotPresentation()
       case StateSlotViewState::available: {
         const auto milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(
           view.timestamp.time_since_epoch()).count();
-        stateText = QDateTime::fromMSecsSinceEpoch(milliseconds)
+        const auto saved = QDateTime::fromMSecsSinceEpoch(milliseconds)
           .toString(QStringLiteral("yyyy-MM-dd HH:mm"));
+        stateText = view.name.empty()
+          ? saved
+          : tr("%1 (%2)").arg(QString::fromStdString(view.name), saved);
         break;
       }
       case StateSlotViewState::invalid:

@@ -209,16 +209,23 @@ preview. The application never contacts an artwork or metadata service. See
 
 Use **Emulation → Save State** (`F5`) and **Load State** (`F8`) with the selected slot.
 The **State Slot** submenu offers slots 0–9, `Ctrl+0` through `Ctrl+9` selection,
-previous/next navigation, timestamps for existing states, and deletion. The status bar
-always shows the selected slot and indicates while an operation is running.
+previous/next navigation, timestamps/names for existing states, and deletion. Choose
+**Manage Save States…** in the same submenu for a keyboard-accessible ten-slot browser
+with native-frame previews, optional names, timestamps, frame numbers, payload sizes,
+and validation status. **Import…** and **Export…** use self-contained `.gpgxstate`
+files; imports must match the loaded game's content identity and hardware before they
+can replace the selected slot. The status bar always shows the selected slot and
+indicates while an operation is running.
 
 State files live under `states/<title>-<sha256>/slot-N.gpgxstate` in the platform
 application-data directory. The frontend preserves the raw Genesis Plus GX state bytes
 inside a metadata envelope recording game SHA-256, hardware, slot, timestamp, frame
-number, payload length, core signature, and payload checksum. Reads and writes run off
-the GUI thread. A state for another game or hardware type, a truncated state, a corrupt
-checksum, and an unsupported schema are rejected before the core loader is called.
-Invalid entries appear as **Invalid** and can be deleted; they cannot be loaded.
+number, payload length, core signature, payload checksum, bounded UTF-8 name, and a
+checksummed PNG preview. Reads and writes run off the GUI thread. A state for another
+game or hardware type, a truncated state, a corrupt payload/preview, and an unsupported
+schema are rejected before the core loader is called. Existing schema-1 states remain
+readable. Invalid entries appear as **Invalid** and can be deleted; they cannot be
+loaded or exported.
 
 Saving replaces a slot atomically. Loading first validates the complete envelope, then
 restores through the emulation thread and reports success in the status bar. Opening or
