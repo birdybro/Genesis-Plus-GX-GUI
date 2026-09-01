@@ -42,6 +42,9 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseStateExport(
     QWidget* parent,
     const std::filesystem::path& suggestedPath);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> chooseRecordingDirectory(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
   [[nodiscard]] virtual std::optional<std::string> chooseArchiveEntry(
     QWidget* parent,
     const std::filesystem::path& archivePath,
@@ -75,6 +78,9 @@ public:
   [[nodiscard]] std::optional<std::filesystem::path> chooseStateExport(
     QWidget* parent,
     const std::filesystem::path& suggestedPath) override;
+  [[nodiscard]] std::optional<std::filesystem::path> chooseRecordingDirectory(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::string> chooseArchiveEntry(
     QWidget* parent,
     const std::filesystem::path& archivePath,

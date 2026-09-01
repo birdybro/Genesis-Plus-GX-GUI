@@ -52,6 +52,7 @@ public:
   std::optional<std::filesystem::path> shaderSelection;
   std::optional<std::filesystem::path> stateImportSelection;
   std::optional<std::filesystem::path> stateExportSelection;
+  std::optional<std::filesystem::path> recordingSelection;
   std::filesystem::path discInitialDirectory;
   std::filesystem::path directoryInitialDirectory;
   std::filesystem::path shaderInitialDirectory;
@@ -62,6 +63,7 @@ public:
   int chooseShaderCount{0};
   int chooseStateImportCount{0};
   int chooseStateExportCount{0};
+  int chooseRecordingCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
@@ -115,6 +117,13 @@ public:
     return stateExportSelection;
   }
 
+  std::optional<std::filesystem::path> chooseRecordingDirectory(
+    QWidget*, const std::filesystem::path&) override
+  {
+    ++chooseRecordingCount;
+    return recordingSelection;
+  }
+
   void showError(QWidget*, const QString& title, const QString& message) override
   {
     errors.push_back(title + QStringLiteral(": ") + message);
@@ -141,6 +150,7 @@ private slots:
   void systemSettingsWorkflowIsValidatedAndDeferred();
   void biosSettingsValidatePersistAndCancel();
   void screenshotCaptureAndSettingsWorkflow();
+  void losslessRecordingWorkflow();
   void saveStateActionsExposeSlotSemantics();
   void segaCdDiscActionsAreTypedAndRecoverable();
   void gameInformationWorkflowIsAsynchronousAndInspectable();
@@ -211,7 +221,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   }
 
   const char* gameOnlyNames[]{
-    "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
+    "closeGameAction", "screenshotAction", "recordingAction", "pauseAction", "resetAction",
     "softResetAction", "fastForwardAction", "slowMotionAction",
     "frameAdvanceAction", "saveStateAction",
     "loadStateAction", "changeDiscAction", "previousDiscAction",
@@ -1165,6 +1175,95 @@ void MainWindowTest::screenshotCaptureAndSettingsWorkflow()
   QVERIFY(loadRequested);
   QVERIFY(!window.displayWidget()->hasFrame());
   QVERIFY(!screenshot->isEnabled());
+}
+
+void MainWindowTest::losslessRecordingWorkflow()
+{
+  genplusgx::test::TemporaryFixture game{
+    genplusgx::test::makeGenesisRamMarkerRom(), ".md"};
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+  const auto root = genplusgx::ui::pathFromQString(temporary.path());
+  const genplusgx::ApplicationPaths paths{root / "application-data"};
+  QVERIFY(paths.initialize());
+  const auto selectedDirectory = root / "custom-recordings";
+  auto dialogs = std::make_shared<FakeDialogService>();
+  dialogs->recordingSelection = selectedDirectory;
+
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+  auto* action = window.findChild<QAction*>(QStringLiteral("recordingAction"));
+  QVERIFY(action != nullptr && action->isCheckable() && !action->isEnabled());
+  window.setApplicationPaths(paths);
+  window.setGameLoaded(game.path());
+  std::vector<std::pair<bool, std::filesystem::path>> requests;
+  window.setRecordingSink([&requests](bool start, const auto& directory) {
+    requests.emplace_back(start, directory);
+    return true;
+  });
+  QVERIFY(action->isEnabled());
+  action->trigger();
+  QCOMPARE(dialogs->chooseRecordingCount, 1);
+  QCOMPARE(requests.size(), std::size_t{1});
+  QVERIFY(requests.front().first);
+  QCOMPARE(requests.front().second, selectedDirectory);
+  QVERIFY(!action->isChecked() && !action->isEnabled());
+  QVERIFY(!window.findChild<QAction*>(
+    QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(!window.findChild<QAction*>(
+    QStringLiteral("closeGameAction"))->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("Starting")));
+
+  const auto finalPath = selectedDirectory / "fixture.gpgx-recording";
+  window.setRecordingState(
+    genplusgx::ui::RecordingUiState::recording, finalPath);
+  QVERIFY(action->isChecked() && action->isEnabled());
+  QVERIFY(action->text().contains(QStringLiteral("Stop")));
+  QVERIFY(window.findChild<QAction*>(
+    QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(window.findChild<QAction*>(
+    QStringLiteral("closeGameAction"))->isEnabled());
+  action->trigger();
+  QCOMPARE(requests.size(), std::size_t{2});
+  QVERIFY(!requests.back().first && requests.back().second.empty());
+  QVERIFY(action->isChecked() && !action->isEnabled());
+  QVERIFY(!window.findChild<QAction*>(
+    QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(QStringLiteral("Finalizing")));
+  window.setRecentGames({game.path()});
+  window.setStateSessionReady(true);
+  window.setStateOperationBusy(false);
+  QVERIFY(!window.findChild<QAction*>(
+    QStringLiteral("openGameAction"))->isEnabled());
+  QVERIFY(!window.findChild<QMenu*>(
+    QStringLiteral("openRecentMenu"))->isEnabled());
+
+  window.setRecordingState(
+    genplusgx::ui::RecordingUiState::idle, finalPath, 120U, 3U);
+  QVERIFY(!action->isChecked() && action->isEnabled());
+  QVERIFY(window.statusBar()->currentMessage().contains(
+    QStringLiteral("120 frames, 3 dropped")));
+
+  dialogs->recordingSelection.reset();
+  action->trigger();
+  QCOMPARE(dialogs->chooseRecordingCount, 2);
+  QCOMPARE(requests.size(), std::size_t{2});
+  QVERIFY(!action->isChecked() && action->isEnabled());
+
+  bool closeRequested = false;
+  window.setGameCloseSink([&closeRequested] { closeRequested = true; });
+  window.setRecordingState(
+    genplusgx::ui::RecordingUiState::recording, finalPath);
+  window.findChild<QAction*>(QStringLiteral("closeGameAction"))->trigger();
+  QCOMPARE(requests.size(), std::size_t{3});
+  QVERIFY(!requests.back().first);
+  QVERIFY(closeRequested);
+  QVERIFY(!action->isEnabled());
+
+  window.setRecordingState(genplusgx::ui::RecordingUiState::idle);
+  window.showRecordingError("Injected recording write failure.");
+  QVERIFY(!dialogs->errors.empty());
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("recording write failure")));
 }
 
 void MainWindowTest::saveStateActionsExposeSlotSemantics()

@@ -84,6 +84,8 @@ constexpr std::array hotkeyDescriptions{
   HotkeyDescription{input::EmulatorHotkeyAction::nextStateSlot, "Next state slot", "NextStateSlot"},
   HotkeyDescription{input::EmulatorHotkeyAction::deleteState, "Delete state", "DeleteState"},
   HotkeyDescription{input::EmulatorHotkeyAction::screenshot, "Screenshot", "Screenshot"},
+  HotkeyDescription{input::EmulatorHotkeyAction::recording,
+    "Start/stop lossless recording", "Recording"},
   HotkeyDescription{input::EmulatorHotkeyAction::mute, "Mute", "Mute"},
   HotkeyDescription{input::EmulatorHotkeyAction::volumeUp, "Volume up", "VolumeUp"},
   HotkeyDescription{input::EmulatorHotkeyAction::volumeDown, "Volume down", "VolumeDown"},

@@ -108,6 +108,12 @@ struct DiagnosticsSnapshot final {
   std::size_t rewindSnapshots{0};
   std::size_t rewindPayloadBytes{0};
   std::size_t rewindMemoryLimitBytes{0};
+  bool recordingActive{false};
+  std::size_t recordingQueuedFrames{0};
+  std::size_t recordingQueueCapacity{0};
+  std::uint64_t recordingWrittenFrames{0};
+  std::uint64_t recordingDroppedFrames{0};
+  std::uint64_t recordingOutputBytes{0};
   bool loggerActive{false};
   LoggerMetrics logger;
   std::vector<BiosDiagnostic> bios;

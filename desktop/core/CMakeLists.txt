@@ -317,6 +317,7 @@ add_library(
   include/genplusgx/core_debug.h
   include/genplusgx/core_firmware_settings.h
   include/genplusgx/core_input_settings.h
+  include/genplusgx/emulation_capture_sink.h
   include/genplusgx/rewind_buffer.h
   include/genplusgx/rewind_configuration.h
   src/debug_analysis.cpp

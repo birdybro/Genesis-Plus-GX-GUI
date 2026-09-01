@@ -89,8 +89,10 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   QVERIFY(inputSummary->text().contains(QStringLiteral("Default")));
   QVERIFY(inputSummary->text().contains(QStringLiteral("2")));
   dialog.openPage(genplusgx::ui::SettingsPage::paths);
-  QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("pathsSettingsSummary"))
-    ->text().contains(directory.path()));
+  const auto pathsText = dialog.findChild<QLabel*>(
+    QStringLiteral("pathsSettingsSummary"))->text();
+  QVERIFY(pathsText.contains(directory.path()));
+  QVERIFY(pathsText.contains(QStringLiteral("Recordings:")));
   dialog.openPage(genplusgx::ui::SettingsPage::advanced);
   QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("advancedSettingsSummary"))
     ->text().contains(QStringLiteral("128 MiB")));

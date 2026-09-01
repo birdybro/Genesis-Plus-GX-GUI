@@ -46,6 +46,7 @@ public:
   [[nodiscard]] std::filesystem::path savesDirectory() const;
   [[nodiscard]] std::filesystem::path statesDirectory() const;
   [[nodiscard]] std::filesystem::path screenshotsDirectory() const;
+  [[nodiscard]] std::filesystem::path recordingsDirectory() const;
   [[nodiscard]] std::filesystem::path libraryDirectory() const;
   [[nodiscard]] std::filesystem::path logsDirectory() const;
   [[nodiscard]] std::filesystem::path cacheDirectory() const;

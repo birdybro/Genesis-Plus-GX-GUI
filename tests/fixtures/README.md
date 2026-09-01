@@ -59,6 +59,9 @@ frame and verify stereo sample values and their hash. The header checksum is cal
 by the generator. Input tests inject neutral frontend snapshots and verify both mapped
 core state and the active-low byte observed by the 68000 program. There is no third-party
 program code, game content, artwork, sampled audio, or trademark graphic in the fixture.
+`integration.recording` also runs four frames through the real emulation worker and
+lossless writer, then validates the temporary native PNG sequence, PCM WAV, index, and
+manifest before RAII cleanup removes the entire capture.
 
 ## Generated 8-bit Z80 RAM marker ROMs
 

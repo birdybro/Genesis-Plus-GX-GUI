@@ -57,6 +57,7 @@ shortcuts.
 | Previous playlist disc | Ctrl+Shift+PageUp |
 | Next playlist disc | Ctrl+Shift+PageDown |
 | Screenshot | F12 |
+| Start/stop lossless A/V recording | Ctrl+Shift+F12 |
 | Mute | M |
 | Volume up / down | + / - |
 | Preferences | Platform standard shortcut |

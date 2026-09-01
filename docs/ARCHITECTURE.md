@@ -634,6 +634,7 @@ saves/<game-id>/scd-internal.brm
 saves/<game-id>/scd-cartridge.brm
 states/<game-id>/slot-0.gpgxstate ... slot-9.gpgxstate
 screenshots/
+recordings/<game>-<timestamp>.gpgx-recording/
 library/game-library.sqlite3
 logs/frontend.jsonl
 ```
@@ -663,6 +664,31 @@ in a same-directory temporary file, then renames to a sanitized timestamp/frame 
 A fixed-capacity event queue reports the final path or concise failure to the GUI. The
 emulation thread, core surface, renderer, and settings store are never touched by the
 encoder thread, and the application joins the worker explicitly during shutdown.
+
+Continuous lossless capture uses a separate `EmulationCaptureSink` boundary. After a
+complete core video/audio batch has been copied on the owner thread, the worker offers
+it to `RecordingService`; the sink never calls into the core. Eight maximum-surface
+slots are allocated before capture begins. Submission copies into a free slot and
+returns immediately, or accounts one dropped A/V frame when the fixed queue is full.
+The dedicated writer expands RGB565 into sequential native PNGs, emits stereo PCM WAV
+samples plus a JSON Lines frame index, and writes a schema-versioned manifest.
+
+```text
+core frame + audio -> emulation-owner capture tap -> preallocated 8-slot queue
+                                                        |
+                                                        v
+                                     recording writer (PNG/WAV/JSONL)
+                                                        |
+                         .gpgx-recording.partial -> atomic directory rename
+```
+
+The queue, per-frame sample count, PNG size, session frame count, and total output bytes
+all have hard limits. A dropped slot loses its matching video and audio together. Host
+mute/volume and presentation shaders stay downstream and therefore do not alter the
+native recording; rewind replaces the otherwise discarded batch with equal-length
+silence. GUI start/stop requests and writer completion are asynchronous immutable
+events. Game replacement/close initiates finalization, and shutdown joins emulation
+before draining and joining the writer, so no capture callback can outlive it.
 
 The implemented video store uses bounded schema-1 JSON and atomic replacement. Schema
 0's legacy flat booleans/mask migrate to named enum values; malformed values and future
@@ -1013,7 +1039,7 @@ after storage confirmation. Startup gives an explicit command-line game preceden
 otherwise it holds the loaded core paused until identity activation validates and
 restores that checkpoint. Any failure clears the stale marker and starts normally.
 The regular shutdown then stops the emulation worker so dirty backup memory is flushed
-and the core is released, then stops audio,
+and the core is released, drains and joins lossless recording, then stops audio,
 controllers, state storage, metadata, screenshots, and the library scanner. The display
 releases its frame exchange last. `ShutdownReport` retains every service failure, keeps
 an existing nonzero application result, upgrades an otherwise-success result when any

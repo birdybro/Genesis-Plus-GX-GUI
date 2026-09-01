@@ -96,7 +96,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
-| 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
+| 85 Recording and frame dumps | IN PROGRESS | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local matrices, encoder, timing, lifecycle, GUI; hosted matrix pending | Recording cannot stall or grow queues without bound | pending |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
@@ -3921,6 +3921,56 @@ thread where appropriate; every local and exact hosted gate passes; and complete
 logs and packages are inspected before completion.
 
 **Commit SHA:** `30ed5d7e378c7107db3be844fc80cfd0c96deec2`
+
+## Milestone 85 detail
+
+**Status:** IN PROGRESS (local gates complete; exact hosted verification pending)
+
+**Goal:** Capture native emulation video and stereo PCM audio without blocking the
+emulation owner thread, with deterministic frame dumps suitable for editing,
+regression review, and long-running diagnostics.
+
+**Files changed:**
+
+- bounded capture sink and worker-thread tap under `desktop/core`
+- asynchronous PNG/WAV/JSONL recording service under `desktop/capture`
+- recording menu action, native directory picker seam, transition-safe controls,
+  configurable hotkey, status notifications, and diagnostics under `desktop/ui`,
+  `desktop/app`, `desktop/input`, and `desktop/diagnostics`
+- standard per-user recordings path under `desktop/persistence`
+- unit, real-core integration, worker ownership, process, settings, diagnostics,
+  migration, and GUI workflow tests under `tests/`
+- README, changelog, architecture, recording, shortcut, input, logging, fixture,
+  test-matrix, user, packaging, and documentation-gate updates
+
+**Tests added:** `unit.recording_service` covers path and rate validation, exact RGB565
+PNG conversion, WAV headers and sample counts, frame indexes and manifests, dynamic
+viewport changes, bounded queue saturation and drop metrics, output collisions, write
+and sample-rate rejection, repeated immediate start/stop races, restart, and shutdown
+draining.
+`integration.recording` drives a generated legal Genesis program through the real core,
+emulation worker, capture tap, PNG writer, WAV writer, and final manifest. Existing
+worker and GUI suites verify owner-thread delivery, disabled taps, injectable directory
+selection, start/stop/error transitions, close-game finalization, and that unrelated
+recent/state refreshes cannot re-enable file actions while recording changes state.
+
+**Gate evidence:** Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan,
+fresh Clang 22, and CHD-disabled builds each pass 95/95 without a finding. The fresh
+shader-disabled graph passes all 93 applicable tests. A fresh Release stage passes
+self-contained package verification, installed help/version, the real XCB event loop
+with isolated application data, and dependency inspection across all 22 ELF objects.
+Hosted Windows, Linux, Apple Silicon, and Intel macOS evidence remains pending until the
+implementation commit is pushed; no later feature may begin before that exact run and
+its complete logs and artifacts pass review.
+
+**Acceptance criteria:** The emulation thread performs only bounded copies into eight
+preallocated slots; a dedicated writer produces sequential native PNG files, stereo
+PCM WAV audio, a JSONL frame index, and an atomic completion manifest; queue, frame,
+file, and total-output limits are enforced and measured; rewind preserves A/V cadence
+with silence; start, stop, game replacement, and shutdown drain safely; every local and
+exact hosted gate passes before completion.
+
+**Commit SHA:** pending
 
 ## Milestone 70 detail
 

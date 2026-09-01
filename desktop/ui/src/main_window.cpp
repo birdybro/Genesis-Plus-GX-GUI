@@ -170,6 +170,14 @@ void MainWindow::buildMenus()
     *file, tr("Screenshot &Settings…"), "screenshotSettingsAction");
   connect(screenshotSettings, &QAction::triggered,
     this, &MainWindow::showScreenshotSettings);
+  auto* recording = addAction(
+    *file, tr("Start Lossless A/V &Recording…"), "recordingAction",
+    QKeySequence{tr("Ctrl+Shift+F12")});
+  recording->setCheckable(true);
+  recording->setToolTip(
+    tr("Record native PNG frames and lossless stereo WAV audio"));
+  connect(recording, &QAction::toggled,
+    this, &MainWindow::requestRecordingToggle);
   file->addSeparator();
   auto* exit = addAction(*file, tr("E&xit"), "exitAction", QKeySequence::Quit);
   connect(exit, &QAction::triggered, this, &QWidget::close);
@@ -697,6 +705,7 @@ void MainWindow::applyHotkeyShortcuts()
       "nextStateSlotAction"},
     std::pair{input::EmulatorHotkeyAction::deleteState, "deleteStateAction"},
     std::pair{input::EmulatorHotkeyAction::screenshot, "screenshotAction"},
+    std::pair{input::EmulatorHotkeyAction::recording, "recordingAction"},
     std::pair{input::EmulatorHotkeyAction::mute, "muteAction"},
     std::pair{input::EmulatorHotkeyAction::volumeUp, "volumeUpAction"},
     std::pair{input::EmulatorHotkeyAction::volumeDown, "volumeDownAction"},
@@ -786,6 +795,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateDiscActions();
   updateStateActions();
   updateScreenshotAction();
+  updateRecordingAction();
   updateCheatAction();
   updatePerGameSettingsAction();
   updateEmulationControls();
@@ -1505,6 +1515,134 @@ void MainWindow::updateScreenshotAction()
   }
 }
 
+void MainWindow::setRecordingSink(RecordingSink sink)
+{
+  recordingSink_ = std::move(sink);
+  if (!recordingSink_) {
+    recordingState_ = RecordingUiState::unavailable;
+    recordingPath_.clear();
+  } else if (recordingState_ == RecordingUiState::unavailable) {
+    recordingState_ = RecordingUiState::idle;
+  }
+  updateRecordingAction();
+}
+
+void MainWindow::setRecordingState(
+  RecordingUiState state,
+  std::filesystem::path path,
+  std::uint64_t writtenFrames,
+  std::uint64_t droppedFrames)
+{
+  recordingState_ = state;
+  recordingPath_ = std::move(path);
+  updateRecordingAction();
+  switch (state) {
+    case RecordingUiState::unavailable:
+      break;
+    case RecordingUiState::idle:
+      if (!recordingPath_.empty()) {
+        statusBar()->showMessage(
+          tr("Recording saved: %1 (%2 frames, %3 dropped)")
+            .arg(pathToQString(recordingPath_))
+            .arg(static_cast<qulonglong>(writtenFrames))
+            .arg(static_cast<qulonglong>(droppedFrames)),
+          8'000);
+      }
+      break;
+    case RecordingUiState::starting:
+      statusBar()->showMessage(tr("Starting lossless recording…"));
+      break;
+    case RecordingUiState::recording:
+      statusBar()->showMessage(
+        tr("Recording native video frames and audio…"));
+      break;
+    case RecordingUiState::stopping:
+      statusBar()->showMessage(tr("Finalizing lossless recording…"));
+      break;
+  }
+}
+
+void MainWindow::showRecordingError(const std::string& detail)
+{
+  recordingState_ = recordingSink_
+    ? RecordingUiState::idle : RecordingUiState::unavailable;
+  recordingPath_.clear();
+  updateRecordingAction();
+  statusBar()->showMessage(tr("Recording failed"), 5'000);
+  dialogService_->showError(
+    this, tr("Lossless Recording Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::requestRecordingToggle(bool enabled)
+{
+  if (enabled) {
+    if (recordingState_ != RecordingUiState::idle || !isGameLoaded() || gameLoading_ ||
+        !applicationPathsAvailable_ || !recordingSink_) {
+      updateRecordingAction();
+      return;
+    }
+    const auto directory = dialogService_->chooseRecordingDirectory(
+      this, applicationPaths_.recordingsDirectory());
+    if (!directory) {
+      updateRecordingAction();
+      return;
+    }
+    recordingState_ = RecordingUiState::starting;
+    recordingPath_ = *directory;
+    updateRecordingAction();
+    statusBar()->showMessage(tr("Starting lossless recording…"));
+    if (!recordingSink_(true, *directory)) {
+      recordingState_ = RecordingUiState::idle;
+      recordingPath_.clear();
+      updateRecordingAction();
+    }
+    return;
+  }
+  if (recordingState_ != RecordingUiState::recording || !recordingSink_) {
+    updateRecordingAction();
+    return;
+  }
+  recordingState_ = RecordingUiState::stopping;
+  updateRecordingAction();
+  statusBar()->showMessage(tr("Finalizing lossless recording…"));
+  if (!recordingSink_(false, {})) {
+    recordingState_ = RecordingUiState::recording;
+    updateRecordingAction();
+  }
+}
+
+void MainWindow::updateRecordingAction()
+{
+  auto* action = findChild<QAction*>(QStringLiteral("recordingAction"));
+  if (action == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker{action};
+  const bool recording = recordingState_ == RecordingUiState::recording ||
+    recordingState_ == RecordingUiState::stopping;
+  action->setChecked(recording);
+  action->setText(recording
+      ? tr("Stop Lossless A/V &Recording")
+      : tr("Start Lossless A/V &Recording…"));
+  const bool canStart = recordingState_ == RecordingUiState::idle &&
+    isGameLoaded() && !gameLoading_ && !sessionResumeBusy_ &&
+    applicationPathsAvailable_ &&
+    static_cast<bool>(recordingSink_);
+  action->setEnabled(canStart || recordingState_ == RecordingUiState::recording);
+  const bool transitionBusy = recordingState_ == RecordingUiState::starting ||
+    recordingState_ == RecordingUiState::stopping;
+  const bool fileOperationReady = !gameLoading_ && !sessionResumeBusy_ &&
+    !stateOperationBusy_ && !transitionBusy;
+  findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(
+    fileOperationReady);
+  findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(
+    fileOperationReady);
+  findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
+    hasRecentGames_ && fileOperationReady);
+  findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(
+    isGameLoaded() && fileOperationReady);
+}
+
 void MainWindow::showAboutDialog()
 {
   if (auto* existing = findChild<AboutDialog*>(QStringLiteral("aboutDialog"))) {
@@ -1593,6 +1731,7 @@ void MainWindow::setApplicationPaths(ApplicationPaths paths)
 {
   applicationPathsAvailable_ = !paths.root().empty();
   applicationPaths_ = std::move(paths);
+  updateRecordingAction();
   refreshSettingsDialog();
 }
 
@@ -2746,6 +2885,7 @@ void MainWindow::setRecentGames(std::vector<std::filesystem::path> paths)
   }
   hasRecentGames_ = !paths.empty();
   menu->setEnabled(hasRecentGames_ && !gameLoading_);
+  updateRecordingAction();
 }
 
 void MainWindow::showRecentGamesError(const std::string& detail)
@@ -2762,6 +2902,12 @@ bool MainWindow::requestGameLoad(
 {
   if (gameLoading_ || sessionResumeBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
+    return false;
+  }
+  if (recordingState_ == RecordingUiState::starting ||
+      recordingState_ == RecordingUiState::stopping) {
+    presentGameLoadError(path,
+      "Wait for the current recording operation to finish before changing games.");
     return false;
   }
   GameLaunchTarget target{
@@ -2832,6 +2978,18 @@ bool MainWindow::requestGameLoad(
   if (!gameLoadSink_) {
     presentGameLoadError(path, "The emulation service is not available.");
     return false;
+  }
+  if (recordingState_ == RecordingUiState::recording) {
+    recordingState_ = RecordingUiState::stopping;
+    updateRecordingAction();
+    statusBar()->showMessage(tr("Finalizing lossless recording…"));
+    if (!recordingSink_ || !recordingSink_(false, {})) {
+      recordingState_ = RecordingUiState::recording;
+      updateRecordingAction();
+      presentGameLoadError(path,
+        "The active recording could not be stopped before replacing the game.");
+      return false;
+    }
   }
   pendingGameTarget_ = target;
   setGameLoading(path);
@@ -3306,7 +3464,24 @@ void MainWindow::chooseGameWithPatch()
 
 void MainWindow::closeGame()
 {
+  if (recordingState_ == RecordingUiState::starting ||
+      recordingState_ == RecordingUiState::stopping) {
+    return;
+  }
   if (gameCloseSink_ && isGameLoaded()) {
+    if (recordingState_ == RecordingUiState::recording) {
+      recordingState_ = RecordingUiState::stopping;
+      updateRecordingAction();
+      statusBar()->showMessage(tr("Finalizing lossless recording…"));
+      if (!recordingSink_ || !recordingSink_(false, {})) {
+        recordingState_ = RecordingUiState::recording;
+        updateRecordingAction();
+        statusBar()->showMessage(tr("Recording could not be stopped"), 5'000);
+        dialogService_->showError(this, tr("Lossless Recording Error"),
+          tr("The active recording could not be stopped before closing the game."));
+        return;
+      }
+    }
     gameLoading_ = true;
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
     findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
@@ -3403,6 +3578,7 @@ void MainWindow::updateStateActions()
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
       hasRecentGames_);
   }
+  updateRecordingAction();
 }
 
 void MainWindow::updateStateSlotPresentation()

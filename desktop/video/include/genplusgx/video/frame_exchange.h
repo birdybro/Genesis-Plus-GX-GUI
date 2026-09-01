@@ -64,7 +64,7 @@ private:
 class VideoFrameExchange final {
 public:
   static constexpr std::size_t slotCount = 3U;
-  static constexpr std::size_t maximumSurfacePixels = 720U * 576U;
+  static constexpr std::size_t maximumSurfacePixels = maximumCoreSurfacePixels;
 
   explicit VideoFrameExchange(
     std::size_t maximumPixels = maximumSurfacePixels);

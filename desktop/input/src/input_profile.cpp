@@ -81,6 +81,7 @@ constexpr std::array hotkeyActions{
   EmulatorHotkeyAction::nextStateSlot,
   EmulatorHotkeyAction::deleteState,
   EmulatorHotkeyAction::screenshot,
+  EmulatorHotkeyAction::recording,
   EmulatorHotkeyAction::mute,
   EmulatorHotkeyAction::volumeUp,
   EmulatorHotkeyAction::volumeDown,
@@ -565,6 +566,22 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
       };
     }
   }
+  if (schema >= 2 && schema < 6) {
+    const std::array recordingCandidates{
+      combined(Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_F12),
+      combined(Qt::AltModifier | Qt::ShiftModifier, Qt::Key_F12),
+      combined(Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_V),
+    };
+    if (!addMigratedHotkey(
+          EmulatorHotkeyAction::recording, recordingCandidates)) {
+      return {
+        .status = failure(InputProfileError::parseFailed,
+          "No conflict-free key is available for the recording hotkey migration."),
+        .exists = true,
+        .configuration = defaultInputConfiguration(),
+      };
+    }
+  }
   const auto validation = validateInputConfiguration(configuration);
   if (!validation) {
     return {
@@ -644,6 +661,8 @@ std::string_view emulatorHotkeyActionName(EmulatorHotkeyAction action) noexcept
     return "delete-state";
   case EmulatorHotkeyAction::screenshot:
     return "screenshot";
+  case EmulatorHotkeyAction::recording:
+    return "recording";
   case EmulatorHotkeyAction::mute:
     return "mute";
   case EmulatorHotkeyAction::volumeUp:
@@ -812,6 +831,8 @@ std::vector<HotkeyBinding> defaultEmulatorHotkeys()
       combined(control, Qt::Key_BracketRight)},
     {EmulatorHotkeyAction::deleteState, combined(control, Qt::Key_Delete)},
     {EmulatorHotkeyAction::screenshot, combined(Qt::NoModifier, Qt::Key_F12)},
+    {EmulatorHotkeyAction::recording,
+      combined(Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_F12)},
     {EmulatorHotkeyAction::mute, combined(Qt::NoModifier, Qt::Key_M)},
     {EmulatorHotkeyAction::volumeUp, combined(Qt::NoModifier, Qt::Key_Plus)},
     {EmulatorHotkeyAction::volumeDown, combined(Qt::NoModifier, Qt::Key_Minus)},

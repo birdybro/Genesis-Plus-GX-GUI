@@ -227,7 +227,8 @@ public:
     int audioSampleRate,
     std::shared_ptr<VideoFrameExchange> videoFrames,
     std::shared_ptr<StereoAudioRingBuffer> audioFrames,
-    std::shared_ptr<BackupMemoryPersistence> backupPersistence)
+    std::shared_ptr<BackupMemoryPersistence> backupPersistence,
+    std::shared_ptr<EmulationCaptureSink> captureSink)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
@@ -237,7 +238,8 @@ public:
       audioFrames_(audioFrames ? std::move(audioFrames)
                                : std::make_shared<StereoAudioRingBuffer>(
                                    defaultAudioRingFrames)),
-      backupPersistence_(std::move(backupPersistence))
+      backupPersistence_(std::move(backupPersistence)),
+      captureSink_(std::move(captureSink))
   {
   }
 
@@ -1290,6 +1292,26 @@ private:
     if (!copied) {
       return copied;
     }
+    if (captureSink_ && captureSink_->active()) {
+      if (describedAudio && !writeAudio) {
+        std::ranges::fill(
+          std::span<StereoAudioFrame>{audioScratch_}.first(
+            audioInfo.frameCount),
+          StereoAudioFrame{});
+      }
+      const auto captureAudio = describedAudio
+        ? std::span<const StereoAudioFrame>{audioScratch_}.first(
+            audioInfo.frameCount)
+        : std::span<const StereoAudioFrame>{};
+      const auto captureAudioInfo = describedAudio
+        ? audioInfo : CoreAudioBatchInfo{};
+      static_cast<void>(captureSink_->submitFrame(
+        frame,
+        std::span<const std::uint16_t>{write->pixels()}.first(
+          frame.pixelCount()),
+        captureAudioInfo,
+        captureAudio));
+    }
     if (!write->publish(frame)) {
       return {
         CoreError::invalidVideoFrame,
@@ -1409,6 +1431,7 @@ private:
   std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
   std::shared_ptr<BackupMemoryPersistence> backupPersistence_;
+  std::shared_ptr<EmulationCaptureSink> captureSink_;
   bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
   std::vector<std::uint8_t> backupScratch_;
@@ -1442,7 +1465,8 @@ EmulationWorker::EmulationWorker(
   int audioSampleRate,
   std::shared_ptr<VideoFrameExchange> videoFrames,
   std::shared_ptr<StereoAudioRingBuffer> audioFrames,
-  std::shared_ptr<BackupMemoryPersistence> backupPersistence)
+  std::shared_ptr<BackupMemoryPersistence> backupPersistence,
+  std::shared_ptr<EmulationCaptureSink> captureSink)
   : private_(std::make_unique<Private>(
       *this,
       commandCapacity,
@@ -1450,7 +1474,8 @@ EmulationWorker::EmulationWorker(
       audioSampleRate,
       std::move(videoFrames),
       std::move(audioFrames),
-      std::move(backupPersistence)))
+      std::move(backupPersistence),
+      std::move(captureSink)))
 {
 }
 

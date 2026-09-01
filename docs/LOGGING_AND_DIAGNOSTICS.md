@@ -29,6 +29,8 @@ Open **Tools → Log and Diagnostics…**. The snapshot includes:
 - operating-system description and CPU architecture;
 - active OpenGL/software renderer and audio device;
 - audio occupancy/capacity plus underrun/overrun counters;
+- lossless-recording activity, bounded queue occupancy, written/dropped frames, and
+  output bytes;
 - controller count and loaded game title, system, and region;
 - each BIOS slot's validation state and a short SHA-256 prefix only when valid;
 - logger active/written/dropped/redacted/rotation counters.

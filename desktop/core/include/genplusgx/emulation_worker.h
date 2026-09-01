@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/emulation_capture_sink.h"
 #include "genplusgx/input_snapshot.h"
 #include "genplusgx/rewind_configuration.h"
 #include "genplusgx/audio_ring_buffer.h"
@@ -230,7 +231,8 @@ public:
     int audioSampleRate = 48'000,
     std::shared_ptr<VideoFrameExchange> videoFrames = {},
     std::shared_ptr<StereoAudioRingBuffer> audioFrames = {},
-    std::shared_ptr<BackupMemoryPersistence> backupPersistence = {});
+    std::shared_ptr<BackupMemoryPersistence> backupPersistence = {},
+    std::shared_ptr<EmulationCaptureSink> captureSink = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;

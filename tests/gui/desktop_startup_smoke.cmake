@@ -57,7 +57,7 @@ if(NOT "${smoke_result}" STREQUAL "0")
 endif()
 
 foreach(required_directory IN ITEMS
-    config saves states screenshots library logs cache)
+    config saves states screenshots recordings library logs cache)
   if(NOT IS_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}/${required_directory}")
     message(FATAL_ERROR
       "Desktop startup did not create ${required_directory} in its isolated root")

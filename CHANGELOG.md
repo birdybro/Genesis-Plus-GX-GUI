@@ -9,6 +9,9 @@ platform documentation.
 
 ### Added
 
+- Bounded lossless A/V recording and continuous native frame dumps with sequential
+  PNGs, stereo PCM WAV, per-frame/manifest metadata, drop instrumentation, atomic
+  finalization, configurable hotkey, diagnostics, and real generated-ROM coverage.
 - A visual save-state manager with native-frame PNG previews, optional per-slot names,
   frame/size/timestamp details, and identity-validated import/export. Schema-2 state
   envelopes remain backward-compatible with existing schema-1 files and keep all

@@ -68,6 +68,8 @@ enum class CorePixelFormat {
   rgb565,
 };
 
+inline constexpr std::size_t maximumCoreSurfacePixels = 720U * 576U;
+
 struct CoreVideoFrameInfo final {
   CorePixelFormat format{CorePixelFormat::rgb565};
   std::uint32_t width{0};

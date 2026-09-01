@@ -267,6 +267,31 @@ number. If that exact name already exists, the application adds a numeric suffix
 never overwrites it. PNG data is first completed in a temporary file in the destination
 directory, so an interrupted encode cannot leave a partially named capture.
 
+## Lossless A/V recording and frame dumps
+
+Choose **File → Start Lossless A/V Recording…** (`Ctrl+Shift+F12`) while a game is
+running, select a destination directory, then use the same action to stop. Recording
+creates one `.gpgx-recording` directory containing sequential native PNG frames, a
+stereo 16-bit PCM `audio.wav`, a per-frame JSON Lines index, and a final JSON manifest.
+It captures the unscaled core image, so presentation filters, shaders, borders, and
+window chrome are intentionally excluded. The status bar reports start/finalization,
+the final path, written frames, and any explicitly counted drops.
+
+An eight-slot preallocated queue separates the emulation thread from PNG and filesystem
+work. When storage cannot keep up, the complete video/audio frame is dropped and
+counted instead of blocking emulation or growing memory. Sessions are capped at 108,000
+accepted frames and 8 GiB. Active output has a `.partial` suffix and is renamed only
+after the audio header, index, and manifest flush successfully. Closing or replacing a
+game automatically requests finalization, and application shutdown drains accepted
+frames before releasing the service.
+
+The default chooser location is the platform application-data `recordings` directory,
+but the selected destination applies only to that session. Host mute and master volume
+do not change recorded core audio; core sound settings do. Fast/slow host pacing keeps
+the file's normal emulated-time cadence, pause adds nothing, and rewind records aligned
+silence. See [RECORDING.md](RECORDING.md) for the format, hard limits, recovery behavior,
+and post-processing guidance.
+
 ## Cheats
 
 With a game loaded, choose **Tools → Cheats…** to manage its local cheat list. Add a
@@ -393,8 +418,9 @@ Choose **Tools → Settings…** (the platform Preferences shortcut) to open the
 settings center. Its stable categories are **General**, **Video**, **Audio**, **Input**,
 **System**, **BIOS**, **Paths**, and **Advanced**. Each page summarizes the live values
 and opens the corresponding complete editor; the Paths page also shows the resolved
-platform directories for configuration, saves, states, screenshots, library data, and
-logs. Existing category menu entries remain direct shortcuts to those same editors.
+platform directories for configuration, saves, states, screenshots, recordings,
+library data, and logs. Existing category menu entries remain direct shortcuts to those
+same editors.
 
 From General, open **Appearance Settings…** to select **System default**, **Light**, or
 **Dark**. System default restores the Qt platform style and
@@ -519,7 +545,8 @@ Choose **Tools → Log and Diagnostics…** to inspect a live support report. It
 the application version and Git commit, Qt and SDL versions, operating system and CPU
 architecture, active renderer and audio device, bounded audio metrics, connected
 controller count, loaded game/system/region, BIOS validity and short checksum prefixes,
-and structured-logger counters. Reopening the action refreshes the existing dialog.
+lossless-recording queue/drop/output metrics, and structured-logger counters. Reopening
+the action refreshes the existing dialog.
 **Copy Diagnostics** copies exactly the visible privacy-filtered text.
 
 Frontend messages are stored as compact JSON Lines in `logs/frontend.jsonl` beneath the
@@ -527,7 +554,7 @@ platform application-data directory. Each line has UTC timestamp, severity, cate
 and message. The active file is limited to 1 MiB and keeps up to three rotated backups.
 Filesystem paths and credential-like values are redacted before writing; diagnostics
 never include ROM/BIOS paths or the log path. Logging covers startup/shutdown, build,
-BIOS, renderer, audio, controller, game, state, screenshot, persistence, and rate-limited
+BIOS, renderer, audio, controller, game, state, screenshot, recording, persistence, and rate-limited
 timing/audio anomalies without per-frame noise. See
 [LOGGING_AND_DIAGNOSTICS.md](LOGGING_AND_DIAGNOSTICS.md) for the schema and support
 workflow.

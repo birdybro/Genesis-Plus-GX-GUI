@@ -436,6 +436,24 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+add_executable(genplusgx_recording_service_test recording_service_test.cpp)
+target_link_libraries(
+  genplusgx_recording_service_test
+  PRIVATE
+    GenesisPlusGX::Capture
+    genplusgx_project_warnings
+    Qt6::Core
+    Qt6::Gui
+    Threads::Threads
+)
+add_test(NAME unit.recording_service COMMAND genplusgx_recording_service_test)
+set_tests_properties(
+  unit.recording_service
+  PROPERTIES
+    LABELS "unit;recording;video;audio;filesystem;concurrency;bounded"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_bios_manager_test bios_manager_test.cpp)
 target_link_libraries(
   genplusgx_bios_manager_test

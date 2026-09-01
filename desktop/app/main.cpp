@@ -7,6 +7,7 @@
 #include "genplusgx/backup_store.h"
 #include "genplusgx/bounded_queue.h"
 #include "genplusgx/cheats/cheat_manager.h"
+#include "genplusgx/capture/recording_service.h"
 #include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
@@ -575,19 +576,30 @@ int main(int argc, char* argv[])
       screenshotServiceStarted.message);
     recordStartupIssue("Screenshot service", screenshotServiceStarted.message);
   }
+  auto recordingService =
+    std::make_shared<genplusgx::capture::RecordingService>();
+  const auto recordingServiceStarted = recordingService->start();
+  if (!recordingServiceStarted) {
+    qWarning().noquote() << QString::fromStdString(
+      recordingServiceStarted.message);
+    recordStartupIssue("Lossless recording service",
+      recordingServiceStarted.message);
+  }
   genplusgx::EmulationWorker worker{
     64U,
     64U,
     audioOutput.config().sampleRate,
     videoFrames,
     audioOutput.ringBuffer(),
-    backupStore};
+    backupStore,
+    recordingServiceStarted ? recordingService : nullptr};
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(screenshotService.stop());
+    static_cast<void>(recordingService->stop());
     static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
     QMessageBox::critical(
@@ -1556,6 +1568,7 @@ int main(int argc, char* argv[])
   std::optional<genplusgx::cheats::CheatSystem> activeCheatSystem;
   genplusgx::cheats::CheatConfiguration activeCheatConfiguration;
   std::uint64_t screenshotOperationId = 4'500'000U;
+  std::uint64_t recordingOperationId = 4'600'000U;
   std::uint64_t debugOperationId = 4'750'000U;
   window.setDebugRequestSink(
     [&debugOperationId, &worker](genplusgx::CoreDebugRequest request) {
@@ -1566,7 +1579,7 @@ int main(int argc, char* argv[])
   window.setDiagnosticsSnapshotProvider(
     [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
-     &rewindSettings, &speedSettings, &window, &worker] {
+     &recordingService, &rewindSettings, &speedSettings, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
@@ -1609,6 +1622,13 @@ int main(int argc, char* argv[])
       snapshot.rewindSnapshots = workerMetrics.rewindSnapshotCount;
       snapshot.rewindPayloadBytes = workerMetrics.rewindPayloadBytes;
       snapshot.rewindMemoryLimitBytes = workerMetrics.rewindMemoryLimitBytes;
+      const auto recordingMetrics = recordingService->metrics();
+      snapshot.recordingActive = recordingMetrics.active;
+      snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
+      snapshot.recordingQueueCapacity = recordingMetrics.queueCapacity;
+      snapshot.recordingWrittenFrames = recordingMetrics.writtenFrames;
+      snapshot.recordingDroppedFrames = recordingMetrics.droppedFrames;
+      snapshot.recordingOutputBytes = recordingMetrics.outputBytes;
       snapshot.loggerActive = frontendLogger.installed();
       snapshot.logger = frontendLogger.metrics();
       const auto& bios = biosManager.snapshot();
@@ -1648,6 +1668,43 @@ int main(int argc, char* argv[])
           pendingScreenshot.reset();
           window.showScreenshotError(submitted.message);
         }
+      });
+  }
+  if (recordingServiceStarted) {
+    window.setRecordingSink(
+      [&activePerGameIdentity, &audioOutput, &recordingOperationId,
+       &recordingService, &window, &worker](
+        bool start, const std::filesystem::path& directory) {
+        const auto operationId = ++recordingOperationId;
+        genplusgx::capture::RecordingStatus status;
+        if (start) {
+          const auto workerMetrics = worker.metrics();
+          auto title = genplusgx::ui::pathToQString(
+            window.loadedGamePath().stem()).toUtf8().toStdString();
+          if (title.empty()) {
+            title = "recording";
+          }
+          status = recordingService->begin({
+            .operationId = operationId,
+            .baseDirectory = directory,
+            .gameTitle = std::move(title),
+            .gameId = activePerGameIdentity
+              ? activePerGameIdentity->sha256 : std::string{},
+            .audioSampleRate = static_cast<std::uint32_t>(
+              audioOutput.config().sampleRate),
+            .nominalFramesPerSecond =
+              workerMetrics.targetFramesPerSecond > 0.0
+                ? workerMetrics.targetFramesPerSecond : 60.0,
+            .timestamp = std::chrono::system_clock::now(),
+          });
+        } else {
+          status = recordingService->end(operationId);
+        }
+        if (!status) {
+          window.showRecordingError(status.message);
+          return false;
+        }
+        return true;
       });
   }
   window.setPerGameSettingsSink(
@@ -2007,7 +2064,7 @@ int main(int argc, char* argv[])
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
      &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
      &pendingCheatMetadata, &pendingCheatOperation, &perGameSettingsStore,
-     &pendingScreenshot, &screenshotService,
+     &pendingScreenshot, &recordingService, &screenshotService,
      &closingGameTarget, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
      &sessionSettings, &sessionSettingsStore, &startLoadedGame,
@@ -2808,6 +2865,43 @@ int main(int argc, char* argv[])
         window.showScreenshotError(event->status.message);
       }
     }
+    while (auto event = recordingService->pollEvent()) {
+      using EventType = genplusgx::capture::RecordingEventType;
+      switch (event->type) {
+        case EventType::serviceStarted:
+          qInfo() << "Lossless recording service started.";
+          break;
+        case EventType::recordingStarted:
+          qInfo().noquote() << "Lossless recording started:"
+                            << genplusgx::ui::pathToQString(event->path);
+          window.setRecordingState(
+            genplusgx::ui::RecordingUiState::recording, event->path);
+          break;
+        case EventType::recordingFinished:
+          qInfo().noquote()
+            << "Lossless recording saved:"
+            << genplusgx::ui::pathToQString(event->path)
+            << "frames" << static_cast<qulonglong>(event->metrics.writtenFrames)
+            << "dropped" << static_cast<qulonglong>(event->metrics.droppedFrames);
+          window.setRecordingState(genplusgx::ui::RecordingUiState::idle,
+            event->path, event->metrics.writtenFrames,
+            event->metrics.droppedFrames);
+          break;
+        case EventType::recordingFailed:
+          qWarning().noquote() << "Lossless recording failed:"
+                               << QString::fromStdString(event->status.message)
+                               << genplusgx::ui::pathToQString(event->path);
+          window.showRecordingError(event->status.message);
+          break;
+        case EventType::serviceStopped:
+          if (!event->status) {
+            qWarning().noquote() << "Lossless recording service stopped:"
+                                 << QString::fromStdString(event->status.message);
+            window.showRecordingError(event->status.message);
+          }
+          break;
+      }
+    }
     while (auto event = metadataService.pollEvent()) {
       if (event->type ==
           genplusgx::library::GameMetadataEventType::serviceStarted) {
@@ -3258,6 +3352,7 @@ int main(int argc, char* argv[])
   window.setGameInformationRequestSink({});
   window.setGameLibraryActions({});
   window.setScreenshotSink({});
+  window.setRecordingSink({});
   window.setScreenshotSettingsSink({});
   window.setCheatConfigurationSink({});
   window.setPerGameSettingsSink({});
@@ -3281,6 +3376,8 @@ int main(int argc, char* argv[])
   };
   const auto workerStopped = worker.stop();
   recordCleanup("Emulation worker", workerStopped);
+  const auto recordingServiceStopped = recordingService->stop();
+  recordCleanup("Lossless recording service", recordingServiceStopped);
   const auto audioOutputStopped = audioOutput.shutdown();
   recordCleanup("Audio output", audioOutputStopped);
   const auto controllerInputStopped = controllerInput.shutdown();

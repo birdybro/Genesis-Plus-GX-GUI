@@ -370,12 +370,13 @@ void SettingsDialog::refresh()
   if (overview_.pathsAvailable) {
     pathsSummary_->setText(
       tr("Application data: %1\nConfiguration: %2\nSaves: %3\nStates: %4\n"
-         "Screenshots: %5\nLibrary: %6\nLogs: %7")
+         "Screenshots: %5\nRecordings: %6\nLibrary: %7\nLogs: %8")
         .arg(pathText(overview_.paths.root()),
           pathText(overview_.paths.configDirectory()),
           pathText(overview_.paths.savesDirectory()),
           pathText(overview_.paths.statesDirectory()),
           pathText(overview_.screenshots.directory),
+          pathText(overview_.paths.recordingsDirectory()),
           pathText(overview_.paths.libraryDirectory()),
           pathText(overview_.paths.logsDirectory())));
   } else {

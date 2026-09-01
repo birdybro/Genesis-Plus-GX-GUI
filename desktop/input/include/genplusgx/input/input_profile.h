@@ -59,12 +59,13 @@ enum class EmulatorHotkeyAction : std::uint8_t {
   nextStateSlot,
   deleteState,
   screenshot,
+  recording,
   mute,
   volumeUp,
   volumeDown,
 };
 
-inline constexpr std::size_t emulatorHotkeyActionCount = 32U;
+inline constexpr std::size_t emulatorHotkeyActionCount = 33U;
 
 struct HotkeyBinding final {
   EmulatorHotkeyAction action{EmulatorHotkeyAction::openGame};
@@ -94,7 +95,7 @@ struct InputProfile final {
 };
 
 struct InputConfiguration final {
-  static constexpr int currentSchemaVersion = 5;
+  static constexpr int currentSchemaVersion = 6;
 
   int schemaVersion{currentSchemaVersion};
   std::string activeProfile;

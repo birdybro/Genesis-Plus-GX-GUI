@@ -394,6 +394,13 @@ std::string formatDiagnostics(
          << "Rewind snapshots: " << snapshot.rewindSnapshots << '\n'
          << "Rewind payload bytes: " << snapshot.rewindPayloadBytes << " / "
          << snapshot.rewindMemoryLimitBytes << '\n'
+         << "Lossless recording: "
+         << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
+         << "Recording queue: " << snapshot.recordingQueuedFrames << " / "
+         << snapshot.recordingQueueCapacity << '\n'
+         << "Recording frames: " << snapshot.recordingWrittenFrames
+         << " written, " << snapshot.recordingDroppedFrames << " dropped\n"
+         << "Recording output bytes: " << snapshot.recordingOutputBytes << '\n'
          << "Structured logging: " << (snapshot.loggerActive ? "Active" : "Unavailable")
          << '\n'
          << "Log messages written: " << snapshot.logger.writtenMessages << '\n'

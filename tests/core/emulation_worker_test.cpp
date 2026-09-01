@@ -3,9 +3,12 @@
 
 #include <chrono>
 #include <algorithm>
+#include <atomic>
 #include <cstdint>
 #include <iostream>
+#include <memory>
 #include <optional>
+#include <span>
 #include <thread>
 #include <vector>
 
@@ -77,6 +80,39 @@ bool waitForReplacedFrameEvent(genplusgx::EmulationWorker& worker)
   }
   return worker.metrics().replacedFrameEvents > 0U;
 }
+
+class CaptureProbe final : public genplusgx::EmulationCaptureSink {
+public:
+  [[nodiscard]] bool active() const noexcept override
+  {
+    return enabled.load(std::memory_order_acquire);
+  }
+
+  [[nodiscard]] bool submitFrame(
+    const genplusgx::CoreVideoFrameInfo& video,
+    std::span<const std::uint16_t> pixels,
+    const genplusgx::CoreAudioBatchInfo& audio,
+    std::span<const genplusgx::StereoAudioFrame> audioFrames) noexcept override
+  {
+    if (pixels.size() != video.pixelCount() ||
+        audioFrames.size() != audio.frameCount) {
+      invalid.store(true, std::memory_order_release);
+      return false;
+    }
+    width.store(video.width, std::memory_order_release);
+    height.store(video.height, std::memory_order_release);
+    audioFrameCount.store(audioFrames.size(), std::memory_order_release);
+    calls.fetch_add(1U, std::memory_order_acq_rel);
+    return true;
+  }
+
+  std::atomic_bool enabled{false};
+  std::atomic_bool invalid{false};
+  std::atomic_uint64_t calls{0U};
+  std::atomic_uint32_t width{0U};
+  std::atomic_uint32_t height{0U};
+  std::atomic_size_t audioFrameCount{0U};
+};
 
 } // namespace
 
@@ -450,9 +486,48 @@ int main()
     }
   }
 
+  {
+    auto capture = std::make_shared<CaptureProbe>();
+    genplusgx::EmulationWorker captureWorker{
+      64U, 64U, 48'000, {}, {}, {}, capture};
+    genplusgx::EmulationEvent captureEvent;
+    if (!check(captureWorker.start(), "Capture worker start failed") ||
+        !check(waitForType(captureWorker,
+          genplusgx::EmulationEventType::workerStarted).has_value(),
+          "Capture worker start event was missing") ||
+        !check(submitAndSucceed(captureWorker,
+          genplusgx::EmulationCommand::load(22U, fixture.path()), captureEvent),
+          "Capture worker game load failed")) {
+      return 18;
+    }
+    capture->enabled.store(true, std::memory_order_release);
+    if (!check(submitAndSucceed(captureWorker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 23U), captureEvent),
+          "Capture frame advance failed") ||
+        !check(capture->calls.load(std::memory_order_acquire) == 1U &&
+          !capture->invalid.load(std::memory_order_acquire) &&
+          capture->width.load(std::memory_order_acquire) > 0U &&
+          capture->height.load(std::memory_order_acquire) > 0U &&
+          capture->audioFrameCount.load(std::memory_order_acquire) > 0U,
+          "Emulation-thread capture tap did not receive the native A/V frame")) {
+      return 19;
+    }
+    capture->enabled.store(false, std::memory_order_release);
+    if (!check(submitAndSucceed(captureWorker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 24U), captureEvent),
+          "Disabled capture frame advance failed") ||
+        !check(capture->calls.load(std::memory_order_acquire) == 1U,
+          "Disabled capture tap continued receiving frames") ||
+        !check(captureWorker.stop(), "Capture worker stop failed")) {
+      return 20;
+    }
+  }
+
   genplusgx::CoreAdapter leaseProbe;
   return check(leaseProbe.initialize(), "Worker destruction retained the global core lease") &&
       check(leaseProbe.shutdown(), "Core lease probe shutdown failed")
     ? 0
-    : 18;
+    : 21;
 }

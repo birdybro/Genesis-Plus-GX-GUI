@@ -56,6 +56,14 @@ enum class DiscUiOperation {
   setEjected,
 };
 
+enum class RecordingUiState {
+  unavailable,
+  idle,
+  starting,
+  recording,
+  stopping,
+};
+
 enum class EmulationUiOperation {
   pause,
   resume,
@@ -97,6 +105,8 @@ public:
     std::vector<std::uint16_t>)>;
   using ScreenshotSettingsSink = std::function<PersistenceStatus(
     const settings::ScreenshotSettings&)>;
+  using RecordingSink = std::function<bool(
+    bool start, const std::filesystem::path& directory)>;
   using CheatConfigurationSink = std::function<PersistenceStatus(
     const cheats::CheatConfiguration&)>;
   using PerGameSettingsSink = std::function<PersistenceStatus(
@@ -224,6 +234,13 @@ public:
   void setScreenshotBusy(bool busy);
   void showScreenshotSaved(const std::filesystem::path& path);
   void showScreenshotError(const std::string& detail);
+  void setRecordingSink(RecordingSink sink);
+  void setRecordingState(
+    RecordingUiState state,
+    std::filesystem::path path = {},
+    std::uint64_t writtenFrames = 0U,
+    std::uint64_t droppedFrames = 0U);
+  void showRecordingError(const std::string& detail);
   void setScreenshotSettings(
     settings::ScreenshotSettings settings,
     std::filesystem::path defaultDirectory);
@@ -327,6 +344,8 @@ private:
   void updateStateSlotPresentation();
   void requestScreenshot();
   void updateScreenshotAction();
+  void requestRecordingToggle(bool enabled);
+  void updateRecordingAction();
   void updateCheatAction();
   void updatePerGameSettingsAction();
   void presentGameLoadError(
@@ -374,6 +393,7 @@ private:
   GameLibraryActions gameLibraryActions_;
   ScreenshotSink screenshotSink_;
   ScreenshotSettingsSink screenshotSettingsSink_;
+  RecordingSink recordingSink_;
   CheatConfigurationSink cheatConfigurationSink_;
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
@@ -393,6 +413,7 @@ private:
   EmulationSpeedConfiguration speedSettings_;
   ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
+  std::filesystem::path recordingPath_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
@@ -428,6 +449,7 @@ private:
   bool gameInformationBusy_{false};
   bool gameLibraryAvailable_{true};
   bool screenshotBusy_{false};
+  RecordingUiState recordingState_{RecordingUiState::unavailable};
   bool cheatSessionReady_{false};
   bool perGameSettingsSessionReady_{false};
   bool applicationPathsAvailable_{false};

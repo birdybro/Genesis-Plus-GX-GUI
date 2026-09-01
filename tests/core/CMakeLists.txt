@@ -349,6 +349,25 @@ set_tests_properties(
   PROPERTIES LABELS "core;integration;fixture;concurrency;lifecycle;state;input" TIMEOUT 30
 )
 
+add_executable(genplusgx_recording_workflow_test recording_workflow_test.cpp)
+target_link_libraries(
+  genplusgx_recording_workflow_test
+  PRIVATE
+    GenesisPlusGX::Capture
+    GenesisPlusGX::CoreAdapter
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+    Qt6::Core
+    Qt6::Gui
+)
+add_test(NAME integration.recording COMMAND genplusgx_recording_workflow_test)
+set_tests_properties(
+  integration.recording
+  PROPERTIES
+    LABELS "core;integration;recording;video;audio;fixture;concurrency;lifecycle"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_timing_pacing_test timing_pacing_test.cpp)
 target_link_libraries(
   genplusgx_timing_pacing_test

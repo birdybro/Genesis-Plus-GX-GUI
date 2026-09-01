@@ -53,6 +53,8 @@ rewritten.
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
 - Ten metadata-wrapped save-state slots with names, native-frame thumbnails, a visual
   manager, validated import/export, and strict game/hardware identity checks
+- Bounded lossless A/V recording with native sequential PNG frame dumps, stereo PCM
+  WAV audio, explicit drop metrics, and atomic session finalization
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
@@ -143,6 +145,11 @@ effect, or **Load Libretro Preset…** for a user-provided modern Slang `.slangp
 See the [Libretro shader guide](docs/LIBRETRO_SHADERS.md) for compatibility and OpenGL
 requirements. No third-party shader pack is bundled or downloaded.
 
+Choose **File → Start Lossless A/V Recording…** (`Ctrl+Shift+F12`) to capture native
+frames and core audio into a self-contained `.gpgx-recording` directory. The writer is
+bounded and asynchronous, so storage cannot block the emulation thread. See the
+[recording guide](docs/RECORDING.md) for the PNG/WAV format and limits.
+
 For Sega CD, configure your own USA, Europe, and/or Japan firmware under
 **Tools → BIOS Settings** before opening a disc. Firmware is validated locally and is
 never downloaded by the application. See [BIOS.md](docs/BIOS.md).
@@ -165,6 +172,7 @@ config/       Versioned global and per-game settings
 saves/        Cartridge SRAM and Sega CD BRAM/RAM-cartridge data
 states/       Per-game save-state slots
 screenshots/  Native PNG captures, unless overridden
+recordings/   Default lossless A/V capture destination
 library/      SQLite game-library index and local metadata
 logs/         Rotating JSON Lines frontend logs
 ```
@@ -227,6 +235,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [User guide](docs/USER_GUIDE.md)
 - [Debug tools](docs/DEBUG_TOOLS.md)
 - [Libretro shaders](docs/LIBRETRO_SHADERS.md)
+- [Lossless recording](docs/RECORDING.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

@@ -83,6 +83,12 @@ int main()
   snapshot.rewindSnapshots = 12U;
   snapshot.rewindPayloadBytes = 12U * 1024U * 1024U;
   snapshot.rewindMemoryLimitBytes = 128U * 1024U * 1024U;
+  snapshot.recordingActive = true;
+  snapshot.recordingQueuedFrames = 2U;
+  snapshot.recordingQueueCapacity = 8U;
+  snapshot.recordingWrittenFrames = 144U;
+  snapshot.recordingDroppedFrames = 1U;
+  snapshot.recordingOutputBytes = 4'096U;
   snapshot.normalSpeedPercent = 125U;
   snapshot.slowMotionSpeedPercent = 50U;
   snapshot.fastForwardSpeedPercent = 800U;
@@ -101,6 +107,9 @@ int main()
                report.find("Sega CD USA: Valid") != std::string::npos &&
                report.find("Rewind: Enabled (active)") != std::string::npos &&
                report.find("Rewind snapshots: 12") != std::string::npos &&
+               report.find("Lossless recording: Active") != std::string::npos &&
+               report.find("Recording queue: 2 / 8") != std::string::npos &&
+               report.find("Recording frames: 144 written, 1 dropped") != std::string::npos &&
                report.find("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%") != std::string::npos &&
                report.find("Active speed: 50% (slow motion)") != std::string::npos &&
                report.find("/users/alex") == std::string::npos &&

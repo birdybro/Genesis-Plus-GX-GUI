@@ -111,6 +111,13 @@ std::optional<std::filesystem::path> DialogService::chooseStateExport(
   return std::nullopt;
 }
 
+std::optional<std::filesystem::path> DialogService::chooseRecordingDirectory(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
 std::optional<std::string> DialogService::chooseArchiveEntry(
   QWidget*,
   const std::filesystem::path&,
@@ -235,6 +242,20 @@ std::optional<std::filesystem::path> QtDialogService::chooseStateExport(
     selected += QStringLiteral(".gpgxstate");
   }
   return pathFromQString(selected);
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseRecordingDirectory(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getExistingDirectory(
+    parent,
+    QObject::tr("Choose Recording Directory"),
+    pathToQString(initialDirectory),
+    QFileDialog::ShowDirsOnly | QFileDialog::DontResolveSymlinks);
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
 }
 
 std::optional<std::string> QtDialogService::chooseArchiveEntry(

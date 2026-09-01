@@ -51,12 +51,13 @@ not leak into a running game.
 Duplicate physical bindings are rejected with an inline explanation. Unmodified keys
 reserved by the configured emulator hotkeys are also rejected, preventing a gameplay mapping from
 silently shadowing Pause, Fast Forward, Frame Advance, save/load, screenshot, mute, or
-volume shortcuts. Restore Defaults resets the selected profile; Cancel leaves the live
+recording/volume shortcuts. Restore Defaults resets the selected profile; Cancel leaves the live
 configuration unchanged; Apply and OK validate before publishing changes.
 
 The Hotkeys tab captures a single keyboard combination for Open/Close, library,
 pause/reset, fullscreen, separate fast-forward and slow-motion hold/toggle controls, frame advance,
 save-state operations and slots, screenshot, mute, and volume. Shortcuts must be unique.
+Lossless recording has its own start/stop binding in the same list.
 A shortcut that would consume a
 gameplay key in any stored profile is rejected, while Ctrl, Alt, and Command/Meta chords
 remain available because gameplay input deliberately ignores those modifiers. Apply or
@@ -70,8 +71,9 @@ state stays enabled until both the held key and the independent toggle latch are
 Schema-2 profiles keep their existing fast-forward binding as the toggle and receive a
 non-conflicting default hold binding during the schema-3 migration.
 Schema-4 profiles receive conflict-free `/` hold and `Ctrl+/` toggle bindings during
-the schema-5 slow-motion migration. Slow-motion holds use the same forced release on
-focus loss as fast forward and rewind.
+the schema-5 slow-motion migration. Schema-5 profiles receive `Ctrl+Shift+F12` (or the
+first conflict-free fallback) for recording during schema-6 migration. Slow-motion
+holds use the same forced release on focus loss as fast forward and rewind.
 
 The Advanced Devices tab configures the analog deadzone, the logical device selected
 for each of eight frontend players, and the emulated action produced by each left-stick

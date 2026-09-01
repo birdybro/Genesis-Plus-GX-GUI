@@ -77,6 +77,10 @@ int main()
       !check(hotkeyCombination(configuration, EmulatorHotkeyAction::rewindHold) ==
           QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined(),
         "Rewind hold hotkey default is incorrect") ||
+      !check(hotkeyCombination(configuration, EmulatorHotkeyAction::recording) ==
+          QKeyCombination{Qt::ControlModifier | Qt::ShiftModifier, Qt::Key_F12}
+            .toCombined(),
+        "Recording hotkey default is incorrect") ||
       !check(hotkeyCombination(
           configuration, EmulatorHotkeyAction::slowMotionHold) ==
           QKeyCombination{Qt::NoModifier, Qt::Key_Slash}.toCombined() &&
@@ -307,6 +311,32 @@ int main()
           EmulatorHotkeyAction::slowMotionToggle) ==
           QKeyCombination{Qt::ControlModifier, Qt::Key_Slash}.toCombined(),
         "Schema 4 did not add conflict-free slow-motion bindings")) {
+    return EXIT_FAILURE;
+  }
+
+  auto schemaFiveRoot = legacyRoot;
+  schemaFiveRoot.insert(QStringLiteral("schemaVersion"), 5);
+  auto schemaFiveHotkeys =
+    schemaFiveRoot.value(QStringLiteral("hotkeys")).toArray();
+  for (qsizetype index = schemaFiveHotkeys.size() - 1; index >= 0; --index) {
+    const auto action = schemaFiveHotkeys[index].toObject()
+      .value(QStringLiteral("action")).toString();
+    if (action == QStringLiteral("recording")) {
+      schemaFiveHotkeys.removeAt(index);
+    }
+  }
+  schemaFiveRoot.insert(QStringLiteral("hotkeys"), schemaFiveHotkeys);
+  if (!check(writeBytes(path, QJsonDocument{schemaFiveRoot}.toJson()),
+        "Could not create the schema-5 recording migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto schemaFive = store.load();
+  if (!check(schemaFive.status && schemaFive.migrated &&
+        hotkeyCombination(schemaFive.configuration,
+          EmulatorHotkeyAction::recording) ==
+          QKeyCombination{Qt::ControlModifier | Qt::ShiftModifier,
+            Qt::Key_F12}.toCombined(),
+        "Schema 5 did not add a conflict-free recording binding")) {
     return EXIT_FAILURE;
   }
 
