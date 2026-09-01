@@ -58,6 +58,8 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
     "${bundle}/Contents/Resources/licenses/librashader-MPL-2.0.md")
   set(portable_data_directory "${package_root}/portable-data")
   set(translation_directory "${bundle}/Contents/Resources/translations")
+  set(forbidden_translation_directory
+    "${bundle}/Contents/MacOS/translations")
 elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_file(
     "${package_root}/bin/genesis-plus-gx-gui"
@@ -115,6 +117,12 @@ endif()
 if(EXISTS "${portable_data_directory}")
   message(FATAL_ERROR
     "Package contains pre-created portable user data: ${portable_data_directory}")
+endif()
+if(DEFINED forbidden_translation_directory AND
+   EXISTS "${forbidden_translation_directory}")
+  message(FATAL_ERROR
+    "Package contains a duplicate executable-directory translation catalog: "
+    "${forbidden_translation_directory}")
 endif()
 
 require_file(

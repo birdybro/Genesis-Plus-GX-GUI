@@ -40,6 +40,22 @@ if(GENPLUSGX_BUILD_DESKTOP)
     PROPERTIES LABELS "unit;infrastructure;packaging"
   )
 
+  configure_file(
+    macos_translation_package_test.cmake.in
+    "${CMAKE_CURRENT_BINARY_DIR}/macos_translation_package_test.cmake"
+    @ONLY
+  )
+  add_test(
+    NAME infrastructure.macos_translation_package
+    COMMAND
+      "${CMAKE_COMMAND}"
+      -P "${CMAKE_CURRENT_BINARY_DIR}/macos_translation_package_test.cmake"
+  )
+  set_tests_properties(
+    infrastructure.macos_translation_package
+    PROPERTIES LABELS "unit;infrastructure;packaging;localization"
+  )
+
   add_test(
     NAME infrastructure.localization_cmake_compatibility
     COMMAND

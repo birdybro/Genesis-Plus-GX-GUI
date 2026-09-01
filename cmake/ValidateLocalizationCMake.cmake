@@ -21,6 +21,11 @@ if(NOT app_cmake MATCHES
   message(FATAL_ERROR
     "Qt 6.8 translation output must use the TS OUTPUT_LOCATION property")
 endif()
+if(NOT app_cmake MATCHES
+   "TARGET_BUNDLE_CONTENT_DIR:genplusgx_desktop>/Resources/translations")
+  message(FATAL_ERROR
+    "macOS build-tree catalogs must use the conventional bundle Resources path")
+endif()
 
 message(STATUS
   "Validated localization CMake against Qt ${MINIMUM_QT_VERSION} grammar")

@@ -68,13 +68,20 @@ qt_add_translations(
 set(GENPLUSGX_TRANSLATION_CATALOGS
   "${genplusgx_translation_catalogs}" PARENT_SCOPE)
 add_dependencies(genplusgx_desktop genplusgx_release_translations)
+if(APPLE)
+  set(genplusgx_build_translation_destination
+    "$<TARGET_BUNDLE_CONTENT_DIR:genplusgx_desktop>/Resources/translations")
+else()
+  set(genplusgx_build_translation_destination
+    "$<TARGET_FILE_DIR:genplusgx_desktop>/translations")
+endif()
 add_custom_command(
   TARGET genplusgx_desktop POST_BUILD
   COMMAND "${CMAKE_COMMAND}" -E make_directory
-    "$<TARGET_FILE_DIR:genplusgx_desktop>/translations"
+    "${genplusgx_build_translation_destination}"
   COMMAND "${CMAKE_COMMAND}" -E copy_if_different
     ${genplusgx_translation_catalogs}
-    "$<TARGET_FILE_DIR:genplusgx_desktop>/translations"
+    "${genplusgx_build_translation_destination}"
   VERBATIM
 )
 

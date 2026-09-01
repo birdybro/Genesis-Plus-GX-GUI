@@ -279,7 +279,7 @@ catalog-output grammar that the local Qt 6.11 parser would otherwise be unable t
 distinguish from a newer-only API.
 
 Warning-as-error Debug, optimized Release, ASan/UBSan, Clang 22, and CHD-disabled
-graphs pass 108/108; the shader-disabled graph passes all 106 applicable tests. The
+graphs pass 109/109; the shader-disabled graph passes all 107 applicable tests. The
 strict inherited libretro build/link/clean succeeds. A fresh staged Linux install and
 TGZ contain the compiled catalog and Localization guide, pass the production package
 verifier and checksum, exclude `portable-data`, resolve all 22 ELF files, and run the
@@ -298,6 +298,14 @@ the archive once. Fresh GCC Debug, Release, ASan/UBSan, and Clang 22 graphs pass
 and fresh staged/package verification passes; replacement exact hosted evidence is the
 remaining closure gate.
 
+Link-corrected run `33569528033` passed all ten jobs. Its complete 15,243-line log is
+free of compiler/linker warnings, sanitizer signatures, test failures, timeouts,
+unfinished messages, and the prior duplicate-library warning. The install trace also
+made a redundant macOS catalog visible in both `Contents/MacOS/translations` and the
+conventional `Contents/Resources/translations`. Build-tree placement now targets bundle
+Resources directly, and a new cross-host package fixture requires that canonical layout
+and rejects the obsolete duplicate; final exact CI and artifact evidence remain pending.
+
 Initial implementation run
 [`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)
 failed all nine CMake jobs at configure because the local Qt 6.11 build had accepted
@@ -315,12 +323,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 108/108 | Passed |
-| Release | Optimized native x86-64 | 108/108 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 108/108 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 106/106 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 108/108 | Passed |
-| Clang 22 | Warning-gated Debug | 108/108 | Passed; frontend warning-clean |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 109/109 | Passed |
+| Release | Optimized native x86-64 | 109/109 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 109/109 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 107/107 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 109/109 | Passed |
+| Clang 22 | Warning-gated Debug | 109/109 | Passed; frontend warning-clean |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -333,23 +341,23 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 108 distinct tests:
+The default shader-enabled build registers 109 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
-| Infrastructure | 10 |
+| Infrastructure | 11 |
 | Core | 20 |
 | Integration | 5 |
 | Unit | 43 |
 | GUI/smoke | 30 |
-| **Total** | **108** |
+| **Total** | **109** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 69 `unit`, 25 `core`, 44 `integration`, and 30 `gui`. Focused
+layers. Label counts are 70 `unit`, 25 `core`, 44 `integration`, and 30 `gui`. Focused
 coverage also includes persistence (33), fixtures (30), concurrency (19), settings
 (21), input (10), video (13), audio (9), timing (7), presentation (1), rewind (4),
 run-ahead (3), state (9), release (5), fuzz/property (4), shader (2), recording (2),
-packaging (4), portable mode (2), and localization (5).
+packaging (5), portable mode (2), and localization (6).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
