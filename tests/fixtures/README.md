@@ -198,6 +198,15 @@ and reads them back to verify conversion and collision behavior. The pixel patte
 original test data dedicated to CC0-1.0; no image fixture, game artwork, or golden binary
 is committed.
 
+`unit.artwork`, `gui.display_widget`, `gui.main_window`, and
+`gui.libretro_shader_render` generate small solid-color or asymmetric alpha PNG/JPEG
+images only in temporary directories. They verify bounded decoding, alpha rules,
+bezel/overlay order, opacity, explicit apertures, software/OpenGL composition, and
+upright top/bottom orientation. The optional external-ROM runner generates its own
+transparent magenta/cyan artwork in the caller-selected comparison directory. All
+patterns are original project test data dedicated to CC0-1.0; no game artwork, box art,
+or downloaded image is used or retained by required tests.
+
 `core.cheats` reuses the generated Genesis RAM marker ROM. It installs a word patch in
 unused generated ROM padding, verifies the changed host word, clears the patch, and
 verifies exact restoration. It also applies and clears a work-RAM patch at an address

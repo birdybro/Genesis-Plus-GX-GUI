@@ -90,6 +90,11 @@ struct DiagnosticsSnapshot final {
   std::string renderer;
   std::string presentationSync;
   std::string presentationBuffering;
+  std::string videoArtwork;
+  std::string videoArtworkFormat;
+  std::uintmax_t videoArtworkBytes{0U};
+  std::uint32_t videoArtworkWidth{0U};
+  std::uint32_t videoArtworkHeight{0U};
   std::string audioDevice;
   std::string loadedGame;
   std::string loadedSystem;

@@ -3,8 +3,8 @@
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
-cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, and display
-synchronization verification through 2026-09-01
+cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
+synchronization, and local bezel/overlay verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -36,6 +36,9 @@ synchronization verification through 2026-09-01
   `65d5f0ba7746e1515493c3f1f5cde20870df8fc9`
 - Exact display-synchronization implementation and hosted evidence baseline:
   `b84af114bef3b087978b0c269268ed1b59358213`
+- Local bezel/overlay implementation under test: the current commit containing this
+  report; use `git log -1 -- docs/FINAL_TEST_REPORT.md` until hosted closure records an
+  exact implementation SHA
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -156,12 +159,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 99/99 | Passed |
-| Release | Optimized native x86-64 | 99/99 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 99/99 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 97/97 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 99/99 | Passed |
-| Clang 22 | Warning-gated Debug | 99/99 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 100/100 | Passed |
+| Release | Optimized native x86-64 | 100/100 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 100/100 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 98/98 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 100/100 | Passed |
+| Clang 22 | Warning-gated Debug | 100/100 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -174,19 +177,19 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 99 distinct tests:
+The default shader-enabled build registers 100 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
 | Integration | 5 |
-| Unit | 40 |
+| Unit | 41 |
 | GUI/smoke | 26 |
-| **Total** | **99** |
+| **Total** | **100** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 63 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
+layers. Label counts are 64 `unit`, 25 `core`, 41 `integration`, and 26 `gui`. Focused
 coverage also includes persistence (33), fixtures (30), concurrency (19), settings
 (20), input (10), video (12), audio (9), timing (7), presentation (1), rewind (4),
 run-ahead (3), state (9), release (4), fuzz/property (4), shader (2), recording (2),
@@ -775,6 +778,28 @@ archive/DMG integrity and safe paths, application/runtime architectures, deploym
 legal resources, Linux dependency graphs and real downloaded-package OpenGL launch,
 DMG contents, and prohibited-payload scans pass.
 
+## Local bezel and overlay verification
+
+Milestone 88 adds local-only user-provided artwork in disabled, background-bezel, and
+alpha-foreground-overlay modes. Decoding is capped at 32 MiB, 4096×4096, and
+16,777,216 pixels; a converted RGBA image is cached per accepted configuration and
+uploaded only when its generation changes. Optional explicit percentage insets constrain
+only the presentation rectangle. No artwork path enters diagnostics, and artwork never
+changes core pixels, timing, state, or input snapshots.
+
+Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan, fresh Clang 22,
+and CHD-disabled graphs pass 100/100 tests; the shader-disabled graph passes 98/98.
+The required real OpenGL test executes 108 aspect × scale × filter × shader × artwork
+combinations and uses asymmetric top/bottom colors to reject hidden or vertically
+inverted composition. Offscreen tests sample real software-rendered pixels and cover
+quick actions, the settings editor, injected file selection, rejected transactions,
+schema-3 migration, sparse per-game persistence, diagnostics, alpha/format validation,
+fully opaque overlay rejection, bounded decode, and overflow-safe aperture math. A
+fresh staged Linux install and TGZ,
+package verifier, checksum, installed guide, and strict legacy libretro build/link/clean
+also pass. Exact hosted cross-platform logs and native artifacts remain the final gate
+before this milestone is marked complete.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -783,7 +808,8 @@ DMG contents, and prohibited-payload scans pass.
   interlace, Game Gear viewport, fullscreen, runtime FPS, native PNG screenshots,
   adjustable built-in CRT output, modern Libretro Slang preset chains, explicit
   off/on/adaptive synchronization, double/triple buffering, and bounded presentation
-  telemetry.
+  telemetry, plus local cached background bezels and alpha foreground overlays with
+  optional explicit apertures.
 - [x] Bounded stereo audio, core mixing options, device/latency selection, live
   transactional reconfiguration, instrumentation, pause, and disconnect recovery.
 - [x] Exact configurable normal, slow-motion, and fast-forward pacing; mutually
@@ -861,9 +887,10 @@ directories.
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
 - The previously supplied external-ROM mount was unmounted/empty during the
-  configurable-speed, soft-patch, enhanced save-state, and recording runs, so its speed
-  workflows, temporary header-only IPS case, optional real-game state browser smoke,
-  and optional real-game recording smoke were not executed locally. The required suites
+  configurable-speed, soft-patch, enhanced save-state, recording, and artwork runs, so
+  its speed workflows, temporary header-only IPS case, optional real-game state browser
+  and recording smokes, and 108-case real-game artwork matrix were not executed locally.
+  The required suites
   use legal generated 68000 and Z80 programs through the same production GUI/worker/core route;
   the earlier 113-case Phantasy Star IV option acceptance remains recorded above. No
   degraded RAID assembly or mount was attempted.

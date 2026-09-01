@@ -108,10 +108,11 @@ widget's built-in CRT output is non-black and differs from its unshaded baseline
 It also invokes and verifies the production pre-`QApplication` surface-format setup;
 this ordering is required for Qt to composite the accelerated child correctly on
 native Wayland.
-The widget portion uses an asymmetric quadrant frame and rejects a vertical or
-horizontal orientation change. It executes all 36 combinations of native/4:3/stretch,
-fit/integer, nearest/bilinear, and off/built-in/custom shader presentation, then checks
-both endpoints of all five bundled CRT parameters.
+The widget portion uses an asymmetric quadrant frame and asymmetric top/bottom local
+artwork, rejecting a vertical or horizontal orientation change. It executes all 108
+combinations of native/4:3/stretch, fit/integer, nearest/bilinear,
+off/built-in/custom shader, and off/bezel/overlay artwork presentation, then checks both
+endpoints of all five bundled CRT parameters.
 Windows and macOS run on their native Qt platforms and use skip code 77 only when the
 hosted environment provides no usable desktop OpenGL context.
 
@@ -120,7 +121,7 @@ hosted environment provides no usable desktop OpenGL context.
 `genplusgx_external_rom_acceptance_test` is built with shader-enabled desktop tests but
 is intentionally not registered as a required CTest: it requires a game legally
 provided by the developer. It loads the file through the real `CoreAdapter`, executes
-13 core-video, 35 core-audio, 12 emulated-device, 36 accelerated-presentation, and 17
+13 core-video, 35 core-audio, 12 emulated-device, 108 accelerated-presentation, and 17
 compatible system-reload cases, then reloads it through `EmulationWorker` at normal,
 slow-motion, and fast-forward rates. Every mode must publish a non-black frame; host
 audio must remain empty outside 100%. Shader images must be closer to the unshaded

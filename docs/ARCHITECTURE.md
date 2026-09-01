@@ -392,7 +392,9 @@ QOpenGLWidget texture upload
         |
 optional librashader Slang pass chain into bounded output texture
         |
-presentation pass + aspect/integer-scale viewport
+optional cached local bezel (before game) / alpha overlay (after game)
+        |
+presentation pass + aspect/integer-scale/explicit-aperture viewport
         |
 window / fullscreen / high-DPI surface
 ```
@@ -464,6 +466,22 @@ reported once and bypasses the chain while normal emulation/presentation continu
 The software renderer likewise reports that OpenGL 3.3 is required without hiding the
 application shell.
 
+Local artwork is a separate frontend-only composition layer. `ArtworkConfiguration`
+validates the off/bezel/overlay mode, 1–100% opacity, persisted path, and four bounded
+percentage insets. `ArtworkImage` rejects non-files, inputs over 32 MiB, dimensions over
+4096×4096 or 16,777,216 pixels, unsupported decoders, and opaque foreground images. The
+GUI thread decodes a successful file once to one RGBA cache; OpenGL uploads it only
+when its configuration generation changes, while the software painter reuses the same
+`QImage`. No artwork-sized allocation or file read occurs per emulated frame.
+
+Bezel mode draws the cache before the game; overlay mode alpha-composites it afterward.
+Both paths use the same upright texture convention. `calculateArtworkVideoLayout()`
+applies aspect and integer-scaling policy inside an optional explicitly configured
+aperture. Transparent pixels are never inspected to guess geometry, and input/core
+coordinates are never changed. A failed image transaction restores the prior settings;
+startup failure leaves ordinary unconstrained video active. Diagnostics expose mode,
+availability, format, dimensions, and bytes without exposing the local path.
+
 `calculateVideoLayout()` is Qt-independent policy for native pixels, forced 4:3, or
 stretch plus fit or integer scale. It validates all dimensions, centers contained output,
 uses exact native pixel multiples whenever at least 1x fits, and falls back to aspect-fit
@@ -482,9 +500,10 @@ settings-file concern crosses this boundary.
 Shader selection and parameter values are frontend-only members of `VideoSettings`.
 The schema-1 to schema-2 migration adds a disabled shader default; schema 3 adds
 synchronized double-buffer presentation defaults without altering prior video behavior.
-Sparse per-game Video overrides carry the same validated configuration and accept old
-files that predate the two presentation members.
-No shader concern enters `CoreAdapter` or modifies Genesis Plus GX output algorithms.
+Schema 4 adds disabled local artwork defaults. Sparse per-game Video overrides carry
+the same validated configuration and accept files that predate all three presentation
+extensions. Neither shaders nor artwork enter `CoreAdapter` or modify Genesis Plus GX
+output algorithms.
 
 The GUI changes its display policy immediately, then submits the typed core subset as a
 worker command. Pending video-settings commands coalesce because only the newest

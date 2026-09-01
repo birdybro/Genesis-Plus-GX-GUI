@@ -1,6 +1,8 @@
 add_library(genplusgx_video_exchange STATIC
+  include/genplusgx/video/artwork_configuration.h
   include/genplusgx/video/presentation.h
   include/genplusgx/video/shader_configuration.h
+  src/artwork_configuration.cpp
   src/presentation.cpp
   src/frame_exchange.cpp
   src/shader_configuration.cpp
@@ -20,8 +22,10 @@ target_link_libraries(
 )
 
 add_library(genplusgx_video_widget STATIC
+  include/genplusgx/video/artwork_image.h
   include/genplusgx/video/display_widget.h
   include/genplusgx/video/libretro_shader_runtime.h
+  src/artwork_image.cpp
   src/display_widget.cpp
   src/libretro_shader_runtime.cpp
 )

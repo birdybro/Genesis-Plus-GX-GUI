@@ -50,17 +50,20 @@ public:
   std::optional<std::filesystem::path> discSelection;
   std::optional<std::filesystem::path> directorySelection;
   std::optional<std::filesystem::path> shaderSelection;
+  std::optional<std::filesystem::path> videoArtworkSelection;
   std::optional<std::filesystem::path> stateImportSelection;
   std::optional<std::filesystem::path> stateExportSelection;
   std::optional<std::filesystem::path> recordingSelection;
   std::filesystem::path discInitialDirectory;
   std::filesystem::path directoryInitialDirectory;
   std::filesystem::path shaderInitialDirectory;
+  std::filesystem::path videoArtworkInitialDirectory;
   int chooseDiscCount{0};
   int chooseGameCount{0};
   int choosePatchCount{0};
   int chooseDirectoryCount{0};
   int chooseShaderCount{0};
+  int chooseVideoArtworkCount{0};
   int chooseStateImportCount{0};
   int chooseStateExportCount{0};
   int chooseRecordingCount{0};
@@ -101,6 +104,14 @@ public:
     ++chooseShaderCount;
     shaderInitialDirectory = initialDirectory;
     return shaderSelection;
+  }
+
+  std::optional<std::filesystem::path> chooseVideoArtwork(
+    QWidget*, const std::filesystem::path& initialDirectory) override
+  {
+    ++chooseVideoArtworkCount;
+    videoArtworkInitialDirectory = initialDirectory;
+    return videoArtworkSelection;
   }
 
   std::optional<std::filesystem::path> chooseStateImport(
@@ -146,6 +157,7 @@ private slots:
   void videoActionsDriveDisplayPolicy();
   void videoSettingsDialogAppliesCancelsAndRestores();
   void shaderMenuAndParameterWorkflow();
+  void artworkMenuAndSettingsWorkflow();
   void audioSettingsWorkflowAppliesCancelsAndRestores();
   void systemSettingsWorkflowIsValidatedAndDeferred();
   void biosSettingsValidatePersistAndCancel();
@@ -196,7 +208,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "fileMenu", "emulationMenu", "videoMenu", "audioMenu", "inputMenu",
     "toolsMenu", "helpMenu", "openRecentMenu", "stateSlotMenu", "videoScaleMenu",
     "aspectRatioMenu", "filteringMenu", "overscanMenu", "ntscFilterMenu",
-    "interlacedRenderMenu", "shaderMenu", "videoSynchronizationMenu",
+    "interlacedRenderMenu", "shaderMenu", "videoArtworkMenu",
+    "videoSynchronizationMenu",
     "emulationSpeedMenu"};
   for (const auto* name : menuNames) {
     QVERIFY2(window.findChild<QMenu*>(QString::fromLatin1(name)) != nullptr, name);
@@ -214,7 +227,9 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "presentationSyncOffAction", "presentationSyncOnAction",
     "presentationSyncAdaptiveAction", "doubleBufferAction",
     "tripleBufferAction",
-    "loadShaderPresetAction", "speedSettingsAction", "runAheadSettingsAction",
+    "loadShaderPresetAction", "artworkDisabledAction", "bezelArtworkAction",
+    "overlayArtworkAction", "chooseVideoArtworkAction",
+    "artworkSettingsAction", "speedSettingsAction", "runAheadSettingsAction",
     "emulationSpeed50Action",
     "emulationSpeed75Action", "emulationSpeed100Action",
     "emulationSpeed125Action", "emulationSpeed150Action",
@@ -733,6 +748,152 @@ void MainWindowTest::shaderMenuAndParameterWorkflow()
     genplusgx::video::ShaderMode::disabled);
   QVERIFY(off->isChecked());
   QVERIFY(!parameters->isEnabled());
+}
+
+void MainWindowTest::artworkMenuAndSettingsWorkflow()
+{
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const auto root = std::filesystem::path{directory.path().toStdString()};
+  const auto overlayPath = root / "test-overlay.png";
+  QImage overlay(64, 48, QImage::Format_ARGB32);
+  overlay.fill(QColor{20, 40, 80, 96});
+  QVERIFY(overlay.save(QString::fromStdString(overlayPath.string()), "PNG"));
+
+  genplusgx::ui::MainWindow window;
+  auto dialogs = std::make_shared<FakeDialogService>();
+  dialogs->videoArtworkSelection = overlayPath;
+  window.setDialogService(dialogs);
+  std::vector<genplusgx::settings::VideoSettings> updates;
+  window.setVideoSettingsSink([&updates](const auto& settings) {
+    updates.push_back(settings);
+    return genplusgx::PersistenceStatus{};
+  });
+
+  auto* off = window.findChild<QAction*>(
+    QStringLiteral("artworkDisabledAction"));
+  auto* bezel = window.findChild<QAction*>(
+    QStringLiteral("bezelArtworkAction"));
+  auto* foreground = window.findChild<QAction*>(
+    QStringLiteral("overlayArtworkAction"));
+  auto* choose = window.findChild<QAction*>(
+    QStringLiteral("chooseVideoArtworkAction"));
+  auto* settingsAction = window.findChild<QAction*>(
+    QStringLiteral("artworkSettingsAction"));
+  QVERIFY(off != nullptr && bezel != nullptr && foreground != nullptr &&
+    choose != nullptr && settingsAction != nullptr);
+  QVERIFY(off->isChecked());
+
+  bezel->trigger();
+  QCOMPARE(dialogs->chooseVideoArtworkCount, 1);
+  QCOMPARE(window.videoSettings().artwork.mode,
+    genplusgx::video::ArtworkMode::bezel);
+  QCOMPARE(window.videoSettings().artwork.imagePath, overlayPath);
+  QVERIFY(window.displayWidget()->artworkAvailable());
+  QVERIFY(bezel->isChecked());
+  QCOMPARE(updates.size(), std::size_t{1U});
+
+  foreground->trigger();
+  QCOMPARE(dialogs->chooseVideoArtworkCount, 1);
+  QCOMPARE(window.videoSettings().artwork.mode,
+    genplusgx::video::ArtworkMode::overlay);
+  QVERIFY(foreground->isChecked());
+  QCOMPARE(updates.size(), std::size_t{2U});
+
+  off->trigger();
+  QCOMPARE(window.videoSettings().artwork.mode,
+    genplusgx::video::ArtworkMode::disabled);
+  QVERIFY(off->isChecked());
+  QCOMPARE(updates.size(), std::size_t{3U});
+
+  choose->trigger();
+  QCOMPARE(dialogs->chooseVideoArtworkCount, 2);
+  QCOMPARE(dialogs->videoArtworkInitialDirectory, root);
+  QCOMPARE(window.videoSettings().artwork.mode,
+    genplusgx::video::ArtworkMode::bezel);
+
+  settingsAction->trigger();
+  QApplication::processEvents();
+  auto* dialog = window.findChild<genplusgx::ui::VideoSettingsDialog*>(
+    QStringLiteral("videoSettingsDialog"));
+  QVERIFY(dialog != nullptr);
+  auto* mode = dialog->findChild<QComboBox*>(
+    QStringLiteral("artworkModeCombo"));
+  auto* opacity = dialog->findChild<QSpinBox*>(
+    QStringLiteral("artworkOpacitySpinBox"));
+  auto* constrain = dialog->findChild<QCheckBox*>(
+    QStringLiteral("constrainArtworkViewportCheckBox"));
+  auto* left = dialog->findChild<QSpinBox*>(
+    QStringLiteral("artworkLeftInsetSpinBox"));
+  auto* top = dialog->findChild<QSpinBox*>(
+    QStringLiteral("artworkTopInsetSpinBox"));
+  auto* right = dialog->findChild<QSpinBox*>(
+    QStringLiteral("artworkRightInsetSpinBox"));
+  auto* bottom = dialog->findChild<QSpinBox*>(
+    QStringLiteral("artworkBottomInsetSpinBox"));
+  auto* browse = dialog->findChild<QPushButton*>(
+    QStringLiteral("chooseVideoArtworkButton"));
+  auto* validation = dialog->findChild<QLabel*>(
+    QStringLiteral("artworkValidationLabel"));
+  auto* apply = dialog->findChild<QPushButton*>(
+    QStringLiteral("applyVideoSettingsButton"));
+  QVERIFY(mode != nullptr && opacity != nullptr && constrain != nullptr &&
+    left != nullptr && top != nullptr && right != nullptr && bottom != nullptr &&
+    browse != nullptr && validation != nullptr && apply != nullptr);
+  QCOMPARE(mode->count(), 3);
+  QVERIFY(browse->isEnabled());
+  QVERIFY(validation->text().contains(QStringLiteral("cached")));
+  mode->setCurrentIndex(mode->findData(
+    static_cast<int>(genplusgx::video::ArtworkMode::disabled)));
+  QVERIFY(browse->isEnabled());
+  QVERIFY(validation->text().contains(QStringLiteral("Disabled")));
+  mode->setCurrentIndex(mode->findData(
+    static_cast<int>(genplusgx::video::ArtworkMode::overlay)));
+  opacity->setValue(43);
+  constrain->setChecked(true);
+  left->setValue(12);
+  top->setValue(8);
+  right->setValue(12);
+  bottom->setValue(8);
+  QTest::mouseClick(apply, Qt::LeftButton);
+  QCOMPARE(window.videoSettings().artwork.mode,
+    genplusgx::video::ArtworkMode::overlay);
+  QCOMPARE(window.videoSettings().artwork.opacityPercent, 43U);
+  QVERIFY(window.videoSettings().artwork.constrainVideoToViewport);
+  QCOMPARE(window.videoSettings().artwork.viewportInsets.leftPercent, 12U);
+  QCOMPARE(window.displayWidget()->artworkConfiguration(),
+    window.videoSettings().artwork);
+  dialog->close();
+
+  dialogs->videoArtworkSelection = root / "missing.png";
+  const auto acceptedSettings = window.videoSettings();
+  choose->trigger();
+  QApplication::processEvents();
+  QCOMPARE(window.videoSettings(), acceptedSettings);
+  QVERIFY(!dialogs->errors.empty());
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("Artwork Error")));
+
+  genplusgx::ui::MainWindow startupWindow;
+  auto startupDialogs = std::make_shared<FakeDialogService>();
+  startupWindow.setDialogService(startupDialogs);
+  auto unavailable = genplusgx::settings::defaultVideoSettings();
+  unavailable.artwork = {
+    .mode = genplusgx::video::ArtworkMode::bezel,
+    .imagePath = root / "not-mounted-at-startup.png",
+    .opacityPercent = 100U,
+    .constrainVideoToViewport = true,
+    .viewportInsets = {
+      .leftPercent = 10U,
+      .topPercent = 10U,
+      .rightPercent = 10U,
+      .bottomPercent = 10U,
+    },
+  };
+  startupWindow.setVideoSettings(unavailable);
+  QApplication::processEvents();
+  QCOMPARE(startupWindow.videoSettings(), unavailable);
+  QVERIFY(!startupWindow.displayWidget()->artworkAvailable());
+  QVERIFY(!startupDialogs->errors.empty());
 }
 
 void MainWindowTest::audioSettingsWorkflowAppliesCancelsAndRestores()

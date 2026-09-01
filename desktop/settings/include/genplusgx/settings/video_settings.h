@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_video_settings.h"
 #include "genplusgx/persistence.h"
+#include "genplusgx/video/artwork_configuration.h"
 #include "genplusgx/video/video_geometry.h"
 #include "genplusgx/video/presentation.h"
 #include "genplusgx/video/shader_configuration.h"
@@ -18,6 +19,7 @@ struct VideoSettings final {
   video::VideoFilter presentationFilter{video::VideoFilter::nearest};
   video::PresentationConfiguration presentation;
   video::ShaderConfiguration shader;
+  video::ArtworkConfiguration artwork;
   CoreVideoSettings core;
 
   [[nodiscard]] bool operator==(const VideoSettings&) const = default;
@@ -35,7 +37,7 @@ struct VideoSettingsLoadResult final {
 
 class VideoSettingsStore final {
 public:
-  static constexpr std::uint32_t schemaVersion = 3U;
+  static constexpr std::uint32_t schemaVersion = 4U;
   static constexpr std::size_t maximumFileBytes = 64U * 1024U;
 
   explicit VideoSettingsStore(std::filesystem::path path);

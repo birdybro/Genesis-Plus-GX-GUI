@@ -23,7 +23,7 @@ ctest --preset debug -L gui --output-on-failure
 | Run-ahead | Disabled defaults, schema/bounds/corruption, real-core state/video/audio/input equivalence, exact CPU/audio/pad/multitap transient rollback, 1–4-frame depth, recording isolation, fast/slow/rewind suspension, frame advance, Sega CD exclusion, stable allocation, settings transactions and menu gating | `unit.run_ahead_settings`, `integration.run_ahead`, `gui.run_ahead_settings`, `gui.main_window`, `unit.diagnostics`, `gui.diagnostics` |
 | Save states | Slots 0–9, schema-1 compatibility, schema-2 names/PNG previews, visual browser, save/load/delete/rename, validated import/export, timestamps/frame/size details, malformed presentation rejection, changed execution, deterministic restore, wrong-game rejection, cancellable identity activation | `unit.state_manager`, `unit.state_storage_service`, `gui.save_state_workflow`, `gui.main_window` |
 | Session resume | Opt-in/defaults, schema migration, absolute Unicode game/patch persistence, invalid-data rejection, dedicated state save/load/delete, multi-process checkpoint creation/restore, explicit command-line game/patch precedence, patched-content identity, and corruption fallback | `unit.session_settings`, `unit.state_manager`, `unit.state_storage_service`, `gui.session_settings`, `gui.session_resume_application` |
-| Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, off/on/adaptive synchronization, double/triple buffering, one-frame pending bound and cadence/drop telemetry, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, built-in/custom Libretro shader selection and parameters, real OpenGL pass-through input sampling, actual CRT widget output, Apply/Cancel/defaults | `unit.presentation`, `unit.shader_configuration`, `gui.main_window`, `gui.display_widget`, `gui.libretro_shader_render` |
+| Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, off/on/adaptive synchronization, double/triple buffering, one-frame pending bound and cadence/drop telemetry, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, built-in/custom Libretro shaders, bounded local bezel/alpha-overlay decoding, opacity and explicit apertures, real OpenGL pass-through/composition, Apply/Cancel/defaults | `unit.presentation`, `unit.shader_configuration`, `unit.artwork`, `gui.main_window`, `gui.display_widget`, `gui.libretro_shader_render` |
 | Audio | Mute/volume/core controls, live latency/device changes without ring replacement, transactional failure, stopped-output retry, concurrent logical-capacity changes, bounded hot-plug refresh/recovery, Apply/Cancel/defaults | `unit.audio_ring_buffer`, `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
 | Controller/input UI | Gameplay/hotkey capture, separate fast-forward and slow-motion hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
@@ -61,8 +61,9 @@ GUI tests assert semantics and state transitions across platforms.
 path. Linux CI runs it under Xvfb with GLX and requires a real OpenGL 3.3 context. It
 executes an original one-pass fixture through librashader, reads RGB output, then enables
 the bundled CRT preset on the actual `DisplayWidget` and requires a non-black, upright
-image that materially differs from the baseline. Its 36-case presentation matrix covers
-every aspect, scaling, texture-filter, and shader mode, followed by minimum/maximum
+image that materially differs from the baseline. Its 108-case presentation matrix covers
+every aspect, scaling, texture-filter, shader, and artwork mode with asymmetric overlay
+orientation checks, followed by minimum/maximum
 coverage for all five CRT parameters. It then rebuilds the live widget across all six
 sync/buffering requests, verifies effective state is observable, and recaptures an
 upright nonblack framebuffer after each rebuild. Windows and macOS use their native Qt platform;
@@ -74,7 +75,7 @@ enumeration/range-endpoint choices, all 12 exposed emulated input devices, and a
 system enumeration/toggle values. The generated 8-bit fixtures additionally execute
 every compatible hardware override and both Game Gear viewport modes. GUI inventory
 assertions require the corresponding combo counts/ranges plus all 33 emulator hotkeys.
-The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 113
+The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 185
 option cases plus three speed-mode workflows on a user-owned game and emits local
 comparison images. It additionally exercises all four run-ahead depths through the real
 worker/core path.

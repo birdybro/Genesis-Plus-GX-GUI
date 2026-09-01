@@ -87,6 +87,19 @@ QString shaderName(video::ShaderMode mode)
   return QObject::tr("Unknown");
 }
 
+QString artworkName(video::ArtworkMode mode)
+{
+  switch (mode) {
+    case video::ArtworkMode::disabled:
+      return QObject::tr("Off");
+    case video::ArtworkMode::bezel:
+      return QObject::tr("Local bezel");
+    case video::ArtworkMode::overlay:
+      return QObject::tr("Local overlay");
+  }
+  return QObject::tr("Unknown");
+}
+
 QString hardwareName(CoreSystemHardware hardware)
 {
   switch (hardware) {
@@ -330,11 +343,12 @@ void SettingsDialog::refresh()
         overview_.appearance.developerToolsEnabled ? tr("enabled") : tr("hidden"),
         overview_.session.resumeOnLaunch ? tr("enabled") : tr("disabled")));
   videoSummary_->setText(
-    tr("Aspect: %1\nScaling: %2\nTexture filter: %3\nShader: %4")
+    tr("Aspect: %1\nScaling: %2\nTexture filter: %3\nShader: %4\nArtwork: %5")
       .arg(aspectName(overview_.video.aspect),
         scalingName(overview_.video.scaling),
         filterName(overview_.video.presentationFilter),
-        shaderName(overview_.video.shader.mode)));
+        shaderName(overview_.video.shader.mode),
+        artworkName(overview_.video.artwork.mode)));
   audioSummary_->setText(
     tr("Playback device: %1\nLatency: %2 ms\nVolume: %3%4")
       .arg(overview_.audio.outputDeviceName.empty()

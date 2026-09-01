@@ -7,6 +7,7 @@
 #include <QString>
 
 #include <optional>
+#include <cmath>
 #include <initializer_list>
 #include <string_view>
 #include <utility>
@@ -104,6 +105,16 @@ QString shaderModeName(video::ShaderMode mode)
   return {};
 }
 
+QString artworkModeName(video::ArtworkMode mode)
+{
+  switch (mode) {
+    case video::ArtworkMode::disabled: return QStringLiteral("disabled");
+    case video::ArtworkMode::bezel: return QStringLiteral("bezel");
+    case video::ArtworkMode::overlay: return QStringLiteral("overlay");
+  }
+  return {};
+}
+
 QString fromPath(const std::filesystem::path& path)
 {
 #ifdef _WIN32
@@ -168,6 +179,57 @@ std::optional<video::ShaderConfiguration> readShader(
   return shader;
 }
 
+std::optional<video::ArtworkConfiguration> readArtwork(
+  const QJsonObject& videoObject)
+{
+  const auto member = videoObject.value(QStringLiteral("artwork"));
+  if (!member.isObject()) {
+    return std::nullopt;
+  }
+  const auto object = member.toObject();
+  const auto mode = enumFromString<video::ArtworkMode>(object,
+    QStringLiteral("mode"), {{"disabled", video::ArtworkMode::disabled},
+      {"bezel", video::ArtworkMode::bezel},
+      {"overlay", video::ArtworkMode::overlay}});
+  const auto path = object.value(QStringLiteral("imagePath"));
+  const auto opacity = object.value(QStringLiteral("opacityPercent"));
+  const auto constrain = object.value(QStringLiteral("constrainVideoToViewport"));
+  const auto insetsMember = object.value(QStringLiteral("viewportInsets"));
+  if (!mode || !path.isString() || !opacity.isDouble() ||
+      !constrain.isBool() || !insetsMember.isObject()) {
+    return std::nullopt;
+  }
+  const auto insets = insetsMember.toObject();
+  const auto left = insets.value(QStringLiteral("leftPercent"));
+  const auto top = insets.value(QStringLiteral("topPercent"));
+  const auto right = insets.value(QStringLiteral("rightPercent"));
+  const auto bottom = insets.value(QStringLiteral("bottomPercent"));
+  const auto integralPercent = [](const QJsonValue& value) {
+    return value.isDouble() && value.toDouble() >= 0.0 &&
+      value.toDouble() <= 255.0 &&
+      std::floor(value.toDouble()) == value.toDouble();
+  };
+  if (!integralPercent(opacity) || !integralPercent(left) ||
+      !integralPercent(top) || !integralPercent(right) ||
+      !integralPercent(bottom)) {
+    return std::nullopt;
+  }
+  video::ArtworkConfiguration artwork{
+    .mode = *mode,
+    .imagePath = toPath(path.toString()),
+    .opacityPercent = static_cast<std::uint8_t>(opacity.toInt()),
+    .constrainVideoToViewport = constrain.toBool(),
+    .viewportInsets = {
+      .leftPercent = static_cast<std::uint8_t>(left.toInt()),
+      .topPercent = static_cast<std::uint8_t>(top.toInt()),
+      .rightPercent = static_cast<std::uint8_t>(right.toInt()),
+      .bottomPercent = static_cast<std::uint8_t>(bottom.toInt()),
+    },
+  };
+  return video::validateArtworkConfiguration(artwork)
+    ? std::optional{artwork} : std::nullopt;
+}
+
 QString overscanName(CoreOverscanMode mode)
 {
   switch (mode) {
@@ -214,7 +276,8 @@ VideoSettingsLoadResult invalidResult(std::string message)
 std::optional<VideoSettings> readCurrent(
   const QJsonObject& videoObject,
   bool hasShader,
-  bool hasPresentation)
+  bool hasPresentation,
+  bool hasArtwork)
 {
   const auto aspect = enumFromString<video::AspectMode>(videoObject,
     QStringLiteral("aspect"), {{"native", video::AspectMode::native},
@@ -255,6 +318,13 @@ std::optional<VideoSettings> readCurrent(
   if (!shader) {
     return std::nullopt;
   }
+  const auto artwork = hasArtwork
+    ? readArtwork(videoObject)
+    : std::optional<video::ArtworkConfiguration>{
+        video::ArtworkConfiguration{}};
+  if (!artwork) {
+    return std::nullopt;
+  }
   auto presentationConfiguration = video::PresentationConfiguration{};
   if (hasPresentation) {
     const auto sync = enumFromString<video::PresentationSyncMode>(videoObject,
@@ -281,6 +351,7 @@ std::optional<VideoSettings> readCurrent(
     .presentationFilter = *presentation,
     .presentation = presentationConfiguration,
     .shader = *shader,
+    .artwork = *artwork,
     .core = {
       .overscan = *overscan,
       .ntscFilter = *ntsc,
@@ -317,6 +388,7 @@ std::optional<VideoSettings> readLegacy(const QJsonObject& root)
                                             : video::VideoFilter::nearest,
     .presentation = {},
     .shader = {},
+    .artwork = {},
     .core = {
       .overscan = static_cast<CoreOverscanMode>(overscanValue),
       .ntscFilter = ntscComposite.toBool() ? CoreNtscFilter::composite
@@ -346,6 +418,7 @@ bool validateVideoSettings(const VideoSettings& settings) noexcept
       static_cast<unsigned>(video::VideoFilter::bilinear) &&
     video::validatePresentationConfiguration(settings.presentation) &&
     video::validateShaderConfiguration(settings.shader) &&
+    video::validateArtworkConfiguration(settings.artwork) &&
     validateCoreVideoSettings(settings.core);
 }
 
@@ -390,6 +463,7 @@ VideoSettingsLoadResult VideoSettingsStore::load() const
   }
   const auto schemaVersionValue = schema.toInt(-1);
   if (schemaVersionValue != 1 && schemaVersionValue != 2 &&
+      schemaVersionValue != 3 &&
       schemaVersionValue != static_cast<int>(schemaVersion)) {
     return invalidResult("The video settings schema version is not supported.");
   }
@@ -397,7 +471,8 @@ VideoSettingsLoadResult VideoSettingsStore::load() const
   const auto settings = videoObject.isObject()
     ? readCurrent(videoObject.toObject(),
         schemaVersionValue >= 2,
-        schemaVersionValue == static_cast<int>(schemaVersion))
+        schemaVersionValue >= 3,
+        schemaVersionValue >= 4)
     : std::nullopt;
   if (!settings || !validateVideoSettings(*settings)) {
     return invalidResult("The video settings values are invalid.");
@@ -423,6 +498,25 @@ PersistenceStatus VideoSettingsStore::save(const VideoSettings& settings) const
     {QStringLiteral("presetPath"), fromPath(settings.shader.presetPath)},
     {QStringLiteral("parameters"), shaderParameters},
   };
+  const QJsonObject artworkInsets{
+    {QStringLiteral("leftPercent"),
+      static_cast<int>(settings.artwork.viewportInsets.leftPercent)},
+    {QStringLiteral("topPercent"),
+      static_cast<int>(settings.artwork.viewportInsets.topPercent)},
+    {QStringLiteral("rightPercent"),
+      static_cast<int>(settings.artwork.viewportInsets.rightPercent)},
+    {QStringLiteral("bottomPercent"),
+      static_cast<int>(settings.artwork.viewportInsets.bottomPercent)},
+  };
+  const QJsonObject artworkObject{
+    {QStringLiteral("mode"), artworkModeName(settings.artwork.mode)},
+    {QStringLiteral("imagePath"), fromPath(settings.artwork.imagePath)},
+    {QStringLiteral("opacityPercent"),
+      static_cast<int>(settings.artwork.opacityPercent)},
+    {QStringLiteral("constrainVideoToViewport"),
+      settings.artwork.constrainVideoToViewport},
+    {QStringLiteral("viewportInsets"), artworkInsets},
+  };
   const QJsonObject videoObject{
     {QStringLiteral("aspect"), aspectName(settings.aspect)},
     {QStringLiteral("scaling"), scalingName(settings.scaling)},
@@ -433,6 +527,7 @@ PersistenceStatus VideoSettingsStore::save(const VideoSettings& settings) const
     {QStringLiteral("presentationBuffering"),
       presentationBufferingName(settings.presentation.buffering)},
     {QStringLiteral("shader"), shaderObject},
+    {QStringLiteral("artwork"), artworkObject},
     {QStringLiteral("overscan"), overscanName(settings.core.overscan)},
     {QStringLiteral("ntscFilter"), ntscName(settings.core.ntscFilter)},
     {QStringLiteral("gameGearExtendedScreen"),

@@ -23,6 +23,7 @@ set(required_documents
   docs/KEYBOARD_SHORTCUTS.md
   docs/INPUT_CONFIGURATION.md
   docs/LIBRETRO_SHADERS.md
+  docs/ARTWORK_OVERLAYS.md
   docs/DISPLAY_SYNCHRONIZATION.md
   docs/RECORDING.md
   docs/RUN_AHEAD.md

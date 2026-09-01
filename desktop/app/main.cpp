@@ -1681,6 +1681,22 @@ int main(int argc, char* argv[])
       snapshot.presentationSync = presentationSyncDescription(presentation);
       snapshot.presentationBuffering =
         presentationBufferingDescription(presentation);
+      const auto artworkMode =
+        window.videoSettings().artwork.mode;
+      snapshot.videoArtwork = artworkMode == genplusgx::video::ArtworkMode::bezel
+        ? (window.displayWidget()->artworkAvailable()
+            ? "Bezel active" : "Bezel unavailable")
+        : artworkMode == genplusgx::video::ArtworkMode::overlay
+          ? (window.displayWidget()->artworkAvailable()
+              ? "Overlay active" : "Overlay unavailable")
+          : "Disabled";
+      snapshot.videoArtworkFormat =
+        window.displayWidget()->artworkFormat().empty()
+          ? "None" : window.displayWidget()->artworkFormat();
+      snapshot.videoArtworkBytes =
+        window.displayWidget()->artworkFileBytes();
+      snapshot.videoArtworkWidth = window.displayWidget()->artworkWidth();
+      snapshot.videoArtworkHeight = window.displayWidget()->artworkHeight();
       snapshot.videoPublishedFrames = presentation.exchange.publishedFrames;
       snapshot.videoCopiedFrames = presentation.exchange.copiedFrames;
       snapshot.videoSkippedFrames = presentation.exchange.skippedFrames;

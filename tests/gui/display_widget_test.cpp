@@ -5,9 +5,12 @@
 #include <QImage>
 #include <QLabel>
 #include <QTest>
+#include <QTemporaryDir>
 
 #include <algorithm>
+#include <filesystem>
 #include <memory>
+#include <string>
 
 namespace {
 
@@ -20,6 +23,8 @@ private slots:
 
 void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
 {
+  QTemporaryDir artworkDirectory;
+  QVERIFY(artworkDirectory.isValid());
   auto exchange = std::make_shared<genplusgx::VideoFrameExchange>(8U);
   genplusgx::video::DisplayWidget widget;
   widget.setFrameExchange(exchange);
@@ -88,6 +93,85 @@ void DisplayWidgetTest::presentsNewestFrameAndResizesStably()
   QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::bilinear);
   widget.setVideoFilter(genplusgx::video::VideoFilter::nearest);
   QCOMPARE(widget.videoFilter(), genplusgx::video::VideoFilter::nearest);
+
+  const auto artworkRoot = std::filesystem::path{
+    artworkDirectory.path().toStdString()};
+  const auto artworkPath = artworkRoot / "bezel.png";
+  QImage bezel(400, 300, QImage::Format_ARGB32);
+  bezel.fill(QColor{0, 0, 255, 255});
+  QVERIFY(bezel.save(QString::fromStdString(artworkPath.string()), "PNG"));
+  QVERIFY(widget.setArtworkConfiguration({
+    .mode = genplusgx::video::ArtworkMode::bezel,
+    .imagePath = artworkPath,
+    .opacityPercent = 100U,
+    .constrainVideoToViewport = true,
+    .viewportInsets = {
+      .leftPercent = 25U,
+      .topPercent = 10U,
+      .rightPercent = 25U,
+      .bottomPercent = 10U,
+    },
+  }));
+  QVERIFY(widget.artworkAvailable());
+  QCOMPARE(widget.artworkFormat(), std::string{"png"});
+  QCOMPARE(widget.artworkWidth(), 400U);
+  QCOMPARE(widget.artworkHeight(), 300U);
+  QVERIFY(widget.artworkFileBytes() > 0U);
+  QApplication::processEvents();
+  rendered = QImage(widget.size(), QImage::Format_ARGB32);
+  rendered.fill(Qt::magenta);
+  widget.render(&rendered);
+  const auto bezelLayout = widget.currentLayout();
+  QVERIFY(bezelLayout.valid());
+  QVERIFY(bezelLayout.x >= 100);
+  QCOMPARE(rendered.pixelColor(10, 10), QColor(Qt::blue));
+  QVERIFY(rendered.pixelColor(
+    bezelLayout.x + bezelLayout.width / 4,
+    bezelLayout.y + bezelLayout.height / 2).red() > 200);
+  QVERIFY(rendered.pixelColor(
+    bezelLayout.x + (bezelLayout.width * 3) / 4,
+    bezelLayout.y + bezelLayout.height / 2).green() > 200);
+
+  const auto overlayPath = artworkRoot / "overlay.png";
+  QImage overlay(400, 300, QImage::Format_ARGB32);
+  overlay.fill(Qt::transparent);
+  for (int y = 0; y < 40; ++y) {
+    for (int x = 0; x < overlay.width(); ++x) {
+      overlay.setPixelColor(x, y, QColor{255, 255, 0, 255});
+    }
+  }
+  QVERIFY(overlay.save(QString::fromStdString(overlayPath.string()), "PNG"));
+  QVERIFY(widget.setArtworkConfiguration({
+    .mode = genplusgx::video::ArtworkMode::overlay,
+    .imagePath = overlayPath,
+    .opacityPercent = 100U,
+    .constrainVideoToViewport = false,
+    .viewportInsets = {},
+  }));
+  QApplication::processEvents();
+  rendered.fill(Qt::magenta);
+  widget.render(&rendered);
+  QCOMPARE(rendered.pixelColor(200, 10), QColor(Qt::yellow));
+  const auto overlayLayout = widget.currentLayout();
+  QVERIFY(rendered.pixelColor(
+    overlayLayout.x + overlayLayout.width / 4,
+    overlayLayout.y + (overlayLayout.height * 3) / 4).red() > 200);
+
+  std::string artworkFailure;
+  widget.setArtworkFailureSink([&artworkFailure](std::string detail) {
+    artworkFailure = std::move(detail);
+  });
+  QVERIFY(!widget.setArtworkConfiguration({
+    .mode = genplusgx::video::ArtworkMode::bezel,
+    .imagePath = artworkRoot / "missing.png",
+    .opacityPercent = 100U,
+    .constrainVideoToViewport = false,
+    .viewportInsets = {},
+  }));
+  QApplication::processEvents();
+  QVERIFY(!artworkFailure.empty());
+  QVERIFY(!widget.artworkAvailable());
+  QVERIFY(widget.setArtworkConfiguration({}));
   QCOMPARE(widget.sourceFramesPerSecond(), 60.0);
   QCOMPARE(widget.presentationConfiguration(),
     genplusgx::video::PresentationConfiguration{});

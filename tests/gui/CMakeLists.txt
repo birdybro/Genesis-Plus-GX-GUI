@@ -416,7 +416,7 @@ target_link_libraries(
 add_test(NAME gui.display_widget COMMAND genplusgx_display_widget_test)
 set_tests_properties(
   gui.display_widget
-  PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" LABELS "gui;integration;video"
+  PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen" LABELS "gui;integration;video;artwork"
 )
 
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
@@ -478,7 +478,7 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     gui.libretro_shader_render
     PROPERTIES
       SKIP_RETURN_CODE 77
-      LABELS "gui;integration;video;shader;opengl"
+      LABELS "gui;integration;video;shader;artwork;opengl"
       TIMEOUT 30
   )
   if(WIN32)

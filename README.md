@@ -45,6 +45,8 @@ rewritten.
   software fallback
 - Built-in adjustable CRT presentation plus modern Libretro `.slangp` shader presets,
   including multi-pass pipelines, lookup textures, history, and runtime parameters
+- Local-only bezel and alpha-overlay composition with opacity, explicit game-aperture
+  insets, bounded cached decoding, global/per-game settings, and no artwork scraping
 - SDL3 stereo audio with live output-device/latency changes, plus hot-pluggable
   controller profiles, deadzones, assignments, capture-based remapping, and specialized
   Genesis Plus GX device choices
@@ -148,6 +150,11 @@ effect, or **Load Libretro Preset…** for a user-provided modern Slang `.slangp
 See the [Libretro shader guide](docs/LIBRETRO_SHADERS.md) for compatibility and OpenGL
 requirements. No third-party shader pack is bundled or downloaded.
 
+Choose **Video → Artwork** for a local bezel behind the game or a transparent PNG
+overlay in front. Optional percentage insets define a game aperture explicitly;
+artwork never changes core pixels or input geometry. See the
+[local artwork guide](docs/ARTWORK_OVERLAYS.md).
+
 Choose **File → Start Lossless A/V Recording…** (`Ctrl+Shift+F12`) to capture native
 frames and core audio into a self-contained `.gpgx-recording` directory. The writer is
 bounded and asynchronous, so storage cannot block the emulation thread. See the
@@ -244,6 +251,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [User guide](docs/USER_GUIDE.md)
 - [Debug tools](docs/DEBUG_TOOLS.md)
 - [Libretro shaders](docs/LIBRETRO_SHADERS.md)
+- [Local bezels and overlays](docs/ARTWORK_OVERLAYS.md)
 - [Display synchronization](docs/DISPLAY_SYNCHRONIZATION.md)
 - [Lossless recording](docs/RECORDING.md)
 - [Run-ahead](docs/RUN_AHEAD.md)

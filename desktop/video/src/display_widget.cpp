@@ -94,6 +94,9 @@ public:
       if (texture_ != 0U) {
         glDeleteTextures(1, &texture_);
       }
+      if (artworkTexture_ != 0U) {
+        glDeleteTextures(1, &artworkTexture_);
+      }
       shaderRuntime_.reset();
       if (shaderOutputTexture_ != 0U) {
         glDeleteTextures(1, &shaderOutputTexture_);
@@ -123,13 +126,13 @@ protected:
         "void main(){ textureCoordinate=textureInput; gl_Position=vec4(position,0.0,1.0); }";
     const char* fragmentSource = modernShader
       ? "#version 150\n"
-        "uniform sampler2D frameTexture;"
+        "uniform sampler2D frameTexture; uniform float opacity;"
         "in vec2 textureCoordinate; out vec4 outputColor;"
-        "void main(){ outputColor=texture(frameTexture,textureCoordinate); }"
+        "void main(){ vec4 color=texture(frameTexture,textureCoordinate); outputColor=vec4(color.rgb,color.a*opacity); }"
       : "#ifdef GL_ES\nprecision mediump float;\n#endif\n"
-        "uniform sampler2D frameTexture;"
+        "uniform sampler2D frameTexture; uniform float opacity;"
         "varying vec2 textureCoordinate;"
-        "void main(){ gl_FragColor=texture2D(frameTexture,textureCoordinate); }";
+        "void main(){ vec4 color=texture2D(frameTexture,textureCoordinate); gl_FragColor=vec4(color.rgb,color.a*opacity); }";
 
     if (!program_.addShaderFromSourceCode(QOpenGLShader::Vertex, vertexSource) ||
         !program_.addShaderFromSourceCode(QOpenGLShader::Fragment, fragmentSource) ||
@@ -168,13 +171,16 @@ protected:
     program_.setAttributeBuffer(
       textureInput, GL_FLOAT, 2 * sizeof(float), 2, 4 * sizeof(float));
     program_.setUniformValue("frameTexture", 0);
+    program_.setUniformValue("opacity", 1.0F);
     program_.release();
     vertexBuffer_.release();
     vertexArray_.release();
 
     glGenTextures(1, &texture_);
+    glGenTextures(1, &artworkTexture_);
     glGenTextures(1, &shaderOutputTexture_);
-    initialized_ = texture_ != 0U && shaderOutputTexture_ != 0U;
+    initialized_ = texture_ != 0U && artworkTexture_ != 0U &&
+      shaderOutputTexture_ != 0U;
     if (!initialized_) {
       owner_.scheduleSoftwareFallback(this);
     } else {
@@ -205,6 +211,15 @@ protected:
     glClear(GL_COLOR_BUFFER_BIT);
     if (!initialized_) {
       return;
+    }
+
+    uploadArtworkIfNeeded();
+    if (owner_.artworkConfiguration_.mode == ArtworkMode::bezel &&
+        !owner_.artworkImage_.isNull()) {
+      drawTexture(artworkTexture_, 0, 0, width(), height(),
+        static_cast<float>(owner_.artworkConfiguration_.opacityPercent) /
+          100.0F,
+        true, GL_LINEAR);
     }
     if (!owner_.hasFrame_) {
       QPainter painter(this);
@@ -304,18 +319,84 @@ protected:
       failedShaderGeneration_ = std::numeric_limits<std::uint64_t>::max();
     }
 
-    vertexArray_.bind();
-    program_.bind();
-    program_.setUniformValue("frameTexture", 0);
-    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    program_.release();
-    vertexArray_.release();
-    glBindTexture(GL_TEXTURE_2D, 0);
+    drawTexture(presentationTexture, layout.x, layout.y,
+      layout.width, layout.height, 1.0F, false,
+      owner_.shaderConfiguration_.mode != ShaderMode::disabled
+        ? GL_LINEAR : filter);
+    if (owner_.artworkConfiguration_.mode == ArtworkMode::overlay &&
+        !owner_.artworkImage_.isNull()) {
+      drawTexture(artworkTexture_, 0, 0, width(), height(),
+        static_cast<float>(owner_.artworkConfiguration_.opacityPercent) /
+          100.0F,
+        true, GL_LINEAR);
+    }
     submittedGeneration_ = owner_.generation_;
     owner_.noteFrameRendered(submittedGeneration_);
   }
 
 private:
+  void drawTexture(GLuint texture, int x, int y, int targetWidth,
+    int targetHeight, float opacity, bool blend, GLint filter)
+  {
+    const auto ratio = devicePixelRatioF();
+    glBindFramebuffer(GL_FRAMEBUFFER, defaultFramebufferObject());
+    glViewport(
+      static_cast<GLint>(std::lround(x * ratio)),
+      static_cast<GLint>(std::lround(
+        (height() - y - targetHeight) * ratio)),
+      static_cast<GLsizei>(std::lround(targetWidth * ratio)),
+      static_cast<GLsizei>(std::lround(targetHeight * ratio)));
+    if (blend) {
+      glEnable(GL_BLEND);
+      glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    } else {
+      glDisable(GL_BLEND);
+    }
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_SCISSOR_TEST);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    glDepthMask(GL_FALSE);
+    glActiveTexture(GL_TEXTURE0);
+    context()->extraFunctions()->glBindSampler(0U, 0U);
+    glBindTexture(GL_TEXTURE_2D, texture);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, filter);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    vertexArray_.bind();
+    program_.bind();
+    program_.setUniformValue("frameTexture", 0);
+    program_.setUniformValue("opacity", opacity);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    program_.release();
+    vertexArray_.release();
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glDisable(GL_BLEND);
+  }
+
+  void uploadArtworkIfNeeded()
+  {
+    if (uploadedArtworkGeneration_ ==
+        owner_.artworkConfigurationGeneration_) {
+      return;
+    }
+    uploadedArtworkGeneration_ = owner_.artworkConfigurationGeneration_;
+    if (owner_.artworkImage_.isNull()) {
+      return;
+    }
+    glActiveTexture(GL_TEXTURE0);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    glBindTexture(GL_TEXTURE_2D, artworkTexture_);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
+    glPixelStorei(GL_UNPACK_ALIGNMENT, 4);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8,
+      owner_.artworkImage_.width(), owner_.artworkImage_.height(), 0,
+      GL_RGBA, GL_UNSIGNED_BYTE, owner_.artworkImage_.constBits());
+    glBindTexture(GL_TEXTURE_2D, 0);
+  }
+
   void ensureShaderConfiguration()
   {
     if (appliedShaderGeneration_ == owner_.shaderConfigurationGeneration_) {
@@ -356,10 +437,13 @@ private:
   QOpenGLBuffer vertexBuffer_{QOpenGLBuffer::VertexBuffer};
   QOpenGLVertexArrayObject vertexArray_;
   GLuint texture_{0U};
+  GLuint artworkTexture_{0U};
   GLuint shaderOutputTexture_{0U};
   std::uint32_t uploadedWidth_{0U};
   std::uint32_t uploadedHeight_{0U};
   std::uint64_t uploadedGeneration_{0U};
+  std::uint64_t uploadedArtworkGeneration_{
+    std::numeric_limits<std::uint64_t>::max()};
   std::uint64_t appliedShaderGeneration_{std::numeric_limits<std::uint64_t>::max()};
   std::uint64_t failedShaderGeneration_{std::numeric_limits<std::uint64_t>::max()};
   std::uint64_t submittedGeneration_{0U};
@@ -487,6 +571,28 @@ void DisplayWidget::setShaderConfiguration(ShaderConfiguration configuration)
   requestRepaint();
 }
 
+bool DisplayWidget::setArtworkConfiguration(
+  ArtworkConfiguration configuration)
+{
+  if (configuration == artworkConfiguration_ &&
+      (configuration.mode == ArtworkMode::disabled ||
+       !artworkImage_.isNull())) {
+    return true;
+  }
+  auto result = loadArtworkImage(configuration);
+  artworkConfiguration_ = std::move(configuration);
+  artworkImage_ = std::move(result.image);
+  artworkError_ = std::move(result.error);
+  artworkFormat_ = std::move(result.format);
+  artworkFileBytes_ = result.fileBytes;
+  ++artworkConfigurationGeneration_;
+  if (!result.success) {
+    reportArtworkFailure(artworkError_);
+  }
+  requestRepaint();
+  return result.success;
+}
+
 void DisplayWidget::setSourceFramesPerSecond(double framesPerSecond)
 {
   if (std::isfinite(framesPerSecond) && framesPerSecond >= 1.0 &&
@@ -505,6 +611,12 @@ void DisplayWidget::setShaderFailureSink(
   std::function<void(std::string)> sink)
 {
   shaderFailureSink_ = std::move(sink);
+}
+
+void DisplayWidget::setArtworkFailureSink(
+  std::function<void(std::string)> sink)
+{
+  artworkFailureSink_ = std::move(sink);
 }
 
 bool DisplayWidget::hasFrame() const noexcept
@@ -574,6 +686,45 @@ const ShaderConfiguration& DisplayWidget::shaderConfiguration() const noexcept
   return shaderConfiguration_;
 }
 
+const ArtworkConfiguration&
+DisplayWidget::artworkConfiguration() const noexcept
+{
+  return artworkConfiguration_;
+}
+
+bool DisplayWidget::artworkAvailable() const noexcept
+{
+  return artworkConfiguration_.mode != ArtworkMode::disabled &&
+    !artworkImage_.isNull();
+}
+
+const std::string& DisplayWidget::artworkError() const noexcept
+{
+  return artworkError_;
+}
+
+std::uintmax_t DisplayWidget::artworkFileBytes() const noexcept
+{
+  return artworkFileBytes_;
+}
+
+const std::string& DisplayWidget::artworkFormat() const noexcept
+{
+  return artworkFormat_;
+}
+
+std::uint32_t DisplayWidget::artworkWidth() const noexcept
+{
+  return artworkImage_.isNull()
+    ? 0U : static_cast<std::uint32_t>(artworkImage_.width());
+}
+
+std::uint32_t DisplayWidget::artworkHeight() const noexcept
+{
+  return artworkImage_.isNull()
+    ? 0U : static_cast<std::uint32_t>(artworkImage_.height());
+}
+
 double DisplayWidget::sourceFramesPerSecond() const noexcept
 {
   return sourceFramesPerSecond_;
@@ -584,8 +735,13 @@ VideoLayout DisplayWidget::currentLayout() const noexcept
   if (!hasFrame_) {
     return {};
   }
-  return calculateVideoLayout(
-    frame_.width, frame_.height, width(), height(), aspectMode_, scaleMode_);
+  auto effectiveArtwork = artworkConfiguration_;
+  if (artworkImage_.isNull()) {
+    effectiveArtwork.mode = ArtworkMode::disabled;
+    effectiveArtwork.constrainVideoToViewport = false;
+  }
+  return calculateArtworkVideoLayout(frame_.width, frame_.height,
+    width(), height(), aspectMode_, scaleMode_, effectiveArtwork);
 }
 
 bool DisplayWidget::usesAcceleratedRenderer() const noexcept
@@ -704,6 +860,23 @@ void DisplayWidget::reportShaderFailure(std::string detail)
   }
 }
 
+void DisplayWidget::reportArtworkFailure(std::string detail)
+{
+  if (detail.empty()) {
+    detail = "The local artwork could not be loaded for an unknown reason.";
+  }
+  qWarning().noquote() << "Local video artwork disabled:"
+                       << QString::fromStdString(detail);
+  if (artworkFailureSink_) {
+    QTimer::singleShot(0, this,
+      [this, detail = std::move(detail)] {
+        if (artworkFailureSink_) {
+          artworkFailureSink_(detail);
+        }
+      });
+  }
+}
+
 void DisplayWidget::paintEvent(QPaintEvent* event)
 {
   static_cast<void>(event);
@@ -718,6 +891,15 @@ void DisplayWidget::paintEvent(QPaintEvent* event)
 void DisplayWidget::paintSoftwareFrame(QPainter& painter)
 {
   painter.fillRect(rect(), Qt::black);
+  if (artworkConfiguration_.mode == ArtworkMode::bezel &&
+      !artworkImage_.isNull()) {
+    painter.save();
+    painter.setOpacity(
+      static_cast<qreal>(artworkConfiguration_.opacityPercent) / 100.0);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.drawImage(rect(), artworkImage_);
+    painter.restore();
+  }
   if (!hasFrame_) {
     return;
   }
@@ -740,6 +922,15 @@ void DisplayWidget::paintSoftwareFrame(QPainter& painter)
   painter.setRenderHint(
     QPainter::SmoothPixmapTransform, videoFilter_ == VideoFilter::bilinear);
   painter.drawImage(target, image);
+  if (artworkConfiguration_.mode == ArtworkMode::overlay &&
+      !artworkImage_.isNull()) {
+    painter.save();
+    painter.setOpacity(
+      static_cast<qreal>(artworkConfiguration_.opacityPercent) / 100.0);
+    painter.setRenderHint(QPainter::SmoothPixmapTransform, true);
+    painter.drawImage(rect(), artworkImage_);
+    painter.restore();
+  }
   noteFrameRendered(generation_);
   noteFrameSwapped(generation_);
 }

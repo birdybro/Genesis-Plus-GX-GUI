@@ -474,6 +474,43 @@ int main(int argc, char** argv)
         "libretro-pass.slangp",
       .parameters = {}},
   };
+  const auto artworkPath = outputDirectory / "generated-local-artwork.png";
+  QImage localArtwork(640, 480, QImage::Format_ARGB32);
+  localArtwork.fill(Qt::transparent);
+  for (int y = 0; y < 24; ++y) {
+    for (int x = 0; x < localArtwork.width(); ++x) {
+      localArtwork.setPixelColor(x, y, QColor{255, 0, 255, 255});
+      localArtwork.setPixelColor(x, localArtwork.height() - 1 - y,
+        QColor{0, 255, 255, 255});
+    }
+  }
+  if (!check(localArtwork.save(
+        QString::fromStdString(artworkPath.string()), "PNG"),
+      "The generated local-artwork fixture could not be written")) {
+    return 10;
+  }
+  const std::array artworkConfigurations{
+    genplusgx::video::ArtworkConfiguration{},
+    genplusgx::video::ArtworkConfiguration{
+      .mode = genplusgx::video::ArtworkMode::bezel,
+      .imagePath = artworkPath,
+      .opacityPercent = 80U,
+      .constrainVideoToViewport = true,
+      .viewportInsets = {
+        .leftPercent = 10U,
+        .topPercent = 10U,
+        .rightPercent = 10U,
+        .bottomPercent = 10U,
+      },
+    },
+    genplusgx::video::ArtworkConfiguration{
+      .mode = genplusgx::video::ArtworkMode::overlay,
+      .imagePath = artworkPath,
+      .opacityPercent = 60U,
+      .constrainVideoToViewport = false,
+      .viewportInsets = {},
+    },
+  };
   std::size_t presentationCases = 0U;
   for (const auto aspect : aspects) {
     widget.setAspectMode(aspect);
@@ -481,42 +518,52 @@ int main(int argc, char** argv)
       widget.setScaleMode(scale);
       for (const auto filter : filters) {
         widget.setVideoFilter(filter);
-        QImage baseline;
-        for (const auto& shader : shaders) {
-          shaderFailure.clear();
-          widget.setShaderConfiguration(shader);
-          QTest::qWait(25);
-          const auto image = canvas->grabFramebuffer();
-          const auto name = "presentation-" + std::to_string(presentationCases) +
-            "-a" + std::to_string(static_cast<int>(aspect)) +
-            "-s" + std::to_string(static_cast<int>(scale)) +
-            "-f" + std::to_string(static_cast<int>(filter)) +
-            "-h" + std::to_string(static_cast<int>(shader.mode)) + ".png";
-          if (!check(shaderFailure.empty(), "A real-ROM shader failed: " + shaderFailure) ||
-              !check(!image.isNull() && isNonBlack(image),
-                "A presentation option produced a black real-ROM image") ||
-              !check(image.save(outputPath(outputDirectory, name)),
-                "A presentation comparison PNG could not be written")) {
+        for (const auto& artworkConfiguration : artworkConfigurations) {
+          if (!check(widget.setArtworkConfiguration(artworkConfiguration),
+                "A real-ROM artwork configuration was rejected")) {
             return 10;
           }
-          if (shader.mode == genplusgx::video::ShaderMode::disabled) {
-            baseline = image;
-          } else {
-            const auto upright = imageDifference(
-              baseline, image, widget.currentLayout(), false);
-            const auto inverted = imageDifference(
-              baseline, image, widget.currentLayout(), true);
-            if (!check(upright < inverted,
-                  "A shader presentation is closer to vertically inverted output")) {
+          QImage baseline;
+          for (const auto& shader : shaders) {
+            shaderFailure.clear();
+            widget.setShaderConfiguration(shader);
+            QTest::qWait(25);
+            const auto image = canvas->grabFramebuffer();
+            const auto name = "presentation-" +
+              std::to_string(presentationCases) +
+              "-a" + std::to_string(static_cast<int>(aspect)) +
+              "-s" + std::to_string(static_cast<int>(scale)) +
+              "-f" + std::to_string(static_cast<int>(filter)) +
+              "-h" + std::to_string(static_cast<int>(shader.mode)) +
+              "-r" + std::to_string(
+                static_cast<int>(artworkConfiguration.mode)) + ".png";
+            if (!check(shaderFailure.empty(),
+                  "A real-ROM shader failed: " + shaderFailure) ||
+                !check(!image.isNull() && isNonBlack(image),
+                  "A presentation option produced a black real-ROM image") ||
+                !check(image.save(outputPath(outputDirectory, name)),
+                  "A presentation comparison PNG could not be written")) {
               return 10;
             }
+            if (shader.mode == genplusgx::video::ShaderMode::disabled) {
+              baseline = image;
+            } else {
+              const auto upright = imageDifference(
+                baseline, image, widget.currentLayout(), false);
+              const auto inverted = imageDifference(
+                baseline, image, widget.currentLayout(), true);
+              if (!check(upright < inverted,
+                    "A shader/artwork presentation is closer to vertically inverted output")) {
+                return 10;
+              }
+            }
+            ++presentationCases;
           }
-          ++presentationCases;
         }
       }
     }
   }
-  if (!check(presentationCases == 36U,
+  if (!check(presentationCases == 108U,
         "The complete real-ROM presentation matrix did not execute")) {
     return 10;
   }
@@ -723,7 +770,7 @@ int main(int argc, char** argv)
     return 13;
   }
   std::cout << "PASS: 13 core video cases, 35 core audio cases, 12 input "
-               "devices, 36 accelerated presentation cases, 17 system "
+               "devices, 108 accelerated shader/artwork presentation cases, 17 system "
                "reload cases, 3 emulation speed modes, 4 run-ahead depths, "
                "and one non-destructive "
                "IPS launch. Comparison PNGs: "

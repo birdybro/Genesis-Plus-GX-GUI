@@ -7,6 +7,7 @@
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QSurfaceFormat>
+#include <QTemporaryDir>
 #include <QTest>
 #include <QOpenGLWidget>
 
@@ -223,6 +224,26 @@ int main(int argc, char** argv)
   }
 
   auto exchange = std::make_shared<genplusgx::VideoFrameExchange>(16U);
+  QTemporaryDir artworkDirectory;
+  if (!artworkDirectory.isValid()) {
+    std::cerr << "The artwork test directory is unavailable.\n";
+    return 6;
+  }
+  const auto artworkPath = std::filesystem::path{
+    artworkDirectory.path().toStdString()} / "asymmetric-overlay.png";
+  QImage artwork(320, 240, QImage::Format_ARGB32);
+  artwork.fill(Qt::transparent);
+  for (int y = 0; y < 20; ++y) {
+    for (int x = 0; x < artwork.width(); ++x) {
+      artwork.setPixelColor(x, y, QColor{255, 0, 255, 255});
+      artwork.setPixelColor(x, artwork.height() - 1 - y,
+        QColor{0, 255, 255, 255});
+    }
+  }
+  if (!artwork.save(QString::fromStdString(artworkPath.string()), "PNG")) {
+    std::cerr << "The asymmetric artwork fixture could not be written.\n";
+    return 6;
+  }
   genplusgx::video::DisplayWidget widget;
   std::string shaderFailure;
   widget.setShaderFailureSink([&shaderFailure](const std::string& detail) {
@@ -331,6 +352,29 @@ int main(int argc, char** argv)
     std::cerr << "The CRT shader output is vertically inverted.\n";
     return 9;
   }
+  if (!widget.setArtworkConfiguration({
+        .mode = genplusgx::video::ArtworkMode::overlay,
+        .imagePath = artworkPath,
+        .opacityPercent = 100U,
+        .constrainVideoToViewport = false,
+        .viewportInsets = {},
+      })) {
+    std::cerr << "The valid OpenGL artwork fixture was rejected.\n";
+    return 9;
+  }
+  QTest::qWait(30);
+  const auto artworkOutput = canvas->grabFramebuffer();
+  const auto topArtwork = averageColor(artworkOutput,
+    QRect{20, 3, artworkOutput.width() - 40, 10});
+  const auto bottomArtwork = averageColor(artworkOutput,
+    QRect{20, artworkOutput.height() - 13,
+      artworkOutput.width() - 40, 10});
+  if (!(topArtwork.red > 0.7 && topArtwork.blue > 0.7 &&
+        topArtwork.green < 0.3 && bottomArtwork.green > 0.7 &&
+        bottomArtwork.blue > 0.7 && bottomArtwork.red < 0.3)) {
+    std::cerr << "OpenGL artwork was inverted or not alpha-composited.\n";
+    return 9;
+  }
 
   const std::array aspects{
     genplusgx::video::AspectMode::native,
@@ -359,6 +403,28 @@ int main(int argc, char** argv)
       .parameters = {},
     },
   };
+  const std::array artworkConfigurations{
+    genplusgx::video::ArtworkConfiguration{},
+    genplusgx::video::ArtworkConfiguration{
+      .mode = genplusgx::video::ArtworkMode::bezel,
+      .imagePath = artworkPath,
+      .opacityPercent = 80U,
+      .constrainVideoToViewport = true,
+      .viewportInsets = {
+        .leftPercent = 10U,
+        .topPercent = 10U,
+        .rightPercent = 10U,
+        .bottomPercent = 10U,
+      },
+    },
+    genplusgx::video::ArtworkConfiguration{
+      .mode = genplusgx::video::ArtworkMode::overlay,
+      .imagePath = artworkPath,
+      .opacityPercent = 60U,
+      .constrainVideoToViewport = false,
+      .viewportInsets = {},
+    },
+  };
   std::size_t presentationCases = 0U;
   for (const auto aspect : aspects) {
     widget.setAspectMode(aspect);
@@ -368,24 +434,32 @@ int main(int argc, char** argv)
         widget.setVideoFilter(filter);
         for (const auto& shader : shaderConfigurations) {
           widget.setShaderConfiguration(shader);
-          QTest::qWait(20);
-          const auto matrixImage = canvas->grabFramebuffer();
-          if (matrixImage.isNull() ||
-              !quadrantsAreUpright(matrixImage, widget.currentLayout())) {
-            std::cerr << "Video presentation case " << presentationCases
-                      << " changed frame orientation (aspect "
-                      << static_cast<int>(aspect) << ", scale "
-                      << static_cast<int>(scale) << ", filter "
-                      << static_cast<int>(filter) << ", shader "
-                      << static_cast<int>(shader.mode) << ").\n";
-            return 10;
+          for (const auto& artworkConfiguration : artworkConfigurations) {
+            if (!widget.setArtworkConfiguration(artworkConfiguration)) {
+              std::cerr << "A valid artwork matrix case was rejected.\n";
+              return 10;
+            }
+            QTest::qWait(20);
+            const auto matrixImage = canvas->grabFramebuffer();
+            if (matrixImage.isNull() ||
+                !quadrantsAreUpright(matrixImage, widget.currentLayout())) {
+              std::cerr << "Video presentation case " << presentationCases
+                        << " changed frame orientation (aspect "
+                        << static_cast<int>(aspect) << ", scale "
+                        << static_cast<int>(scale) << ", filter "
+                        << static_cast<int>(filter) << ", shader "
+                        << static_cast<int>(shader.mode) << ", artwork "
+                        << static_cast<int>(artworkConfiguration.mode)
+                        << ").\n";
+              return 10;
+            }
+            ++presentationCases;
           }
-          ++presentationCases;
         }
       }
     }
   }
-  if (presentationCases != 36U) {
+  if (presentationCases != 108U) {
     std::cerr << "The complete presentation matrix did not execute.\n";
     return 10;
   }

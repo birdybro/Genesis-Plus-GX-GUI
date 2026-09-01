@@ -190,6 +190,9 @@ public:
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
   void showVideoSettings();
+  void chooseVideoArtwork(
+    video::ArtworkMode requestedMode,
+    bool forceChooser = false);
   void setAudioSettings(settings::AudioSettings settings);
   void setAvailableAudioDevices(std::vector<std::string> devices);
   void setAudioSettingsSink(AudioSettingsSink sink);

@@ -61,6 +61,18 @@ int main()
         {.name = "CURVATURE", .value = 0.08F},
       },
     },
+    .artwork = {
+      .mode = genplusgx::video::ArtworkMode::overlay,
+      .imagePath = path / "screen-overlay.png",
+      .opacityPercent = 72U,
+      .constrainVideoToViewport = true,
+      .viewportInsets = {
+        .leftPercent = 12U,
+        .topPercent = 8U,
+        .rightPercent = 12U,
+        .bottomPercent = 8U,
+      },
+    },
     .core = {
       .overscan = genplusgx::CoreOverscanMode::full,
       .ntscFilter = genplusgx::CoreNtscFilter::sVideo,
@@ -104,6 +116,15 @@ int main()
           genplusgx::PersistenceError::invalidData,
       "Invalid presentation settings were accepted")) {
     return 7;
+  }
+
+  auto invalidArtwork = custom;
+  invalidArtwork.artwork.viewportInsets.leftPercent = 46U;
+  if (!check(!genplusgx::settings::validateVideoSettings(invalidArtwork) &&
+        store.save(invalidArtwork).error ==
+          genplusgx::PersistenceError::invalidData,
+      "Invalid artwork settings were accepted")) {
+    return 8;
   }
 
   constexpr std::string_view legacy = R"json({
@@ -183,6 +204,33 @@ int main()
           genplusgx::video::PresentationConfiguration{},
       "Schema-two settings did not gain safe synchronization defaults")) {
     return 13;
+  }
+
+  constexpr std::string_view schemaThree = R"json({
+    "schemaVersion": 3,
+    "video": {
+      "aspect": "native",
+      "scaling": "fit",
+      "presentationFilter": "nearest",
+      "presentationSync": "synchronized",
+      "presentationBuffering": "double-buffer",
+      "shader": {"mode": "disabled", "presetPath": "", "parameters": []},
+      "overscan": "disabled",
+      "ntscFilter": "disabled",
+      "gameGearExtendedScreen": false,
+      "interlacedRender": "single-field"
+    }
+  })json";
+  if (!check(writeText(store.path(), schemaThree),
+        "Schema-three settings could not be staged")) {
+    return 14;
+  }
+  const auto schemaThreeMigrated = store.load();
+  if (!check(schemaThreeMigrated.status && schemaThreeMigrated.migrated &&
+        schemaThreeMigrated.settings.artwork ==
+          genplusgx::video::ArtworkConfiguration{},
+      "Schema-three settings did not gain safe artwork defaults")) {
+    return 15;
   }
 
   if (!check(writeText(store.path(), "{broken"),

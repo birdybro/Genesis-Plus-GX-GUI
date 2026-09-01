@@ -376,6 +376,11 @@ std::string formatDiagnostics(
   field("Renderer", snapshot.renderer);
   field("Presentation sync", snapshot.presentationSync);
   field("Presentation buffering", snapshot.presentationBuffering);
+  field("Video artwork", snapshot.videoArtwork);
+  field("Video artwork format", snapshot.videoArtworkFormat);
+  output << "Video artwork dimensions: " << snapshot.videoArtworkWidth
+         << " x " << snapshot.videoArtworkHeight << '\n'
+         << "Video artwork bytes: " << snapshot.videoArtworkBytes << '\n';
   field("Audio device", snapshot.audioDevice);
   field("Loaded game", snapshot.loadedGame);
   field("Loaded system", snapshot.loadedSystem);

@@ -62,6 +62,18 @@ int main()
     .presetPath = {},
     .parameters = {{.name = "CURVATURE", .value = 0.15F}},
   };
+  overrideVideo.artwork = {
+    .mode = video::ArtworkMode::bezel,
+    .imagePath = temporaryPath / "artwork" / "first-game.png",
+    .opacityPercent = 75U,
+    .constrainVideoToViewport = true,
+    .viewportInsets = {
+      .leftPercent = 10U,
+      .topPercent = 8U,
+      .rightPercent = 10U,
+      .bottomPercent = 8U,
+    },
+  };
   overrides.video = overrideVideo;
   auto overrideAudio = global.audio;
   overrideAudio.masterVolumePercent = 35;
@@ -127,6 +139,12 @@ int main()
   if (!check(!validatePerGameSettings(invalid),
         "Invalid nested video settings were accepted")) {
     return 2;
+  }
+  invalid = overrides;
+  invalid.video->artwork.opacityPercent = 0U;
+  if (!check(!validatePerGameSettings(invalid),
+        "Invalid nested artwork settings were accepted")) {
+    return 3;
   }
   invalid = overrides;
   invalid.inputProfile = std::string{"bad\nprofile"};

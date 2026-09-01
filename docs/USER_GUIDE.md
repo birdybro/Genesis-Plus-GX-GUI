@@ -413,6 +413,26 @@ The accelerated renderer works on native X11 and Wayland sessions. If a graphics
 driver cannot provide the requested context, the frontend automatically retains the
 normal software-rendered picture; shaders are unavailable only for that session.
 
+### Local bezel and overlay artwork
+
+Use **Video → Artwork** to choose a local image and display it as a bezel behind the
+game or as a foreground overlay. Bezel mode accepts PNG, JPEG, and BMP. Overlay mode
+requires a PNG alpha channel so an opaque file cannot hide gameplay. The Artwork page
+in Video Settings also provides 1–100% opacity and optional left/top/right/bottom
+percentage insets for an explicitly designed game aperture.
+
+Artwork is frontend-only and never changes core pixels, timing, input snapshots, save
+states, or screenshots of the native emulated image. With aperture constraints off,
+game geometry is identical to artwork-off presentation. The image is bounded, decoded
+once when applied, and cached for both OpenGL and software drawing. If it later goes
+missing or becomes invalid, the application reports the problem and retains normal
+video or the previous working configuration.
+
+Selections may be global or part of a per-game Video override. The application stores
+only the absolute local path and never downloads, scrapes, packages, or copies artwork.
+See [ARTWORK_OVERLAYS.md](ARTWORK_OVERLAYS.md) for supported formats, limits, aperture
+semantics, privacy, and troubleshooting.
+
 ## Input configuration
 
 Choose **Input → Controller Configuration…** to edit named keyboard/controller profiles,

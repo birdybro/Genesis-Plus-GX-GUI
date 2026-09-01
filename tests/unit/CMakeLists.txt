@@ -406,6 +406,21 @@ target_link_libraries(
 add_test(NAME unit.video_geometry COMMAND genplusgx_video_geometry_test)
 set_tests_properties(unit.video_geometry PROPERTIES LABELS "unit;video")
 
+add_executable(genplusgx_artwork_test artwork_test.cpp)
+target_link_libraries(
+  genplusgx_artwork_test
+  PRIVATE
+    GenesisPlusGX::VideoWidget
+    genplusgx_project_options
+    genplusgx_project_warnings
+    Qt6::Core
+    Qt6::Gui
+)
+add_test(NAME unit.artwork COMMAND genplusgx_artwork_test)
+set_tests_properties(
+  unit.artwork PROPERTIES LABELS "unit;video;artwork;security" TIMEOUT 30
+)
+
 add_executable(genplusgx_video_settings_test video_settings_test.cpp)
 target_link_libraries(
   genplusgx_video_settings_test

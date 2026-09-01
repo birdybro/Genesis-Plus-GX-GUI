@@ -11,6 +11,7 @@
 #include <QLabel>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 #include <utility>
@@ -57,10 +58,21 @@ VideoSettingsDialog::VideoSettingsDialog(
   setObjectName(QStringLiteral("videoSettingsDialog"));
   setWindowTitle(tr("Video Settings"));
   setModal(false);
-  resize(560, 560);
+  resize(640, 720);
 
   auto* root = new QVBoxLayout(this);
-  auto* presentationGroup = new QGroupBox(tr("Presentation"), this);
+  auto* settingsScroll = new QScrollArea(this);
+  settingsScroll->setObjectName(QStringLiteral("videoSettingsScrollArea"));
+  settingsScroll->setWidgetResizable(true);
+  settingsScroll->setFrameShape(QFrame::NoFrame);
+  auto* settingsContents = new QWidget(settingsScroll);
+  settingsContents->setObjectName(QStringLiteral("videoSettingsContents"));
+  auto* settingsLayout = new QVBoxLayout(settingsContents);
+  settingsScroll->setWidget(settingsContents);
+  root->addWidget(settingsScroll, 1);
+
+  auto* presentationGroup = new QGroupBox(
+    tr("Presentation"), settingsContents);
   presentationGroup->setObjectName(QStringLiteral("videoPresentationGroup"));
   auto* presentationForm = new QFormLayout(presentationGroup);
   aspect_ = combo(*presentationGroup, "videoAspectCombo");
@@ -96,9 +108,10 @@ VideoSettingsDialog::VideoSettingsDialog(
   presentationBuffering_->setAccessibleDescription(tr(
     "Requests one or two back buffers without adding a frontend frame queue."));
   presentationForm->addRow(tr("Swap buffering:"), presentationBuffering_);
-  root->addWidget(presentationGroup);
+  settingsLayout->addWidget(presentationGroup);
 
-  auto* shaderGroup = new QGroupBox(tr("CRT and Libretro shaders"), this);
+  auto* shaderGroup = new QGroupBox(
+    tr("CRT and Libretro shaders"), settingsContents);
   shaderGroup->setObjectName(QStringLiteral("videoShaderGroup"));
   auto* shaderForm = new QFormLayout(shaderGroup);
   shaderMode_ = combo(*shaderGroup, "shaderModeCombo");
@@ -132,9 +145,10 @@ VideoSettingsDialog::VideoSettingsDialog(
   shaderGroup->setToolTip(
     tr("This build does not include Libretro shader support."));
 #endif
-  root->addWidget(shaderGroup);
+  settingsLayout->addWidget(shaderGroup);
 
-  shaderParametersGroup_ = new QGroupBox(tr("Shader parameters"), this);
+  shaderParametersGroup_ = new QGroupBox(
+    tr("Shader parameters"), settingsContents);
   shaderParametersGroup_->setObjectName(
     QStringLiteral("shaderParametersGroup"));
   auto* parameterScroll = new QScrollArea(shaderParametersGroup_);
@@ -147,9 +161,68 @@ VideoSettingsDialog::VideoSettingsDialog(
   parameterScroll->setWidget(parameterContents);
   auto* parameterGroupLayout = new QVBoxLayout(shaderParametersGroup_);
   parameterGroupLayout->addWidget(parameterScroll);
-  root->addWidget(shaderParametersGroup_);
+  settingsLayout->addWidget(shaderParametersGroup_);
 
-  auto* coreGroup = new QGroupBox(tr("Genesis Plus GX output"), this);
+  auto* artworkGroup = new QGroupBox(
+    tr("Local bezel and overlay artwork"), settingsContents);
+  artworkGroup->setObjectName(QStringLiteral("videoArtworkGroup"));
+  auto* artworkForm = new QFormLayout(artworkGroup);
+  artworkMode_ = combo(*artworkGroup, "artworkModeCombo");
+  addChoice(*artworkMode_, tr("Off"), video::ArtworkMode::disabled);
+  addChoice(*artworkMode_, tr("Bezel (behind game)"), video::ArtworkMode::bezel);
+  addChoice(*artworkMode_, tr("Overlay (in front of game)"), video::ArtworkMode::overlay);
+  artworkForm->addRow(tr("Artwork:"), artworkMode_);
+  artworkPath_ = new QLabel(artworkGroup);
+  artworkPath_->setObjectName(QStringLiteral("artworkImagePathLabel"));
+  artworkPath_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  artworkPath_->setWordWrap(true);
+  artworkForm->addRow(tr("Image:"), artworkPath_);
+  chooseArtworkButton_ = new QPushButton(tr("Browse…"), artworkGroup);
+  chooseArtworkButton_->setObjectName(QStringLiteral("chooseVideoArtworkButton"));
+  artworkForm->addRow(QString{}, chooseArtworkButton_);
+  artworkOpacity_ = new QSpinBox(artworkGroup);
+  artworkOpacity_->setObjectName(QStringLiteral("artworkOpacitySpinBox"));
+  artworkOpacity_->setRange(1, 100);
+  artworkOpacity_->setSuffix(tr("%"));
+  artworkForm->addRow(tr("Opacity:"), artworkOpacity_);
+  constrainArtworkViewport_ = new QCheckBox(
+    tr("Constrain game image to an explicit viewport"), artworkGroup);
+  constrainArtworkViewport_->setObjectName(
+    QStringLiteral("constrainArtworkViewportCheckBox"));
+  constrainArtworkViewport_->setAccessibleDescription(tr(
+    "When enabled, the four percentage insets define the game aperture. "
+    "Artwork never changes input or core geometry."));
+  artworkForm->addRow(QString{}, constrainArtworkViewport_);
+  const auto inset = [artworkGroup](const char* name) {
+    auto* editor = new QSpinBox(artworkGroup);
+    editor->setObjectName(QString::fromLatin1(name));
+    editor->setRange(0, video::maximumArtworkInsetPercent);
+    editor->setSuffix(QObject::tr("%"));
+    return editor;
+  };
+  artworkLeftInset_ = inset("artworkLeftInsetSpinBox");
+  artworkTopInset_ = inset("artworkTopInsetSpinBox");
+  artworkRightInset_ = inset("artworkRightInsetSpinBox");
+  artworkBottomInset_ = inset("artworkBottomInsetSpinBox");
+  artworkForm->addRow(tr("Left inset:"), artworkLeftInset_);
+  artworkForm->addRow(tr("Top inset:"), artworkTopInset_);
+  artworkForm->addRow(tr("Right inset:"), artworkRightInset_);
+  artworkForm->addRow(tr("Bottom inset:"), artworkBottomInset_);
+  artworkValidation_ = new QLabel(artworkGroup);
+  artworkValidation_->setObjectName(QStringLiteral("artworkValidationLabel"));
+  artworkValidation_->setWordWrap(true);
+  artworkValidation_->setAccessibleName(tr("Artwork validation status"));
+  artworkForm->addRow(QString{}, artworkValidation_);
+  connect(artworkMode_, &QComboBox::currentIndexChanged,
+    this, &VideoSettingsDialog::updateArtworkControls);
+  connect(constrainArtworkViewport_, &QCheckBox::toggled,
+    this, &VideoSettingsDialog::updateArtworkControls);
+  connect(chooseArtworkButton_, &QPushButton::clicked,
+    this, &VideoSettingsDialog::chooseArtwork);
+  settingsLayout->addWidget(artworkGroup);
+
+  auto* coreGroup = new QGroupBox(
+    tr("Genesis Plus GX output"), settingsContents);
   coreGroup->setObjectName(QStringLiteral("coreVideoOutputGroup"));
   auto* coreForm = new QFormLayout(coreGroup);
   overscan_ = combo(*coreGroup, "coreOverscanCombo");
@@ -174,7 +247,8 @@ VideoSettingsDialog::VideoSettingsDialog(
   gameGearExtended_ = new QCheckBox(tr("Show extended 256×192 Game Gear screen"), coreGroup);
   gameGearExtended_->setObjectName(QStringLiteral("gameGearExtendedScreenCheckBox"));
   coreForm->addRow(QString{}, gameGearExtended_);
-  root->addWidget(coreGroup);
+  settingsLayout->addWidget(coreGroup);
+  settingsLayout->addStretch(1);
 
   auto* buttons = new QDialogButtonBox(
     QDialogButtonBox::Ok | QDialogButtonBox::Cancel |
@@ -214,6 +288,11 @@ void VideoSettingsDialog::setPresetChooser(PresetChooser chooser)
   presetChooser_ = std::move(chooser);
 }
 
+void VideoSettingsDialog::setArtworkChooser(PresetChooser chooser)
+{
+  artworkChooser_ = std::move(chooser);
+}
+
 settings::VideoSettings VideoSettingsDialog::settings() const
 {
   auto shader = shaderConfiguration_;
@@ -231,6 +310,19 @@ settings::VideoSettings VideoSettingsDialog::settings() const
       });
     }
   }
+  auto artwork = artworkConfiguration_;
+  artwork.mode = choice<video::ArtworkMode>(*artworkMode_);
+  artwork.opacityPercent = static_cast<std::uint8_t>(artworkOpacity_->value());
+  artwork.constrainVideoToViewport = constrainArtworkViewport_->isChecked();
+  artwork.viewportInsets = {
+    .leftPercent = static_cast<std::uint8_t>(artworkLeftInset_->value()),
+    .topPercent = static_cast<std::uint8_t>(artworkTopInset_->value()),
+    .rightPercent = static_cast<std::uint8_t>(artworkRightInset_->value()),
+    .bottomPercent = static_cast<std::uint8_t>(artworkBottomInset_->value()),
+  };
+  if (artwork.mode == video::ArtworkMode::disabled) {
+    artwork.constrainVideoToViewport = false;
+  }
   return {
     .aspect = choice<video::AspectMode>(*aspect_),
     .scaling = choice<video::ScaleMode>(*scaling_),
@@ -241,6 +333,7 @@ settings::VideoSettings VideoSettingsDialog::settings() const
         *presentationBuffering_),
     },
     .shader = std::move(shader),
+    .artwork = std::move(artwork),
     .core = {
       .overscan = choice<CoreOverscanMode>(*overscan_),
       .ntscFilter = choice<CoreNtscFilter>(*ntscFilter_),
@@ -263,12 +356,22 @@ void VideoSettingsDialog::setSettings(const settings::VideoSettings& value)
   select(*presentationBuffering_, value.presentation.buffering);
   shaderConfiguration_ = value.shader;
   select(*shaderMode_, value.shader.mode);
+  artworkConfiguration_ = value.artwork;
+  select(*artworkMode_, value.artwork.mode);
+  artworkOpacity_->setValue(value.artwork.opacityPercent);
+  constrainArtworkViewport_->setChecked(
+    value.artwork.constrainVideoToViewport);
+  artworkLeftInset_->setValue(value.artwork.viewportInsets.leftPercent);
+  artworkTopInset_->setValue(value.artwork.viewportInsets.topPercent);
+  artworkRightInset_->setValue(value.artwork.viewportInsets.rightPercent);
+  artworkBottomInset_->setValue(value.artwork.viewportInsets.bottomPercent);
   select(*overscan_, value.core.overscan);
   select(*ntscFilter_, value.core.ntscFilter);
   select(*interlacedRender_, value.core.interlacedRender);
   gameGearExtended_->setChecked(value.core.gameGearExtendedScreen);
   updateShaderControls();
   loadShaderParameters();
+  updateArtworkControls();
 }
 
 bool VideoSettingsDialog::apply()
@@ -314,6 +417,55 @@ void VideoSettingsDialog::updateShaderControls()
     shaderPath_->setText(pathToQString(shaderConfiguration_.presetPath));
   } else {
     shaderPath_->setText(tr("None"));
+  }
+}
+
+void VideoSettingsDialog::chooseArtwork()
+{
+  const auto initialDirectory = artworkConfiguration_.imagePath.has_parent_path()
+    ? artworkConfiguration_.imagePath.parent_path()
+    : std::filesystem::path{};
+  const auto selected = artworkChooser_ ? artworkChooser_(initialDirectory)
+                                        : std::nullopt;
+  if (!selected) {
+    return;
+  }
+  artworkConfiguration_.imagePath = *selected;
+  if (choice<video::ArtworkMode>(*artworkMode_) ==
+      video::ArtworkMode::disabled) {
+    select(*artworkMode_, video::ArtworkMode::bezel);
+  }
+  updateArtworkControls();
+}
+
+void VideoSettingsDialog::updateArtworkControls()
+{
+  const auto mode = choice<video::ArtworkMode>(*artworkMode_);
+  const bool enabled = mode != video::ArtworkMode::disabled;
+  // Browsing while disabled is a useful first-run path: chooseArtwork() turns
+  // the feature on in bezel mode after a file is selected.
+  chooseArtworkButton_->setEnabled(true);
+  artworkOpacity_->setEnabled(enabled);
+  constrainArtworkViewport_->setEnabled(enabled);
+  const bool editInsets = enabled && constrainArtworkViewport_->isChecked();
+  for (auto* editor : {artworkLeftInset_, artworkTopInset_,
+                       artworkRightInset_, artworkBottomInset_}) {
+    editor->setEnabled(editInsets);
+  }
+  artworkPath_->setText(artworkConfiguration_.imagePath.empty()
+    ? tr("None") : pathToQString(artworkConfiguration_.imagePath));
+  if (!enabled) {
+    artworkValidation_->setText(tr(
+      "Disabled. Artwork is local-only and never downloaded automatically."));
+  } else if (artworkConfiguration_.imagePath.empty()) {
+    artworkValidation_->setText(tr("Choose a local artwork image to continue."));
+  } else if (mode == video::ArtworkMode::overlay) {
+    artworkValidation_->setText(tr(
+      "Foreground overlays require a PNG with transparent pixels. The image "
+      "is decoded and cached only when settings are applied."));
+  } else {
+    artworkValidation_->setText(tr(
+      "The image is decoded and cached only when settings are applied."));
   }
 }
 

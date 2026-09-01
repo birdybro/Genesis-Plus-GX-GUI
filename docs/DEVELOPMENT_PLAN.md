@@ -99,7 +99,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
-| 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
+| 88 Overlays and bezels | IN PROGRESS | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
@@ -3926,6 +3926,56 @@ bounded; the worker's rational frame pacer stays authoritative; and every local 
 hosted regression passes.
 
 **Commit SHA:** implementation `b84af114bef3b087978b0c269268ed1b59358213`
+
+## Milestone 88 detail
+
+**Status:** IN PROGRESS — HOSTED IMPLEMENTATION GATE
+
+**Goal:** Add safe local bezel and foreground-overlay composition without allowing
+artwork to alter core output, infer input geometry, allocate per frame, or introduce an
+online artwork dependency.
+
+**Files changed:**
+
+- bounded artwork configuration, aperture geometry, decoder, cache, and OpenGL/software
+  composition under `desktop/video`
+- schema-4 global video persistence and backward-compatible sparse per-game settings
+- Video quick menu, scrollable accessible Video Settings controls, injected file
+  chooser, transactional error handling, and privacy-safe diagnostics
+- focused unit, offscreen GUI, native OpenGL, settings migration, per-game, and optional
+  external-ROM option-matrix tests under `tests/`
+- README, changelog, architecture, user, artwork, testing, fixture, package, and milestone
+  documentation
+
+**Tests added:** New `unit.artwork` covers configuration bounds, overflow-safe aperture
+math, PNG/JPEG transparency policy, fully opaque PNG rejection, RGBA cache format,
+malformed files, and dimension limits.
+Global/per-game tests cover schema-3 migration and exact artwork round trips. MainWindow
+tests drive all menu/settings/error transactions through an injected chooser; the
+software display test checks actual bezel/overlay pixels. The required real OpenGL test
+uses asymmetric magenta/cyan artwork and expands its presentation matrix from 36 to 108
+aspect × scale × filter × shader × artwork cases. The optional external-ROM runner
+repeats the 108 accelerated cases and writes comparison images only outside the tree.
+
+**Gate evidence:** Complete warning-as-error Debug, optimized Release, leak-detecting
+ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 100/100 tests; the
+shader-disabled graph passes all 98 applicable tests. The required native OpenGL test
+executes all 108 artwork/shader/presentation combinations. A fresh staged Linux install
+passes package verification, the artwork guide is installed, the TGZ and SHA-256
+manifest verify, and the strict Unix libretro target builds, links as x86-64 ELF, and
+cleans without a diagnostic. The user-provided `/mnt/qnapraid` mount is not present in
+the current host session, so the optional Phantasy Star IV runner cannot be repeated;
+the same runner source carries the 108-case artwork matrix and required tests use legal
+generated frames. Exact hosted CI, complete-log inspection, and native artifact audit
+remain pending before this status can become COMPLETE.
+
+**Acceptance criteria:** Off is the migration/default state; bezel draws behind and
+alpha overlay draws in front with identical upright OpenGL/software semantics; decoded
+files and dimensions are bounded and cached; explicit apertures never silently change
+input/core geometry; failed transactions retain working video; global/per-game settings,
+menus, diagnostics, docs, packages, and tests agree; and all local/hosted gates pass.
+
+**Commit SHA:** pending
 
 ## Milestone 83 detail
 

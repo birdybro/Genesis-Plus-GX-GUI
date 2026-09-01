@@ -90,6 +90,13 @@ std::optional<std::filesystem::path> DialogService::chooseArtwork(
   return std::nullopt;
 }
 
+std::optional<std::filesystem::path> DialogService::chooseVideoArtwork(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
 std::optional<std::filesystem::path> DialogService::chooseShaderPreset(
   QWidget*,
   const std::filesystem::path&)
@@ -193,6 +200,20 @@ std::optional<std::filesystem::path> QtDialogService::chooseArtwork(
     QObject::tr("Choose Local Box Art"),
     pathToQString(initialDirectory),
     QObject::tr("Images (*.png *.jpg *.jpeg *.webp *.bmp);;All files (*)"));
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseVideoArtwork(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Choose Bezel or Overlay Artwork"),
+    pathToQString(initialDirectory),
+    QObject::tr("Supported artwork (*.png *.jpg *.jpeg *.bmp);;All files (*)"));
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};

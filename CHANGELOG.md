@@ -9,6 +9,12 @@ platform documentation.
 
 ### Added
 
+- Local-only bezel and foreground-alpha-overlay presentation with bounded cached
+  PNG/JPEG/BMP decoding, opacity, explicit game-aperture insets, quick menus,
+  schema-migrated global/per-game settings, privacy-safe diagnostics, and identical
+  OpenGL/software composition.
+- A 108-case real-OpenGL shader/artwork presentation matrix plus an optional 185-case
+  user-owned-ROM option runner that rejects black, hidden, or inverted output.
 - Off/on/adaptive vertical-synchronization and double/triple-buffer presentation
   controls with live surface recreation, schema migration, per-game overrides,
   newest-frame-only pending behavior, swap-cadence/drop diagnostics, and a real OpenGL

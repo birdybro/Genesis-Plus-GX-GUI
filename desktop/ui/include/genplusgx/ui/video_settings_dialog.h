@@ -16,6 +16,7 @@ class QDoubleSpinBox;
 class QFormLayout;
 class QGroupBox;
 class QPushButton;
+class QSpinBox;
 
 namespace genplusgx::ui {
 
@@ -33,6 +34,7 @@ public:
 
   void setSettingsSink(SettingsSink sink);
   void setPresetChooser(PresetChooser chooser);
+  void setArtworkChooser(PresetChooser chooser);
   [[nodiscard]] settings::VideoSettings settings() const;
   void setSettings(const settings::VideoSettings& settings);
 
@@ -41,6 +43,8 @@ private:
   void restoreDefaults();
   void choosePreset();
   void updateShaderControls();
+  void chooseArtwork();
+  void updateArtworkControls();
   void loadShaderParameters();
   void clearShaderParameters();
 
@@ -62,8 +66,20 @@ private:
   std::vector<video::ShaderParameter> shaderParameterMetadata_;
   std::vector<QDoubleSpinBox*> shaderParameterEditors_;
   video::ShaderConfiguration shaderConfiguration_;
+  QComboBox* artworkMode_{nullptr};
+  QLabel* artworkPath_{nullptr};
+  QPushButton* chooseArtworkButton_{nullptr};
+  QSpinBox* artworkOpacity_{nullptr};
+  QCheckBox* constrainArtworkViewport_{nullptr};
+  QSpinBox* artworkLeftInset_{nullptr};
+  QSpinBox* artworkTopInset_{nullptr};
+  QSpinBox* artworkRightInset_{nullptr};
+  QSpinBox* artworkBottomInset_{nullptr};
+  QLabel* artworkValidation_{nullptr};
+  video::ArtworkConfiguration artworkConfiguration_;
   SettingsSink settingsSink_;
   PresetChooser presetChooser_;
+  PresetChooser artworkChooser_;
 };
 
 } // namespace genplusgx::ui

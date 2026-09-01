@@ -78,6 +78,11 @@ int main()
     "Adaptive requested; effective swap interval -1";
   snapshot.presentationBuffering =
     "Double buffer requested; Double buffer effective";
+  snapshot.videoArtwork = "Overlay active";
+  snapshot.videoArtworkFormat = "png";
+  snapshot.videoArtworkBytes = 4'096U;
+  snapshot.videoArtworkWidth = 1'920U;
+  snapshot.videoArtworkHeight = 1'080U;
   snapshot.videoPublishedFrames = 600U;
   snapshot.videoCopiedFrames = 590U;
   snapshot.videoSkippedFrames = 10U;
@@ -130,6 +135,8 @@ int main()
                !snapshot.qtVersion.empty() && !snapshot.sdlVersion.empty() &&
                report.find("OpenGL") != std::string::npos &&
                report.find("Presentation sync: Adaptive") != std::string::npos &&
+               report.find("Video artwork: Overlay active") != std::string::npos &&
+               report.find("Video artwork dimensions: 1920 x 1080") != std::string::npos &&
                report.find("Video exchange: 590 copied / 600 published, 10 skipped, 0 producer drops") != std::string::npos &&
                report.find("Video presentation: 580 rendered, 580 swapped, 10 coalesced, 2 duplicate renders") != std::string::npos &&
                report.find("Video pending frames: 0 / 1 maximum") != std::string::npos &&

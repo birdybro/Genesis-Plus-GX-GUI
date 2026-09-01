@@ -132,6 +132,11 @@ void MainWindow::createCanvas()
     dialogService_->showError(this, tr("Libretro Shader Error"),
       QString::fromStdString(detail));
   });
+  displayWidget_->setArtworkFailureSink([this](std::string detail) {
+    statusBar()->showMessage(tr("Local video artwork was not applied."), 5'000);
+    dialogService_->showError(this, tr("Artwork Error"),
+      QString::fromStdString(detail));
+  });
   setCentralWidget(displayWidget_);
 }
 
@@ -564,6 +569,44 @@ void MainWindow::buildMenus()
   shaders->menuAction()->setToolTip(
     tr("This build does not include Libretro shader support."));
 #endif
+  auto* artwork = video->addMenu(tr("&Artwork"));
+  artwork->setObjectName(QStringLiteral("videoArtworkMenu"));
+  auto* artworkGroup = new QActionGroup(this);
+  artworkGroup->setObjectName(QStringLiteral("videoArtworkActionGroup"));
+  auto* artworkOff = addAction(
+    *artwork, tr("&Off"), "artworkDisabledAction");
+  auto* bezelArtwork = addAction(
+    *artwork, tr("&Bezel Behind Game"), "bezelArtworkAction");
+  auto* overlayArtwork = addAction(
+    *artwork, tr("&Overlay in Front of Game"), "overlayArtworkAction");
+  for (auto* action : {artworkOff, bezelArtwork, overlayArtwork}) {
+    action->setCheckable(true);
+    artworkGroup->addAction(action);
+  }
+  artworkOff->setChecked(true);
+  connect(artworkOff, &QAction::triggered, this, [this] {
+    auto settings = videoSettings_;
+    settings.artwork.mode = video::ArtworkMode::disabled;
+    settings.artwork.constrainVideoToViewport = false;
+    applyVideoSettings(settings, true);
+  });
+  connect(bezelArtwork, &QAction::triggered, this, [this] {
+    chooseVideoArtwork(video::ArtworkMode::bezel);
+  });
+  connect(overlayArtwork, &QAction::triggered, this, [this] {
+    chooseVideoArtwork(video::ArtworkMode::overlay);
+  });
+  artwork->addSeparator();
+  auto* chooseArtwork = addAction(*artwork, tr("Choose Local &Image…"),
+    "chooseVideoArtworkAction");
+  connect(chooseArtwork, &QAction::triggered, this, [this] {
+    chooseVideoArtwork(videoSettings_.artwork.mode == video::ArtworkMode::disabled
+      ? video::ArtworkMode::bezel : videoSettings_.artwork.mode, true);
+  });
+  auto* artworkSettings = addAction(*artwork, tr("Artwork &Settings…"),
+    "artworkSettingsAction");
+  connect(artworkSettings, &QAction::triggered,
+    this, &MainWindow::showVideoSettings);
   auto* overscan = video->addMenu(tr("&Overscan"));
   overscan->setObjectName(QStringLiteral("overscanMenu"));
   auto* overscanGroup = new QActionGroup(this);
@@ -2286,7 +2329,37 @@ void MainWindow::showVideoSettings()
   dialog->setPresetChooser([this](const std::filesystem::path& initial) {
     return dialogService_->chooseShaderPreset(this, initial);
   });
+  dialog->setArtworkChooser([this](const std::filesystem::path& initial) {
+    return dialogService_->chooseVideoArtwork(this, initial);
+  });
   dialog->open();
+}
+
+void MainWindow::chooseVideoArtwork(
+  video::ArtworkMode requestedMode,
+  bool forceChooser)
+{
+  auto settings = videoSettings_;
+  if (forceChooser || settings.artwork.imagePath.empty()) {
+    const auto initialDirectory =
+      settings.artwork.imagePath.has_parent_path()
+        ? settings.artwork.imagePath.parent_path()
+        : std::filesystem::path{};
+    const auto selected = dialogService_->chooseVideoArtwork(
+      this, initialDirectory);
+    if (!selected) {
+      updateVideoActionChecks();
+      return;
+    }
+    settings.artwork.imagePath = *selected;
+  }
+  settings.artwork.mode = requestedMode;
+  if (applyVideoSettings(settings, true)) {
+    statusBar()->showMessage(
+      requestedMode == video::ArtworkMode::bezel
+        ? tr("Local bezel artwork enabled.")
+        : tr("Local foreground overlay enabled."), 3'000);
+  }
 }
 
 void MainWindow::chooseShaderPreset()
@@ -2638,6 +2711,17 @@ bool MainWindow::applyVideoSettings(
       return false;
     }
   }
+  const bool artworkChanged = settings.artwork != videoSettings_.artwork;
+  const auto previousArtwork = videoSettings_.artwork;
+  if (artworkChanged) {
+    const bool artworkApplied =
+      displayWidget_->setArtworkConfiguration(settings.artwork);
+    if (!artworkApplied && notifySink) {
+      static_cast<void>(displayWidget_->setArtworkConfiguration(previousArtwork));
+      updateVideoActionChecks();
+      return false;
+    }
+  }
   if (notifySink && videoSettingsSink_) {
     const auto status = videoSettingsSink_(settings);
     if (!status) {
@@ -2645,6 +2729,10 @@ bool MainWindow::applyVideoSettings(
       statusBar()->showMessage(tr("Video settings could not be saved."), 5'000);
       dialogService_->showError(this, tr("Video Settings Error"),
         QString::fromStdString(status.message));
+      if (artworkChanged) {
+        static_cast<void>(
+          displayWidget_->setArtworkConfiguration(previousArtwork));
+      }
       return false;
     }
   }
@@ -2654,6 +2742,9 @@ bool MainWindow::applyVideoSettings(
   displayWidget_->setVideoFilter(settings.presentationFilter);
   displayWidget_->setPresentationConfiguration(settings.presentation);
   displayWidget_->setShaderConfiguration(settings.shader);
+  if (!artworkChanged) {
+    static_cast<void>(displayWidget_->setArtworkConfiguration(settings.artwork));
+  }
   updateVideoActionChecks();
   if (auto* dialog = findChild<VideoSettingsDialog*>(
         QStringLiteral("videoSettingsDialog"))) {
@@ -2709,6 +2800,12 @@ void MainWindow::updateVideoActionChecks()
         videoSettings_.shader.presetPath.filename())));
   findChild<QAction*>(QStringLiteral("shaderParametersAction"))->setEnabled(
     videoSettings_.shader.mode != video::ShaderMode::disabled);
+  findChild<QAction*>(QStringLiteral("artworkDisabledAction"))->setChecked(
+    videoSettings_.artwork.mode == video::ArtworkMode::disabled);
+  findChild<QAction*>(QStringLiteral("bezelArtworkAction"))->setChecked(
+    videoSettings_.artwork.mode == video::ArtworkMode::bezel);
+  findChild<QAction*>(QStringLiteral("overlayArtworkAction"))->setChecked(
+    videoSettings_.artwork.mode == video::ArtworkMode::overlay);
 
   const auto setDataChecked = [this](const char* actionName, int value, int current) {
     auto* action = findChild<QAction*>(QString::fromLatin1(actionName));

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "genplusgx/video/artwork_configuration.h"
+#include "genplusgx/video/artwork_image.h"
 #include "genplusgx/video/frame_exchange.h"
 #include "genplusgx/video/presentation.h"
 #include "genplusgx/video/shader_configuration.h"
@@ -54,9 +56,12 @@ public:
   void setVideoFilter(VideoFilter filter);
   void setPresentationConfiguration(PresentationConfiguration configuration);
   void setShaderConfiguration(ShaderConfiguration configuration);
+  [[nodiscard]] bool setArtworkConfiguration(
+    ArtworkConfiguration configuration);
   void setSourceFramesPerSecond(double framesPerSecond);
   void setRendererFailureSink(std::function<void(std::string)> sink);
   void setShaderFailureSink(std::function<void(std::string)> sink);
+  void setArtworkFailureSink(std::function<void(std::string)> sink);
 
   [[nodiscard]] bool hasFrame() const noexcept;
   [[nodiscard]] const CoreVideoFrameInfo& currentFrameInfo() const noexcept;
@@ -69,6 +74,14 @@ public:
     presentationConfiguration() const noexcept;
   [[nodiscard]] DisplayPresentationMetrics presentationMetrics() const;
   [[nodiscard]] const ShaderConfiguration& shaderConfiguration() const noexcept;
+  [[nodiscard]] const ArtworkConfiguration&
+    artworkConfiguration() const noexcept;
+  [[nodiscard]] bool artworkAvailable() const noexcept;
+  [[nodiscard]] const std::string& artworkError() const noexcept;
+  [[nodiscard]] std::uintmax_t artworkFileBytes() const noexcept;
+  [[nodiscard]] const std::string& artworkFormat() const noexcept;
+  [[nodiscard]] std::uint32_t artworkWidth() const noexcept;
+  [[nodiscard]] std::uint32_t artworkHeight() const noexcept;
   [[nodiscard]] double sourceFramesPerSecond() const noexcept;
   [[nodiscard]] VideoLayout currentLayout() const noexcept;
   [[nodiscard]] bool usesAcceleratedRenderer() const noexcept;
@@ -83,6 +96,7 @@ private:
   void requestRepaint();
   void scheduleSoftwareFallback(OpenGLCanvas* failedCanvas);
   void reportShaderFailure(std::string detail);
+  void reportArtworkFailure(std::string detail);
   void noteFrameRendered(std::uint64_t generation);
   void noteFrameSwapped(std::uint64_t generation);
   void noteRendererInitialized(
@@ -102,8 +116,14 @@ private:
   PresentationConfiguration presentationConfiguration_;
   PresentationTelemetry presentationTelemetry_;
   ShaderConfiguration shaderConfiguration_;
+  ArtworkConfiguration artworkConfiguration_;
+  QImage artworkImage_;
+  std::string artworkError_;
+  std::string artworkFormat_;
+  std::uintmax_t artworkFileBytes_{0U};
   double sourceFramesPerSecond_{60.0};
   std::uint64_t shaderConfigurationGeneration_{0U};
+  std::uint64_t artworkConfigurationGeneration_{0U};
   OpenGLCanvas* openGLCanvas_{nullptr};
   int effectiveSwapInterval_{0};
   PresentationBufferingMode effectiveBuffering_{
@@ -111,6 +131,7 @@ private:
   bool rendererInitialized_{false};
   std::function<void(std::string)> rendererFailureSink_;
   std::function<void(std::string)> shaderFailureSink_;
+  std::function<void(std::string)> artworkFailureSink_;
 };
 
 } // namespace genplusgx::video

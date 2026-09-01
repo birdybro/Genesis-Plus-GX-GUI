@@ -33,6 +33,9 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseArtwork(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> chooseVideoArtwork(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseShaderPreset(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
@@ -67,6 +70,9 @@ public:
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::filesystem::path> chooseArtwork(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::filesystem::path> chooseVideoArtwork(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::filesystem::path> chooseShaderPreset(

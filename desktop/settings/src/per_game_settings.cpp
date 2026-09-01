@@ -130,6 +130,66 @@ QJsonObject writeShader(const video::ShaderConfiguration& shader)
   };
 }
 
+std::optional<video::ArtworkConfiguration> readArtwork(
+  const QJsonObject& object)
+{
+  const auto mode = enumeration<video::ArtworkMode>(object, "mode");
+  const auto path = object.value(QStringLiteral("imagePath"));
+  const auto opacity = integer(object, "opacityPercent");
+  const auto constrain = boolean(object, "constrainVideoToViewport");
+  const auto insetsMember = object.value(QStringLiteral("viewportInsets"));
+  if (!mode || !path.isString() || !opacity || !constrain ||
+      !insetsMember.isObject()) {
+    return std::nullopt;
+  }
+  const auto insets = insetsMember.toObject();
+  const auto left = integer(insets, "leftPercent");
+  const auto top = integer(insets, "topPercent");
+  const auto right = integer(insets, "rightPercent");
+  const auto bottom = integer(insets, "bottomPercent");
+  if (!left || !top || !right || !bottom || *opacity < 0 || *opacity > 255 ||
+      *left < 0 || *left > 255 || *top < 0 || *top > 255 ||
+      *right < 0 || *right > 255 || *bottom < 0 || *bottom > 255) {
+    return std::nullopt;
+  }
+  video::ArtworkConfiguration artwork{
+    .mode = *mode,
+    .imagePath = toPath(path.toString()),
+    .opacityPercent = static_cast<std::uint8_t>(*opacity),
+    .constrainVideoToViewport = *constrain,
+    .viewportInsets = {
+      .leftPercent = static_cast<std::uint8_t>(*left),
+      .topPercent = static_cast<std::uint8_t>(*top),
+      .rightPercent = static_cast<std::uint8_t>(*right),
+      .bottomPercent = static_cast<std::uint8_t>(*bottom),
+    },
+  };
+  return video::validateArtworkConfiguration(artwork)
+    ? std::optional{artwork} : std::nullopt;
+}
+
+QJsonObject writeArtwork(const video::ArtworkConfiguration& artwork)
+{
+  return {
+    {QStringLiteral("mode"), static_cast<int>(artwork.mode)},
+    {QStringLiteral("imagePath"), fromPath(artwork.imagePath)},
+    {QStringLiteral("opacityPercent"),
+      static_cast<int>(artwork.opacityPercent)},
+    {QStringLiteral("constrainVideoToViewport"),
+      artwork.constrainVideoToViewport},
+    {QStringLiteral("viewportInsets"), QJsonObject{
+      {QStringLiteral("leftPercent"),
+        static_cast<int>(artwork.viewportInsets.leftPercent)},
+      {QStringLiteral("topPercent"),
+        static_cast<int>(artwork.viewportInsets.topPercent)},
+      {QStringLiteral("rightPercent"),
+        static_cast<int>(artwork.viewportInsets.rightPercent)},
+      {QStringLiteral("bottomPercent"),
+        static_cast<int>(artwork.viewportInsets.bottomPercent)},
+    }},
+  };
+}
+
 std::optional<VideoSettings> readVideo(const QJsonObject& object)
 {
   const auto aspect = enumeration<video::AspectMode>(object, "aspect");
@@ -154,6 +214,16 @@ std::optional<VideoSettings> readVideo(const QJsonObject& object)
       return std::nullopt;
     }
     shader = *parsed;
+  }
+  auto artwork = video::ArtworkConfiguration{};
+  if (object.contains(QStringLiteral("artwork"))) {
+    const auto artworkValue = object.value(QStringLiteral("artwork"));
+    const auto parsed = artworkValue.isObject()
+      ? readArtwork(artworkValue.toObject()) : std::nullopt;
+    if (!parsed) {
+      return std::nullopt;
+    }
+    artwork = *parsed;
   }
   auto presentationConfiguration = video::PresentationConfiguration{};
   const bool hasSync = object.contains(QStringLiteral("presentationSync"));
@@ -181,6 +251,7 @@ std::optional<VideoSettings> readVideo(const QJsonObject& object)
     .presentationFilter = *presentation,
     .presentation = presentationConfiguration,
     .shader = std::move(shader),
+    .artwork = std::move(artwork),
     .core =
       {
         .overscan = *overscan,
@@ -203,6 +274,7 @@ QJsonObject writeVideo(const VideoSettings& value)
     {QStringLiteral("presentationBuffering"),
       static_cast<int>(value.presentation.buffering)},
     {QStringLiteral("shader"), writeShader(value.shader)},
+    {QStringLiteral("artwork"), writeArtwork(value.artwork)},
     {QStringLiteral("overscan"), static_cast<int>(value.core.overscan)},
     {QStringLiteral("ntscFilter"), static_cast<int>(value.core.ntscFilter)},
     {QStringLiteral("interlacedRender"), static_cast<int>(value.core.interlacedRender)},
