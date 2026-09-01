@@ -97,6 +97,11 @@ struct DiagnosticsSnapshot final {
   std::uint64_t audioOverruns{0};
   std::size_t audioBufferedFrames{0};
   std::size_t audioCapacityFrames{0};
+  bool rewindEnabled{false};
+  bool rewinding{false};
+  std::size_t rewindSnapshots{0};
+  std::size_t rewindPayloadBytes{0};
+  std::size_t rewindMemoryLimitBytes{0};
   bool loggerActive{false};
   LoggerMetrics logger;
   std::vector<BiosDiagnostic> bios;

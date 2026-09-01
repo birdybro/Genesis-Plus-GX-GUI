@@ -9,6 +9,9 @@ platform documentation.
 
 ### Added
 
+- Bounded in-memory rewind on the emulation thread, with a configurable 16–1024 MiB
+  budget and 1–60-frame capture interval, a focus-safe Backspace hold hotkey, a menu
+  toggle, audio suppression, diagnostics, persisted settings, and state-history tests.
 - An opt-in, hidden-by-default developer workspace for live 68000/Z80 registers,
   bounded memory reads and paused writes, VDP registers/palette/tiles/sprites/planes/
   scroll data, YM2612/PSG state, logical input snapshots, run controls, and validated

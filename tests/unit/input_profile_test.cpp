@@ -74,6 +74,9 @@ int main()
           configuration, EmulatorHotkeyAction::fastForwardToggle) ==
           QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined(),
         "Fast-forward hold/toggle defaults are incorrect") ||
+      !check(hotkeyCombination(configuration, EmulatorHotkeyAction::rewindHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined(),
+        "Rewind hold hotkey default is incorrect") ||
       !check(std::ranges::find(reservedDefaults, Qt::Key_M) !=
         reservedDefaults.end(),
         "Unmodified emulator hotkeys were not reserved from gameplay")) {
@@ -237,6 +240,31 @@ int main()
           EmulatorHotkeyAction::fastForwardHold) ==
           QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined(),
         "Schema 2 did not preserve toggle behavior and add a unique hold binding")) {
+    return EXIT_FAILURE;
+  }
+
+  auto schemaThreeRoot = legacyRoot;
+  schemaThreeRoot.insert(QStringLiteral("schemaVersion"), 3);
+  auto schemaThreeHotkeys =
+    schemaThreeRoot.value(QStringLiteral("hotkeys")).toArray();
+  for (qsizetype index = schemaThreeHotkeys.size() - 1; index >= 0; --index) {
+    const auto action = schemaThreeHotkeys[index].toObject()
+      .value(QStringLiteral("action")).toString();
+    if (action == QStringLiteral("rewind-hold")) {
+      schemaThreeHotkeys.removeAt(index);
+    }
+  }
+  schemaThreeRoot.insert(QStringLiteral("hotkeys"), schemaThreeHotkeys);
+  if (!check(writeBytes(path, QJsonDocument{schemaThreeRoot}.toJson()),
+        "Could not create the schema-3 rewind migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto schemaThree = store.load();
+  if (!check(schemaThree.status && schemaThree.migrated &&
+        hotkeyCombination(schemaThree.configuration,
+          EmulatorHotkeyAction::rewindHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined(),
+        "Schema 3 did not add a conflict-free rewind hold binding")) {
     return EXIT_FAILURE;
   }
 

@@ -383,6 +383,11 @@ std::string formatDiagnostics(
          << snapshot.audioCapacityFrames << '\n'
          << "Audio underruns: " << snapshot.audioUnderruns << '\n'
          << "Audio overruns: " << snapshot.audioOverruns << '\n'
+         << "Rewind: " << (snapshot.rewindEnabled ? "Enabled" : "Disabled")
+         << (snapshot.rewinding ? " (active)" : "") << '\n'
+         << "Rewind snapshots: " << snapshot.rewindSnapshots << '\n'
+         << "Rewind payload bytes: " << snapshot.rewindPayloadBytes << " / "
+         << snapshot.rewindMemoryLimitBytes << '\n'
          << "Structured logging: " << (snapshot.loggerActive ? "Active" : "Unavailable")
          << '\n'
          << "Log messages written: " << snapshot.logger.writtenMessages << '\n'

@@ -44,6 +44,7 @@ shortcuts.
 | Soft reset | Ctrl+Shift+R |
 | Fast forward (hold) | Tab |
 | Fast forward (toggle) | ` |
+| Rewind (hold) | Backspace |
 | Frame advance | N |
 | Save selected state slot | F5 |
 | Load selected state slot | F8 |
@@ -68,3 +69,9 @@ The hold shortcut enables fast-forward only while the combination is down. Relea
 it, deactivating the application, hiding the main window, or closing the game releases
 the hold so focus changes cannot leave acceleration stuck on. The toggle is an
 independent latch: releasing a temporary hold does not cancel an enabled toggle.
+
+The rewind hold is likewise focus-safe. Once history has accumulated, hold Backspace
+to move backward at normal display cadence or use **Emulation → Rewind Toggle** to latch
+it. Backward playback discards audio; releasing the hold resumes forward execution.
+Configure the bounded memory budget and capture interval under **Emulation → Rewind
+Settings…** or **Settings → Advanced**.

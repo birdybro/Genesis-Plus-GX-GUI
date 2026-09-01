@@ -78,6 +78,11 @@ int main()
   snapshot.loadedGame = "/users/alex/private.bin";
   snapshot.loadedSystem = "Genesis";
   snapshot.loadedRegion = "USA password=hunter2";
+  snapshot.rewindEnabled = true;
+  snapshot.rewinding = true;
+  snapshot.rewindSnapshots = 12U;
+  snapshot.rewindPayloadBytes = 12U * 1024U * 1024U;
+  snapshot.rewindMemoryLimitBytes = 128U * 1024U * 1024U;
   snapshot.loggerActive = true;
   snapshot.bios.push_back({
     .name = "Sega CD USA",
@@ -89,6 +94,8 @@ int main()
                !snapshot.qtVersion.empty() && !snapshot.sdlVersion.empty() &&
                report.find("OpenGL") != std::string::npos &&
                report.find("Sega CD USA: Valid") != std::string::npos &&
+               report.find("Rewind: Enabled (active)") != std::string::npos &&
+               report.find("Rewind snapshots: 12") != std::string::npos &&
                report.find("/users/alex") == std::string::npos &&
                report.find("hunter2") == std::string::npos &&
                report.find("Privacy:") != std::string::npos,

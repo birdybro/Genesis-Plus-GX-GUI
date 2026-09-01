@@ -31,6 +31,10 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.controllerCount = 2U;
     snapshot.audioBufferedFrames = 128U;
     snapshot.audioCapacityFrames = 512U;
+    snapshot.rewindEnabled = true;
+    snapshot.rewindSnapshots = 7U;
+    snapshot.rewindPayloadBytes = 7U * 1024U;
+    snapshot.rewindMemoryLimitBytes = 64U * 1024U;
     snapshot.loggerActive = true;
     snapshot.logger.writtenMessages = 42U;
     snapshot.bios.push_back({
@@ -61,6 +65,8 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
   QVERIFY(report->toPlainText().contains(QStringLiteral("Test renderer generation 1")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Sega CD USA: Valid")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Controllers: 2")));
+  QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind: Enabled")));
+  QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind snapshots: 7")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("do-not-copy")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("/users/private")));
 

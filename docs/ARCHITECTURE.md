@@ -150,6 +150,21 @@ the main window and forces its release on focus loss, hide, game close, or confi
 replacement. The core and worker continue to receive only the single canonical
 fast-forward boolean.
 
+Rewind history follows the same owner-thread rule. After a configured number of forward
+frames, the worker captures the core's unchanged raw state payload into a deque whose
+aggregate payload bytes cannot exceed the configured limit. Oldest entries are evicted
+first. A rewind tick pops the newest state earlier than the current frame, restores it
+with its frontend frame number, executes one frame to refresh the framebuffer, publishes
+through the existing triple buffer, and writes no host audio. Lifecycle discontinuities
+clear history so a state can never cross games, resets, discs, or incompatible settings.
+
+```text
+forward frame -> raw state capture -> byte-capped rewind deque
+                                          |
+rewind command -> earlier state restore <-+ -> video exchange
+                                                (audio ring cleared)
+```
+
 The core adapter exposes observation-only capacities for its fixed framebuffer, audio,
 save-state, and state-load scratch buffers. Worker metrics likewise expose command/event
 queue depths together with configured capacities. The long-running regression samples

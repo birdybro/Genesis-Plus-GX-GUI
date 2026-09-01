@@ -254,8 +254,10 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::gameLibrary},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Advanced"),
-    tr("Per-game overrides and read-only runtime diagnostics for troubleshooting."),
+    tr("Rewind history, per-game overrides, and runtime diagnostics."),
     "advancedSettingsPage", "advancedSettingsSummary", advancedSummary_, {
+      {tr("Rewind Settings…"), "configureRewindButton",
+        SettingsPageAction::rewind},
       {tr("Per-Game Settings…"), "configurePerGameButton",
         SettingsPageAction::perGame},
       {tr("Log and Diagnostics…"), "openDiagnosticsButton",
@@ -373,9 +375,16 @@ void SettingsDialog::refresh()
   } else {
     pathsSummary_->setText(tr("Platform application-data paths are unavailable."));
   }
+  const auto rewindSummary = overview_.rewind.enabled
+    ? tr("Rewind: enabled, %1 MiB, every %2 frames")
+        .arg(overview_.rewind.memoryLimitBytes / (1024U * 1024U))
+        .arg(overview_.rewind.captureIntervalFrames)
+    : tr("Rewind: disabled");
   advancedSummary_->setText(overview_.gameLoaded
-    ? tr("Per-game overrides are available for the loaded game. Diagnostics can be copied without personal secrets.")
-    : tr("Load a game to configure per-game overrides. Diagnostics remain available."));
+    ? tr("%1\nPer-game overrides are available. Diagnostics omit personal secrets.")
+        .arg(rewindSummary)
+    : tr("%1\nLoad a game to configure per-game overrides. Diagnostics remain available.")
+        .arg(rewindSummary));
   perGameButton_->setEnabled(overview_.gameLoaded);
 }
 

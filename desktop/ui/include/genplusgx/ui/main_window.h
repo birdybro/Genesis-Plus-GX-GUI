@@ -18,6 +18,7 @@
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
+#include "genplusgx/settings/rewind_settings.h"
 
 #include <QMainWindow>
 
@@ -77,6 +78,7 @@ enum class EmulationUiOperation {
   softReset,
   frameAdvance,
   setFastForward,
+  setRewinding,
 };
 
 class MainWindow final : public QMainWindow {
@@ -115,6 +117,8 @@ public:
     const settings::PerGameSettings&)>;
   using AppearanceSettingsSink = std::function<PersistenceStatus(
     const settings::AppearanceSettings&)>;
+  using RewindSettingsSink = std::function<PersistenceStatus(
+    const RewindConfiguration&)>;
   using DiagnosticsSnapshotProvider =
     std::function<diagnostics::DiagnosticsSnapshot()>;
   using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
@@ -149,7 +153,15 @@ public:
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
   void setStateOperationSink(StateOperationSink sink);
   void setEmulationControlSink(EmulationControlSink sink);
-  void setEmulationControlState(bool paused, bool fastForward);
+  void setEmulationControlState(
+    bool paused,
+    bool fastForward,
+    bool rewinding,
+    bool rewindAvailable);
+  void setRewindSettings(RewindConfiguration settings);
+  void setRewindSettingsSink(RewindSettingsSink sink);
+  [[nodiscard]] const RewindConfiguration& rewindSettings() const noexcept;
+  void showRewindSettings();
   void setVideoSettings(settings::VideoSettings settings);
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
@@ -289,6 +301,7 @@ private:
     EmulationUiOperation operation,
     bool enabled = false);
   void setFastForwardHeld(bool held);
+  void setRewindHeld(bool held);
   void updateEmulationControls();
   void updateStateActions();
   void updateStateSlotPresentation();
@@ -343,6 +356,7 @@ private:
   CheatConfigurationSink cheatConfigurationSink_;
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
+  RewindSettingsSink rewindSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   DebugRequestSink debugRequestSink_;
   cheats::CheatConfiguration cheatConfiguration_;
@@ -351,6 +365,7 @@ private:
   settings::AppearanceSettings appearanceSettings_;
   settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
+  RewindConfiguration rewindSettings_;
   ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
@@ -366,6 +381,10 @@ private:
   bool fastForwardActive_{false};
   bool fastForwardHeld_{false};
   bool fastForwardToggled_{false};
+  bool rewindActive_{false};
+  bool rewindAvailable_{false};
+  bool rewindHeld_{false};
+  bool rewindToggled_{false};
   bool segaCdSession_{false};
   bool discEjected_{false};
   bool discPresent_{false};

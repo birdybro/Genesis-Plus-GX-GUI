@@ -1,5 +1,6 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 
@@ -39,6 +40,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .system = {},
     .bios = {},
     .screenshots = {.directory = root / "custom-shots"},
+    .rewind = genplusgx::settings::defaultRewindSettings(),
     .paths = genplusgx::ApplicationPaths{root},
     .connectedControllerCount = 2U,
     .pathsAvailable = true,
@@ -86,6 +88,9 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   dialog.openPage(genplusgx::ui::SettingsPage::paths);
   QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("pathsSettingsSummary"))
     ->text().contains(directory.path()));
+  dialog.openPage(genplusgx::ui::SettingsPage::advanced);
+  QVERIFY(dialog.findChild<QLabel*>(QStringLiteral("advancedSettingsSummary"))
+    ->text().contains(QStringLiteral("128 MiB")));
 
   QTest::mouseClick(
     dialog.findChild<QPushButton*>(QStringLiteral("configureVideoButton")),
@@ -93,9 +98,13 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   QTest::mouseClick(
     dialog.findChild<QPushButton*>(QStringLiteral("configureAssignmentsButton")),
     Qt::LeftButton);
+  QTest::mouseClick(
+    dialog.findChild<QPushButton*>(QStringLiteral("configureRewindButton")),
+    Qt::LeftButton);
   const std::vector expectedActions{
     genplusgx::ui::SettingsPageAction::video,
-    genplusgx::ui::SettingsPageAction::playerAssignments};
+    genplusgx::ui::SettingsPageAction::playerAssignments,
+    genplusgx::ui::SettingsPageAction::rewind};
   QCOMPARE(actions, expectedActions);
 
   auto* perGame =
@@ -144,6 +153,15 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
     QStringLiteral("videoSettingsDialog"));
   QVERIFY(video != nullptr);
   video->reject();
+
+  center->openPage(genplusgx::ui::SettingsPage::advanced);
+  QTest::mouseClick(center->findChild<QPushButton*>(
+    QStringLiteral("configureRewindButton")), Qt::LeftButton);
+  QApplication::processEvents();
+  auto* rewind = window.findChild<genplusgx::ui::RewindSettingsDialog*>(
+    QStringLiteral("rewindSettingsDialog"));
+  QVERIFY(rewind != nullptr);
+  rewind->reject();
 
   settingsAction->trigger();
   QApplication::processEvents();

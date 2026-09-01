@@ -2,12 +2,14 @@ add_library(genplusgx_settings STATIC
   include/genplusgx/settings/appearance_settings.h
   include/genplusgx/settings/audio_settings.h
   include/genplusgx/settings/per_game_settings.h
+  include/genplusgx/settings/rewind_settings.h
   include/genplusgx/settings/system_settings.h
   include/genplusgx/settings/screenshot_settings.h
   include/genplusgx/settings/video_settings.h
   src/appearance_settings.cpp
   src/audio_settings.cpp
   src/per_game_settings.cpp
+  src/rewind_settings.cpp
   src/system_settings.cpp
   src/screenshot_settings.cpp
   src/video_settings.cpp

@@ -181,6 +181,9 @@ public:
   [[nodiscard]] CoreResult setInputSnapshot(const InputSnapshot& snapshot);
   [[nodiscard]] CoreResult saveRawState(std::vector<std::uint8_t>& output);
   [[nodiscard]] CoreResult loadRawState(std::span<const std::uint8_t> state);
+  [[nodiscard]] CoreResult loadRawState(
+    std::span<const std::uint8_t> state,
+    std::uint64_t emulatedFrameNumber);
   [[nodiscard]] CoreResult backupMemoryInfo(
     BackupMemoryKind kind,
     BackupMemoryInfo& output) const;

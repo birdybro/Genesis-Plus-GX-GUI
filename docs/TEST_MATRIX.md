@@ -61,7 +61,7 @@ Core option-domain regressions explicitly execute 13 video choices, 35 audio
 enumeration/range-endpoint choices, all 12 exposed emulated input devices, and all 24
 system enumeration/toggle values. The generated 8-bit fixtures additionally execute
 every compatible hardware override and both Game Gear viewport modes. GUI inventory
-assertions require the corresponding combo counts/ranges plus all 29 emulator hotkeys.
+assertions require the corresponding combo counts/ranges plus all 30 emulator hotkeys.
 The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 113
 compatible runtime cases on a user-owned game and emits local comparison images.
 

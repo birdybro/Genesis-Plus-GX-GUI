@@ -1,5 +1,26 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_rewind_buffer_test rewind_buffer_test.cpp)
+target_link_libraries(
+  genplusgx_rewind_buffer_test
+  PRIVATE GenesisPlusGX::CoreAdapter genplusgx_project_warnings
+)
+add_test(NAME unit.rewind_buffer COMMAND genplusgx_rewind_buffer_test)
+set_tests_properties(
+  unit.rewind_buffer PROPERTIES LABELS "unit;rewind;state;bounded" TIMEOUT 30
+)
+
+add_executable(genplusgx_rewind_settings_test rewind_settings_test.cpp)
+target_link_libraries(
+  genplusgx_rewind_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.rewind_settings COMMAND genplusgx_rewind_settings_test)
+set_tests_properties(
+  unit.rewind_settings
+  PROPERTIES LABELS "unit;rewind;settings;persistence;filesystem" TIMEOUT 30
+)
+
 add_executable(genplusgx_debug_analysis_test debug_analysis_test.cpp)
 target_link_libraries(
   genplusgx_debug_analysis_test

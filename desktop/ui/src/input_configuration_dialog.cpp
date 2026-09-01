@@ -61,6 +61,8 @@ constexpr std::array hotkeyDescriptions{
     "Fast forward (hold)", "FastForwardHold"},
   HotkeyDescription{input::EmulatorHotkeyAction::fastForwardToggle,
     "Fast forward (toggle)", "FastForwardToggle"},
+  HotkeyDescription{input::EmulatorHotkeyAction::rewindHold,
+    "Rewind (hold)", "RewindHold"},
   HotkeyDescription{input::EmulatorHotkeyAction::frameAdvance, "Frame advance", "FrameAdvance"},
   HotkeyDescription{input::EmulatorHotkeyAction::saveState, "Save state", "SaveState"},
   HotkeyDescription{input::EmulatorHotkeyAction::loadState, "Load state", "LoadState"},

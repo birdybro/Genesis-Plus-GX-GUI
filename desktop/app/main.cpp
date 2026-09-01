@@ -26,6 +26,7 @@
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
+#include "genplusgx/settings/rewind_settings.h"
 #include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/theme_controller.h"
@@ -415,6 +416,15 @@ int main(int argc, char* argv[])
       recordStartupIssue("Screenshot settings migration", migrated.message);
     }
   }
+  genplusgx::settings::RewindSettingsStore rewindSettingsStore{
+    applicationPaths.configDirectory() / "rewind-settings.json"};
+  auto loadedRewindSettings = rewindSettingsStore.load();
+  if (!loadedRewindSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedRewindSettings.status.message);
+    recordStartupIssue("Rewind settings", loadedRewindSettings.status.message);
+  }
+  auto rewindSettings = loadedRewindSettings.settings;
   genplusgx::platform::BiosManager biosManager{
     genplusgx::platform::BiosConfigurationStore{
       applicationPaths.configDirectory() / "bios.json"}};
@@ -514,6 +524,14 @@ int main(int argc, char* argv[])
         "The emulation service could not start, so the application must close.\n\n%1")
         .arg(QString::fromStdString(workerStarted.message)));
     return 1;
+  }
+  std::uint64_t rewindSettingsOperationId = 850'000U;
+  const auto initialRewindSettings = worker.submit(
+    genplusgx::EmulationCommand::updateRewindSettings(
+      ++rewindSettingsOperationId, rewindSettings));
+  if (!initialRewindSettings) {
+    qWarning().noquote() << QString::fromStdString(initialRewindSettings.message);
+    recordStartupIssue("Rewind runtime settings", initialRewindSettings.message);
   }
 
   genplusgx::ui::MainWindow window;
@@ -741,6 +759,25 @@ int main(int argc, char* argv[])
   window.setVideoSettings(videoSettings);
   window.setAudioSettings(audioSettings);
   window.setSystemSettings(systemSettings);
+  window.setRewindSettings(rewindSettings);
+  window.setRewindSettingsSink(
+    [&rewindSettings, &rewindSettingsOperationId, &rewindSettingsStore,
+     &worker](const genplusgx::RewindConfiguration& settings) {
+      const auto previous = rewindSettings;
+      const auto saved = rewindSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateRewindSettings(
+          ++rewindSettingsOperationId, settings));
+      if (!submitted) {
+        static_cast<void>(rewindSettingsStore.save(previous));
+        return workerPersistenceFailure(submitted.message);
+      }
+      rewindSettings = settings;
+      return genplusgx::PersistenceStatus{};
+    });
   window.setScreenshotSettings(
     screenshotSettings, applicationPaths.screenshotsDirectory());
   window.setScreenshotSettingsSink(
@@ -1392,7 +1429,7 @@ int main(int argc, char* argv[])
   window.setDiagnosticsSnapshotProvider(
     [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
-     &window] {
+     &rewindSettings, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
@@ -1423,6 +1460,12 @@ int main(int argc, char* argv[])
         snapshot.audioBufferedFrames = ring->occupancyFrames();
         snapshot.audioCapacityFrames = ring->capacityFrames();
       }
+      const auto workerMetrics = worker.metrics();
+      snapshot.rewindEnabled = rewindSettings.enabled;
+      snapshot.rewinding = workerMetrics.rewinding;
+      snapshot.rewindSnapshots = workerMetrics.rewindSnapshotCount;
+      snapshot.rewindPayloadBytes = workerMetrics.rewindPayloadBytes;
+      snapshot.rewindMemoryLimitBytes = workerMetrics.rewindMemoryLimitBytes;
       snapshot.loggerActive = frontendLogger.installed();
       snapshot.logger = frontendLogger.metrics();
       const auto& bios = biosManager.snapshot();
@@ -1590,6 +1633,10 @@ int main(int argc, char* argv[])
           break;
         case UiOperation::setFastForward:
           command = genplusgx::EmulationCommand::fastForward(
+            operationId, enabled);
+          break;
+        case UiOperation::setRewinding:
+          command = genplusgx::EmulationCommand::rewinding(
             operationId, enabled);
           break;
       }
@@ -1829,13 +1876,14 @@ int main(int argc, char* argv[])
       nextInstrumentationLog = instrumentationNow + std::chrono::seconds{5};
     }
     while (auto event = worker.pollEvent()) {
-      if (event->type != genplusgx::EmulationEventType::frameCompleted &&
-          window.isGameLoaded() &&
+      if (window.isGameLoaded() &&
           (event->workerState == genplusgx::EmulationWorkerState::paused ||
            event->workerState == genplusgx::EmulationWorkerState::running)) {
         window.setEmulationControlState(
           event->workerState == genplusgx::EmulationWorkerState::paused,
-          event->fastForward);
+          event->fastForward,
+          event->rewinding,
+          event->rewindAvailable);
       }
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
@@ -1933,7 +1981,8 @@ int main(int argc, char* argv[])
             ? discRegionName(event->disc.region)
             : completedLoad.diagnosticRegion;
           window.setGameLoaded(loadedPath);
-          window.setEmulationControlState(true, false);
+          window.setEmulationControlState(
+            true, event->fastForward, event->rewinding, event->rewindAvailable);
           if (activePerGameIdentity) {
             window.setPerGameSettingsSession(
               activePerGameSettings, globalGameSettings());
@@ -2201,7 +2250,7 @@ int main(int argc, char* argv[])
       }
       const bool audioShouldRun =
         event->workerState == genplusgx::EmulationWorkerState::running &&
-        !event->fastForward;
+        !event->fastForward && !event->rewinding;
       if (audioShouldRun &&
           audioOutput.isPaused()) {
         const auto resumed = audioOutput.resume();

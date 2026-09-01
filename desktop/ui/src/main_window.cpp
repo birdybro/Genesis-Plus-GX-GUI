@@ -14,6 +14,7 @@
 #include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
+#include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -181,6 +182,24 @@ void MainWindow::buildMenus()
       updateEmulationControls();
     }
   });
+  auto* rewind = addAction(
+    *emulation, tr("&Rewind Toggle"), "rewindAction");
+  rewind->setCheckable(true);
+  rewind->setToolTip(tr("Toggle rewind; hold the configured rewind hotkey for momentary use"));
+  connect(rewind, &QAction::toggled, this, [this](bool enabled) {
+    const bool previous = rewindToggled_;
+    rewindToggled_ = enabled;
+    if (!requestEmulationControl(
+          EmulationUiOperation::setRewinding,
+          rewindToggled_ || rewindHeld_)) {
+      rewindToggled_ = previous;
+      updateEmulationControls();
+    }
+  });
+  auto* rewindSettings = addAction(
+    *emulation, tr("Rewind &Settings…"), "rewindSettingsAction");
+  connect(rewindSettings, &QAction::triggered,
+    this, &MainWindow::showRewindSettings);
   auto* frameAdvance = addAction(
     *emulation, tr("Frame &Advance"), "frameAdvanceAction", QKeySequence{tr("N")});
   connect(frameAdvance, &QAction::triggered, this, [this] {
@@ -659,7 +678,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
 {
   static constexpr const char* gameActionNames[]{
     "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
-    "softResetAction", "fastForwardAction", "frameAdvanceAction",
+    "softResetAction", "fastForwardAction", "rewindAction", "frameAdvanceAction",
     "cheatsAction",
     "gameInformationAction"};
   for (const auto* name : gameActionNames) {
@@ -680,15 +699,26 @@ void MainWindow::setEmulationControlSink(EmulationControlSink sink)
   updateEmulationControls();
 }
 
-void MainWindow::setEmulationControlState(bool paused, bool fastForward)
+void MainWindow::setEmulationControlState(
+  bool paused,
+  bool fastForward,
+  bool rewinding,
+  bool rewindAvailable)
 {
   emulationPaused_ = isGameLoaded() && paused;
   fastForwardActive_ = isGameLoaded() && fastForward;
+  rewindActive_ = isGameLoaded() && rewinding;
+  rewindAvailable_ = isGameLoaded() && rewindAvailable;
   if (!isGameLoaded()) {
     fastForwardHeld_ = false;
     fastForwardToggled_ = false;
+    rewindHeld_ = false;
+    rewindToggled_ = false;
   } else if (!fastForwardHeld_) {
     fastForwardToggled_ = fastForwardActive_;
+  }
+  if (isGameLoaded() && !rewindHeld_) {
+    rewindToggled_ = rewindActive_;
   }
   updateEmulationControls();
   if (auto* debugger = findChild<DebugToolsWindow*>(
@@ -714,6 +744,18 @@ bool MainWindow::requestEmulationControl(
     emulationPaused_ = false;
   } else if (operation == EmulationUiOperation::setFastForward) {
     fastForwardActive_ = enabled;
+    if (enabled) {
+      rewindActive_ = false;
+      rewindHeld_ = false;
+      rewindToggled_ = false;
+    }
+  } else if (operation == EmulationUiOperation::setRewinding) {
+    rewindActive_ = enabled;
+    if (enabled) {
+      fastForwardActive_ = false;
+      fastForwardHeld_ = false;
+      fastForwardToggled_ = false;
+    }
   }
   updateEmulationControls();
   return true;
@@ -734,44 +776,78 @@ void MainWindow::setFastForwardHeld(bool held)
   }
 }
 
+void MainWindow::setRewindHeld(bool held)
+{
+  if (held == rewindHeld_) {
+    return;
+  }
+  const bool previous = rewindHeld_;
+  rewindHeld_ = held;
+  const bool effective = rewindToggled_ || rewindHeld_;
+  if (effective != rewindActive_ &&
+      !requestEmulationControl(EmulationUiOperation::setRewinding, effective)) {
+    rewindHeld_ = previous;
+  }
+}
+
 bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 {
   if (event->type() == QEvent::ApplicationDeactivate ||
       (event->type() == QEvent::WindowDeactivate && watched == this) ||
       (event->type() == QEvent::Hide && watched == this)) {
     setFastForwardHeld(false);
+    setRewindHeld(false);
   }
 
   if (event->type() != QEvent::KeyPress &&
       event->type() != QEvent::KeyRelease) {
     return QMainWindow::eventFilter(watched, event);
   }
-  const auto combination = input::hotkeyCombination(
+  const auto fastForwardCombination = input::hotkeyCombination(
     inputConfiguration_, input::EmulatorHotkeyAction::fastForwardHold);
-  if (!combination) {
+  const auto rewindCombination = input::hotkeyCombination(
+    inputConfiguration_, input::EmulatorHotkeyAction::rewindHold);
+  if (!fastForwardCombination && !rewindCombination) {
     return QMainWindow::eventFilter(watched, event);
   }
 
   auto* keyEvent = static_cast<QKeyEvent*>(event);
-  const auto configured = QKeyCombination::fromCombined(*combination);
-  const bool releaseOfHeldKey = fastForwardHeld_ &&
-    event->type() == QEvent::KeyRelease && keyEvent->key() == configured.key();
-  const bool exactPress = event->type() == QEvent::KeyPress &&
-    keyEvent->keyCombination() == configured;
-  if (!exactPress && !releaseOfHeldKey) {
+  const auto matches = [event, keyEvent](
+      std::optional<int> combination, bool held) {
+    if (!combination) {
+      return std::pair{false, false};
+    }
+    const auto configured = QKeyCombination::fromCombined(*combination);
+    const bool release = held && event->type() == QEvent::KeyRelease &&
+      keyEvent->key() == configured.key();
+    const bool press = event->type() == QEvent::KeyPress &&
+      keyEvent->keyCombination() == configured;
+    return std::pair{press, release};
+  };
+  const auto [fastPress, fastRelease] = matches(
+    fastForwardCombination, fastForwardHeld_);
+  const auto [rewindPress, rewindRelease] = matches(
+    rewindCombination, rewindHeld_);
+  if (!fastPress && !fastRelease && !rewindPress && !rewindRelease) {
     return QMainWindow::eventFilter(watched, event);
   }
 
   auto* widget = qobject_cast<QWidget*>(watched);
   const bool belongsToWindow = widget != nullptr && widget->window() == this;
   const auto* active = QApplication::activeWindow();
-  if (exactPress &&
+  if ((fastPress || rewindPress) &&
       (!belongsToWindow || (active != nullptr && active != this) ||
-       !isGameLoaded() || gameLoading_)) {
+       !isGameLoaded() || gameLoading_ || emulationPaused_ ||
+       (rewindPress && !rewindAvailable_))) {
     return QMainWindow::eventFilter(watched, event);
   }
   if (!keyEvent->isAutoRepeat()) {
-    setFastForwardHeld(exactPress);
+    if (fastPress || fastRelease) {
+      setFastForwardHeld(fastPress);
+    }
+    if (rewindPress || rewindRelease) {
+      setRewindHeld(rewindPress);
+    }
   }
   return true;
 }
@@ -784,6 +860,7 @@ void MainWindow::updateEmulationControls()
   auto* reset = findChild<QAction*>(QStringLiteral("resetAction"));
   auto* softReset = findChild<QAction*>(QStringLiteral("softResetAction"));
   auto* fastForward = findChild<QAction*>(QStringLiteral("fastForwardAction"));
+  auto* rewind = findChild<QAction*>(QStringLiteral("rewindAction"));
   auto* frameAdvance = findChild<QAction*>(QStringLiteral("frameAdvanceAction"));
   if (pause != nullptr) {
     const QSignalBlocker blocker{pause};
@@ -801,6 +878,12 @@ void MainWindow::updateEmulationControls()
     const QSignalBlocker blocker{fastForward};
     fastForward->setChecked(available && fastForwardToggled_);
     fastForward->setEnabled(available);
+  }
+  if (rewind != nullptr) {
+    const QSignalBlocker blocker{rewind};
+    rewind->setChecked(available && rewindToggled_);
+    rewind->setEnabled(available && !emulationPaused_ &&
+      (rewindAvailable_ || rewindActive_));
   }
   if (frameAdvance != nullptr) {
     frameAdvance->setEnabled(available && emulationPaused_);
@@ -1399,9 +1482,62 @@ void MainWindow::showSettings(SettingsPage page)
       case SettingsPageAction::perGame:
         showPerGameSettings();
         break;
+      case SettingsPageAction::rewind:
+        showRewindSettings();
+        break;
     }
   });
   dialog->openPage(page);
+  dialog->open();
+}
+
+void MainWindow::setRewindSettings(RewindConfiguration settings)
+{
+  if (!validateRewindConfiguration(settings)) {
+    return;
+  }
+  rewindSettings_ = settings;
+  if (!rewindSettings_.enabled) {
+    rewindAvailable_ = false;
+    rewindActive_ = false;
+    rewindHeld_ = false;
+    rewindToggled_ = false;
+  }
+  updateEmulationControls();
+  refreshSettingsDialog();
+}
+
+void MainWindow::setRewindSettingsSink(RewindSettingsSink sink)
+{
+  rewindSettingsSink_ = std::move(sink);
+}
+
+const RewindConfiguration& MainWindow::rewindSettings() const noexcept
+{
+  return rewindSettings_;
+}
+
+void MainWindow::showRewindSettings()
+{
+  if (auto* existing = findChild<RewindSettingsDialog*>(
+        QStringLiteral("rewindSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new RewindSettingsDialog(rewindSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const RewindConfiguration& settings) {
+    if (rewindSettingsSink_) {
+      const auto saved = rewindSettingsSink_(settings);
+      if (!saved) {
+        return saved;
+      }
+    }
+    setRewindSettings(settings);
+    statusBar()->showMessage(tr("Rewind settings applied."), 3'000);
+    return PersistenceStatus{};
+  });
   dialog->open();
 }
 
@@ -1991,6 +2127,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .system = systemSettings_,
     .bios = biosSnapshot_,
     .screenshots = screenshotSettings_,
+    .rewind = rewindSettings_,
     .paths = applicationPaths_,
     .connectedControllerCount = controllers_.size(),
     .pathsAvailable = applicationPathsAvailable_,
@@ -2010,6 +2147,7 @@ void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
 {
   if (input::validateInputConfiguration(configuration)) {
     setFastForwardHeld(false);
+    setRewindHeld(false);
     inputConfiguration_ = std::move(configuration);
     applyHotkeyShortcuts();
     refreshSettingsDialog();
@@ -2248,6 +2386,10 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   fastForwardActive_ = false;
   fastForwardHeld_ = false;
   fastForwardToggled_ = false;
+  rewindActive_ = false;
+  rewindAvailable_ = false;
+  rewindHeld_ = false;
+  rewindToggled_ = false;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
   displayWidget_->clearFrame();
@@ -2350,6 +2492,10 @@ void MainWindow::setNoGameLoaded()
   fastForwardActive_ = false;
   fastForwardHeld_ = false;
   fastForwardToggled_ = false;
+  rewindActive_ = false;
+  rewindAvailable_ = false;
+  rewindHeld_ = false;
+  rewindToggled_ = false;
   segaCdSession_ = false;
   discEjected_ = false;
   discPresent_ = false;

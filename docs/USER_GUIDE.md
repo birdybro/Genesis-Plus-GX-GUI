@@ -75,6 +75,16 @@ one decimal place, falls to `0.0 FPS` while paused, and reflects the faster cade
 fast-forward. The adjacent System and Region fields describe the loaded image; missing
 header data is shown explicitly as Unknown instead of leaving a stale prior-game value.
 
+Rewind begins recording in-memory states as soon as a game loads. Hold Backspace for
+momentary rewind or select **Emulation → Rewind Toggle** for latched backward playback.
+The action becomes available after the first earlier state exists. Audio is cleared and
+muted while moving backward, then normal PAL/NTSC/Sega CD pacing resumes on release.
+**Emulation → Rewind Settings…** (also available from **Settings → Advanced**) controls
+whether history is recorded, the 1–60-frame capture interval, and a strict 16–1024 MiB
+payload cap. Defaults are enabled, every six frames, and 128 MiB (roughly 12 seconds for
+one-MiB states at 60 Hz). Loading/unloading, reset, state restore, disc change, and
+state-affecting core setting changes clear incompatible history.
+
 ## Sega CD and Mega CD discs
 
 Configure the USA, Europe, and/or Japan BIOS you legally provide under **Tools → BIOS

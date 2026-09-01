@@ -1,6 +1,7 @@
 #include "genplusgx/emulation_worker.h"
 
 #include "genplusgx/bounded_queue.h"
+#include "genplusgx/rewind_buffer.h"
 #include "genplusgx/timing/host_timer_resolution.h"
 
 #include <array>
@@ -79,6 +80,24 @@ EmulationCommand EmulationCommand::fastForward(
 {
   auto command = simple(EmulationCommandType::setFastForward, operationId);
   command.enabled = enabled;
+  return command;
+}
+
+EmulationCommand EmulationCommand::rewinding(
+  std::uint64_t operationId,
+  bool enabled)
+{
+  auto command = simple(EmulationCommandType::setRewinding, operationId);
+  command.enabled = enabled;
+  return command;
+}
+
+EmulationCommand EmulationCommand::updateRewindSettings(
+  std::uint64_t operationId,
+  RewindConfiguration configuration)
+{
+  auto command = simple(EmulationCommandType::rewindSettings, operationId);
+  command.rewindConfiguration = configuration;
   return command;
 }
 
@@ -219,6 +238,8 @@ public:
     shutdownStatus_ = success();
     acceptingCommands_ = true;
     fastForward_ = false;
+    rewinding_ = false;
+    rewindBuffer_.clear();
     frameBreakpoints_.clear();
     lastBreakpointHit_.reset();
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
@@ -328,6 +349,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::rewindSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::rewindSettings;
+          },
+          std::move(command))) {
+      ++coalescedRewindSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -375,6 +406,7 @@ public:
   EmulationWorkerMetrics metrics() const
   {
     std::scoped_lock lock{mutex_};
+    const auto rewind = rewindBufferMetrics_;
     return {
       .commandQueueDepth = commands_.size(),
       .commandQueueCapacity = commands_.capacity(),
@@ -387,6 +419,7 @@ public:
       .coalescedSystemSettingsCommands = coalescedSystemSettingsCommands_,
       .coalescedFirmwareSettingsCommands = coalescedFirmwareSettingsCommands_,
       .coalescedCheatCommands = coalescedCheatCommands_,
+      .coalescedRewindSettingsCommands = coalescedRewindSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -397,6 +430,12 @@ public:
           pacingMetrics_.maximumLateness).count(),
       .targetFramesPerSecond = pacingMetrics_.targetFramesPerSecond,
       .fastForward = pacingMetrics_.fastForward,
+      .rewinding = rewindingMetrics_,
+      .rewindAvailable = rewindAvailableMetrics_,
+      .rewindSnapshotCount = rewind.snapshotCount,
+      .rewindPayloadBytes = rewind.payloadBytes,
+      .rewindMemoryLimitBytes = rewind.memoryLimitBytes,
+      .discardedRewindSnapshots = rewind.discardedSnapshots,
     };
   }
 
@@ -511,7 +550,7 @@ private:
     }
 
     pacer_ = FramePacer{};
-    updatePacingMetrics();
+    updateMetrics(adapter);
     owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
     publishOperation(eventFor(
       EmulationEventType::workerStarted, EmulationWorkerState::idle));
@@ -579,7 +618,7 @@ private:
   void finishThread(CoreAdapter& adapter)
   {
     pacer_.pause();
-    updatePacingMetrics();
+    updateMetrics(adapter);
     const auto persisted = saveBackupMemory(adapter);
     const auto shutdown = adapter.shutdown();
     endBackupGame();
@@ -617,6 +656,8 @@ private:
       case EmulationCommandType::loadGame: {
         frameBreakpoints_.clear();
         lastBreakpointHit_.reset();
+        rewinding_ = false;
+        rewindBuffer_.clear();
         coreResult = saveBackupMemory(adapter);
         if (!coreResult) {
           break;
@@ -634,6 +675,9 @@ private:
         if (coreResult) {
           coreResult = configurePacing(adapter, false);
         }
+        if (coreResult) {
+          coreResult = resetRewindHistory(adapter);
+        }
         if (!coreResult) {
           static_cast<void>(adapter.unloadGame());
           endBackupGame();
@@ -650,6 +694,8 @@ private:
       case EmulationCommandType::unloadGame:
         frameBreakpoints_.clear();
         lastBreakpointHit_.reset();
+        rewinding_ = false;
+        rewindBuffer_.clear();
         coreResult = saveBackupMemory(adapter);
         if (coreResult) {
           discardLatestFrame();
@@ -674,24 +720,35 @@ private:
       case EmulationCommandType::pause:
         validTransition = current == EmulationWorkerState::running;
         if (validTransition) {
+          rewinding_ = false;
           pacer_.pause();
           owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
         }
         break;
       case EmulationCommandType::hardReset:
         discardLatestFrame();
+        rewinding_ = false;
+        rewindBuffer_.clear();
         coreResult = adapter.reset();
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
         }
+        if (coreResult) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::softReset:
         discardLatestFrame();
+        rewinding_ = false;
+        rewindBuffer_.clear();
         coreResult = adapter.softReset();
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
+        }
+        if (coreResult) {
+          coreResult = resetRewindHistory(adapter);
         }
         break;
       case EmulationCommandType::frameAdvance:
@@ -704,6 +761,9 @@ private:
         validTransition = current == EmulationWorkerState::paused ||
                           current == EmulationWorkerState::running;
         if (validTransition) {
+          if (command.enabled) {
+            rewinding_ = false;
+          }
           if (pacer_.setFastForward(command.enabled, Clock::now())) {
             fastForward_ = command.enabled;
           } else {
@@ -714,28 +774,86 @@ private:
           }
         }
         break;
+      case EmulationCommandType::setRewinding:
+        validTransition = current == EmulationWorkerState::running ||
+          (!command.enabled && current == EmulationWorkerState::paused);
+        if (validTransition && command.enabled &&
+            (!rewindBuffer_.configuration().enabled ||
+             !rewindBuffer_.canRewind(adapter.frameCount()))) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            rewindBuffer_.configuration().enabled
+              ? "No earlier rewind snapshot is available yet."
+              : "Rewind is disabled in the current settings.",
+          };
+        } else if (validTransition) {
+          rewinding_ = command.enabled;
+          if (rewinding_) {
+            fastForward_ = false;
+            audioFrames_->clear();
+          }
+          if (!pacer_.setFastForward(false, Clock::now())) {
+            coreResult = {
+              CoreError::invalidTiming,
+              "Rewind could not restore normal frame pacing.",
+            };
+            rewinding_ = false;
+          }
+        }
+        break;
+      case EmulationCommandType::rewindSettings:
+        if (!rewindBuffer_.configure(command.rewindConfiguration)) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            "The rewind settings are outside their safe limits.",
+          };
+          break;
+        }
+        rewinding_ = false;
+        if (adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
+        break;
       case EmulationCommandType::inputSnapshot:
         coreResult = adapter.setInputSnapshot(command.input);
         break;
       case EmulationCommandType::inputSettings:
         coreResult = adapter.applyInputSettings(command.coreInputSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::videoSettings:
         discardLatestFrame();
         coreResult = adapter.applyVideoSettings(command.coreVideoSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::audioSettings:
         audioFrames_->clear();
         coreResult = adapter.applyAudioSettings(command.coreAudioSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::systemSettings:
         coreResult = adapter.applySystemSettings(command.coreSystemSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::firmwareSettings:
         coreResult = adapter.applyFirmwareSettings(command.coreFirmwareSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::cheats:
         coreResult = adapter.applyCheats(command.coreCheats);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = resetRewindHistory(adapter);
+        }
         break;
       case EmulationCommandType::setDiscEjected:
         validTransition = current == EmulationWorkerState::paused ||
@@ -743,6 +861,9 @@ private:
         if (validTransition) {
           audioFrames_->clear();
           coreResult = adapter.setDiscEjected(command.enabled);
+          if (coreResult) {
+            coreResult = resetRewindHistory(adapter);
+          }
         }
         break;
       case EmulationCommandType::changeDisc:
@@ -751,6 +872,9 @@ private:
         if (validTransition) {
           audioFrames_->clear();
           coreResult = adapter.changeDisc(command.path);
+          if (coreResult) {
+            coreResult = resetRewindHistory(adapter);
+          }
         }
         break;
       case EmulationCommandType::captureState:
@@ -761,10 +885,15 @@ private:
         break;
       case EmulationCommandType::restoreState:
         discardLatestFrame();
+        rewinding_ = false;
+        rewindBuffer_.clear();
         coreResult = adapter.loadRawState(command.rawState);
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
+        }
+        if (coreResult) {
+          coreResult = resetRewindHistory(adapter);
         }
         break;
       case EmulationCommandType::debugRequest: {
@@ -783,6 +912,10 @@ private:
             coreResult = adapter.debugRequest(
               command.coreDebugRequest, debugResponse);
           }
+          if (coreResult && writesCore &&
+              adapter.state() == CoreLifecycleState::loaded) {
+            coreResult = resetRewindHistory(adapter);
+          }
           if (coreResult) {
             eventType = EmulationEventType::debugResponse;
           }
@@ -791,7 +924,7 @@ private:
       }
     }
 
-    updatePacingMetrics();
+    updateMetrics(adapter);
 
     if (!validTransition) {
       auto event = eventFor(EmulationEventType::commandFailed, current);
@@ -803,6 +936,8 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      event.rewinding = rewinding_;
+      event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
       if (adapter.state() == CoreLifecycleState::loaded) {
         static_cast<void>(adapter.discInfo(event.disc));
       }
@@ -821,6 +956,8 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      event.rewinding = rewinding_;
+      event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
       if (adapter.state() == CoreLifecycleState::loaded) {
         static_cast<void>(adapter.discInfo(event.disc));
       }
@@ -837,6 +974,8 @@ private:
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
+    event.rewinding = rewinding_;
+    event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     event.rawState = std::move(capturedState);
     event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
@@ -851,7 +990,8 @@ private:
     if (!result) {
       owner_.state_.store(EmulationWorkerState::paused, std::memory_order_release);
       pacer_.pause();
-      updatePacingMetrics();
+      rewinding_ = false;
+      updateMetrics(adapter);
       auto event = eventFor(
         EmulationEventType::commandFailed, EmulationWorkerState::paused);
       event.error = EmulationWorkerError::coreFailure;
@@ -865,24 +1005,28 @@ private:
 
     pacer_.frameExecuted(Clock::now());
     auto frameState = EmulationWorkerState::running;
-    if (const auto breakpoint = matchingFrameBreakpoint(adapter)) {
-      frameState = EmulationWorkerState::paused;
-      owner_.state_.store(frameState, std::memory_order_release);
-      pacer_.pause();
-      audioFrames_->clear();
-      lastBreakpointHit_ = breakpoint;
-      auto event = eventFor(EmulationEventType::debugBreakpointHit, frameState);
-      event.command = EmulationCommandType::debugRequest;
-      event.frameNumber = adapter.frameCount();
-      event.hardware = adapter.hardware();
-      event.videoGeneration = videoFrames_->metrics().publishedFrames;
-      event.appliedInputSequence = adapter.appliedInputSequence();
-      event.fastForward = fastForward_;
-      event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
-      event.debug.breakpointHit = breakpoint;
-      publishOperation(std::move(event));
+    if (!rewinding_) {
+      if (const auto breakpoint = matchingFrameBreakpoint(adapter)) {
+        frameState = EmulationWorkerState::paused;
+        owner_.state_.store(frameState, std::memory_order_release);
+        pacer_.pause();
+        audioFrames_->clear();
+        lastBreakpointHit_ = breakpoint;
+        auto event = eventFor(EmulationEventType::debugBreakpointHit, frameState);
+        event.command = EmulationCommandType::debugRequest;
+        event.frameNumber = adapter.frameCount();
+        event.hardware = adapter.hardware();
+        event.videoGeneration = videoFrames_->metrics().publishedFrames;
+        event.appliedInputSequence = adapter.appliedInputSequence();
+        event.fastForward = fastForward_;
+        event.rewinding = rewinding_;
+        event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+        event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
+        event.debug.breakpointHit = breakpoint;
+        publishOperation(std::move(event));
+      }
     }
-    updatePacingMetrics();
+    updateMetrics(adapter);
 
     std::scoped_lock lock{mutex_};
     if (latestFrame_) {
@@ -895,6 +1039,8 @@ private:
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
+    event.rewinding = rewinding_;
+    event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     latestFrame_ = std::move(event);
     eventReady_.notify_all();
   }
@@ -961,6 +1107,41 @@ private:
 
   CoreResult executeOneFrame(CoreAdapter& adapter)
   {
+    if (rewinding_) {
+      const auto currentFrame = adapter.frameCount();
+      const auto latestUsableState = currentFrame > 0U
+        ? currentFrame - 1U : 0U;
+      auto snapshot = rewindBuffer_.takePrevious(latestUsableState);
+      if (!snapshot) {
+        return {};
+      }
+      audioFrames_->clear();
+      if (const auto restored = adapter.loadRawState(
+            snapshot->rawState, snapshot->frameNumber); !restored) {
+        return restored;
+      }
+      return executeCoreFrame(adapter, false);
+    }
+
+    const auto result = executeCoreFrame(adapter, true);
+    if (!result || !rewindBuffer_.shouldCapture(adapter.frameCount())) {
+      return result;
+    }
+    std::vector<std::uint8_t> state;
+    if (const auto captured = adapter.saveRawState(state); !captured) {
+      return captured;
+    }
+    if (!rewindBuffer_.capture(adapter.frameCount(), std::move(state))) {
+      return {
+        CoreError::stateSaveFailed,
+        "The bounded rewind history rejected a core snapshot.",
+      };
+    }
+    return {};
+  }
+
+  CoreResult executeCoreFrame(CoreAdapter& adapter, bool writeAudio)
+  {
     const auto result = adapter.runFrame(false);
     if (!result) {
       return result;
@@ -984,7 +1165,7 @@ private:
       if (!copiedAudio) {
         return copiedAudio;
       }
-      if (!fastForward_) {
+      if (writeAudio && !fastForward_) {
         static_cast<void>(audioFrames_->write(
           std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
       }
@@ -1003,6 +1184,26 @@ private:
       return {
         CoreError::invalidVideoFrame,
         "The bounded video exchange rejected a core frame.",
+      };
+    }
+    return {};
+  }
+
+  CoreResult resetRewindHistory(CoreAdapter& adapter)
+  {
+    rewindBuffer_.clear();
+    if (!rewindBuffer_.configuration().enabled ||
+        adapter.state() != CoreLifecycleState::loaded) {
+      return {};
+    }
+    std::vector<std::uint8_t> state;
+    if (const auto saved = adapter.saveRawState(state); !saved) {
+      return saved;
+    }
+    if (!rewindBuffer_.capture(adapter.frameCount(), std::move(state))) {
+      return {
+        CoreError::stateSaveFailed,
+        "The bounded rewind history rejected its initial core snapshot.",
       };
     }
     return {};
@@ -1031,10 +1232,13 @@ private:
     return {};
   }
 
-  void updatePacingMetrics()
+  void updateMetrics(CoreAdapter& adapter)
   {
     std::scoped_lock lock{mutex_};
     pacingMetrics_ = pacer_.metrics();
+    rewindBufferMetrics_ = rewindBuffer_.metrics();
+    rewindingMetrics_ = rewinding_;
+    rewindAvailableMetrics_ = rewindBuffer_.canRewind(adapter.frameCount());
   }
 
   void publishOperation(EmulationEvent event)
@@ -1078,6 +1282,7 @@ private:
   bool acceptingCommands_{false};
   std::atomic_bool stopRequested_{false};
   bool fastForward_{false};
+  bool rewinding_{false};
   EmulationWorkerStatus shutdownStatus_;
   std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
@@ -1087,6 +1292,10 @@ private:
   std::vector<std::uint8_t> backupScratch_;
   std::vector<CoreDebugBreakpoint> frameBreakpoints_;
   std::optional<CoreDebugBreakpoint> lastBreakpointHit_;
+  RewindBuffer rewindBuffer_;
+  RewindBufferMetrics rewindBufferMetrics_;
+  bool rewindingMetrics_{false};
+  bool rewindAvailableMetrics_{false};
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
@@ -1096,6 +1305,7 @@ private:
   std::uint64_t coalescedSystemSettingsCommands_{0};
   std::uint64_t coalescedFirmwareSettingsCommands_{0};
   std::uint64_t coalescedCheatCommands_{0};
+  std::uint64_t coalescedRewindSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

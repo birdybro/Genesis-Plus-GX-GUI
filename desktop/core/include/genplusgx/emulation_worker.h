@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/input_snapshot.h"
+#include "genplusgx/rewind_configuration.h"
 #include "genplusgx/audio_ring_buffer.h"
 #include "genplusgx/timing/frame_pacer.h"
 #include "genplusgx/video/frame_exchange.h"
@@ -40,6 +41,8 @@ enum class EmulationCommandType {
   softReset,
   frameAdvance,
   setFastForward,
+  setRewinding,
+  rewindSettings,
   inputSnapshot,
   inputSettings,
   videoSettings,
@@ -65,6 +68,7 @@ struct EmulationCommand final {
   CoreAudioSettings coreAudioSettings;
   CoreSystemSettings coreSystemSettings;
   CoreFirmwareSettings coreFirmwareSettings;
+  RewindConfiguration rewindConfiguration;
   std::vector<std::uint8_t> rawState;
   std::vector<CoreCheatPatch> coreCheats;
   CoreDebugRequest coreDebugRequest;
@@ -78,6 +82,12 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand fastForward(
     std::uint64_t operationId,
     bool enabled);
+  [[nodiscard]] static EmulationCommand rewinding(
+    std::uint64_t operationId,
+    bool enabled);
+  [[nodiscard]] static EmulationCommand updateRewindSettings(
+    std::uint64_t operationId,
+    RewindConfiguration configuration);
   [[nodiscard]] static EmulationCommand updateInput(
     std::uint64_t operationId,
     InputSnapshot input);
@@ -156,6 +166,8 @@ struct EmulationEvent final {
   std::uint64_t videoGeneration{0};
   std::uint64_t appliedInputSequence{0};
   bool fastForward{false};
+  bool rewinding{false};
+  bool rewindAvailable{false};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
   CoreDiscInfo disc;
@@ -179,6 +191,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedSystemSettingsCommands{0};
   std::uint64_t coalescedFirmwareSettingsCommands{0};
   std::uint64_t coalescedCheatCommands{0};
+  std::uint64_t coalescedRewindSettingsCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
   std::uint64_t pacedFrameCount{0};
@@ -187,6 +200,12 @@ struct EmulationWorkerMetrics final {
   std::int64_t maximumLatenessMicroseconds{0};
   double targetFramesPerSecond{0.0};
   bool fastForward{false};
+  bool rewinding{false};
+  bool rewindAvailable{false};
+  std::size_t rewindSnapshotCount{0U};
+  std::size_t rewindPayloadBytes{0U};
+  std::size_t rewindMemoryLimitBytes{0U};
+  std::uint64_t discardedRewindSnapshots{0U};
 };
 
 class EmulationWorker final {

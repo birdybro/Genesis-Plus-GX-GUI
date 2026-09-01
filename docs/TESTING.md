@@ -18,7 +18,7 @@ ctest --preset release
 
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
-`packaging`, `release`, and `documentation`:
+`rewind`, `packaging`, `release`, and `documentation`:
 
 ```bash
 ctest --preset debug -L gui --output-on-failure
@@ -33,6 +33,14 @@ Markdown links. It never follows external links or requires network access.
 Hosted builds enable `GENPLUSGX_WARNINGS_AS_ERRORS`, so a new frontend/test compiler
 warning fails the relevant platform job before CTest. This is intentionally not applied
 wholesale to inherited core or bundled third-party sources.
+
+`unit.rewind_buffer` proves strict byte-cap eviction and backward ordering;
+`unit.rewind_settings` covers defaults, atomic persistence, validation, and corruption;
+`core.rewind_worker` runs a generated Genesis program forward, rewinds to lower frame
+numbers through the real worker/core state path, verifies the audio ring remains empty,
+then resumes forward. `gui.rewind_settings`, `gui.emulation_controls`, and
+`gui.input_configuration` cover settings transactions, toggle/hold/focus behavior,
+hotkey migration, and stable widget identifiers.
 
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not

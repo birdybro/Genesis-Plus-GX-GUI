@@ -756,6 +756,13 @@ CoreResult CoreAdapter::saveRawState(std::vector<std::uint8_t>& output)
 
 CoreResult CoreAdapter::loadRawState(std::span<const std::uint8_t> state)
 {
+  return loadRawState(state, 0U);
+}
+
+CoreResult CoreAdapter::loadRawState(
+  std::span<const std::uint8_t> state,
+  std::uint64_t emulatedFrameNumber)
+{
   std::scoped_lock lock{coreMutex};
   if (const auto owner = requireOwner(true); !owner) {
     return owner;
@@ -784,7 +791,7 @@ CoreResult CoreAdapter::loadRawState(std::span<const std::uint8_t> state)
   private_->pendingAudioFrames = 0;
   private_->pendingAudioFrameNumber = 0;
   bitmap.viewport.changed = 3;
-  frameCount_ = 0;
+  frameCount_ = emulatedFrameNumber;
   return success();
 }
 

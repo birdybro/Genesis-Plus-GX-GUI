@@ -44,6 +44,7 @@ QString keyboardShortcutText()
     "Soft reset                Ctrl+Shift+R\n"
     "Fast forward (hold)       Tab\n"
     "Fast forward (toggle)     `\n"
+    "Rewind (hold)             Backspace\n"
     "Frame advance             N (while paused)\n"
     "Save state                F5\n"
     "Load state                F8\n"

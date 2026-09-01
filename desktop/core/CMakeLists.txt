@@ -271,10 +271,13 @@ add_library(
   include/genplusgx/core_debug.h
   include/genplusgx/core_firmware_settings.h
   include/genplusgx/core_input_settings.h
+  include/genplusgx/rewind_buffer.h
+  include/genplusgx/rewind_configuration.h
   src/debug_analysis.cpp
   src/core_debug.cpp
   src/core_adapter.cpp
   src/emulation_worker.cpp
+  src/rewind_buffer.cpp
 )
 add_library(GenesisPlusGX::CoreAdapter ALIAS genplusgx_core_adapter)
 target_link_libraries(

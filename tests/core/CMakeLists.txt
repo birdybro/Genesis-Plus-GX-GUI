@@ -283,6 +283,20 @@ target_link_libraries(
     genplusgx_test_utilities
     genplusgx_project_warnings
 )
+
+add_executable(genplusgx_rewind_worker_test rewind_worker_test.cpp)
+target_link_libraries(
+  genplusgx_rewind_worker_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_test_utilities
+    genplusgx_project_warnings
+)
+add_test(NAME core.rewind_worker COMMAND genplusgx_rewind_worker_test)
+set_tests_properties(
+  core.rewind_worker
+  PROPERTIES LABELS "core;integration;fixture;concurrency;state;rewind;audio" TIMEOUT 30
+)
 add_test(NAME core.emulation_worker COMMAND genplusgx_emulation_worker_test)
 set_tests_properties(
   core.emulation_worker

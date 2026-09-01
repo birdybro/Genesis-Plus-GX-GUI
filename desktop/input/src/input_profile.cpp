@@ -61,6 +61,7 @@ constexpr std::array hotkeyActions{
   EmulatorHotkeyAction::fullscreen,
   EmulatorHotkeyAction::fastForwardHold,
   EmulatorHotkeyAction::fastForwardToggle,
+  EmulatorHotkeyAction::rewindHold,
   EmulatorHotkeyAction::frameAdvance,
   EmulatorHotkeyAction::saveState,
   EmulatorHotkeyAction::loadState,
@@ -466,6 +467,45 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
     }
     configuration.profiles.push_back(*profile);
   }
+  if (schema >= 2 && schema < 4 &&
+      std::ranges::none_of(configuration.hotkeys, [](const HotkeyBinding& binding) {
+        return binding.action == EmulatorHotkeyAction::rewindHold;
+      })) {
+    const std::array candidates{
+      combined(Qt::NoModifier, Qt::Key_Backspace),
+      combined(Qt::ControlModifier, Qt::Key_Backspace),
+      combined(Qt::NoModifier, Qt::Key_F11),
+    };
+    const auto available = std::ranges::find_if(candidates,
+      [&configuration](int candidate) {
+        const auto key = QKeyCombination::fromCombined(candidate).key();
+        const bool hotkeyUsed = std::ranges::any_of(
+          configuration.hotkeys, [candidate](const HotkeyBinding& binding) {
+            return binding.keyCombination == candidate;
+          });
+        const bool gameplayUsed = std::ranges::any_of(
+          configuration.profiles, [key](const InputProfile& profile) {
+            return std::ranges::any_of(
+              profile.keyboardBindings, [key](const KeyboardBinding& binding) {
+                return binding.key == key;
+              });
+          });
+        return !hotkeyUsed &&
+          (QKeyCombination::fromCombined(candidate).keyboardModifiers()
+              .testAnyFlags(Qt::ControlModifier | Qt::AltModifier |
+                Qt::MetaModifier) || !gameplayUsed);
+      });
+    if (available == candidates.end()) {
+      return {
+        .status = failure(InputProfileError::parseFailed,
+          "No conflict-free key is available for the rewind hotkey migration."),
+        .exists = true,
+        .configuration = defaultInputConfiguration(),
+      };
+    }
+    configuration.hotkeys.push_back(
+      {EmulatorHotkeyAction::rewindHold, *available});
+  }
   const auto validation = validateInputConfiguration(configuration);
   if (!validation) {
     return {
@@ -505,6 +545,8 @@ std::string_view emulatorHotkeyActionName(EmulatorHotkeyAction action) noexcept
     return "fast-forward-hold";
   case EmulatorHotkeyAction::fastForwardToggle:
     return "fast-forward-toggle";
+  case EmulatorHotkeyAction::rewindHold:
+    return "rewind-hold";
   case EmulatorHotkeyAction::frameAdvance:
     return "frame-advance";
   case EmulatorHotkeyAction::saveState:
@@ -682,6 +724,8 @@ std::vector<HotkeyBinding> defaultEmulatorHotkeys()
       combined(Qt::NoModifier, Qt::Key_Tab)},
     {EmulatorHotkeyAction::fastForwardToggle,
       combined(Qt::NoModifier, Qt::Key_QuoteLeft)},
+    {EmulatorHotkeyAction::rewindHold,
+      combined(Qt::NoModifier, Qt::Key_Backspace)},
     {EmulatorHotkeyAction::frameAdvance, combined(Qt::NoModifier, Qt::Key_N)},
     {EmulatorHotkeyAction::saveState, combined(Qt::NoModifier, Qt::Key_F5)},
     {EmulatorHotkeyAction::loadState, combined(Qt::NoModifier, Qt::Key_F8)},

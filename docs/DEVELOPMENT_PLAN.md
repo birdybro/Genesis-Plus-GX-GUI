@@ -3999,6 +3999,65 @@ the one intentional host-capability skip honestly.
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
 
+## Milestone 79 detail
+
+**Status:** IMPLEMENTED — HOSTED GATE PENDING
+
+**Goal:** Add user-configurable, bounded rewind without moving Genesis Plus GX state
+ownership out of the emulation thread or allowing frame/audio queues to grow without
+limit.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/rewind_configuration.h`
+- `desktop/core/include/genplusgx/rewind_buffer.h`
+- `desktop/core/src/rewind_buffer.cpp`
+- `desktop/core/include/genplusgx/core_adapter.h`
+- `desktop/core/src/core_adapter.cpp`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/settings/include/genplusgx/settings/rewind_settings.h`
+- `desktop/settings/src/rewind_settings.cpp`
+- `desktop/ui/include/genplusgx/ui/rewind_settings_dialog.h`
+- `desktop/ui/src/rewind_settings_dialog.cpp`
+- `desktop/ui/include/genplusgx/ui/main_window.h`
+- `desktop/ui/src/main_window.cpp`
+- `desktop/app/main.cpp`
+- input, diagnostics, CMake, help, and user/test documentation files
+
+**Tests added:** `unit.rewind_buffer` proves interval selection, strict byte-cap
+eviction, ordered restoration, disabled behavior, and invalid-limit rejection;
+`unit.rewind_settings` covers atomic persistence, defaults, invalid values, corrupt
+JSON, bounded reads, and safe fallback; `core.rewind_worker` executes the generated
+legal Genesis fixture through the production worker, verifies that the first rewind
+tick moves backward, audio remains empty, forward execution resumes, disable releases
+history, audio-setting and debugger-write invalidation, and descriptive rejected use;
+and `gui.rewind_settings` covers stable
+widget identifiers plus Apply, Cancel, OK, defaults, validation, and sink failure.
+Existing hotkey migration, binding-conflict, settings navigation, emulation-control,
+diagnostics, shader, startup, lifecycle, timing, and stability tests were extended or
+rerun as regression coverage.
+
+**Gate evidence:** On the development host, the warning-gated shader-disabled build
+passes 83/83; shader-enabled Debug and optimized Release pass 85/85; and the full
+ASan/UBSan build passes 85/85 with leak detection and halt-on-error enabled. A staged
+self-contained Linux install passes structural verification and reports version
+0.1.1; CPack produces a checksum-verified
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`. The user-supplied QNAP ROM mount is
+not mounted in this environment, so the generated redistributable ROM exercises the
+same production load/execute/rewind path locally and the opt-in external-ROM harness
+remains available for mounted collections.
+
+**Acceptance criteria:** Rewind has configurable capture cadence and a 16–1024 MiB
+hard payload cap; snapshots and the core are owned only by the emulation thread;
+rewind and fast-forward are mutually exclusive; rewind never queues audio; the first
+rewind presentation is earlier than the current frame; history is invalidated on every
+state-changing lifecycle/settings operation; settings and hotkeys persist and migrate;
+the GUI remains responsive through bounded command/frame exchanges; and diagnostics
+report active history use without exposing personal paths.
+
+**Commit SHA:** pending
+
 ## Milestone 65 detail
 
 **Status:** COMPLETE

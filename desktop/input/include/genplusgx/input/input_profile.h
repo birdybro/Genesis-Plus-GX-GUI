@@ -39,6 +39,7 @@ enum class EmulatorHotkeyAction : std::uint8_t {
   fullscreen,
   fastForwardHold,
   fastForwardToggle,
+  rewindHold,
   frameAdvance,
   saveState,
   loadState,
@@ -61,7 +62,7 @@ enum class EmulatorHotkeyAction : std::uint8_t {
   volumeDown,
 };
 
-inline constexpr std::size_t emulatorHotkeyActionCount = 29U;
+inline constexpr std::size_t emulatorHotkeyActionCount = 30U;
 
 struct HotkeyBinding final {
   EmulatorHotkeyAction action{EmulatorHotkeyAction::openGame};
@@ -91,7 +92,7 @@ struct InputProfile final {
 };
 
 struct InputConfiguration final {
-  static constexpr int currentSchemaVersion = 3;
+  static constexpr int currentSchemaVersion = 4;
 
   int schemaVersion{currentSchemaVersion};
   std::string activeProfile;

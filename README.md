@@ -40,6 +40,8 @@ region-appropriate BIOS supplied by the user.
   controller profiles, deadzones, assignments, capture-based remapping, and specialized
   Genesis Plus GX device choices
 - Keyboard play controls plus capture-configurable, conflict-checked emulator hotkeys
+- Bounded rewind with configurable capture interval/memory budget, focus-safe hold and
+  menu-toggle controls, muted backward playback, and deterministic forward resume
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
 - Ten metadata-wrapped save-state slots with game-identity validation
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows

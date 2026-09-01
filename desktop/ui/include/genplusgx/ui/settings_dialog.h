@@ -6,6 +6,7 @@
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/appearance_settings.h"
 #include "genplusgx/settings/audio_settings.h"
+#include "genplusgx/settings/rewind_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/video_settings.h"
 
@@ -44,6 +45,7 @@ enum class SettingsPageAction {
   gameLibrary,
   diagnostics,
   perGame,
+  rewind,
 };
 
 struct SettingsOverview final {
@@ -54,6 +56,7 @@ struct SettingsOverview final {
   CoreSystemSettings system;
   platform::BiosSnapshot bios;
   settings::ScreenshotSettings screenshots;
+  RewindConfiguration rewind;
   ApplicationPaths paths;
   std::size_t connectedControllerCount{0U};
   bool pathsAvailable{false};

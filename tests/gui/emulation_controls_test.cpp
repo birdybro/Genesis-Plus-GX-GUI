@@ -36,7 +36,9 @@ void synchronize(
 {
   window.setEmulationControlState(
     event.workerState == genplusgx::EmulationWorkerState::paused,
-    event.fastForward);
+    event.fastForward,
+    event.rewinding,
+    event.rewindAvailable);
 }
 
 class EmulationControlsTest final : public QObject {
@@ -100,6 +102,10 @@ void EmulationControlsTest::actionsDriveLiveWorkerAndTrackCanonicalState()
           break;
         case UiOperation::setFastForward:
           command = genplusgx::EmulationCommand::fastForward(
+            submittedOperation, enabled);
+          break;
+        case UiOperation::setRewinding:
+          command = genplusgx::EmulationCommand::rewinding(
             submittedOperation, enabled);
           break;
       }
@@ -205,7 +211,7 @@ void EmulationControlsTest::holdHotkeyIsMomentaryAndFocusSafe()
       return true;
     });
   window.setGameLoaded(std::filesystem::path{"synthetic.md"});
-  window.setEmulationControlState(false, false);
+  window.setEmulationControlState(false, false, false, true);
   window.show();
   window.activateWindow();
   QApplication::processEvents();
@@ -261,10 +267,19 @@ void EmulationControlsTest::holdHotkeyIsMomentaryAndFocusSafe()
   QCOMPARE(requests[6U], std::make_pair(Operation::setFastForward, true));
   QCOMPARE(requests[7U], std::make_pair(Operation::setFastForward, false));
 
+  auto* rewind = window.findChild<QAction*>(QStringLiteral("rewindAction"));
+  QVERIFY(rewind != nullptr);
+  QVERIFY(rewind->isEnabled());
+  QTest::keyPress(&window, Qt::Key_Backspace);
+  QTest::keyRelease(&window, Qt::Key_Backspace);
+  QCOMPARE(requests.size(), std::size_t{10U});
+  QCOMPARE(requests[8U], std::make_pair(Operation::setRewinding, true));
+  QCOMPARE(requests[9U], std::make_pair(Operation::setRewinding, false));
+
   window.setNoGameLoaded();
   QTest::keyPress(&window, Qt::Key_G, Qt::ControlModifier);
   QTest::keyRelease(&window, Qt::Key_G, Qt::ControlModifier);
-  QCOMPARE(requests.size(), std::size_t{8U});
+  QCOMPARE(requests.size(), std::size_t{10U});
 }
 
 void EmulationControlsTest::rejectedCommandsRollBackOptimisticActionState()
@@ -277,15 +292,16 @@ void EmulationControlsTest::rejectedCommandsRollBackOptimisticActionState()
       return false;
     });
   window.setGameLoaded(std::filesystem::path{"synthetic.md"});
-  window.setEmulationControlState(false, false);
+  window.setEmulationControlState(false, false, false, true);
 
   auto* pause = window.findChild<QAction*>(QStringLiteral("pauseAction"));
   auto* fastForward =
     window.findChild<QAction*>(QStringLiteral("fastForwardAction"));
+  auto* rewind = window.findChild<QAction*>(QStringLiteral("rewindAction"));
   auto* frameAdvance =
     window.findChild<QAction*>(QStringLiteral("frameAdvanceAction"));
-  QVERIFY(pause && fastForward && frameAdvance);
-  QVERIFY(pause->isEnabled() && fastForward->isEnabled());
+  QVERIFY(pause && fastForward && rewind && frameAdvance);
+  QVERIFY(pause->isEnabled() && fastForward->isEnabled() && rewind->isEnabled());
   QVERIFY(!frameAdvance->isEnabled());
 
   pause->trigger();
@@ -293,13 +309,16 @@ void EmulationControlsTest::rejectedCommandsRollBackOptimisticActionState()
   QVERIFY(!frameAdvance->isEnabled());
   fastForward->trigger();
   QVERIFY(!fastForward->isChecked());
-  QCOMPARE(requests.size(), std::size_t{2});
+  rewind->trigger();
+  QVERIFY(!rewind->isChecked());
+  QCOMPARE(requests.size(), std::size_t{3});
   QVERIFY(window.statusBar()->currentMessage().contains(
     QStringLiteral("could not be queued")));
 
   window.setEmulationControlSink({});
   QVERIFY(!pause->isEnabled());
   QVERIFY(!fastForward->isEnabled());
+  QVERIFY(!rewind->isEnabled());
 }
 
 } // namespace
