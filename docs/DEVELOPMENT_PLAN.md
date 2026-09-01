@@ -4001,7 +4001,7 @@ cannot contain its own SHA)
 
 ## Milestone 79 detail
 
-**Status:** IMPLEMENTED — HOSTED GATE PENDING
+**Status:** COMPLETE
 
 **Goal:** Add user-configurable, bounded rewind without moving Genesis Plus GX state
 ownership out of the emulation thread or allowing frame/audio queues to grow without
@@ -4056,7 +4056,23 @@ state-changing lifecycle/settings operation; settings and hotkeys persist and mi
 the GUI remains responsive through bounded command/frame exchanges; and diagnostics
 report active history use without exposing personal paths.
 
-**Commit SHA:** pending
+**Hosted gate:** Continuous Integration run
+[`33465978685`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33465978685)
+passes all ten jobs at exact implementation commit
+`e44d4c2e6aeee926603e4318b28641888ada4909`. Every one of the nine CMake jobs
+registers 85 tests and passes every supported test. Both Windows configurations
+capability-skip only the established real-OpenGL shader test on their software context;
+Linux and both macOS architectures execute all 85. The full 13,848-line log corpus has
+no compiler/linker warning, sanitizer signature, crash, runtime error, timeout, failed
+test, invalid generated path, or deployment failure. All four rewind-specific tests
+pass nine times each. Normal Windows pthread probes, absent optional Vulkan headers,
+and checkout hints are not application defects.
+
+The verified workflow artifacts are Linux x86-64 (39,885,530 bytes), Windows x86-64
+(52,462,222 bytes), macOS arm64 (63,718,652 bytes), and macOS x86-64 (65,316,304
+bytes).
+
+**Commit SHA:** `e44d4c2e6aeee926603e4318b28641888ada4909`
 
 ## Milestone 65 detail
 

@@ -2,7 +2,7 @@
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader
-and debugger verification through 2026-08-31 (America/Denver).
+debugger, and rewind verification through 2026-08-31 (America/Denver).
 
 ## Candidate identity
 
@@ -13,6 +13,8 @@ and debugger verification through 2026-08-31 (America/Denver).
   `1a16da87911e9cabe2bc33cea5222946f69444d8`
 - Exact debugger implementation and hosted evidence baseline:
   `2799b3c88572314ac576af34c3b9fd06c8666467`
+- Exact rewind implementation and hosted evidence baseline:
+  `e44d4c2e6aeee926603e4318b28641888ada4909`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -78,18 +80,27 @@ formerly crashing optimized-Clang debugger test 50 consecutive times. A complete
 successful-run log audit also removed duplicate core-adapter entries from four macOS
 GUI-test link commands.
 
+Bounded rewind now captures raw core states only on the emulation-owner thread, evicts
+oldest states at a configurable 16–1024 MiB payload cap, restores the frontend frame
+counter with the core state, suppresses audio while moving backward, and never expands
+the bounded video, audio, command, or event exchanges. Fast-forward is mutually
+exclusive. Lifecycle changes, setting changes, disc operations, cheats, debugger
+writes, and explicit state restores invalidate incompatible history. A persisted
+settings dialog, Backspace hold hotkey with schema migration/conflict checks, menu
+toggle, help, and privacy-safe diagnostics complete the user-facing workflow.
+
 ## Build configurations tested
 
-The primary Debug, Release, and sanitizer configurations were rebuilt with
-`--clean-first`; the shader-disabled graph was reconfigured and rebuilt. Newly authored
-frontend code produced no compiler warning.
+The primary Debug, Release, and sanitizer configurations were rebuilt against the exact
+implementation; the shader-disabled graph was separately reconfigured and rebuilt with
+warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 81/81 | Passed |
-| Release | Optimized native x86-64 | 81/81 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 81/81 | Passed; no project finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 79/79 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 85/85 | Passed |
+| Release | Optimized native x86-64 | 85/85 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 85/85 | Passed; no project finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 83/83 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -99,22 +110,22 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-The default shader-enabled build registers 81 distinct tests:
+The default shader-enabled build registers 85 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
-| Core | 19 |
+| Core | 20 |
 | Integration | 1 |
-| Unit | 32 |
-| GUI/smoke | 21 |
-| **Total** | **81** |
+| Unit | 34 |
+| GUI/smoke | 22 |
+| **Total** | **85** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 51 `unit`, 20 `core`, 32 `integration`, and 21 `gui`. Focused
-coverage also includes persistence (24), fixtures (24), concurrency (15), settings
-(12), input (9), video (8), audio (5), timing (4), release (4), fuzz/property (3),
-shader (2), and packaging (3).
+layers. Label counts are 54 `unit`, 21 `core`, 34 `integration`, and 22 `gui`. Focused
+coverage also includes persistence (26), fixtures (25), concurrency (16), settings
+(14), input (9), video (8), audio (6), timing (4), rewind (4), state (7), release (4),
+fuzz/property (3), shader (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -128,7 +139,7 @@ project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal
 Option-domain coverage is also explicit rather than inferred: core tests execute all
 13 video values, 35 audio enumerations/endpoints, 12 emulated device types, and 24
 system values. UI inventory checks require every corresponding choice, range, and all
-29 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
+30 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
 mute/volume/device/latency, keyboard/controller event paths, persistence, states,
 library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
 Four debugger-labeled tests cover the analysis model, core/worker bridge, semantic GUI,
@@ -165,6 +176,25 @@ pthread feature probes, absent optional Vulkan headers, source text for fail-clo
 Visual C++ runtime checks that did not execute, and `windeployqt` intentionally omitting
 the unused OpenSSL backend. This final corpus specifically confirms that the former
 Intel Release debugger crashes and duplicate-library linker warnings are gone.
+
+### Exact rewind cross-platform verification
+
+Continuous Integration run
+[`33465978685`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33465978685)
+passes all ten jobs against exact commit
+`e44d4c2e6aeee926603e4318b28641888ada4909`. All nine CMake jobs register 85 tests.
+Linux Debug/Release/ASan+UBSan and macOS arm64/x86-64 Debug/Release execute and pass
+85/85. Windows MSVC Debug/Release pass all supported tests and capability-skip only
+`gui.libretro_shader_render` because the hosted software context is below desktop
+OpenGL 3.3. The legacy libretro build, link, and clean gate passes.
+
+All 13,848 combined log lines were inspected. No compiler/linker warning, sanitizer
+signature, crash, runtime error, timeout, failed test, invalid generated path, or
+deployment failure remains. `core.rewind_worker`, `unit.rewind_buffer`,
+`unit.rewind_settings`, and `gui.rewind_settings` each pass in all nine CMake jobs.
+Normal Windows pthread probes, absent optional Vulkan headers, checkout default-branch
+hints, fail-closed script source text, and artifact uploader policy text are benign and
+did not execute as failures.
 
 ## Operating-system CI matrix
 
@@ -222,6 +252,12 @@ Exact debugger-evidence run `33421889014` produced four current workflow artifac
 Linux x86-64 (39,876,276 bytes), Windows x86-64 (52,448,121 bytes), macOS arm64
 (63,684,037 bytes), and macOS x86-64 (65,291,661 bytes). These are CI artifacts for
 tester consumption, not a newly authorized version tag or GitHub Release.
+
+Exact rewind-evidence run `33465978685` supersedes those tester artifacts with Linux
+x86-64 (39,885,530 bytes), Windows x86-64 (52,462,222 bytes), macOS arm64 (63,718,652
+bytes), and macOS x86-64 (65,316,304 bytes). Each native Release job verified its
+self-contained staged layout and generated neighboring package checksums before the
+artifact upload.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows
@@ -322,6 +358,8 @@ correction; the sanitizer suite reports no finding.
   identities covering the sheet plus every validated track without path dependence.
 - [x] State slots 0-9, quick operations, timestamps, delete, corruption/wrong-game
   rejection, thumbnails, and deterministic restoration.
+- [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
+  conflict-checked hotkey migration, muted reverse playback, and state invalidation.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, and missing-firmware errors without bundled firmware.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,
