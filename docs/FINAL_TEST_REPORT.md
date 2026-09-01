@@ -456,8 +456,25 @@ when the optional CHD decoder is excluded and that its prefixed zlib copy is ind
 The staged Linux installation passes package verification. Its 0.1.1 x86-64 TGZ has a
 valid SHA-256 manifest, valid gzip/tar structure, 86 entries, and the expected binary,
 Qt/SDL/librashader runtime, CRT assets, documentation, and notices. The inherited Unix
-libretro target also builds, links, and cleans. Exact hosted cross-platform evidence is
-pending the milestone implementation push.
+libretro target also builds, links, and cleans.
+
+Exact implementation run
+[`33483677263`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33483677263)
+for commit `3b828babc13e9a620161a556e1984221358b771d` passes all ten hosted jobs. Each of
+the nine native configurations registers 91 tests and reports zero failures; Windows
+capability-skips only the established real OpenGL shader test on its software context.
+The complete 14,255-line, 1,902,125-byte log has no authored warning, linker failure,
+sanitizer finding, runtime error, timeout, or test failure. Expected Windows pthread
+and optional Vulkan-header configure probes are non-actionable.
+
+The four downloaded artifacts are Linux x86-64 (40,017,572 bytes), Windows x86-64
+(52,551,513 bytes), macOS arm64 (63,869,318 bytes), and macOS x86_64 (65,518,404
+bytes). All six package checksum manifests and every ZIP/gzip/tar integrity check pass;
+the DMGs and four application binaries identify with their advertised formats and
+architectures. Extracted Linux runtime dependencies resolve, its `--version` and
+`--help` smokes pass, required runtime/assets/notices are present, and the complete
+payload scan finds no ROM, BIOS, save, state, test-fixture, credential, or private-key
+content.
 
 ## Final feature checklist
 

@@ -93,6 +93,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 79 Bounded rewind | COMPLETE | Add owner-thread rewind with strict time and memory limits | core rewind buffer/worker, settings, UI, input, diagnostics, tests/docs | 85-test local and ten-job hosted matrices; package and full-log audit | Reverse playback is bounded, audio-silent, conflict-safe, and invalidated by incompatible state changes | `e44d4c2` |
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
+| 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
 
 ## Execution policy
 
@@ -4258,7 +4259,7 @@ local gates pass; and the exact hosted matrix and logs are clean.
 
 ## Milestone 82 detail
 
-**Status:** IMPLEMENTED — AWAITING HOSTED VERIFICATION
+**Status:** COMPLETE
 
 **Goal:** Add safe ZIP cartridge browsing and local M3U/M3U8 Sega CD playlists while
 preserving source-file identity, keeping core input as an ordinary validated path, and
@@ -4300,6 +4301,31 @@ Unix libretro target builds, links, identifies as x86-64 ELF, and cleans. A fres
 CHD-disabled graph independently passes 91/91, proving ZIP support does not depend on
 the optional CHD decoder.
 
+**Hosted gate evidence:** Exact implementation run
+[`33483677263`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33483677263)
+for `3b828babc13e9a620161a556e1984221358b771d` passes all ten jobs. The nine native
+CMake jobs each register 91 tests and report no failure across Linux Debug/Release,
+Linux ASan/UBSan, Windows MSVC x64 Debug/Release, and macOS arm64/x86_64
+Debug/Release. Windows capability-skips only the established real OpenGL shader render
+test because the hosted software context lacks desktop OpenGL 3.3; its other 90 tests
+pass. The legacy libretro build also passes and cleans.
+
+The complete 14,255-line, 1,902,125-byte log contains no compiler warning, linker
+failure, sanitizer finding, runtime error, timeout, or test failure. The only negative
+configure probes are expected Windows pthread checks and optional Vulkan-header
+discovery; checkout's default-branch hint is non-product output. New archive/playlist
+unit, integration, GUI, and full-process tests pass on every native host.
+
+All four hosted artifacts were downloaded and inspected: Linux x86-64 (40,017,572
+bytes), Windows x86-64 (52,551,513 bytes), macOS arm64 (63,869,318 bytes), and macOS
+x86_64 (65,518,404 bytes). All six inner SHA-256 manifests pass, all ZIP/gzip/tar
+containers pass integrity checks, both DMGs identify as Apple disk images, and the
+executables identify as ELF x86-64, PE32+ x86-64, Mach-O arm64, and Mach-O x86_64.
+The extracted Linux application launches `--version` and `--help`, has no unresolved
+loader entry, and all packages contain the expected runtime, shader assets,
+documentation, and notices without ROM, BIOS, save, state, fixture, credential, or
+private-key payloads.
+
 **Acceptance criteria:** Only bounded stored/deflated cartridge members are advertised;
 unsafe, encrypted, unsupported, oversized, suspiciously compressed, truncated, or
 CRC-invalid entries fail closed; one-member archives load without prompting and
@@ -4309,7 +4335,7 @@ disc order has correctly gated previous/next controls; source paths drive recent
 sessions, and diagnostics while validated runtime paths drive core/persistence; every
 local and hosted regression passes; and the exact hosted logs and artifacts are clean.
 
-**Commit SHA:** Pending
+**Commit SHA:** `3b828babc13e9a620161a556e1984221358b771d`
 
 ## Milestone 65 detail
 
