@@ -66,6 +66,7 @@ void SessionSettingsDialogTest::settingsCenterRoutesToTypedEditor()
   genplusgx::settings::SessionSettings initial{
     .resumeOnLaunch = true,
     .lastGamePath = std::filesystem::temp_directory_path() / "last.md",
+    .lastPatchPath = std::nullopt,
   };
   window.setSessionSettings(initial);
   bool saved = true;

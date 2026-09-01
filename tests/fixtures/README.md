@@ -215,3 +215,20 @@ absolute/drive/URL/parent paths, symlink escape, duplicate or missing discs, exc
 line/disc counts, and a fixed-seed bounded parser corpus. These playlists contain no
 commercial filenames, disc data, firmware, or copied metadata; all generated container
 fixtures are dedicated to CC0-1.0 with the underlying project-authored fixtures.
+
+## Generated IPS, BPS, and UPS patch fixtures
+
+`unit.game_patch` builds all patch bytes in memory from original short byte sequences.
+Its IPS records cover literals, RLE, growth, and final-size handling; its BPS patch uses
+all four action types plus metadata and generated CRC-32 fields; its UPS patch changes
+and grows an input and is applied in both directions. Fixed-seed mutations exercise
+malformed data without storing a fuzz corpus. File/cache and ambiguous-sidecar cases
+exist only in a Qt temporary directory.
+
+`integration.soft_patch`, `gui.main_window`, `gui.game_loading`, and
+`gui.session_resume_application` generate a 15-byte IPS patch that changes the immediate
+value in the CC0 Genesis RAM-marker program from `0x13579bdf` to `0x13572468`. Tests
+verify the changed emulated RAM marker, unchanged source file, distinct patched SHA-256,
+GUI/CLI selection, and checkpoint restoration. The patch applies only to the original
+project-authored fixture, contains no commercial game bytes, and is dedicated to
+CC0-1.0. No patch file or patched ROM survives its temporary directory.

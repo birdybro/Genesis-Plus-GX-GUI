@@ -9,6 +9,11 @@ platform documentation.
 
 ### Added
 
+- Non-destructive IPS, BPS, and bidirectional UPS cartridge soft patching with strict
+  bounds and CRC validation, automatic same-stem sidecars, explicit file/CLI/two-file
+  drop selection, collision-safe caching, patched-content save/state/settings identity,
+  visible status/logging, and automatic session-resume preservation.
+
 - Bounded ZIP browsing for stored/deflated cartridge images, with deterministic member
   selection, safe cached extraction, CRC/size/ratio validation, source-aware recents,
   and command-line, drag/drop, session-resume, core, integration, and GUI coverage.

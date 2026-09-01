@@ -30,6 +30,7 @@
 #include <algorithm>
 #include <array>
 #include <chrono>
+#include <fstream>
 #include <memory>
 #include <optional>
 #include <tuple>
@@ -40,6 +41,8 @@ namespace {
 class FakeDialogService final : public genplusgx::ui::DialogService {
 public:
   std::vector<QString> errors;
+  std::optional<std::filesystem::path> gameSelection;
+  std::optional<std::filesystem::path> patchSelection;
   std::optional<std::filesystem::path> discSelection;
   std::optional<std::filesystem::path> directorySelection;
   std::optional<std::filesystem::path> shaderSelection;
@@ -47,13 +50,23 @@ public:
   std::filesystem::path directoryInitialDirectory;
   std::filesystem::path shaderInitialDirectory;
   int chooseDiscCount{0};
+  int chooseGameCount{0};
+  int choosePatchCount{0};
   int chooseDirectoryCount{0};
   int chooseShaderCount{0};
 
   std::optional<std::filesystem::path> chooseGame(
     QWidget*, const std::filesystem::path&) override
   {
-    return std::nullopt;
+    ++chooseGameCount;
+    return gameSelection;
+  }
+
+  std::optional<std::filesystem::path> choosePatch(
+    QWidget*, const std::filesystem::path&) override
+  {
+    ++choosePatchCount;
+    return patchSelection;
   }
 
   std::optional<std::filesystem::path> chooseDisc(
@@ -109,6 +122,7 @@ private slots:
   void saveStateActionsExposeSlotSemantics();
   void segaCdDiscActionsAreTypedAndRecoverable();
   void gameInformationWorkflowIsAsynchronousAndInspectable();
+  void softPatchWorkflowIsNonDestructiveAndVisible();
 };
 
 void MainWindowTest::shellIsVisibleAndIdentified()
@@ -156,7 +170,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   }
 
   const char* enabledNames[]{
-    "openGameAction", "gameLibraryAction", "exitAction", "fullscreenAction",
+    "openGameAction", "openGameWithPatchAction", "gameLibraryAction",
+    "exitAction", "fullscreenAction",
     "muteAction", "volumeUpAction", "volumeDownAction",
     "controllerConfigurationAction", "playerAssignmentsAction", "settingsAction",
     "videoSettingsAction", "audioSettingsAction",
@@ -1373,6 +1388,94 @@ void MainWindowTest::gameInformationWorkflowIsAsynchronousAndInspectable()
 
   window.setNoGameLoaded();
   QVERIFY(!action->isEnabled());
+}
+
+void MainWindowTest::softPatchWorkflowIsNonDestructiveAndVisible()
+{
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+  const auto root = std::filesystem::path{temporary.path().toStdString()};
+  const auto gamePath = root / "Patch Fixture.md";
+  const auto patchPath = root / "Patch Fixture.ips";
+  const auto discPath = root / "disc.iso";
+  const auto original = genplusgx::test::makeGenesisRamMarkerRom();
+  const std::vector<std::uint8_t> patch{
+    'P', 'A', 'T', 'C', 'H',
+    0x00, 0x02, 0x0a, 0x00, 0x02, 0x24, 0x68,
+    'E', 'O', 'F',
+  };
+  const auto write = [](const auto& path, const auto& bytes) {
+    std::ofstream output(path, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(bytes.data()),
+      static_cast<std::streamsize>(bytes.size()));
+    return static_cast<bool>(output);
+  };
+  QVERIFY(write(gamePath, original));
+  QVERIFY(write(patchPath, patch));
+  QVERIFY(write(discPath, genplusgx::test::makeSegaCdDiscImage()));
+
+  auto dialogs = std::make_shared<FakeDialogService>();
+  dialogs->gameSelection = gamePath;
+  dialogs->patchSelection = patchPath;
+  genplusgx::ui::MainWindow window;
+  window.setDialogService(dialogs);
+  window.setPatchCacheDirectory(root / "patch-cache");
+  std::vector<genplusgx::GameLaunchTarget> loads;
+  window.setGameLoadSink([&loads](const auto& target) {
+    loads.push_back(target);
+  });
+
+  window.findChild<QAction*>(
+    QStringLiteral("openGameWithPatchAction"))->trigger();
+  QCOMPARE(dialogs->chooseGameCount, 1);
+  QCOMPARE(dialogs->choosePatchCount, 1);
+  QCOMPARE(loads.size(), std::size_t{1});
+  QVERIFY(loads.back().sourcePath == gamePath);
+  QVERIFY(loads.back().patchPath == patchPath);
+  QVERIFY(loads.back().runtimePath != gamePath);
+  QVERIFY(std::filesystem::is_regular_file(loads.back().runtimePath));
+
+  std::ifstream unchangedFile(gamePath, std::ios::binary);
+  const std::vector<std::uint8_t> unchanged{
+    std::istreambuf_iterator<char>{unchangedFile},
+    std::istreambuf_iterator<char>{}};
+  QCOMPARE(unchanged, original);
+  std::ifstream patchedFile(loads.back().runtimePath, std::ios::binary);
+  const std::vector<std::uint8_t> patched{
+    std::istreambuf_iterator<char>{patchedFile},
+    std::istreambuf_iterator<char>{}};
+  QCOMPARE(patched[0x20aU], std::uint8_t{0x24U});
+  QCOMPARE(patched[0x20bU], std::uint8_t{0x68U});
+
+  window.setGameLoaded(loads.back());
+  QVERIFY(window.findChild<QLabel*>(
+    QStringLiteral("gameStatusLabel"))->text().contains(
+      QStringLiteral("Patch Fixture.ips patch")));
+  window.setNoGameLoaded();
+  loads.clear();
+  QVERIFY(window.requestGameLoad(gamePath));
+  QCOMPARE(loads.size(), std::size_t{1});
+  QVERIFY(loads.back().patchPath == patchPath);
+
+  window.setNoGameLoaded();
+  loads.clear();
+  const auto secondSidecar = root / "Patch Fixture.md.BPS";
+  QVERIFY(write(secondSidecar, patch));
+  QVERIFY(!window.requestGameLoad(gamePath));
+  QVERIFY(loads.empty());
+  QVERIFY(!dialogs->errors.empty());
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("Multiple sidecar")));
+
+  QVERIFY(!window.requestGameLoad(discPath, patchPath));
+  QVERIFY(dialogs->errors.back().contains(QStringLiteral("cartridge")));
+
+  auto* openPatched = window.findChild<QAction*>(
+    QStringLiteral("openGameWithPatchAction"));
+  QVERIFY(openPatched->isEnabled());
+  window.setGameLoading(gamePath);
+  QVERIFY(!openPatched->isEnabled());
+  window.setNoGameLoaded();
+  QVERIFY(openPatched->isEnabled());
 }
 
 } // namespace

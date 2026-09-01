@@ -1,6 +1,7 @@
 #include "genplusgx/ui/dialog_service.h"
 
 #include "genplusgx/game_file.h"
+#include "genplusgx/game_patch.h"
 #include "genplusgx/ui/archive_entry_dialog.h"
 
 #include <QFileDialog>
@@ -46,11 +47,28 @@ QString discFileDialogFilter()
     .arg(patterns.join(u' '));
 }
 
+QString patchFileDialogFilter()
+{
+  QStringList patterns;
+  for (const auto extension : supportedGamePatchExtensions()) {
+    patterns.push_back(QStringLiteral("*") + QString::fromLatin1(extension));
+  }
+  return QObject::tr("Soft patches (%1);;All files (*)")
+    .arg(patterns.join(u' '));
+}
+
 std::optional<std::filesystem::path> DialogService::chooseDisc(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
 {
   return chooseGame(parent, initialDirectory);
+}
+
+std::optional<std::filesystem::path> DialogService::choosePatch(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
 }
 
 std::optional<std::filesystem::path> DialogService::chooseDirectory(
@@ -110,6 +128,20 @@ std::optional<std::filesystem::path> QtDialogService::chooseDisc(
     return std::nullopt;
   }
   return pathFromQString(selected);
+}
+
+std::optional<std::filesystem::path> QtDialogService::choosePatch(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Choose IPS, BPS, or UPS Soft Patch"),
+    pathToQString(initialDirectory),
+    patchFileDialogFilter());
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
 }
 
 std::optional<std::filesystem::path> QtDialogService::chooseDirectory(

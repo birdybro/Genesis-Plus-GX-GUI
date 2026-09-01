@@ -13,12 +13,14 @@ forms are:
 genesis-plus-gx-gui
 genesis-plus-gx-gui game.md
 genesis-plus-gx-gui --fullscreen game.md
+genesis-plus-gx-gui --patch translation.bps game.md
 genesis-plus-gx-gui --help
 genesis-plus-gx-gui --version
 ```
 
 Only one startup game is accepted. Unknown options and multiple positional files print
-a diagnostic and exit with status 2. Use `--` before a filename beginning with `-`.
+a diagnostic and exit with status 2. `--patch` requires both an IPS/BPS/UPS file and a
+startup game. Use `--` before a filename beginning with `-`.
 
 ## Opening and closing games
 
@@ -27,6 +29,29 @@ file onto the main window. The emulator loads on its dedicated worker thread and
 running after initialization; the window remains responsive throughout. Choose
 **File → Close Game** to stop and unload it. Opening another file replaces the current
 game without restarting the application.
+
+Choose **File → Open Game with Patch…** (`Ctrl+Shift+O`) to select a cartridge and an
+IPS, BPS, or UPS patch together. You may instead drop exactly two local files—the game
+and patch in either order—or pass `--patch FILE` on the command line. Ordinary Open,
+Recent, library, command-line, and one-file drop launches search beside a direct
+cartridge for one same-stem sidecar such as `game.ips` or `game.md.ips`, including
+uppercase extensions. Multiple matching sidecars are ambiguous and produce an error
+that directs you to explicit selection.
+
+The source file is never modified. The parser caps patches at 64 MiB and cartridge
+input/output at the core's 32 MiB limit, validates all record/copy bounds, and verifies
+BPS/UPS source, output, and patch CRC-32 values. Exact output is published atomically to
+the per-user `cache/patches` directory. The core, save RAM, save states, cheats, and
+per-game overrides use the patched content's SHA-256 identity; recents and library
+history retain the user-selected source path. The active patch name appears beside the
+game in the status bar. Explicitly selected patches survive automatic session resume.
+Delete the patch cache only while the application is closed; it is recreated as needed.
+
+Soft patches apply only to cartridge content. A selected ZIP cartridge member can be
+patched explicitly, but automatic ZIP sidecars are avoided because the intended member
+would be ambiguous. CUE/ISO/CHD disc images and M3U playlists are rejected. A standalone
+`.bin` remains eligible because that extension is also used for Genesis cartridges;
+oversized disc-track data fails the cartridge size gate.
 
 Every successfully loaded game moves to the top of **File → Open Recent**. The history
 stores at most 12 absolute paths in the platform application-data directory. A missing

@@ -24,6 +24,9 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDisc(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> choosePatch(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseDirectory(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
@@ -48,6 +51,9 @@ public:
   [[nodiscard]] std::optional<std::filesystem::path> chooseDisc(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::filesystem::path> choosePatch(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::filesystem::path> chooseDirectory(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
@@ -66,6 +72,7 @@ public:
 
 [[nodiscard]] QString gameFileDialogFilter();
 [[nodiscard]] QString discFileDialogFilter();
+[[nodiscard]] QString patchFileDialogFilter();
 [[nodiscard]] QString pathToQString(const std::filesystem::path& path);
 [[nodiscard]] std::filesystem::path pathFromQString(const QString& path);
 

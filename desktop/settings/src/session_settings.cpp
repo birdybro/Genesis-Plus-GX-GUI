@@ -54,14 +54,15 @@ SessionSettings defaultSessionSettings() noexcept
 
 bool validateSessionSettings(const SessionSettings& settings) noexcept
 {
-  if (!settings.lastGamePath) {
-    return true;
-  }
-  if (settings.lastGamePath->empty() || !settings.lastGamePath->is_absolute()) {
+  const auto validPath = [](const std::optional<std::filesystem::path>& path) {
+    return !path || (!path->empty() && path->is_absolute() &&
+      path->native().size() <= SessionSettingsStore::maximumPathBytes);
+  };
+  if (!validPath(settings.lastGamePath) || !validPath(settings.lastPatchPath) ||
+      (settings.lastPatchPath && !settings.lastGamePath)) {
     return false;
   }
-  return settings.lastGamePath->native().size() <=
-    SessionSettingsStore::maximumPathBytes;
+  return true;
 }
 
 SessionSettingsStore::SessionSettingsStore(std::filesystem::path path)
@@ -95,23 +96,37 @@ SessionSettingsLoadResult SessionSettingsStore::load() const
   const auto schema = root.value(QStringLiteral("schemaVersion"));
   const auto resume = root.value(QStringLiteral("resumeOnLaunch"));
   const auto lastGame = root.value(QStringLiteral("lastGamePath"));
+  const auto lastPatch = root.value(QStringLiteral("lastPatchPath"));
   if (!schema.isDouble() ||
-      schema.toDouble() != static_cast<double>(schemaVersion) ||
+      (schema.toDouble() != 1.0 &&
+       schema.toDouble() != static_cast<double>(schemaVersion)) ||
       !resume.isBool() || (!lastGame.isNull() && !lastGame.isString())) {
     return invalidResult("The session settings values are invalid.");
+  }
+  const bool migrated = schema.toDouble() == 1.0;
+  if (!migrated && !lastPatch.isNull() && !lastPatch.isString()) {
+    return invalidResult("The session settings patch path is invalid.");
   }
 
   SessionSettings settings{
     .resumeOnLaunch = resume.toBool(),
     .lastGamePath = std::nullopt,
+    .lastPatchPath = std::nullopt,
   };
   if (lastGame.isString()) {
     settings.lastGamePath = pathFromQString(lastGame.toString());
   }
+  if (!migrated && lastPatch.isString()) {
+    settings.lastPatchPath = pathFromQString(lastPatch.toString());
+  }
   if (!validateSessionSettings(settings)) {
     return invalidResult("The session settings path is invalid.");
   }
-  return {.status = {}, .settings = std::move(settings)};
+  return {
+    .status = {},
+    .settings = std::move(settings),
+    .migrated = migrated,
+  };
 }
 
 PersistenceStatus SessionSettingsStore::save(
@@ -121,13 +136,18 @@ PersistenceStatus SessionSettingsStore::save(
     return invalid("Invalid session settings cannot be saved.");
   }
   QJsonValue lastGame{QJsonValue::Null};
+  QJsonValue lastPatch{QJsonValue::Null};
   if (settings.lastGamePath) {
     lastGame = pathToQString(*settings.lastGamePath);
+  }
+  if (settings.lastPatchPath) {
+    lastPatch = pathToQString(*settings.lastPatchPath);
   }
   const auto data = QJsonDocument{QJsonObject{
     {QStringLiteral("schemaVersion"), static_cast<int>(schemaVersion)},
     {QStringLiteral("resumeOnLaunch"), settings.resumeOnLaunch},
     {QStringLiteral("lastGamePath"), lastGame},
+    {QStringLiteral("lastPatchPath"), lastPatch},
   }}.toJson(QJsonDocument::Indented);
   return writeFileAtomically(path_,
     std::span<const std::uint8_t>{

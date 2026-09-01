@@ -168,11 +168,27 @@ void GameLoadingTest::dragAndDropAcceptsOneSupportedLocalFile()
 {
   genplusgx::test::TemporaryFixture fixture{
     genplusgx::test::makeGenesisRamMarkerRom(), ".gen"};
+  QTemporaryDir temporary;
+  QVERIFY(temporary.isValid());
+  const auto root = genplusgx::ui::pathFromQString(temporary.path());
+  const auto patchPath = root / "fixture.ips";
+  {
+    const std::vector<std::uint8_t> patch{
+      'P', 'A', 'T', 'C', 'H',
+      0x00, 0x02, 0x0a, 0x00, 0x02, 0x24, 0x68,
+      'E', 'O', 'F',
+    };
+    std::ofstream output(patchPath, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(patch.data()),
+      static_cast<std::streamsize>(patch.size()));
+    QVERIFY(output);
+  }
   genplusgx::ui::MainWindow window;
+  window.setPatchCacheDirectory(root / "cache");
   window.show();
-  std::filesystem::path requested;
+  std::optional<genplusgx::GameLaunchTarget> requested;
   window.setGameLoadSink(
-    [&requested](const auto& target) { requested = target.sourcePath; });
+    [&requested](const auto& target) { requested = target; });
 
   QMimeData validMime;
   validMime.setUrls({QUrl::fromLocalFile(
@@ -185,10 +201,31 @@ void GameLoadingTest::dragAndDropAcceptsOneSupportedLocalFile()
     QPointF{10.0, 10.0}, Qt::CopyAction, &validMime, Qt::LeftButton, Qt::NoModifier);
   QApplication::sendEvent(&window, &drop);
   QVERIFY(drop.isAccepted());
-  QCOMPARE(requested, fixture.path());
+  QVERIFY(requested && requested->sourcePath == fixture.path());
 
   window.setNoGameLoaded();
-  requested.clear();
+  requested.reset();
+  QMimeData patchedMime;
+  patchedMime.setUrls({
+    QUrl::fromLocalFile(genplusgx::ui::pathToQString(patchPath)),
+    QUrl::fromLocalFile(genplusgx::ui::pathToQString(fixture.path())),
+  });
+  QDragEnterEvent patchedDrag(
+    QPoint{10, 10}, Qt::CopyAction, &patchedMime,
+    Qt::LeftButton, Qt::NoModifier);
+  QApplication::sendEvent(&window, &patchedDrag);
+  QVERIFY(patchedDrag.isAccepted());
+  QDropEvent patchedDrop(
+    QPointF{10.0, 10.0}, Qt::CopyAction, &patchedMime,
+    Qt::LeftButton, Qt::NoModifier);
+  QApplication::sendEvent(&window, &patchedDrop);
+  QVERIFY(patchedDrop.isAccepted());
+  QVERIFY(requested && requested->sourcePath == fixture.path() &&
+    requested->patchPath == patchPath &&
+    requested->runtimePath != fixture.path());
+
+  window.setNoGameLoaded();
+  requested.reset();
   QMimeData multipleMime;
   multipleMime.setUrls({
     QUrl::fromLocalFile(genplusgx::ui::pathToQString(fixture.path())),
@@ -197,7 +234,7 @@ void GameLoadingTest::dragAndDropAcceptsOneSupportedLocalFile()
     QPointF{10.0, 10.0}, Qt::CopyAction, &multipleMime, Qt::LeftButton, Qt::NoModifier);
   QApplication::sendEvent(&window, &multiple);
   QVERIFY(!multiple.isAccepted());
-  QVERIFY(requested.empty());
+  QVERIFY(!requested);
 }
 
 void GameLoadingTest::recentMenuLaunchesValidEntriesAndClears()

@@ -12,6 +12,7 @@ namespace genplusgx::settings {
 struct SessionSettings final {
   bool resumeOnLaunch{false};
   std::optional<std::filesystem::path> lastGamePath;
+  std::optional<std::filesystem::path> lastPatchPath;
 
   [[nodiscard]] bool operator==(const SessionSettings&) const = default;
 };
@@ -27,7 +28,7 @@ struct SessionSettingsLoadResult final {
 
 class SessionSettingsStore final {
 public:
-  static constexpr std::uint32_t schemaVersion = 1U;
+  static constexpr std::uint32_t schemaVersion = 2U;
   static constexpr std::size_t maximumFileBytes = 32U * 1024U;
   static constexpr std::size_t maximumPathBytes = 16U * 1024U;
 

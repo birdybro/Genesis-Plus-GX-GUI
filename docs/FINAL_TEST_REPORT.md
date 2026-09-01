@@ -2,7 +2,8 @@
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
-debugger, rewind, automatic-session-resume, and configurable-speed verification through 2026-09-01
+debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist, and
+cartridge soft-patch verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -20,6 +21,8 @@ debugger, rewind, automatic-session-resume, and configurable-speed verification 
   `3cce4030f83c1ee7c057113eab1a811129c02858`
 - Exact configurable-speed implementation and hosted evidence baseline:
   `253c04352a762dfaf2c920fa6b107b6a983f4ecd`
+- Exact archive/playlist implementation and hosted evidence baseline:
+  `3b828babc13e9a620161a556e1984221358b771d`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -140,11 +143,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 90/90 | Passed |
-| Release | Optimized native x86-64 | 90/90 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 90/90 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 88/88 | Passed |
-| Clang 22 | Warning-gated Debug | 90/90 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 93/93 | Passed |
+| Release | Optimized native x86-64 | 93/93 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 93/93 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 91/91 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 93/93 | Passed |
+| Clang 22 | Warning-gated Debug | 93/93 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -154,22 +158,22 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-The default shader-enabled build registers 90 distinct tests:
+The default shader-enabled build registers 93 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
-| Integration | 1 |
-| Unit | 36 |
+| Integration | 3 |
+| Unit | 37 |
 | GUI/smoke | 25 |
-| **Total** | **90** |
+| **Total** | **93** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 58 `unit`, 21 `core`, 36 `integration`, and 25 `gui`. Focused
-coverage also includes persistence (30), fixtures (26), concurrency (16), settings
+layers. Label counts are 59 `unit`, 23 `core`, 38 `integration`, and 25 `gui`. Focused
+coverage also includes persistence (31), fixtures (28), concurrency (16), settings
 (18), input (9), video (8), audio (6), timing (6), rewind (4), state (8), release (4),
-fuzz/property (3), shader (2), and packaging (3).
+fuzz/property (4), shader (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -476,6 +480,35 @@ architectures. Extracted Linux runtime dependencies resolve, its `--version` and
 payload scan finds no ROM, BIOS, save, state, test-fixture, credential, or private-key
 content.
 
+## Cartridge soft-patch verification
+
+Milestone 83 adds bounded, checksum-validating IPS, BPS, and UPS cartridge soft
+patching. The original game is never modified: a collision-safe per-user cache contains
+the exact patched runtime bytes, while recent-game and library records retain the
+source path. Metadata, SHA-256 game identity, saves, states, cheats, per-game settings,
+and automatic session resume all derive from the patched bytes. Users can choose a
+game/patch pair, pass `--patch`, drop the two files together, or use one unambiguous
+same-name sidecar. Disc images and playlists are rejected because cartridge patch
+formats do not describe multi-file disc layouts.
+
+Complete warning-as-error Debug, optimized Release, ASan/UBSan, fresh Clang 22, and
+CHD-disabled suites each pass 93/93; the shader-disabled graph passes all 91 applicable
+tests. The sanitizer run has no finding. Unit coverage exercises IPS literals/RLE/
+growth/truncation, every BPS command and checksum, bidirectional/resizing UPS, malformed
+offsets and varints, fixed-seed mutation input, sidecar ambiguity, immutable sources,
+and cache collision/reuse. The core workflow changes a generated Genesis program's
+68000 immediate through IPS and proves changed RAM plus independent identity. GUI and
+real-process coverage proves explicit/automatic/drop/CLI launch, errors, status,
+versioned session migration, checkpoint creation, and exact patched restart.
+
+The staged Linux installation passes package verification, dependency and CLI smokes;
+CPack emits the expected 0.1.1 x86-64 TGZ/checksum; and the inherited Unix libretro
+target builds, links, identifies as x86-64 ELF, and cleans. The supplied NAS ROM path
+was not mounted during this verification, so the optional header-only IPS acceptance
+case could not run against it. No degraded RAID mount was attempted. Exact hosted
+Windows, Linux, Apple Silicon, and Intel macOS evidence is recorded after the milestone
+implementation commit is pushed and audited.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -494,6 +527,8 @@ content.
 - [x] Open/replace/close, drag/drop, command line, strict bounded CUE preflight,
   bounded ZIP cartridge browsing, strict M3U multi-disc playlists, descriptive
   malformed-file errors, and persistent source-aware recent-game history.
+- [x] Non-destructive IPS/BPS/UPS cartridge soft patching through explicit GUI/CLI,
+  two-file drop, and unambiguous sidecars with checksummed patched-content identity.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
   automatic load/flush, platform-standard application-data paths, and composite CUE
   identities covering the sheet plus every validated track without path dependence.
@@ -551,10 +586,11 @@ directories.
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
 - The previously supplied external-ROM mount was unmounted/empty during the
-  configurable-speed run, so its three newly added speed workflows were not executed
-  locally. The required suites use legal generated 68000 and Z80 programs through the
-  same production GUI/worker/core route; the earlier 113-case Phantasy Star IV option
-  acceptance remains recorded above. No degraded RAID assembly or mount was attempted.
+  configurable-speed and soft-patch runs, so its speed workflows and temporary
+  header-only IPS case were not executed locally. The required suites use legal
+  generated 68000 and Z80 programs through the same production GUI/worker/core route;
+  the earlier 113-case Phantasy Star IV option acceptance remains recorded above. No
+  degraded RAID assembly or mount was attempted.
 - Controller and audio hot-plug behavior is deterministically tested with injected SDL
   events and the SDL dummy audio driver. Maintainers should still smoke-test target
   hardware and vendor drivers before a public release.
@@ -563,7 +599,10 @@ directories.
 - Linux ships a relocatable TGZ rather than an AppImage and intentionally relies on the
   CI distribution's base graphics, window-system, C/C++ runtime, and libc libraries.
 - ZIP support is intentionally limited to stored/deflated cartridge members; archived
-  Sega CD workflows and formats other than ZIP remain unsupported. Physical optical drives, netplay,
+  Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
+  patch discovery is intentionally limited to direct cartridge files; ZIP members can
+  use an explicitly chosen patch, while disc images/playlists reject cartridge patch
+  formats. Physical optical drives, netplay,
   achievements, cloud sync, online scraping/downloading, instruction-level stepping,
   an external debugger server, TAS tooling, and streaming remain intentionally outside
   scope.

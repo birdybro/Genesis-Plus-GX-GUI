@@ -66,6 +66,7 @@ struct DiscPlaylistInfo final {
 struct GameLaunchTarget final {
   std::filesystem::path sourcePath;
   std::filesystem::path runtimePath;
+  std::filesystem::path patchPath;
   std::string archiveEntry;
   std::vector<std::filesystem::path> playlistDiscs;
 
@@ -80,6 +81,10 @@ struct GameLaunchTarget final {
   [[nodiscard]] bool isPlaylist() const noexcept
   {
     return !playlistDiscs.empty();
+  }
+  [[nodiscard]] bool isPatched() const noexcept
+  {
+    return !patchPath.empty();
   }
   [[nodiscard]] bool operator==(const GameLaunchTarget&) const = default;
 };

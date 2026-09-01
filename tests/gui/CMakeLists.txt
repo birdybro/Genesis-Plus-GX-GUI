@@ -186,7 +186,7 @@ add_test(
 set_tests_properties(
   gui.session_resume_application
   PROPERTIES
-    LABELS "gui;integration;session;state;lifecycle;fixture;process"
+    LABELS "gui;integration;session;state;lifecycle;fixture;process;patch;cli"
     TIMEOUT 75
 )
 add_test(NAME gui.emulation_controls COMMAND genplusgx_emulation_controls_test)
@@ -420,6 +420,7 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
     genplusgx_external_rom_acceptance_test
     PRIVATE
       GenesisPlusGX::CoreAdapter
+      GenesisPlusGX::GameFiles
       GenesisPlusGX::VideoWidget
       genplusgx_project_options
       genplusgx_project_warnings

@@ -296,8 +296,10 @@ set_target_properties(
 add_library(
   genplusgx_game_files STATIC
   include/genplusgx/game_archive.h
+  include/genplusgx/game_patch.h
   src/game_archive.cpp
   src/game_file.cpp
+  src/game_patch.cpp
 )
 add_library(GenesisPlusGX::GameFiles ALIAS genplusgx_game_files)
 target_link_libraries(

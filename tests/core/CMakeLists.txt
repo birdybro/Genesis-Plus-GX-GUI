@@ -8,6 +8,30 @@ add_test(NAME core.library_link COMMAND genplusgx_core_link_test)
 set_tests_properties(core.library_link PROPERTIES LABELS "core;smoke")
 
 add_executable(
+  genplusgx_soft_patch_workflow_test soft_patch_workflow_test.cpp
+)
+target_link_libraries(
+  genplusgx_soft_patch_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::GameFiles
+    GenesisPlusGX::Persistence
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(
+  NAME integration.soft_patch
+  COMMAND genplusgx_soft_patch_workflow_test
+)
+set_tests_properties(
+  integration.soft_patch
+  PROPERTIES
+    LABELS "core;integration;patch;ips;fixture;lifecycle;persistence"
+    TIMEOUT 30
+)
+
+add_executable(
   genplusgx_archive_playlist_workflow_test archive_playlist_workflow_test.cpp
 )
 target_link_libraries(

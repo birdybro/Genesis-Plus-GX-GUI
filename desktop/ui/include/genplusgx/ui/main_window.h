@@ -158,6 +158,7 @@ public:
   void showDebugRequestError(const std::string& detail);
   void setGameLoadSink(GameLoadSink sink);
   void setArchiveCacheDirectory(std::filesystem::path directory);
+  void setPatchCacheDirectory(std::filesystem::path directory);
   void setGameCloseSink(GameCloseSink sink);
   void setClearRecentGamesSink(ClearRecentGamesSink sink);
   void setStateOperationSink(StateOperationSink sink);
@@ -273,7 +274,9 @@ public:
   [[nodiscard]] std::uint32_t selectedStateSlot() const noexcept;
   void showStateOperationSuccess(StateUiOperation operation, std::uint32_t slot);
   void showStateOperationError(StateUiOperation operation, const std::string& detail);
-  [[nodiscard]] bool requestGameLoad(const std::filesystem::path& path);
+  [[nodiscard]] bool requestGameLoad(
+    const std::filesystem::path& path,
+    std::optional<std::filesystem::path> patchPath = std::nullopt);
   void setGameLoading(const std::filesystem::path& path);
   void setGameLoaded(const std::filesystem::path& path);
   void setGameLoaded(const GameLaunchTarget& target);
@@ -313,6 +316,7 @@ private:
   void createCanvas();
   void setGameActionsEnabled(bool enabled);
   void chooseGame();
+  void chooseGameWithPatch();
   void closeGame();
   void chooseDisc();
   void requestPlaylistDisc(int direction);
@@ -412,6 +416,7 @@ private:
   GameLaunchTarget pendingGameTarget_;
   std::filesystem::path pendingGamePath_;
   std::filesystem::path archiveCacheDirectory_;
+  std::filesystem::path patchCacheDirectory_;
   bool hasRecentGames_{false};
   bool gameLoading_{false};
   bool stateSessionReady_{false};

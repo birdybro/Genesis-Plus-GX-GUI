@@ -1,5 +1,16 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_game_patch_test game_patch_test.cpp)
+target_link_libraries(
+  genplusgx_game_patch_test
+  PRIVATE GenesisPlusGX::GameFiles genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.game_patch COMMAND genplusgx_game_patch_test)
+set_tests_properties(
+  unit.game_patch
+  PROPERTIES LABELS "unit;patch;parser;filesystem;security;fuzz" TIMEOUT 30
+)
+
 add_executable(genplusgx_rewind_buffer_test rewind_buffer_test.cpp)
 target_link_libraries(
   genplusgx_rewind_buffer_test

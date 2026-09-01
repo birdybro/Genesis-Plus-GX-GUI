@@ -94,6 +94,23 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
+| 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, tests/docs | 93-test Debug/Release/ASan suites; reduced-feature/compiler/package/libretro gates; exact hosted matrix pending push | Every format is bounded; patched bytes own persistence identity; source paths remain intact | pending |
+| 84 Enhanced save-state UX | PLANNED | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
+| 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
+| 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
+| 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
+| 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
+| 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
+| 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
+| 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
+| 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
+| 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
+| 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
+| 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
+| 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
+| 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
+| 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
+| 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
 ## Execution policy
 
@@ -3765,6 +3782,49 @@ all package layouts; and every applicable local gate passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
+
+## Milestone 83 detail
+
+**Status:** COMPLETE
+
+**Goal:** Add non-destructive cartridge soft patching for IPS, BPS, and UPS while
+preserving the source/runtime boundary and making every downstream identity derive from
+the exact patched bytes.
+
+**Files changed:**
+
+- `desktop/core/include/genplusgx/game_patch.h`
+- `desktop/core/src/game_patch.cpp`
+- game launch, dialog, command-line, and session settings composition under `desktop/`
+- unit, core, GUI, process, and optional external-ROM tests under `tests/`
+- README, changelog, architecture, user, state, fixture, and testing documentation
+
+**Tests added:** `unit.game_patch` covers every patch format, all four BPS actions,
+bidirectional UPS, bounds/checksums, sidecars, cache collision/reuse, and fixed-seed
+mutation input. `integration.soft_patch` executes a changed immediate value through the
+real 68000 core and verifies source restoration plus distinct SHA-256 identity. GUI and
+process tests cover explicit/automatic/two-file-drop/CLI workflows, error behavior,
+visible status, schema migration, patched checkpoint creation, and restart restoration.
+The optional real-ROM runner now adds a temporary header-only IPS launch.
+
+**Gate evidence:** Complete warning-as-error Debug, optimized Release, and ASan/UBSan
+builds each pass 93/93 tests; the sanitizer run has no finding. Fresh Clang 22 and
+CHD-disabled graphs each pass 93/93, while the shader-disabled graph passes all 91
+applicable tests. A staged Linux installation passes package verification and installed
+CLI/dependency smokes; CPack emits the expected versioned x86-64 TGZ and checksum. The
+legacy Unix libretro target builds, links, identifies as x86-64 ELF, and cleans. The
+previously supplied NAS path was not mounted during this gate, so the optional real-ROM
+acceptance case was unavailable; generated legal ROMs execute the same patch path in
+every required suite. Exact hosted evidence begins only after the milestone commit is
+pushed.
+
+**Acceptance criteria:** IPS/BPS/UPS are parsed without unchecked offsets or unbounded
+output; BPS/UPS checksums and source identity are enforced; the source file is never
+modified; automatic selection is unambiguous; manual GUI/CLI/drop selection works;
+patched content has independent saves/states/cheats/settings; patched session resume is
+exact; all local/hosted gates pass; and full hosted logs/artifacts contain no new issue.
+
+**Commit SHA:** pending
 
 ## Milestone 70 detail
 

@@ -31,6 +31,10 @@ supports stored or deflated cartridge images; M3U playlists provide ordered loca
 CD disc sets. A Sega CD game needs a legally obtained, region-appropriate BIOS supplied
 by the user.
 
+Cartridge images can be soft-patched at launch with IPS, BPS, or UPS files. Patching is
+non-destructive: the core receives a validated cache copy and the source game is never
+rewritten.
+
 ## Features
 
 - Dedicated emulation thread with bounded video, audio, input, and command exchanges
@@ -52,6 +56,8 @@ by the user.
   running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
 - Bounded ZIP cartridge browser and traversal-safe M3U/M3U8 multi-disc playlists
+- Non-destructive IPS/BPS/UPS soft patching with automatic sidecars, explicit selection,
+  checksum validation, patched-content save/state identity, and session resume
 - Recent games, searchable asynchronous SQLite library, favorites, play history, and
   user-provided local artwork
 - Header metadata and SHA-256 game information, Game Genie/PAR cheats, and sparse
@@ -100,6 +106,7 @@ window, launch it from the game library, or pass it on the command line:
 
 ```bash
 genesis-plus-gx-gui [--fullscreen] path/to/game.bin
+genesis-plus-gx-gui --patch path/to/translation.bps path/to/game.bin
 genesis-plus-gx-gui --help
 genesis-plus-gx-gui --version
 ```
@@ -108,6 +115,12 @@ A ZIP containing one compatible cartridge opens directly; a multi-game ZIP prese
 keyboard-accessible member chooser. Opening an M3U starts its first disc and enables the
 previous/next playlist-disc commands. Archived Sega CD sets are intentionally not
 supported; keep CUE/BIN/CHD disc files beside a relative-path M3U instead.
+
+For a cartridge patch, choose **File → Open Game with Patch…** (`Ctrl+Shift+O`),
+drop the game and patch together, or use `--patch`. Ordinary Open automatically applies
+one same-stem `.ips`, `.bps`, or `.ups` sidecar; if more than one matches, the emulator
+asks you to use the explicit command. ZIP members can be patched explicitly after
+selection. Disc images and M3U playlists are not soft-patched.
 
 Use **Input → Controller Configuration** to assign or remap keyboard and SDL controllers.
 Default keyboard controls and application hotkeys are listed in

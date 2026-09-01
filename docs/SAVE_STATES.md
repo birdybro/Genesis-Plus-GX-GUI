@@ -66,6 +66,12 @@ session marker and starts a normal game session when possible; it never weakens 
 validation. Explicitly closing the game clears the marker. A crash retains only the
 last checkpoint from an earlier clean exit.
 
+When a cartridge was opened with an IPS, BPS, or UPS patch, the session marker stores
+both absolute source and patch paths. Startup reapplies the patch and activates the
+checkpoint only after the resulting bytes reproduce the same SHA-256 identity. Manual
+slots and the automatic checkpoint therefore cannot silently cross between patched and
+unpatched variants of the same source ROM. A missing patch clears the stale resume pair.
+
 ## Invalid or incompatible states
 
 An **Invalid** slot cannot be loaded. Its tooltip provides a concise reason, such as a

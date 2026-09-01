@@ -1,11 +1,13 @@
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/emulation_worker.h"
+#include "genplusgx/game_patch.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
 #include <QImage>
 #include <QOpenGLWidget>
 #include <QTest>
+#include <QTemporaryDir>
 
 #include <algorithm>
 #include <array>
@@ -13,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -521,6 +524,58 @@ int main(int argc, char** argv)
   if (!check(adapter.unloadGame(), "The real-ROM session could not unload")) {
     return 11;
   }
+
+  QTemporaryDir patchDirectory;
+  const auto patchRoot = std::filesystem::path{
+    patchDirectory.path().toStdString()};
+  const auto patchPath = patchRoot / "external-rom.ips";
+  std::uint8_t originalHeaderByte{};
+  {
+    std::ifstream source(rom, std::ios::binary);
+    source.seekg(0x120, std::ios::beg);
+    source.read(reinterpret_cast<char*>(&originalHeaderByte), 1);
+    if (!check(static_cast<bool>(source),
+          "The real ROM is too small for the safe header-only patch case")) {
+      return 11;
+    }
+  }
+  const std::vector<std::uint8_t> patch{
+    'P', 'A', 'T', 'C', 'H',
+    0x00, 0x01, 0x20, 0x00, 0x01,
+    static_cast<std::uint8_t>(originalHeaderByte == 0x58U ? 0x59U : 0x58U),
+    'E', 'O', 'F',
+  };
+  {
+    std::ofstream output(patchPath, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(patch.data()),
+      static_cast<std::streamsize>(patch.size()));
+    if (!check(static_cast<bool>(output),
+          "The temporary real-ROM IPS patch could not be written")) {
+      return 11;
+    }
+  }
+  const auto patched = genplusgx::applyGamePatchFile(
+    rom, patchPath, patchRoot / "cache");
+  if (!check(patched.status && patched.path != rom,
+        "The real ROM could not be soft-patched non-destructively") ||
+      !check(adapter.loadGame(patched.path),
+        "The patched real ROM did not load through the core")) {
+    return 11;
+  }
+  for (std::size_t frame = 0U; frame < 120U; ++frame) {
+    if (!check(adapter.runFrame(false),
+          "The patched real-ROM frame failed")) {
+      return 11;
+    }
+  }
+  std::vector<std::uint16_t> patchedPixels;
+  CoreVideoFrameInfo patchedFrame;
+  if (!check(copyCurrentFrame(adapter, patchedPixels, patchedFrame),
+        "The patched real ROM produced a black frame") ||
+      !check(adapter.unloadGame(),
+        "The patched real-ROM session did not unload")) {
+    return 11;
+  }
   std::vector<CoreSystemSettings> systemCases;
   const auto addSystemCases = [&systemCases](auto values, auto assign) {
     for (const auto value : values) {
@@ -641,7 +696,8 @@ int main(int argc, char** argv)
   }
   std::cout << "PASS: 13 core video cases, 35 core audio cases, 12 input "
                "devices, 36 accelerated presentation cases, 17 system "
-               "reload cases, and 3 emulation speed modes. Comparison PNGs: "
+               "reload cases, 3 emulation speed modes, and one non-destructive "
+               "IPS launch. Comparison PNGs: "
             << outputDirectory << '\n';
   return 0;
 }

@@ -454,15 +454,34 @@ int main(int argc, char* argv[])
     recordStartupIssue("Session settings", loadedSessionSettings.status.message);
   }
   auto sessionSettings = loadedSessionSettings.settings;
+  if (loadedSessionSettings.status && loadedSessionSettings.migrated) {
+    const auto migrated = sessionSettingsStore.save(sessionSettings);
+    if (!migrated) {
+      qWarning().noquote() << QString::fromStdString(migrated.message);
+      recordStartupIssue("Session settings migration", migrated.message);
+    }
+  }
   std::optional<std::filesystem::path> automaticResumePath;
+  std::optional<std::filesystem::path> automaticResumePatchPath;
   if (!commandLine.gamePath && sessionSettings.resumeOnLaunch &&
       sessionSettings.lastGamePath) {
     std::error_code pathError;
     if (std::filesystem::is_regular_file(
           *sessionSettings.lastGamePath, pathError) && !pathError) {
-      automaticResumePath = *sessionSettings.lastGamePath;
+      if (sessionSettings.lastPatchPath &&
+          (!std::filesystem::is_regular_file(
+             *sessionSettings.lastPatchPath, pathError) || pathError)) {
+        sessionSettings.lastGamePath.reset();
+        sessionSettings.lastPatchPath.reset();
+      } else {
+        automaticResumePath = *sessionSettings.lastGamePath;
+        automaticResumePatchPath = sessionSettings.lastPatchPath;
+      }
     } else {
       sessionSettings.lastGamePath.reset();
+      sessionSettings.lastPatchPath.reset();
+    }
+    if (!automaticResumePath) {
       const auto cleared = sessionSettingsStore.save(sessionSettings);
       if (!cleared) {
         qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -592,6 +611,8 @@ int main(int argc, char* argv[])
   genplusgx::ui::MainWindow window;
   window.setArchiveCacheDirectory(
     applicationPaths.cacheDirectory() / "archives");
+  window.setPatchCacheDirectory(
+    applicationPaths.cacheDirectory() / "patches");
   window.displayWidget()->setRendererFailureSink(
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
@@ -861,6 +882,7 @@ int main(int argc, char* argv[])
       candidate.resumeOnLaunch = enabled;
       if (!enabled) {
         candidate.lastGamePath.reset();
+        candidate.lastPatchPath.reset();
       }
       const auto saved = sessionSettingsStore.save(candidate);
       if (saved) {
@@ -1648,13 +1670,15 @@ int main(int argc, char* argv[])
     });
   window.setGameLoadSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
-     &applyEffectiveSettings, &automaticResumePath, &globalGameSettings,
+     &applyEffectiveSettings, &automaticResumePatchPath, &automaticResumePath,
+     &globalGameSettings,
      &lifecycleOperationId, &loadMetadataOperationId, &metadataService,
      &pendingAutomaticResume, &pendingLoad, &window, &worker](
       const genplusgx::GameLaunchTarget& target) {
       if (pendingAutomaticResume) {
         pendingAutomaticResume.reset();
         automaticResumePath.reset();
+        automaticResumePatchPath.reset();
         window.setSessionResumeBusy(false);
       }
       const auto metadataId = ++loadMetadataOperationId;
@@ -1921,7 +1945,7 @@ int main(int argc, char* argv[])
     &window,
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &automatedReadyQuitScheduled,
-     &automaticResumePath,
+     &automaticResumePatchPath, &automaticResumePath,
      &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
      &controllerInput,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
@@ -2063,11 +2087,13 @@ int main(int argc, char* argv[])
         const bool restored = event->succeeded();
         pendingAutomaticResume.reset();
         automaticResumePath.reset();
+        automaticResumePatchPath.reset();
         window.setSessionResumeBusy(false);
         if (restored) {
           qInfo() << "Automatic session checkpoint restored.";
         } else {
           sessionSettings.lastGamePath.reset();
+          sessionSettings.lastPatchPath.reset();
           const auto cleared = sessionSettingsStore.save(sessionSettings);
           if (!cleared) {
             qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2180,6 +2206,13 @@ int main(int argc, char* argv[])
                                  diagnosticLoadedSystem.empty()
                                    ? "Unknown system"
                                    : diagnosticLoadedSystem);
+          if (completedLoad.target.isPatched()) {
+            qInfo().noquote() << "Soft patch active:"
+                              << genplusgx::ui::pathToQString(
+                                   completedLoad.target.patchPath.filename())
+                              << "runtime"
+                              << genplusgx::ui::pathToQString(runtimePath);
+          }
           ++gameGeneration;
           stateSessionAvailable = false;
           const auto activationId = ++stateOperationId;
@@ -2197,7 +2230,9 @@ int main(int argc, char* argv[])
               "Save states are unavailable: " + stateActivated.message);
             if (automaticResumeCandidate) {
               automaticResumePath.reset();
+              automaticResumePatchPath.reset();
               sessionSettings.lastGamePath.reset();
+              sessionSettings.lastPatchPath.reset();
               const auto cleared = sessionSettingsStore.save(sessionSettings);
               if (!cleared) {
                 qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2265,8 +2300,10 @@ int main(int argc, char* argv[])
                                << QString::fromStdString(event->message);
           if (automaticResumePath && *automaticResumePath == loadedPath) {
             automaticResumePath.reset();
+            automaticResumePatchPath.reset();
             pendingAutomaticResume.reset();
             sessionSettings.lastGamePath.reset();
+            sessionSettings.lastPatchPath.reset();
             const auto cleared = sessionSettingsStore.save(sessionSettings);
             if (!cleared) {
               qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2346,10 +2383,12 @@ int main(int argc, char* argv[])
         if (event->succeeded()) {
           pendingAutomaticResume.reset();
           automaticResumePath.reset();
+          automaticResumePatchPath.reset();
           window.setSessionResumeBusy(false);
           if (sessionSettings.lastGamePath) {
             auto clearedSession = sessionSettings;
             clearedSession.lastGamePath.reset();
+            clearedSession.lastPatchPath.reset();
             const auto cleared = sessionSettingsStore.save(clearedSession);
             if (cleared) {
               sessionSettings = std::move(clearedSession);
@@ -2512,8 +2551,10 @@ int main(int argc, char* argv[])
           } else {
             pendingAutomaticResume.reset();
             automaticResumePath.reset();
+            automaticResumePatchPath.reset();
             window.setSessionResumeBusy(false);
             sessionSettings.lastGamePath.reset();
+            sessionSettings.lastPatchPath.reset();
             const auto cleared = sessionSettingsStore.save(sessionSettings);
             if (!cleared) {
               qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2538,8 +2579,10 @@ int main(int argc, char* argv[])
             << QString::fromStdString(detail);
           pendingAutomaticResume.reset();
           automaticResumePath.reset();
+          automaticResumePatchPath.reset();
           window.setSessionResumeBusy(false);
           sessionSettings.lastGamePath.reset();
+          sessionSettings.lastPatchPath.reset();
           const auto cleared = sessionSettingsStore.save(sessionSettings);
           if (!cleared) {
             qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2564,8 +2607,10 @@ int main(int argc, char* argv[])
                 AutomaticResumePhase::waitingForStateSession) {
             pendingAutomaticResume.reset();
             automaticResumePath.reset();
+            automaticResumePatchPath.reset();
             window.setSessionResumeBusy(false);
             sessionSettings.lastGamePath.reset();
+            sessionSettings.lastPatchPath.reset();
             const auto cleared = sessionSettingsStore.save(sessionSettings);
             if (!cleared) {
               qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2611,8 +2656,10 @@ int main(int argc, char* argv[])
         } else {
           pendingAutomaticResume.reset();
           automaticResumePath.reset();
+          automaticResumePatchPath.reset();
           window.setSessionResumeBusy(false);
           sessionSettings.lastGamePath.reset();
+          sessionSettings.lastPatchPath.reset();
           const auto cleared = sessionSettingsStore.save(sessionSettings);
           if (!cleared) {
             qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -2960,21 +3007,29 @@ int main(int argc, char* argv[])
     window.setFullscreen(true);
   }
   std::optional<std::filesystem::path> startupGame;
+  std::optional<std::filesystem::path> startupPatch;
   if (commandLine.gamePath) {
     startupGame = genplusgx::ui::pathFromQString(*commandLine.gamePath);
+    if (commandLine.patchPath) {
+      startupPatch = genplusgx::ui::pathFromQString(*commandLine.patchPath);
+    }
   } else if (automaticResumePath) {
     startupGame = *automaticResumePath;
+    startupPatch = automaticResumePatchPath;
   }
   if (startupGame) {
     const bool automatic = automaticResumePath.has_value();
     QTimer::singleShot(0, &window,
-      [&automaticResumePath, &sessionSettings, &sessionSettingsStore, &window,
-       automatic, startupGame = *startupGame] {
-        if (window.requestGameLoad(startupGame) || !automatic) {
+      [&automaticResumePatchPath, &automaticResumePath, &sessionSettings,
+       &sessionSettingsStore, &window, automatic, startupGame = *startupGame,
+       startupPatch] {
+        if (window.requestGameLoad(startupGame, startupPatch) || !automatic) {
           return;
         }
         automaticResumePath.reset();
+        automaticResumePatchPath.reset();
         sessionSettings.lastGamePath.reset();
+        sessionSettings.lastPatchPath.reset();
         const auto cleared = sessionSettingsStore.save(sessionSettings);
         if (!cleared) {
           qWarning().noquote() << QString::fromStdString(cleared.message);
@@ -3093,14 +3148,30 @@ int main(int argc, char* argv[])
         checkpointGamePath = checkpointGamePath.lexically_normal();
         auto savedSession = sessionSettings;
         savedSession.lastGamePath = std::move(checkpointGamePath);
-        const auto saved = sessionSettingsStore.save(savedSession);
-        if (saved) {
-          sessionSettings = std::move(savedSession);
-          qInfo().noquote() << "Automatic session checkpoint saved for"
-                            << genplusgx::ui::pathToQString(
-                                 *sessionSettings.lastGamePath);
-        } else {
-          shutdownReport.addFailure("Automatic session resume", saved.message);
+        savedSession.lastPatchPath.reset();
+        if (window.loadedGameTarget().isPatched()) {
+          std::error_code patchPathError;
+          auto checkpointPatchPath = std::filesystem::absolute(
+            window.loadedGameTarget().patchPath, patchPathError);
+          if (patchPathError || checkpointPatchPath.empty()) {
+            checkpointReady = false;
+            shutdownReport.addFailure(
+              "Automatic session resume",
+              "The running game's patch path could not be recorded.");
+          } else {
+            savedSession.lastPatchPath = checkpointPatchPath.lexically_normal();
+          }
+        }
+        if (checkpointReady) {
+          const auto saved = sessionSettingsStore.save(savedSession);
+          if (saved) {
+            sessionSettings = std::move(savedSession);
+            qInfo().noquote() << "Automatic session checkpoint saved for"
+                              << genplusgx::ui::pathToQString(
+                                   *sessionSettings.lastGamePath);
+          } else {
+            shutdownReport.addFailure("Automatic session resume", saved.message);
+          }
         }
       }
     }

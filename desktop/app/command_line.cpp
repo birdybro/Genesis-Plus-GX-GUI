@@ -10,7 +10,8 @@ CommandLineOptions parseCommandLine(const QStringList& arguments)
 {
   CommandLineOptions options;
   bool positionalOnly = false;
-  for (const auto& argument : arguments) {
+  for (qsizetype index = 0; index < arguments.size(); ++index) {
+    const auto& argument = arguments[index];
     if (!positionalOnly && argument == QStringLiteral("--")) {
       positionalOnly = true;
       continue;
@@ -30,6 +31,38 @@ CommandLineOptions parseCommandLine(const QStringList& arguments)
       options.fullscreen = true;
       continue;
     }
+    if (!positionalOnly && argument == QStringLiteral("--patch")) {
+      if (options.patchPath) {
+        options.valid = false;
+        options.error = QCoreApplication::translate(
+          "CommandLine", "Only one soft patch may be selected at startup.");
+        return options;
+      }
+      if (index + 1 >= arguments.size()) {
+        options.valid = false;
+        options.error = QCoreApplication::translate(
+          "CommandLine", "The --patch option requires a patch file path.");
+        return options;
+      }
+      options.patchPath = arguments[++index];
+      continue;
+    }
+    if (!positionalOnly && argument.startsWith(QStringLiteral("--patch="))) {
+      if (options.patchPath) {
+        options.valid = false;
+        options.error = QCoreApplication::translate(
+          "CommandLine", "Only one soft patch may be selected at startup.");
+        return options;
+      }
+      options.patchPath = argument.sliced(8);
+      if (options.patchPath->isEmpty()) {
+        options.valid = false;
+        options.error = QCoreApplication::translate(
+          "CommandLine", "The --patch option requires a patch file path.");
+        return options;
+      }
+      continue;
+    }
     if (!positionalOnly && argument.startsWith(u'-')) {
       options.valid = false;
       options.error = QCoreApplication::translate(
@@ -44,6 +77,11 @@ CommandLineOptions parseCommandLine(const QStringList& arguments)
     }
     options.gamePath = argument;
   }
+  if (options.patchPath && !options.gamePath) {
+    options.valid = false;
+    options.error = QCoreApplication::translate(
+      "CommandLine", "The --patch option requires a startup game file.");
+  }
   return options;
 }
 
@@ -57,7 +95,8 @@ QString commandLineHelp()
     "Options:\n"
     "  -h, --help        Show this help text.\n"
     "  -v, --version     Show application version.\n"
-    "  -f, --fullscreen  Start in fullscreen mode.\n\n"
+    "  -f, --fullscreen  Start in fullscreen mode.\n"
+    "      --patch FILE  Apply an IPS, BPS, or UPS soft patch.\n\n"
     "Arguments:\n"
     "  game              Game cartridge or disc image to open.")
     .arg(QString::fromLatin1(GENPLUSGX_APP_NAME),

@@ -764,11 +764,12 @@ duplicate the emulator's content interpretation. The direct core host accepts `.
 `.bin`, `.bms`, `.cue`, `.gen`, `.gg`, `.iso`, `.md`, `.mdx`, `.sg`, `.sgd`, `.smd`,
 and `.sms`; `.chd` is added only when bundled libchdr support is compiled.
 `GameLaunchTarget` keeps that runtime path separate from the user-selected source path.
-The source resolver adds two bounded container layers:
+The source resolver adds bounded container and transformation layers:
 
 ```text
 ZIP source -> validated central directory -> selected cartridge -> cache/runtime path
 M3U source -> validated ordered local discs -> first/current disc runtime path
+cartridge runtime + IPS/BPS/UPS -> validated immutable patch cache -> core runtime path
 ```
 
 ZIP enumeration is capped at 4,096 entries and 512 MiB per archive. Only stored or
@@ -780,9 +781,31 @@ validated relative disc paths that remain beneath the playlist directory after
 canonicalization. Container parsing never runs the emulator core or dereferences an
 untrusted offset directly.
 
+The soft-patch layer is frontend-only. `game_patch.cpp` implements IPS records, all
+four BPS action types, and reversible UPS XOR records from their public format
+specifications; no emulator-core source is changed. Input patches are capped at 64 MiB,
+source/output cartridges at 32 MiB, and every variable integer, relative copy, literal,
+RLE run, metadata range, and output range is checked before access. BPS and UPS validate
+their source/output/patch CRC-32 fields; IPS has no checksum field. Exact results are
+published through a same-directory temporary file to a content-keyed, collision-safe
+cache name. `GameLaunchTarget` therefore carries three distinct paths:
+
+```text
+sourcePath  = user-selected file retained by recents/library/session
+patchPath   = optional user-selected or discovered IPS/BPS/UPS file
+runtimePath = exact validated bytes passed to metadata, persistence, and core services
+```
+
+This keeps save RAM, states, cheats, and per-game overrides isolated by the patched
+SHA-256 without modifying the source. Same-stem sidecar discovery is deterministic and
+fails closed when multiple candidates exist. Explicit patches may follow ZIP member
+selection; automatic ZIP sidecars and all disc/playlist patching are intentionally
+excluded because their target content would be ambiguous.
+
 Native file selection is abstracted behind `DialogService`, enabling production Qt
-dialogs and deterministic GUI tests. Open actions, one-local-file drops, and the single
-command-line positional argument all converge on `MainWindow::requestGameLoad()`. The
+dialogs and deterministic GUI tests. Open actions, one-game or game-plus-patch drops,
+and the command-line game/optional `--patch` pair all converge on
+`MainWindow::requestGameLoad()`. The
 composition root assigns operation IDs and submits load/unload commands. A successful
 load enters worker `Paused`, updates UI identity, applies current input, then submits
 `Start`; frame execution never happens on the GUI thread. A different game can replace

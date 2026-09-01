@@ -32,6 +32,35 @@ int main(int argc, char** argv)
       *startup.gamePath == QStringLiteral("game.md"),
     "fullscreen and a positional game parse together");
 
+  const auto patched = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--patch"), QStringLiteral("translation.bps"),
+      QStringLiteral("game.md")});
+  passed &= check(patched.valid && patched.patchPath &&
+      *patched.patchPath == QStringLiteral("translation.bps") &&
+      patched.gamePath && *patched.gamePath == QStringLiteral("game.md"),
+    "an explicit soft patch parses with its startup game");
+  const auto equalsPatch = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--patch=fix.ips"), QStringLiteral("game.md")});
+  passed &= check(equalsPatch.valid && equalsPatch.patchPath &&
+      *equalsPatch.patchPath == QStringLiteral("fix.ips"),
+    "the equals form of the patch option parses");
+  const auto orphanPatch = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--patch"), QStringLiteral("fix.ups")});
+  passed &= check(!orphanPatch.valid &&
+      orphanPatch.error.contains(QStringLiteral("startup game")),
+    "a patch without a game is rejected");
+  const auto missingPatchValue = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--patch")});
+  passed &= check(!missingPatchValue.valid &&
+      missingPatchValue.error.contains(QStringLiteral("requires")),
+    "a missing patch option value is rejected");
+  const auto duplicatePatch = genplusgx::app::parseCommandLine(
+    {QStringLiteral("--patch=one.ips"), QStringLiteral("--patch=two.bps"),
+      QStringLiteral("game.md")});
+  passed &= check(!duplicatePatch.valid &&
+      duplicatePatch.error.contains(QStringLiteral("Only one")),
+    "multiple startup patches are rejected explicitly");
+
   const auto shortOptions = genplusgx::app::parseCommandLine(
     {QStringLiteral("-f"), QStringLiteral("-h")});
   passed &= check(shortOptions.valid && shortOptions.fullscreen && shortOptions.showHelp,
@@ -55,6 +84,7 @@ int main(int argc, char** argv)
 
   const auto help = genplusgx::app::commandLineHelp();
   passed &= check(help.contains(QStringLiteral("--fullscreen")) &&
+      help.contains(QStringLiteral("--patch FILE")) &&
       help.contains(QStringLiteral("[game]")),
     "help documents startup behavior");
   return passed ? 0 : 1;

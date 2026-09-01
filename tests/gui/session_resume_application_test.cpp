@@ -12,6 +12,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <optional>
 #include <string>
@@ -52,7 +53,8 @@ bool runDesktop(
   const QString& executable,
   const std::filesystem::path& root,
   const std::optional<std::filesystem::path>& game,
-  bool relativeGameArgument = false)
+  bool relativeGameArgument = false,
+  const std::optional<std::filesystem::path>& patch = std::nullopt)
 {
   auto environment = QProcessEnvironment::systemEnvironment();
   environment.insert(QStringLiteral("QT_QPA_PLATFORM"), QStringLiteral("offscreen"));
@@ -68,14 +70,20 @@ bool runDesktop(
   QProcess process;
   process.setProcessEnvironment(environment);
   process.setProgram(executable);
+  QStringList arguments;
+  if (patch) {
+    arguments.append(QStringLiteral("--patch"));
+    arguments.append(pathText(*patch));
+  }
   if (game) {
     if (relativeGameArgument) {
       process.setWorkingDirectory(pathText(game->parent_path()));
-      process.setArguments({pathText(game->filename())});
+      arguments.append(pathText(game->filename()));
     } else {
-      process.setArguments({pathText(*game)});
+      arguments.append(pathText(*game));
     }
   }
+  process.setArguments(arguments);
   process.start();
   if (!process.waitForStarted(5'000) || !process.waitForFinished(20'000)) {
     process.kill();
@@ -110,6 +118,7 @@ int main(int argc, char** argv)
   if (!check(settingsStore.save({
         .resumeOnLaunch = true,
         .lastGamePath = std::nullopt,
+        .lastPatchPath = std::nullopt,
       }), "Could not enable automatic session resume")) {
     return 3;
   }
@@ -251,6 +260,66 @@ int main(int argc, char** argv)
         !cacheError && !std::filesystem::is_empty(archiveCache, cacheError),
       "ZIP launch did not create a bounded per-user extraction cache")) {
     return 19;
+  }
+
+  const auto patchPath =
+    std::filesystem::path{temporary.path().toStdString()} / "marker.ips";
+  const std::vector<std::uint8_t> patch{
+    'P', 'A', 'T', 'C', 'H',
+    0x00, 0x02, 0x0a, 0x00, 0x02, 0x24, 0x68,
+    'E', 'O', 'F',
+  };
+  {
+    std::ofstream output(patchPath, std::ios::binary | std::ios::trunc);
+    output.write(reinterpret_cast<const char*>(patch.data()),
+      static_cast<std::streamsize>(patch.size()));
+    if (!check(static_cast<bool>(output),
+          "Could not create the command-line soft-patch fixture")) {
+      return 20;
+    }
+  }
+  if (!check(runDesktop(executable, root, first.path(), false, patchPath),
+        "Command-line soft-patch launch did not shut down cleanly")) {
+    return 21;
+  }
+  settings = settingsStore.load();
+  if (!check(settings.status &&
+        isAbsolutePathTo(settings.settings.lastGamePath, first.path()) &&
+        isAbsolutePathTo(settings.settings.lastPatchPath, patchPath),
+      "Clean shutdown did not preserve the game and patch resume pair")) {
+    return 22;
+  }
+  const auto patchCache = paths.cacheDirectory() / "patches";
+  std::filesystem::path patchedRuntime;
+  for (std::filesystem::directory_iterator iterator{
+         patchCache, cacheError}, end;
+       !cacheError && iterator != end;
+       iterator.increment(cacheError)) {
+    if (iterator->is_regular_file(cacheError) && !cacheError) {
+      patchedRuntime = iterator->path();
+      break;
+    }
+  }
+  const auto patchedIdentity = genplusgx::identifyGame(patchedRuntime);
+  const auto patchedCheckpoint = patchedIdentity.status
+    ? manager.loadResumeState(patchedIdentity.identity, 0x80U)
+    : genplusgx::SaveStateLoadResult{};
+  if (!check(!patchedRuntime.empty() && patchedIdentity.status &&
+        patchedIdentity.identity.sha256 != identity.identity.sha256 &&
+        patchedCheckpoint.status,
+      "Patched runtime content did not receive its own resumable identity")) {
+    return 23;
+  }
+  if (!check(runDesktop(executable, root, std::nullopt),
+        "Automatic patched-session restore did not shut down cleanly")) {
+    return 24;
+  }
+  settings = settingsStore.load();
+  if (!check(settings.status &&
+        isAbsolutePathTo(settings.settings.lastGamePath, first.path()) &&
+        isAbsolutePathTo(settings.settings.lastPatchPath, patchPath),
+      "Automatic resume silently discarded the selected soft patch")) {
+    return 25;
   }
   return 0;
 }

@@ -40,6 +40,7 @@ int main()
   const SessionSettings enabled{
     .resumeOnLaunch = true,
     .lastGamePath = root / std::filesystem::path{u8"RÖMs"} / "game.md",
+    .lastPatchPath = root / std::filesystem::path{u8"PÄtches"} / "game.bps",
   };
   if (!check(store.save(enabled), "Session settings could not be saved")) {
     return EXIT_FAILURE;
@@ -53,6 +54,7 @@ int main()
   const SessionSettings disabled{
     .resumeOnLaunch = false,
     .lastGamePath = std::nullopt,
+    .lastPatchPath = std::nullopt,
   };
   if (!check(store.save(disabled), "Disabled session settings could not be saved") ||
       !check(store.load().settings == disabled,
@@ -63,6 +65,7 @@ int main()
   const SessionSettings emptyPath{
     .resumeOnLaunch = true,
     .lastGamePath = std::filesystem::path{},
+    .lastPatchPath = std::nullopt,
   };
   if (!check(!validateSessionSettings(emptyPath) && !store.save(emptyPath),
         "An invalid empty session path was accepted")) {
@@ -71,14 +74,47 @@ int main()
   const SessionSettings relativePath{
     .resumeOnLaunch = true,
     .lastGamePath = std::filesystem::path{"relative-game.md"},
+    .lastPatchPath = std::nullopt,
   };
   if (!check(!validateSessionSettings(relativePath) && !store.save(relativePath),
         "A working-directory-dependent session path was accepted")) {
     return EXIT_FAILURE;
   }
 
+  const SessionSettings orphanPatch{
+    .resumeOnLaunch = true,
+    .lastGamePath = std::nullopt,
+    .lastPatchPath = root / "orphan.ips",
+  };
+  if (!check(!validateSessionSettings(orphanPatch) && !store.save(orphanPatch),
+        "A patch without a session game was accepted")) {
+    return EXIT_FAILURE;
+  }
+
+  const std::string legacy =
+    "{\"schemaVersion\":1,\"resumeOnLaunch\":true,\"lastGamePath\":\"" +
+    (root / "legacy.md").string() + "\"}";
+  if (!check(writeFileAtomically(store.path(),
+        std::span<const std::uint8_t>{
+          reinterpret_cast<const std::uint8_t*>(legacy.data()), legacy.size()},
+        SessionSettingsStore::maximumFileBytes),
+        "Could not write legacy session fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto migrated = store.load();
+  if (!check(migrated.status && migrated.migrated &&
+        migrated.settings.lastGamePath == root / "legacy.md" &&
+        !migrated.settings.lastPatchPath,
+        "Schema-1 session settings were not migrated safely")) {
+    return EXIT_FAILURE;
+  }
+  if (!check(store.save(migrated.settings) && !store.load().migrated,
+        "Migrated session settings could not be rewritten as schema 2")) {
+    return EXIT_FAILURE;
+  }
+
   const std::string corrupt =
-    "{\"schemaVersion\":1,\"resumeOnLaunch\":\"yes\"}";
+    "{\"schemaVersion\":2,\"resumeOnLaunch\":\"yes\"}";
   if (!check(writeFileAtomically(store.path(),
         std::span<const std::uint8_t>{
           reinterpret_cast<const std::uint8_t*>(corrupt.data()), corrupt.size()},

@@ -36,6 +36,7 @@ shortcuts.
 | Action | Shortcut |
 | --- | --- |
 | Open game | Ctrl+O (Command+O on macOS) |
+| Open game with IPS/BPS/UPS patch | Ctrl+Shift+O (Command+Shift+O on macOS) |
 | Close game | Ctrl+W (Command+W on macOS) |
 | Game library | Ctrl+L (Command+L on macOS) |
 | Fullscreen | Alt+Return |

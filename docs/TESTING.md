@@ -59,6 +59,17 @@ members plus an M3U-driven generated Sega CD disc change through the real core a
 The GUI suite covers archive selection, cancellation, drag/drop/open source identity,
 playlist action gating, and an isolated executable ZIP resume workflow.
 
+`unit.game_patch` exercises IPS literals/RLE/growth/truncation, every BPS action,
+forward and reverse UPS, all CRC/source mismatch paths, cache reuse/collisions,
+sidecar ambiguity, and a fixed-seed 512-case mutation corpus. `integration.soft_patch`
+changes an immediate operand in the generated Genesis program, executes the cached ROM
+through the real core, verifies the changed RAM marker and distinct SHA-256 identity,
+then reloads the unchanged source. GUI tests cover explicit and automatic selection,
+two-file drop, visible patch status, disc rejection, and malformed/ambiguous errors.
+`gui.session_resume_application` additionally starts the real desktop with `--patch`,
+checks an identity-specific checkpoint, and restores the exact game/patch pair in a
+second process.
+
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
@@ -100,7 +111,9 @@ provided by the developer. It loads the file through the real `CoreAdapter`, exe
 compatible system-reload cases, then reloads it through `EmulationWorker` at normal,
 slow-motion, and fast-forward rates. Every mode must publish a non-black frame; host
 audio must remain empty outside 100%. Shader images must be closer to the unshaded
-upright image than to its vertical mirror.
+upright image than to its vertical mirror. It also creates a temporary IPS record that
+changes one Genesis header byte, runs the separately cached result for 120 frames, and
+requires a non-black frame without touching the supplied source.
 
 Run it on a native desktop backend with an output directory outside the source tree:
 

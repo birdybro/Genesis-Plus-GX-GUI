@@ -2,6 +2,7 @@
 
 #include "genplusgx/game_file.h"
 #include "genplusgx/game_archive.h"
+#include "genplusgx/game_patch.h"
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
@@ -52,6 +53,13 @@ namespace genplusgx::ui {
 namespace {
 
 constexpr std::array speedPresets{50U, 75U, 100U, 125U, 150U, 200U};
+
+bool isUnambiguousDiscImage(const std::filesystem::path& path)
+{
+  return hasSupportedDiscExtension(path) &&
+    pathToQString(path.extension()).compare(
+      QStringLiteral(".bin"), Qt::CaseInsensitive) != 0;
+}
 
 QLabel* statusLabel(
   QStatusBar& bar,
@@ -136,6 +144,13 @@ void MainWindow::buildMenus()
   auto* openGame = addAction(
     *file, tr("&Open Game…"), "openGameAction", QKeySequence::Open);
   connect(openGame, &QAction::triggered, this, &MainWindow::chooseGame);
+  auto* openPatchedGame = addAction(
+    *file, tr("Open Game with &Patch…"), "openGameWithPatchAction",
+    QKeySequence{tr("Ctrl+Shift+O")});
+  openPatchedGame->setToolTip(
+    tr("Open a cartridge image with an IPS, BPS, or UPS soft patch"));
+  connect(openPatchedGame, &QAction::triggered,
+    this, &MainWindow::chooseGameWithPatch);
   auto* recent = file->addMenu(tr("Open &Recent"));
   recent->setObjectName(QStringLiteral("openRecentMenu"));
   recent->setEnabled(false);
@@ -1797,6 +1812,7 @@ void MainWindow::showSessionSettings()
     updated.resumeOnLaunch = enabled;
     if (!enabled) {
       updated.lastGamePath.reset();
+      updated.lastPatchPath.reset();
     }
     setSessionSettings(std::move(updated));
     statusBar()->showMessage(tr("Session settings applied."), 3'000);
@@ -2477,6 +2493,11 @@ void MainWindow::setArchiveCacheDirectory(std::filesystem::path directory)
   archiveCacheDirectory_ = std::move(directory);
 }
 
+void MainWindow::setPatchCacheDirectory(std::filesystem::path directory)
+{
+  patchCacheDirectory_ = std::move(directory);
+}
+
 void MainWindow::setGameCloseSink(GameCloseSink sink)
 {
   gameCloseSink_ = std::move(sink);
@@ -2628,7 +2649,9 @@ void MainWindow::showRecentGamesError(const std::string& detail)
     this, tr("Recent Games Error"), QString::fromStdString(detail));
 }
 
-bool MainWindow::requestGameLoad(const std::filesystem::path& path)
+bool MainWindow::requestGameLoad(
+  const std::filesystem::path& path,
+  std::optional<std::filesystem::path> patchPath)
 {
   if (gameLoading_ || sessionResumeBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
@@ -2637,6 +2660,7 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
   GameLaunchTarget target{
     .sourcePath = path,
     .runtimePath = path,
+    .patchPath = {},
     .archiveEntry = {},
     .playlistDiscs = {},
   };
@@ -2674,6 +2698,30 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
     presentGameLoadError(path, status.message);
     return false;
   }
+  if (!patchPath && !target.isArchive() && !target.isPlaylist() &&
+      !isUnambiguousDiscImage(target.runtimePath)) {
+    const auto sidecar = discoverGamePatchSidecar(path);
+    if (!sidecar.status) {
+      presentGameLoadError(path, sidecar.status.message);
+      return false;
+    }
+    patchPath = sidecar.path;
+  }
+  if (patchPath) {
+    if (target.isPlaylist() || isUnambiguousDiscImage(target.runtimePath)) {
+      presentGameLoadError(path,
+        "Soft patches can only be applied to cartridge game images.");
+      return false;
+    }
+    const auto patched = applyGamePatchFile(
+      target.runtimePath, *patchPath, patchCacheDirectory_);
+    if (!patched.status) {
+      presentGameLoadError(path, patched.status.message);
+      return false;
+    }
+    target.runtimePath = patched.path;
+    target.patchPath = *patchPath;
+  }
   if (!gameLoadSink_) {
     presentGameLoadError(path, "The emulation service is not available.");
     return false;
@@ -2689,6 +2737,8 @@ void MainWindow::setSessionResumeBusy(bool busy)
   sessionResumeBusy_ = busy && isGameLoaded();
   setGameActionsEnabled(isGameLoaded() && !sessionResumeBusy_);
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(
+    !gameLoading_ && !sessionResumeBusy_);
+  findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(
     !gameLoading_ && !sessionResumeBusy_);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
     hasRecentGames_ && !gameLoading_ && !sessionResumeBusy_);
@@ -2734,12 +2784,14 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
     pendingGameTarget_ = {
       .sourcePath = path,
       .runtimePath = path,
+      .patchPath = {},
       .archiveEntry = {},
       .playlistDiscs = {},
     };
   }
   displayWidget_->clearFrame();
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+  findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
   setGameActionsEnabled(false);
   gameStatus_->setText(
@@ -2764,6 +2816,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
   setGameLoaded(GameLaunchTarget{
     .sourcePath = path,
     .runtimePath = path,
+    .patchPath = {},
     .archiveEntry = {},
     .playlistDiscs = {},
   });
@@ -2791,14 +2844,20 @@ void MainWindow::setGameLoaded(const GameLaunchTarget& target)
   gameLoading_ = false;
   gameInformationBusy_ = false;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(true);
   updateStateSlotPresentation();
-  gameStatus_->setText(target.isArchive()
+  auto gameDescription = target.isArchive()
     ? tr("%1 — %2")
         .arg(pathToQString(target.sourcePath.filename()),
           QString::fromUtf8(target.archiveEntry))
-    : pathToQString(target.sourcePath.filename()));
+    : pathToQString(target.sourcePath.filename());
+  if (target.isPatched()) {
+    gameDescription += tr(" — %1 patch")
+      .arg(pathToQString(target.patchPath.filename()));
+  }
+  gameStatus_->setText(gameDescription);
   statusBar()->showMessage(tr("Game loaded"), 3000);
   refreshSettingsDialog();
   if (auto* debugger = findChild<DebugToolsWindow*>(
@@ -2885,6 +2944,7 @@ void MainWindow::setNoGameLoaded()
     stateSlotViews_[slot].slot = slot;
   }
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+  findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(false);
   gameStatus_->setText(tr("No game loaded"));
@@ -3063,8 +3123,15 @@ const GameLaunchTarget& MainWindow::loadedGameTarget() const noexcept
 void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 {
   const auto urls = event->mimeData()->urls();
-  if (!gameLoading_ && urls.size() == 1 && urls.front().isLocalFile() &&
-      hasSupportedGameExtension(pathFromQString(urls.front().toLocalFile()))) {
+  const auto validSingle = urls.size() == 1 && urls.front().isLocalFile() &&
+    hasSupportedGameExtension(pathFromQString(urls.front().toLocalFile()));
+  const auto validPair = urls.size() == 2 && urls[0].isLocalFile() &&
+    urls[1].isLocalFile() &&
+    ((hasSupportedGameExtension(pathFromQString(urls[0].toLocalFile())) &&
+      hasSupportedGamePatchExtension(pathFromQString(urls[1].toLocalFile()))) ||
+     (hasSupportedGameExtension(pathFromQString(urls[1].toLocalFile())) &&
+      hasSupportedGamePatchExtension(pathFromQString(urls[0].toLocalFile()))));
+  if (!gameLoading_ && (validSingle || validPair)) {
     event->acceptProposedAction();
   }
 }
@@ -3072,6 +3139,17 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
 void MainWindow::dropEvent(QDropEvent* event)
 {
   const auto urls = event->mimeData()->urls();
+  if (urls.size() == 2 && urls[0].isLocalFile() && urls[1].isLocalFile()) {
+    auto first = pathFromQString(urls[0].toLocalFile());
+    auto second = pathFromQString(urls[1].toLocalFile());
+    if (hasSupportedGamePatchExtension(first)) {
+      std::swap(first, second);
+    }
+    if (requestGameLoad(first, second)) {
+      event->acceptProposedAction();
+    }
+    return;
+  }
   if (urls.size() != 1 || !urls.front().isLocalFile()) {
     return;
   }
@@ -3091,11 +3169,27 @@ void MainWindow::chooseGame()
   }
 }
 
+void MainWindow::chooseGameWithPatch()
+{
+  const auto initialDirectory = loadedGamePath_.empty()
+    ? std::filesystem::path{}
+    : loadedGamePath_.parent_path();
+  const auto game = dialogService_->chooseGame(this, initialDirectory);
+  if (!game) {
+    return;
+  }
+  const auto patch = dialogService_->choosePatch(this, game->parent_path());
+  if (patch) {
+    static_cast<void>(requestGameLoad(*game, *patch));
+  }
+}
+
 void MainWindow::closeGame()
 {
   if (gameCloseSink_ && isGameLoaded()) {
     gameLoading_ = true;
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+    findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
     setGameActionsEnabled(false);
     gameStatus_->setText(tr("Closing game…"));
@@ -3144,10 +3238,12 @@ void MainWindow::updateStateActions()
 
   if (stateOperationBusy_ || sessionResumeBusy_) {
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+    findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
     findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(false);
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
   } else if (!gameLoading_) {
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
+    findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
     findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(
       isGameLoaded());
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
