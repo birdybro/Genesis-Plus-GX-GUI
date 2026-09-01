@@ -18,8 +18,8 @@ debugger, rewind, automatic-session-resume, and configurable-speed verification 
   `e44d4c2e6aeee926603e4318b28641888ada4909`
 - Exact automatic-resume implementation and hosted evidence baseline:
   `3cce4030f83c1ee7c057113eab1a811129c02858`
-- Configurable-speed implementation: the next milestone commit containing this report;
-  exact hosted evidence is pending that commit
+- Exact configurable-speed implementation and hosted evidence baseline:
+  `253c04352a762dfaf2c920fa6b107b6a983f4ecd`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -128,8 +128,9 @@ neither slow nor accelerated playback can accumulate stale audio. The input prof
 schema migrates existing users to two conflict-checked slow-motion bindings without
 changing their prior mappings. Fresh Debug, Release, ASan/UBSan, and Clang 22 suites
 each pass 90/90; the shader-disabled graph passes 88/88; Linux staging/package and the
-legacy libretro regression pass. Exact cross-platform hosted evidence remains pending
-the implementation commit and is required before the next feature begins.
+legacy libretro regression pass. Exact hosted run `33477974149` passes every one of its
+ten Linux, Windows, Apple Silicon, and Intel macOS jobs against the implementation SHA;
+the complete logs and native artifacts have also passed the audit recorded below.
 
 ## Build configurations tested
 
@@ -258,6 +259,24 @@ The failed-job retry used the identical SHA and completed SDL setup, compilation
 runtime error, timeout, failed test, invalid generated path, or deployment failure.
 Normal checkout hints and Windows pthread feature probes are non-actionable.
 
+### Exact configurable-speed cross-platform verification
+
+Continuous Integration run
+[`33477974149`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33477974149)
+passes all ten jobs against exact implementation commit
+`253c04352a762dfaf2c920fa6b107b6a983f4ecd`. All nine CMake jobs register and complete
+90/90 tests. Linux Debug/Release/ASan+UBSan and macOS arm64/x86-64 Debug/Release run the
+complete suite. Windows MSVC Debug/Release capability-skip only the documented real
+OpenGL 3.3 shader test on the hosted software context while completing every other
+test. The legacy libretro target builds, links, and cleans.
+
+All 14,067 log lines (1,874,662 bytes) were inspected. There is no compiler/linker
+warning, sanitizer signature, crash, runtime error, timeout, failed test, invalid
+generated path, or deployment failure. Normal checkout default-branch hints, Windows
+pthread feature probes, absent optional Vulkan headers, and omission of the unused
+OpenSSL Qt backend are non-actionable. In particular, the new speed settings, timing,
+worker, GUI, migration, and long-running boundedness regressions pass on every host.
+
 ## Operating-system CI matrix
 
 Continuous Integration run
@@ -329,6 +348,15 @@ The Linux TGZ has 86 entries, Windows ZIP 75, and each macOS app ZIP 123. Requir
 SDL3, librashader, platform-plugin, CRT-preset, license, and Windows redistributable
 payloads are present, with no ROM, disc, BIOS, save/state, secret-key, or environment
 payload.
+
+Exact configurable-speed run `33477974149` supersedes those tester artifacts with Linux
+x86-64 (39,929,410 bytes), Windows x86-64 (52,502,878 bytes), macOS arm64 (63,777,323
+bytes), and macOS x86-64 (65,382,346 bytes). All six contained SHA-256 manifests verify;
+TGZ and ZIP integrity checks pass; both DMGs identify as Apple DMG version 4. Extracted
+executables identify as the four expected native architectures. The Linux archive has
+86 entries, Windows has 75, and each macOS app ZIP has 123. Required Qt, SDL3,
+librashader, CRT, license/documentation, and Windows redistributable payloads are
+present, with no ROM, disc, BIOS, save/state, private-key, or environment payload.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows

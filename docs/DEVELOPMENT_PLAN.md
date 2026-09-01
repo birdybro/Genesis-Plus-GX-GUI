@@ -92,7 +92,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 78 Debug hosted evidence | COMPLETE | Audit exact-commit Linux, Windows, and macOS builds, tests, packages, and complete logs | CI evidence and final report | all ten hosted jobs, 13,564 log lines, and four artifacts | No cross-platform warning, failure, sanitizer issue, or packaging regression remains | pending |
 | 79 Bounded rewind | COMPLETE | Add owner-thread rewind with strict time and memory limits | core rewind buffer/worker, settings, UI, input, diagnostics, tests/docs | 85-test local and ten-job hosted matrices; package and full-log audit | Reverse playback is bounded, audio-silent, conflict-safe, and invalidated by incompatible state changes | `e44d4c2` |
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
-| 81 Configurable emulation speed | IN PROGRESS | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test Debug/Release/ASan/Clang suites; 88-test shader-disabled graph; package and legacy gates | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | pending |
+| 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 
 ## Execution policy
 
@@ -4172,7 +4172,7 @@ local and hosted regression passes; and complete CI logs contain no actionable i
 
 ## Milestone 81 detail
 
-**Status:** IN PROGRESS — LOCAL GATES PASSED; HOSTED GATE PENDING
+**Status:** COMPLETE
 
 **Goal:** Add configurable normal-speed presets, slow motion, and fast forward without
 moving timing into the GUI thread, growing queues, or allowing accelerated audio to
@@ -4223,9 +4223,29 @@ previously supplied `/mnt/qnapraid` volume is currently unmounted/empty. No atte
 made to assemble or mount its degraded RAID devices; the generated legal ROM suite
 exercises the same production adapter, worker, frame, audio, input, and setting paths.
 
-**Hosted gate:** Pending the exact implementation commit and required ten-job GitHub
-Actions run. Development of milestone 82 will not begin until every job passes and the
-complete logs and produced artifacts have been audited.
+**Hosted gate:** Exact Continuous Integration run
+[`33477974149`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33477974149)
+passes all ten jobs at implementation commit
+`253c04352a762dfaf2c920fa6b107b6a983f4ecd`. All nine CMake jobs register and complete
+90/90 tests. Windows capability-skips only the established real-OpenGL shader exercise
+inside its passing suite because the hosted software context is below OpenGL 3.3;
+Linux and both macOS architectures execute it. The legacy libretro warning gate builds,
+links, and cleans.
+
+The complete 14,067-line, 1,874,662-byte log corpus contains no compiler/linker
+warning, sanitizer finding, crash, runtime error, timeout, failed test, invalid
+generated path, or deployment failure. Checkout default-branch hints, Windows pthread
+feature probes, absent optional Vulkan headers, and `windeployqt` omitting the unused
+OpenSSL backend are benign capability/dependency messages. Every required job and
+package step completes successfully.
+
+All six package SHA-256 manifests verify; TGZ and ZIP integrity checks pass; both DMGs
+identify as Apple DMG version 4. Extracted binaries identify as Linux x86-64 ELF,
+Windows x86-64 PE32+, macOS arm64 Mach-O, and macOS x86-64 Mach-O. Required Qt/SDL3,
+librashader, built-in CRT, documentation/license, and Windows redistributable payloads
+are present, with no ROM, disc, BIOS, save/state, private-key, or environment payload.
+Workflow artifacts are Linux x86-64 (39,929,410 bytes), Windows x86-64 (52,502,878
+bytes), macOS arm64 (63,777,323 bytes), and macOS x86-64 (65,382,346 bytes).
 
 **Acceptance criteria:** Configuration is versioned, bounded, atomic, and defaults to
 100%/50%/400%; normal 50–200%, slow 25–75%, and fast-forward 200–1600% are rationally
@@ -4234,7 +4254,7 @@ active together; input uses conflict-checked hold/toggle bindings; non-100% play
 cannot create an audio backlog; status and diagnostics expose effective speed; all
 local gates pass; and the exact hosted matrix and logs are clean.
 
-**Commit SHA:** pending
+**Commit SHA:** `253c04352a762dfaf2c920fa6b107b6a983f4ecd`
 
 ## Milestone 65 detail
 
