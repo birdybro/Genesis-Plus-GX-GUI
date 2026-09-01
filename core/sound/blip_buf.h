@@ -4,6 +4,8 @@
 #ifndef BLIP_BUF_H 
 #define BLIP_BUF_H
 
+#include <stddef.h>
+
 #ifdef __cplusplus
 	extern "C" {
 #endif
@@ -74,6 +76,11 @@ int blip_mix_samples( blip_t* m1, blip_t** m2, int num, short out [], int count)
 
 /** Frees buffer. No effect if NULL is passed. */
 void blip_delete( blip_t* );
+
+/* In-process rollback context used by speculative frontend execution. */
+size_t blip_rollback_state_size( const blip_t* );
+int blip_rollback_state_save( const blip_t*, unsigned char*, size_t );
+int blip_rollback_state_load( blip_t*, const unsigned char*, size_t );
 
 
 /* Deprecated */

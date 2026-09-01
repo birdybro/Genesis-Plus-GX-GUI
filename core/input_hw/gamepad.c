@@ -56,6 +56,41 @@ static struct
 
 static uint8 latch;
 
+size_t gamepad_rollback_state_size(void)
+{
+  return sizeof(gamepad) + sizeof(flipflop) + sizeof(latch);
+}
+
+int gamepad_rollback_state_save(uint8 *state, size_t state_size)
+{
+  uint8 *cursor = state;
+  if (!state || state_size != gamepad_rollback_state_size())
+  {
+    return 0;
+  }
+  memcpy(cursor, gamepad, sizeof(gamepad));
+  cursor += sizeof(gamepad);
+  memcpy(cursor, flipflop, sizeof(flipflop));
+  cursor += sizeof(flipflop);
+  memcpy(cursor, &latch, sizeof(latch));
+  return 1;
+}
+
+int gamepad_rollback_state_load(const uint8 *state, size_t state_size)
+{
+  const uint8 *cursor = state;
+  if (!state || state_size != gamepad_rollback_state_size())
+  {
+    return 0;
+  }
+  memcpy(gamepad, cursor, sizeof(gamepad));
+  cursor += sizeof(gamepad);
+  memcpy(flipflop, cursor, sizeof(flipflop));
+  cursor += sizeof(flipflop);
+  memcpy(&latch, cursor, sizeof(latch));
+  return 1;
+}
+
 
 void gamepad_reset(int port)
 {

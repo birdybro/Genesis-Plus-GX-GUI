@@ -20,6 +20,7 @@ ctest --preset debug -L gui --output-on-failure
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
 | Loading and soft patches | Injected Open/patch dialogs, invalid input errors, one/two-file drag/drop, IPS/BPS/UPS bounds/checksums/reverse UPS, sidecar ambiguity, non-destructive cache and patched core execution, bounded ZIP member browser/extraction, M3U disc navigation, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `unit.game_patch`, `unit.game_file`, `integration.soft_patch`, `integration.archive_playlist`, `gui.game_loading`, `gui.main_window` |
 | Emulation controls and speed | Live Pause/Resume, hard/soft reset, configurable exact normal/slow/fast rates, independent hold/toggle composition, focus-safe release, mutually exclusive rewind/slow/fast modes, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `unit.speed_settings`, `unit.frame_pacer`, `core.timing_pacing`, `gui.speed_settings`, `gui.emulation_controls` |
+| Run-ahead | Disabled defaults, schema/bounds/corruption, real-core state/video/audio/input equivalence, exact CPU/audio/pad/multitap transient rollback, 1–4-frame depth, recording isolation, fast/slow/rewind suspension, frame advance, Sega CD exclusion, stable allocation, settings transactions and menu gating | `unit.run_ahead_settings`, `integration.run_ahead`, `gui.run_ahead_settings`, `gui.main_window`, `unit.diagnostics`, `gui.diagnostics` |
 | Save states | Slots 0–9, schema-1 compatibility, schema-2 names/PNG previews, visual browser, save/load/delete/rename, validated import/export, timestamps/frame/size details, malformed presentation rejection, changed execution, deterministic restore, wrong-game rejection, cancellable identity activation | `unit.state_manager`, `unit.state_storage_service`, `gui.save_state_workflow`, `gui.main_window` |
 | Session resume | Opt-in/defaults, schema migration, absolute Unicode game/patch persistence, invalid-data rejection, dedicated state save/load/delete, multi-process checkpoint creation/restore, explicit command-line game/patch precedence, patched-content identity, and corruption fallback | `unit.session_settings`, `unit.state_manager`, `unit.state_storage_service`, `gui.session_settings`, `gui.session_resume_application` |
 | Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, built-in/custom Libretro shader selection and parameters, real OpenGL pass-through input sampling, actual CRT widget output, Apply/Cancel/defaults | `unit.shader_configuration`, `gui.main_window`, `gui.display_widget`, `gui.libretro_shader_render` |
@@ -73,7 +74,8 @@ every compatible hardware override and both Game Gear viewport modes. GUI invent
 assertions require the corresponding combo counts/ranges plus all 33 emulator hotkeys.
 The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 113
 option cases plus three speed-mode workflows on a user-owned game and emits local
-comparison images.
+comparison images. It additionally exercises all four run-ahead depths through the real
+worker/core path.
 
 ## Supporting layers
 
@@ -87,6 +89,10 @@ CI and are never counted as required.
 The required `core.long_running_stability` test adds accelerated 20,000-frame core
 execution, input/speed-command coalescing, normal/slow/fast bounded queue/audio/video
 saturation, and repeated worker lifecycle coverage.
+`integration.run_ahead` separately executes 120 maximum-depth host frames (480
+speculative core frames) after transition coverage and requires rollback vector
+capacity, audio occupancy, video publication, recording cadence, and determinism
+counters to remain bounded.
 Detailed sanitizer and stress commands are in [TESTING.md](TESTING.md).
 
 `unit.persistence` and `unit.game_metadata` also prove that the raw SHA-256 for ordinary

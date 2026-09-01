@@ -45,6 +45,10 @@ extern void sound_init(void);
 extern void sound_reset(void);
 extern int sound_context_save(uint8 *state);
 extern int sound_context_load(uint8 *state);
+/* Transient frame-boundary state omitted from portable save states. */
+extern size_t sound_rollback_state_size(void);
+extern int sound_rollback_state_save(uint8 *state, size_t state_size);
+extern int sound_rollback_state_load(const uint8 *state, size_t state_size);
 extern int sound_update(unsigned int cycles);
 extern void (*fm_reset)(unsigned int cycles);
 extern void (*fm_write)(unsigned int cycles, unsigned int address, unsigned int data);

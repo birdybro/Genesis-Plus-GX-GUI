@@ -58,6 +58,7 @@ foreach(document IN ITEMS
     PACKAGING.md
     PER_GAME_SETTINGS.md
     RECORDING.md
+    RUN_AHEAD.md
     RELEASES.md
     REQUIREMENTS_AUDIT.md
     SAVE_STATES.md

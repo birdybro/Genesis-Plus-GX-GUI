@@ -9,6 +9,10 @@ platform documentation.
 
 ### Added
 
+- Optional one-to-four-frame bounded run-ahead for cartridge systems, with exact
+  owner-thread rollback context, authoritative audio/input/state preservation,
+  recording isolation, deterministic fail-closed verification, Sega CD exclusion,
+  persisted settings, runtime diagnostics, and maximum-depth stress coverage.
 - Bounded lossless A/V recording and continuous native frame dumps with sequential
   PNGs, stereo PCM WAV, per-frame/manifest metadata, drop instrumentation, atomic
   finalization, configurable hotkey, diagnostics, and real generated-ROM coverage.

@@ -108,6 +108,10 @@ extern uint32 system_clock;
 extern int audio_init(int samplerate, double framerate);
 extern void audio_set_rate(int samplerate, double framerate);
 extern void audio_reset(void);
+/* Opaque same-process context; never use as a persistent save-state format. */
+extern size_t system_rollback_state_size(void);
+extern int system_rollback_state_save(uint8 *state, size_t state_size);
+extern int system_rollback_state_load(const uint8 *state, size_t state_size);
 extern void audio_shutdown(void);
 extern int audio_update(int16 *buffer);
 extern void audio_set_equalizer(void);

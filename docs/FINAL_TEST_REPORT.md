@@ -3,7 +3,7 @@
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
-cartridge soft-patch, enhanced save-state, and bounded-recording verification through 2026-09-01
+cartridge soft-patch, enhanced save-state, bounded-recording, and run-ahead verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -656,6 +656,35 @@ required Qt, SDL3, SQLite, shaders, documentation, notices, and redistributable 
 are present; all 22 Linux ELF dependencies resolve; and no prohibited game, firmware,
 save/state, fixture, credential, or private-key payload is present.
 
+## Run-ahead verification
+
+Milestone 86 adds optional, disabled-by-default one-through-four-frame run-ahead for
+cartridge systems. The emulation owner thread captures the portable raw state plus a
+separate same-process transient context, executes bounded speculative frames, retains
+only the final native framebuffer, rolls back exactly, reapplies the latest input, and
+executes one authoritative frame. Only that authoritative frame contributes audio,
+state, persistence, rewind history, frame count, and recording cadence. Sega CD and
+specialized peripheral protocols fail safe to authoritative-only operation.
+
+The transient context includes the viewport, pause line, full 68000 execution context,
+sound filters/counters, every active blip buffer, standard pad/Master Tap/Four Way Play
+state, and Team Player state. The pre-commit adversarial review caught the initially
+omitted private Team Player handshake counter; a direct save/mutate/restore regression
+now proves it is preserved. The first speculative continuation is compared with its
+authoritative counterpart and any mismatch disables run-ahead for that session while
+publishing the canonical frame.
+
+Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan, fresh Clang 22,
+and CHD-disabled builds pass 98/98 tests; the shader-disabled graph passes 96/96. The
+integration suite proves independent baseline state/audio/input, future video, host
+audio FIFO retention, recording isolation, pad and multitap rollback, incompatible-mode
+suspension, Sega CD exclusion, and stable allocation through 120 maximum-depth host
+frames. The strict legacy libretro build/link/clean and a fresh staged Linux package
+also pass. All 22 staged ELF dependency graphs resolve; installed CLI and real
+XCB/OpenGL event-loop smokes pass; the package contains no prohibited runtime payload;
+and its TGZ checksum verifies. Exact hosted native logs and artifacts remain pending
+until the implementation commit is pushed; Milestone 86 cannot close before that audit.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -689,6 +718,9 @@ save/state, fixture, credential, or private-key payload is present.
   command-line precedence, explicit-close clearing, and safe normal-launch fallback.
 - [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
   conflict-checked hotkey migration, muted reverse playback, and state invalidation.
+- [x] Optional bounded one-through-four-frame cartridge run-ahead with exact transient
+  rollback, authoritative audio/input/state, pad/multitap support, fail-closed
+  determinism verification, mode suspension, settings, status, and diagnostics.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, and missing-firmware errors without bundled firmware.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,

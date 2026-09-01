@@ -210,7 +210,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction", "shaderDisabledAction", "builtinCrtShaderAction",
-    "loadShaderPresetAction", "speedSettingsAction", "emulationSpeed50Action",
+    "loadShaderPresetAction", "speedSettingsAction", "runAheadSettingsAction",
+    "emulationSpeed50Action",
     "emulationSpeed75Action", "emulationSpeed100Action",
     "emulationSpeed125Action", "emulationSpeed150Action",
     "emulationSpeed200Action"};
@@ -223,6 +224,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   const char* gameOnlyNames[]{
     "closeGameAction", "screenshotAction", "recordingAction", "pauseAction", "resetAction",
     "softResetAction", "fastForwardAction", "slowMotionAction",
+    "runAheadAction",
     "frameAdvanceAction", "saveStateAction",
     "loadStateAction", "changeDiscAction", "previousDiscAction",
     "nextDiscAction", "ejectDiscAction", "cheatsAction",
@@ -237,6 +239,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   QVERIFY(window.findChild<QAction*>(QStringLiteral("pauseAction"))->isCheckable());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("fastForwardAction"))->isCheckable());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("slowMotionAction"))->isCheckable());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("runAheadAction"))->isCheckable());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("fullscreenAction"))->isCheckable());
 }
 

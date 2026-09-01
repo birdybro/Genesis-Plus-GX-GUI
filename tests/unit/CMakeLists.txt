@@ -43,6 +43,17 @@ set_tests_properties(
   PROPERTIES LABELS "unit;rewind;settings;persistence;filesystem" TIMEOUT 30
 )
 
+add_executable(genplusgx_run_ahead_settings_test run_ahead_settings_test.cpp)
+target_link_libraries(
+  genplusgx_run_ahead_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.run_ahead_settings COMMAND genplusgx_run_ahead_settings_test)
+set_tests_properties(
+  unit.run_ahead_settings
+  PROPERTIES LABELS "unit;run-ahead;settings;persistence;filesystem;security" TIMEOUT 30
+)
+
 add_executable(genplusgx_speed_settings_test speed_settings_test.cpp)
 target_link_libraries(
   genplusgx_speed_settings_test

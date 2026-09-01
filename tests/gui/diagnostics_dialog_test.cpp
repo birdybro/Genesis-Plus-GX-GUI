@@ -35,6 +35,15 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.rewindSnapshots = 7U;
     snapshot.rewindPayloadBytes = 7U * 1024U;
     snapshot.rewindMemoryLimitBytes = 64U * 1024U;
+    snapshot.runAheadEnabled = true;
+    snapshot.runAheadSupported = true;
+    snapshot.runAheadActive = true;
+    snapshot.runAheadVerified = true;
+    snapshot.runAheadFrames = 2U;
+    snapshot.runAheadSpeculativeFrames = 84U;
+    snapshot.runAheadRollbacks = 42U;
+    snapshot.runAheadStateBytes = 192U * 1024U;
+    snapshot.runAheadStateCapacityBytes = 256U * 1024U;
     snapshot.normalSpeedPercent = 125U;
     snapshot.slowMotionSpeedPercent = 50U;
     snapshot.fastForwardSpeedPercent = 800U;
@@ -72,6 +81,12 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
   QVERIFY(report->toPlainText().contains(QStringLiteral("Controllers: 2")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind: Enabled")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind snapshots: 7")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Run-ahead: Enabled (active)")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Run-ahead speculative frames: 84")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Run-ahead state bytes: 196608 / 262144")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(

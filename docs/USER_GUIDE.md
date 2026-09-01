@@ -267,6 +267,23 @@ number. If that exact name already exists, the application adds a numeric suffix
 never overwrites it. PNG data is first completed in a temporary file in the destination
 directory, so an interrupted encode cannot leave a partially named capture.
 
+## Run-ahead latency reduction
+
+For cartridge games, choose **Emulation → Run-Ahead** to display a future frame while
+the saved machine advances by only one frame. **Run-Ahead Settings…** selects one to
+four speculative frames. The feature is disabled by default and additional frames cost
+additional CPU time.
+
+Fast-forward, slow motion, and rewind suspend speculation until normal forward play
+returns. Pause performs no work; Frame Advance applies one complete configured
+run-ahead step. Sega CD remains authoritative-only because its disc and CDDA path has
+not passed the same exact rollback gate. If the first speculative continuation differs
+from the authoritative continuation, the application disables run-ahead for that game
+session and continues normal emulation. Specialized mouse/light-gun/analog/tablet
+devices similarly use authoritative-only input; standard pads and pad-only multitaps
+are supported. See [RUN_AHEAD.md](RUN_AHEAD.md) for the exact
+state/audio/video flow and diagnostic counters.
+
 ## Lossless A/V recording and frame dumps
 
 Choose **File → Start Lossless A/V Recording…** (`Ctrl+Shift+F12`) while a game is

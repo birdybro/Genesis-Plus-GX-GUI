@@ -108,6 +108,31 @@ set_tests_properties(
     LABELS "gui;unit;integration;rewind;settings;persistence;accessibility"
     TIMEOUT 30
 )
+
+qt_add_executable(
+  genplusgx_run_ahead_settings_dialog_test run_ahead_settings_dialog_test.cpp
+)
+set_target_properties(
+  genplusgx_run_ahead_settings_dialog_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_run_ahead_settings_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(
+  NAME gui.run_ahead_settings COMMAND genplusgx_run_ahead_settings_dialog_test
+)
+set_tests_properties(
+  gui.run_ahead_settings
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;run-ahead;settings;persistence;accessibility"
+    TIMEOUT 30
+)
 add_test(NAME gui.settings COMMAND genplusgx_settings_dialog_test)
 set_tests_properties(
   gui.settings

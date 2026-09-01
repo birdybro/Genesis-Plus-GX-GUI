@@ -40,6 +40,8 @@
  ****************************************************************************************/
 
 #include "shared.h"
+#include "gamepad.h"
+#include "teamplayer.h"
 #include "yx5200.h"
 #include "eq.h"
 
@@ -175,6 +177,162 @@ void audio_reset(void)
 
   /* 3 band EQ */
   audio_set_equalizer();
+}
+
+size_t system_rollback_state_size(void)
+{
+  int i;
+  size_t size = sizeof(bitmap.viewport) + sizeof(pause_b) + sizeof(eq) +
+    sizeof(llp) + sizeof(rrp) + sizeof(m68k) + sizeof(input) +
+    (3 * sizeof(size_t)) + sound_rollback_state_size() +
+    gamepad_rollback_state_size() + teamplayer_rollback_state_size();
+  for (i=0; i<4; i++)
+  {
+    size += sizeof(size_t) + blip_rollback_state_size(snd.blips[i]);
+  }
+  return size;
+}
+
+int system_rollback_state_save(uint8 *state, size_t state_size)
+{
+  int i;
+  uint8 *cursor = state;
+  if (!state || state_size != system_rollback_state_size())
+  {
+    return 0;
+  }
+
+#define SAVE_ROLLBACK_FIELD(field) \
+  memcpy(cursor, &(field), sizeof(field)); cursor += sizeof(field)
+  SAVE_ROLLBACK_FIELD(bitmap.viewport);
+  SAVE_ROLLBACK_FIELD(pause_b);
+  SAVE_ROLLBACK_FIELD(eq);
+  SAVE_ROLLBACK_FIELD(llp);
+  SAVE_ROLLBACK_FIELD(rrp);
+  SAVE_ROLLBACK_FIELD(m68k);
+  SAVE_ROLLBACK_FIELD(input);
+#undef SAVE_ROLLBACK_FIELD
+
+  {
+    size_t sound_size = sound_rollback_state_size();
+    memcpy(cursor, &sound_size, sizeof(sound_size));
+    cursor += sizeof(sound_size);
+    if (!sound_rollback_state_save(cursor, sound_size))
+    {
+      return 0;
+    }
+    cursor += sound_size;
+  }
+
+  {
+    size_t gamepad_size = gamepad_rollback_state_size();
+    memcpy(cursor, &gamepad_size, sizeof(gamepad_size));
+    cursor += sizeof(gamepad_size);
+    if (!gamepad_rollback_state_save(cursor, gamepad_size))
+    {
+      return 0;
+    }
+    cursor += gamepad_size;
+  }
+
+  {
+    size_t teamplayer_size = teamplayer_rollback_state_size();
+    memcpy(cursor, &teamplayer_size, sizeof(teamplayer_size));
+    cursor += sizeof(teamplayer_size);
+    if (!teamplayer_rollback_state_save(cursor, teamplayer_size))
+    {
+      return 0;
+    }
+    cursor += teamplayer_size;
+  }
+
+  for (i=0; i<4; i++)
+  {
+    size_t blip_size = blip_rollback_state_size(snd.blips[i]);
+    memcpy(cursor, &blip_size, sizeof(blip_size));
+    cursor += sizeof(blip_size);
+    if (blip_size && !blip_rollback_state_save(snd.blips[i], cursor, blip_size))
+    {
+      return 0;
+    }
+    cursor += blip_size;
+  }
+  return 1;
+}
+
+int system_rollback_state_load(const uint8 *state, size_t state_size)
+{
+  int i;
+  const uint8 *cursor = state;
+  if (!state || state_size != system_rollback_state_size())
+  {
+    return 0;
+  }
+
+#define LOAD_ROLLBACK_FIELD(field) \
+  memcpy(&(field), cursor, sizeof(field)); cursor += sizeof(field)
+  LOAD_ROLLBACK_FIELD(bitmap.viewport);
+  LOAD_ROLLBACK_FIELD(pause_b);
+  LOAD_ROLLBACK_FIELD(eq);
+  LOAD_ROLLBACK_FIELD(llp);
+  LOAD_ROLLBACK_FIELD(rrp);
+  LOAD_ROLLBACK_FIELD(m68k);
+  LOAD_ROLLBACK_FIELD(input);
+#undef LOAD_ROLLBACK_FIELD
+
+  {
+    size_t sound_size;
+    const size_t expected = sound_rollback_state_size();
+    memcpy(&sound_size, cursor, sizeof(sound_size));
+    cursor += sizeof(sound_size);
+    if (sound_size != expected ||
+        !sound_rollback_state_load(cursor, sound_size))
+    {
+      return 0;
+    }
+    cursor += sound_size;
+  }
+
+  {
+    size_t gamepad_size;
+    const size_t expected = gamepad_rollback_state_size();
+    memcpy(&gamepad_size, cursor, sizeof(gamepad_size));
+    cursor += sizeof(gamepad_size);
+    if (gamepad_size != expected ||
+        !gamepad_rollback_state_load(cursor, gamepad_size))
+    {
+      return 0;
+    }
+    cursor += gamepad_size;
+  }
+
+  {
+    size_t teamplayer_size;
+    const size_t expected = teamplayer_rollback_state_size();
+    memcpy(&teamplayer_size, cursor, sizeof(teamplayer_size));
+    cursor += sizeof(teamplayer_size);
+    if (teamplayer_size != expected ||
+        !teamplayer_rollback_state_load(cursor, teamplayer_size))
+    {
+      return 0;
+    }
+    cursor += teamplayer_size;
+  }
+
+  for (i=0; i<4; i++)
+  {
+    size_t blip_size;
+    const size_t expected = blip_rollback_state_size(snd.blips[i]);
+    memcpy(&blip_size, cursor, sizeof(blip_size));
+    cursor += sizeof(blip_size);
+    if (blip_size != expected ||
+        (blip_size && !blip_rollback_state_load(snd.blips[i], cursor, blip_size)))
+    {
+      return 0;
+    }
+    cursor += blip_size;
+  }
+  return 1;
 }
 
 void audio_set_equalizer(void)

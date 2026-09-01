@@ -176,6 +176,71 @@ void blip_delete( blip_t* m )
 	}
 }
 
+size_t blip_rollback_state_size( const blip_t* m )
+{
+	if ( m == NULL )
+		return 0;
+#ifdef BLIP_MONO
+	return sizeof m->factor + sizeof m->offset + sizeof m->integrator +
+		(size_t) (m->size + buf_extra) * sizeof (buf_t);
+#else
+	return sizeof m->factor + sizeof m->offset + sizeof m->integrator +
+		(size_t) 2 * (m->size + buf_extra) * sizeof (buf_t);
+#endif
+}
+
+int blip_rollback_state_save(
+	const blip_t* m, unsigned char* state, size_t state_size )
+{
+	unsigned char* cursor = state;
+	const size_t required = blip_rollback_state_size( m );
+	if ( m == NULL || state == NULL || state_size != required )
+		return 0;
+	memcpy( cursor, &m->factor, sizeof m->factor );
+	cursor += sizeof m->factor;
+	memcpy( cursor, &m->offset, sizeof m->offset );
+	cursor += sizeof m->offset;
+	memcpy( cursor, &m->integrator, sizeof m->integrator );
+	cursor += sizeof m->integrator;
+#ifdef BLIP_MONO
+	memcpy( cursor, SAMPLES( m ),
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+#else
+	memcpy( cursor, m->buffer[0],
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+	cursor += (size_t) (m->size + buf_extra) * sizeof (buf_t);
+	memcpy( cursor, m->buffer[1],
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+#endif
+	return 1;
+}
+
+int blip_rollback_state_load(
+	blip_t* m, const unsigned char* state, size_t state_size )
+{
+	const unsigned char* cursor = state;
+	const size_t required = blip_rollback_state_size( m );
+	if ( m == NULL || state == NULL || state_size != required )
+		return 0;
+	memcpy( &m->factor, cursor, sizeof m->factor );
+	cursor += sizeof m->factor;
+	memcpy( &m->offset, cursor, sizeof m->offset );
+	cursor += sizeof m->offset;
+	memcpy( &m->integrator, cursor, sizeof m->integrator );
+	cursor += sizeof m->integrator;
+#ifdef BLIP_MONO
+	memcpy( SAMPLES( m ), cursor,
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+#else
+	memcpy( m->buffer[0], cursor,
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+	cursor += (size_t) (m->size + buf_extra) * sizeof (buf_t);
+	memcpy( m->buffer[1], cursor,
+		(size_t) (m->size + buf_extra) * sizeof (buf_t) );
+#endif
+	return 1;
+}
+
 void blip_set_rates( blip_t* m, double clock_rate, double sample_rate )
 {
 	double factor = time_unit * sample_rate / clock_rate;

@@ -119,6 +119,15 @@ EmulationCommand EmulationCommand::updateRewindSettings(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateRunAheadSettings(
+  std::uint64_t operationId,
+  RunAheadConfiguration configuration)
+{
+  auto command = simple(EmulationCommandType::runAheadSettings, operationId);
+  command.runAheadConfiguration = configuration;
+  return command;
+}
+
 EmulationCommand EmulationCommand::updateInput(
   std::uint64_t operationId,
   InputSnapshot input)
@@ -261,6 +270,9 @@ public:
     slowMotion_ = false;
     rewinding_ = false;
     rewindBuffer_.clear();
+    resetRunAheadSession(false);
+    latestInput_ = {};
+    hasLatestInput_ = false;
     frameBreakpoints_.clear();
     lastBreakpointHit_.reset();
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
@@ -380,6 +392,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::runAheadSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::runAheadSettings;
+          },
+          std::move(command))) {
+      ++coalescedRunAheadSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (command.type == EmulationCommandType::speedSettings &&
         commands_.replaceNewestMatching(
           [](const EmulationCommand& queued) {
@@ -451,6 +473,7 @@ public:
       .coalescedFirmwareSettingsCommands = coalescedFirmwareSettingsCommands_,
       .coalescedCheatCommands = coalescedCheatCommands_,
       .coalescedRewindSettingsCommands = coalescedRewindSettingsCommands_,
+      .coalescedRunAheadSettingsCommands = coalescedRunAheadSettingsCommands_,
       .coalescedSpeedSettingsCommands = coalescedSpeedSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
@@ -470,6 +493,16 @@ public:
       .rewindPayloadBytes = rewind.payloadBytes,
       .rewindMemoryLimitBytes = rewind.memoryLimitBytes,
       .discardedRewindSnapshots = rewind.discardedSnapshots,
+      .runAheadEnabled = runAheadEnabledMetrics_,
+      .runAheadSupported = runAheadSupportedMetrics_,
+      .runAheadActive = runAheadActiveMetrics_,
+      .runAheadVerified = runAheadVerifiedMetrics_,
+      .runAheadFrames = runAheadFramesMetrics_,
+      .runAheadSpeculativeFrames = runAheadSpeculativeFramesMetrics_,
+      .runAheadRollbacks = runAheadRollbacksMetrics_,
+      .runAheadDeterminismFailures = runAheadDeterminismFailuresMetrics_,
+      .runAheadStateBytes = runAheadStateBytesMetrics_,
+      .runAheadStateCapacityBytes = runAheadStateCapacityBytesMetrics_,
     };
   }
 
@@ -698,6 +731,9 @@ private:
         if (!coreResult) {
           break;
         }
+        resetRunAheadSession(true);
+        latestInput_ = {};
+        hasLatestInput_ = false;
         discardLatestFrame();
         endBackupGame();
         coreResult = adapter.loadGame(command.path);
@@ -743,6 +779,10 @@ private:
         }
         if (coreResult) {
           endBackupGame();
+          resetRunAheadSession(true);
+          runAheadSupported_ = false;
+          latestInput_ = {};
+          hasLatestInput_ = false;
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
           slowMotion_ = false;
@@ -916,11 +956,34 @@ private:
           coreResult = resetRewindHistory(adapter);
         }
         break;
+      case EmulationCommandType::runAheadSettings:
+        if (!validateRunAheadConfiguration(command.runAheadConfiguration)) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            "The run-ahead settings are outside their safe limits.",
+          };
+          break;
+        }
+        runAheadConfiguration_ = command.runAheadConfiguration;
+        resetRunAheadSession(true);
+        audioFrames_->clear();
+        break;
       case EmulationCommandType::inputSnapshot:
         coreResult = adapter.setInputSnapshot(command.input);
+        if (coreResult) {
+          latestInput_ = command.input;
+          hasLatestInput_ = true;
+        }
         break;
       case EmulationCommandType::inputSettings:
         coreResult = adapter.applyInputSettings(command.coreInputSettings);
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded &&
+            hasLatestInput_) {
+          coreResult = adapter.setInputSnapshot(latestInput_);
+        }
+        if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
+          coreResult = updateRunAheadSupport(adapter);
+        }
         if (coreResult && adapter.state() == CoreLifecycleState::loaded) {
           coreResult = resetRewindHistory(adapter);
         }
@@ -990,6 +1053,9 @@ private:
         rewinding_ = false;
         rewindBuffer_.clear();
         coreResult = adapter.loadRawState(command.rawState);
+        if (coreResult && hasLatestInput_) {
+          coreResult = adapter.setInputSnapshot(latestInput_);
+        }
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
@@ -1042,6 +1108,7 @@ private:
       event.speedPercent = pacer_.speedPercent();
       event.rewinding = rewinding_;
       event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+      populateRunAheadEvent(event, adapter);
       if (adapter.state() == CoreLifecycleState::loaded) {
         static_cast<void>(adapter.discInfo(event.disc));
       }
@@ -1064,6 +1131,7 @@ private:
       event.speedPercent = pacer_.speedPercent();
       event.rewinding = rewinding_;
       event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+      populateRunAheadEvent(event, adapter);
       if (adapter.state() == CoreLifecycleState::loaded) {
         static_cast<void>(adapter.discInfo(event.disc));
       }
@@ -1084,6 +1152,7 @@ private:
     event.speedPercent = pacer_.speedPercent();
     event.rewinding = rewinding_;
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+    populateRunAheadEvent(event, adapter);
     event.rawState = std::move(capturedState);
     event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
@@ -1131,6 +1200,7 @@ private:
         event.speedPercent = pacer_.speedPercent();
         event.rewinding = rewinding_;
         event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+        populateRunAheadEvent(event, adapter);
         event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
         event.debug.breakpointHit = breakpoint;
         publishOperation(std::move(event));
@@ -1153,6 +1223,7 @@ private:
     event.speedPercent = pacer_.speedPercent();
     event.rewinding = rewinding_;
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+    populateRunAheadEvent(event, adapter);
     latestFrame_ = std::move(event);
     eventReady_.notify_all();
   }
@@ -1235,9 +1306,20 @@ private:
       return executeCoreFrame(adapter, false);
     }
 
-    const auto result = executeCoreFrame(adapter, true);
-    if (!result || !rewindBuffer_.shouldCapture(adapter.frameCount())) {
-      return result;
+    if (runAheadActive(adapter)) {
+      const auto result = executeRunAheadFrame(adapter);
+      if (!result) {
+        return result;
+      }
+    } else {
+      const auto result = executeCoreFrame(adapter, true);
+      if (!result) {
+        return result;
+      }
+    }
+
+    if (!rewindBuffer_.shouldCapture(adapter.frameCount())) {
+      return {};
     }
     std::vector<std::uint8_t> state;
     if (const auto captured = adapter.saveRawState(state); !captured) {
@@ -1252,6 +1334,175 @@ private:
     return {};
   }
 
+  bool runAheadActive(const CoreAdapter& adapter) const noexcept
+  {
+    return adapter.state() == CoreLifecycleState::loaded &&
+      runAheadConfiguration_.enabled && runAheadSupported_ &&
+      !runAheadDeterminism_.faulted() && !fastForward_ && !slowMotion_ &&
+      !rewinding_;
+  }
+
+  CoreResult transferCoreAudio(
+    CoreAdapter& adapter,
+    bool writeHostAudio,
+    CoreAudioBatchInfo& audioInfo)
+  {
+    audioInfo = {};
+    const auto describedAudio = adapter.audioBatchInfo(audioInfo);
+    if (!describedAudio) {
+      return describedAudio.error == CoreError::noAudioAvailable
+        ? CoreResult{} : describedAudio;
+    }
+    if (audioInfo.frameCount > audioScratch_.size()) {
+      return {
+        CoreError::invalidAudioBatch,
+        "The core audio batch exceeds the worker's fixed transfer buffer.",
+      };
+    }
+    const auto copiedAudio = adapter.copyAudioFrames(
+      std::span<StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount),
+      audioInfo);
+    if (!copiedAudio) {
+      return copiedAudio;
+    }
+    if (writeHostAudio && pacer_.speedPercent() == 100U) {
+      static_cast<void>(audioFrames_->write(
+        std::span<const StereoAudioFrame>{audioScratch_}.first(
+          audioInfo.frameCount)));
+    }
+    return {};
+  }
+
+  CoreResult publishPreparedFrame(
+    CoreVideoFrameInfo frame,
+    std::span<const std::uint16_t> pixels,
+    const CoreAudioBatchInfo& audioInfo)
+  {
+    auto write = videoFrames_->beginWrite();
+    if (!write) {
+      return {};
+    }
+    if (pixels.size() < frame.pixelCount() ||
+        write->pixels().size() < frame.pixelCount()) {
+      return {
+        CoreError::videoBufferTooSmall,
+        "The run-ahead video transfer buffer is too small.",
+      };
+    }
+    std::ranges::copy(
+      pixels.first(frame.pixelCount()), write->pixels().begin());
+    if (captureSink_ && captureSink_->active()) {
+      const auto captureAudio = audioInfo.frameCount > 0U
+        ? std::span<const StereoAudioFrame>{audioScratch_}.first(
+            audioInfo.frameCount)
+        : std::span<const StereoAudioFrame>{};
+      static_cast<void>(captureSink_->submitFrame(
+        frame, pixels.first(frame.pixelCount()), audioInfo, captureAudio));
+    }
+    if (!write->publish(frame)) {
+      return {
+        CoreError::invalidVideoFrame,
+        "The bounded video exchange rejected a run-ahead frame.",
+      };
+    }
+    return {};
+  }
+
+  CoreResult restoreRunAheadRollback(CoreAdapter& adapter)
+  {
+    auto restored = adapter.restoreRollbackState(runAheadRollbackState_);
+    if (!restored) {
+      return restored;
+    }
+    ++runAheadRollbacks_;
+    if (hasLatestInput_) {
+      restored = adapter.setInputSnapshot(latestInput_);
+    }
+    return restored;
+  }
+
+  CoreResult executeRunAheadFrame(CoreAdapter& adapter)
+  {
+    if (const auto saved = adapter.saveRollbackState(runAheadRollbackState_);
+        !saved) {
+      return saved;
+    }
+
+    CoreVideoFrameInfo speculativeVideo;
+    for (std::uint32_t index = 0U;
+         index < runAheadConfiguration_.frames;
+         ++index) {
+      if (const auto executed = adapter.runFrame(false); !executed) {
+        const auto restored = restoreRunAheadRollback(adapter);
+        return restored ? executed : restored;
+      }
+      ++runAheadSpeculativeFrames_;
+      CoreAudioBatchInfo discardedAudio;
+      if (const auto drained = transferCoreAudio(
+            adapter, false, discardedAudio); !drained) {
+        const auto restored = restoreRunAheadRollback(adapter);
+        return restored ? drained : restored;
+      }
+      if (index == 0U && runAheadDeterminism_.pending()) {
+        if (const auto saved = adapter.saveRawState(runAheadFirstFrameState_);
+            !saved) {
+          const auto restored = restoreRunAheadRollback(adapter);
+          return restored ? saved : restored;
+        }
+      }
+    }
+
+    if (const auto copied = adapter.copyVideoFrame(
+          runAheadVideoScratch_, speculativeVideo); !copied) {
+      const auto restored = restoreRunAheadRollback(adapter);
+      return restored ? copied : restored;
+    }
+    if (const auto restored = restoreRunAheadRollback(adapter); !restored) {
+      return restored;
+    }
+
+    const bool verifying = runAheadDeterminism_.pending();
+    if (const auto executed = adapter.runFrame(false); !executed) {
+      return executed;
+    }
+    CoreAudioBatchInfo authoritativeAudio;
+    if (const auto transferred = transferCoreAudio(
+          adapter, true, authoritativeAudio); !transferred) {
+      return transferred;
+    }
+
+    if (verifying) {
+      if (const auto saved = adapter.saveRawState(runAheadCanonicalState_);
+          !saved) {
+        return saved;
+      }
+      const auto verification = runAheadDeterminism_.verify(
+        runAheadFirstFrameState_, runAheadCanonicalState_);
+      if (verification == RunAheadVerificationResult::mismatch) {
+        if (const auto copied = adapter.copyVideoFrame(
+              runAheadVideoScratch_, speculativeVideo); !copied) {
+          return copied;
+        }
+        auto event = eventFor(
+          EmulationEventType::runAheadDisabled,
+          owner_.state_.load(std::memory_order_acquire));
+        event.message = "Run-ahead was suspended because speculative and "
+          "authoritative core states were not deterministic.";
+        event.frameNumber = adapter.frameCount();
+        event.hardware = adapter.hardware();
+        populateRunAheadEvent(event, adapter);
+        publishOperation(std::move(event));
+      }
+    }
+
+    speculativeVideo.frameNumber = adapter.frameCount();
+    return publishPreparedFrame(
+      speculativeVideo,
+      std::span<const std::uint16_t>{runAheadVideoScratch_}.first(
+        speculativeVideo.pixelCount()),
+      authoritativeAudio);
+  }
+
   CoreResult executeCoreFrame(CoreAdapter& adapter, bool writeAudio)
   {
     const auto result = adapter.runFrame(false);
@@ -1260,27 +1511,9 @@ private:
     }
 
     CoreAudioBatchInfo audioInfo;
-    const auto describedAudio = adapter.audioBatchInfo(audioInfo);
-    if (!describedAudio && describedAudio.error != CoreError::noAudioAvailable) {
-      return describedAudio;
-    }
-    if (describedAudio) {
-      if (audioInfo.frameCount > audioScratch_.size()) {
-        return {
-          CoreError::invalidAudioBatch,
-          "The core audio batch exceeds the worker's fixed transfer buffer.",
-        };
-      }
-      const auto copiedAudio = adapter.copyAudioFrames(
-        std::span<StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount),
-        audioInfo);
-      if (!copiedAudio) {
-        return copiedAudio;
-      }
-      if (writeAudio && pacer_.speedPercent() == 100U) {
-        static_cast<void>(audioFrames_->write(
-          std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
-      }
+    if (const auto transferred = transferCoreAudio(
+          adapter, writeAudio, audioInfo); !transferred) {
+      return transferred;
     }
 
     auto write = videoFrames_->beginWrite();
@@ -1293,23 +1526,21 @@ private:
       return copied;
     }
     if (captureSink_ && captureSink_->active()) {
-      if (describedAudio && !writeAudio) {
+      if (audioInfo.frameCount > 0U && !writeAudio) {
         std::ranges::fill(
           std::span<StereoAudioFrame>{audioScratch_}.first(
             audioInfo.frameCount),
           StereoAudioFrame{});
       }
-      const auto captureAudio = describedAudio
+      const auto captureAudio = audioInfo.frameCount > 0U
         ? std::span<const StereoAudioFrame>{audioScratch_}.first(
             audioInfo.frameCount)
         : std::span<const StereoAudioFrame>{};
-      const auto captureAudioInfo = describedAudio
-        ? audioInfo : CoreAudioBatchInfo{};
       static_cast<void>(captureSink_->submitFrame(
         frame,
         std::span<const std::uint16_t>{write->pixels()}.first(
           frame.pixelCount()),
-        captureAudioInfo,
+        audioInfo,
         captureAudio));
     }
     if (!write->publish(frame)) {
@@ -1324,6 +1555,7 @@ private:
   CoreResult resetRewindHistory(CoreAdapter& adapter)
   {
     rewindBuffer_.clear();
+    resetRunAheadSession(true);
     if (!rewindBuffer_.configuration().enabled ||
         adapter.state() != CoreLifecycleState::loaded) {
       return {};
@@ -1347,6 +1579,9 @@ private:
     if (const auto result = adapter.timingInfo(timing); !result) {
       return result;
     }
+    if (const auto support = updateRunAheadSupport(adapter); !support) {
+      return support;
+    }
     const FrameRateRatio rate{
       .framesNumerator = timing.masterClockHz,
       .framesDenominator = timing.masterCyclesPerFrame(),
@@ -1360,6 +1595,17 @@ private:
     if (resume) {
       pacer_.resume(Clock::now());
     }
+    return {};
+  }
+
+  CoreResult updateRunAheadSupport(CoreAdapter& adapter)
+  {
+    CoreInputSettings inputSettings;
+    if (const auto result = adapter.inputSettings(inputSettings); !result) {
+      return result;
+    }
+    runAheadSupported_ = runAheadSupportedForHardware(adapter.hardware()) &&
+      runAheadSupportedForInputSettings(inputSettings);
     return {};
   }
 
@@ -1382,6 +1628,46 @@ private:
     rewindBufferMetrics_ = rewindBuffer_.metrics();
     rewindingMetrics_ = rewinding_;
     rewindAvailableMetrics_ = rewindBuffer_.canRewind(adapter.frameCount());
+    runAheadEnabledMetrics_ = runAheadConfiguration_.enabled;
+    runAheadSupportedMetrics_ = runAheadSupported_;
+    runAheadActiveMetrics_ = runAheadActive(adapter);
+    runAheadVerifiedMetrics_ = runAheadDeterminism_.verified();
+    runAheadFramesMetrics_ = runAheadConfiguration_.frames;
+    runAheadSpeculativeFramesMetrics_ = runAheadSpeculativeFrames_;
+    runAheadRollbacksMetrics_ = runAheadRollbacks_;
+    runAheadDeterminismFailuresMetrics_ = runAheadDeterminism_.failures();
+    runAheadStateBytesMetrics_ = runAheadRollbackState_.rawState.size() +
+      runAheadRollbackState_.transientSystemState.size() +
+      runAheadFirstFrameState_.size() + runAheadCanonicalState_.size();
+    runAheadStateCapacityBytesMetrics_ =
+      runAheadRollbackState_.rawState.capacity() +
+      runAheadRollbackState_.transientSystemState.capacity() +
+      runAheadFirstFrameState_.capacity() + runAheadCanonicalState_.capacity();
+  }
+
+  void resetRunAheadSession(bool preserveCounters) noexcept
+  {
+    runAheadDeterminism_.reset(
+      runAheadConfiguration_.enabled, preserveCounters);
+    runAheadRollbackState_.rawState.clear();
+    runAheadRollbackState_.transientSystemState.clear();
+    runAheadFirstFrameState_.clear();
+    runAheadCanonicalState_.clear();
+    if (!preserveCounters) {
+      runAheadSpeculativeFrames_ = 0U;
+      runAheadRollbacks_ = 0U;
+    }
+  }
+
+  void populateRunAheadEvent(
+    EmulationEvent& event,
+    const CoreAdapter& adapter) const noexcept
+  {
+    event.runAheadEnabled = runAheadConfiguration_.enabled;
+    event.runAheadSupported = runAheadSupported_;
+    event.runAheadActive = runAheadActive(adapter);
+    event.runAheadVerified = runAheadDeterminism_.verified();
+    event.runAheadFrames = runAheadConfiguration_.frames;
   }
 
   void publishOperation(EmulationEvent event)
@@ -1427,6 +1713,9 @@ private:
   bool fastForward_{false};
   bool slowMotion_{false};
   bool rewinding_{false};
+  RunAheadConfiguration runAheadConfiguration_;
+  bool runAheadSupported_{false};
+  RunAheadDeterminismGuard runAheadDeterminism_;
   EmulationWorkerStatus shutdownStatus_;
   std::shared_ptr<VideoFrameExchange> videoFrames_;
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
@@ -1434,6 +1723,12 @@ private:
   std::shared_ptr<EmulationCaptureSink> captureSink_;
   bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
+  std::array<std::uint16_t, maximumCoreSurfacePixels> runAheadVideoScratch_{};
+  CoreRollbackState runAheadRollbackState_;
+  std::vector<std::uint8_t> runAheadFirstFrameState_;
+  std::vector<std::uint8_t> runAheadCanonicalState_;
+  InputSnapshot latestInput_;
+  bool hasLatestInput_{false};
   std::vector<std::uint8_t> backupScratch_;
   std::vector<CoreDebugBreakpoint> frameBreakpoints_;
   std::optional<CoreDebugBreakpoint> lastBreakpointHit_;
@@ -1444,6 +1739,18 @@ private:
   bool slowMotionMetrics_{false};
   bool rewindingMetrics_{false};
   bool rewindAvailableMetrics_{false};
+  bool runAheadEnabledMetrics_{false};
+  bool runAheadSupportedMetrics_{false};
+  bool runAheadActiveMetrics_{false};
+  bool runAheadVerifiedMetrics_{false};
+  std::uint32_t runAheadFramesMetrics_{1U};
+  std::uint64_t runAheadSpeculativeFrames_{0U};
+  std::uint64_t runAheadRollbacks_{0U};
+  std::uint64_t runAheadSpeculativeFramesMetrics_{0U};
+  std::uint64_t runAheadRollbacksMetrics_{0U};
+  std::uint64_t runAheadDeterminismFailuresMetrics_{0U};
+  std::size_t runAheadStateBytesMetrics_{0U};
+  std::size_t runAheadStateCapacityBytesMetrics_{0U};
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
@@ -1454,6 +1761,7 @@ private:
   std::uint64_t coalescedFirmwareSettingsCommands_{0};
   std::uint64_t coalescedCheatCommands_{0};
   std::uint64_t coalescedRewindSettingsCommands_{0};
+  std::uint64_t coalescedRunAheadSettingsCommands_{0};
   std::uint64_t coalescedSpeedSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};

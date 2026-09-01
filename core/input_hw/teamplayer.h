@@ -39,6 +39,8 @@
 #ifndef _TEAMPLAYER_H_
 #define _TEAMPLAYER_H_
 
+#include <stddef.h>
+
 /* Function prototypes */
 extern void teamplayer_init(int port);
 extern void teamplayer_reset(int port);
@@ -46,5 +48,9 @@ extern unsigned char teamplayer_1_read(void);
 extern unsigned char teamplayer_2_read(void);
 extern void teamplayer_1_write(unsigned char data, unsigned char mask);
 extern void teamplayer_2_write(unsigned char data, unsigned char mask);
+/* Transient Team Player handshake state for same-process rollback only. */
+extern size_t teamplayer_rollback_state_size(void);
+extern int teamplayer_rollback_state_save(unsigned char *state, size_t state_size);
+extern int teamplayer_rollback_state_load(const unsigned char *state, size_t state_size);
 
 #endif

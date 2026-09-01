@@ -62,6 +62,11 @@ program code, game content, artwork, sampled audio, or trademark graphic in the 
 `integration.recording` also runs four frames through the real emulation worker and
 lossless writer, then validates the temporary native PNG sequence, PCM WAV, index, and
 manifest before RAII cleanup removes the entire capture.
+`integration.run_ahead` uses the same generated program to compare an independent
+authoritative continuation with owner-thread speculation, including input, raw state,
+native video, stereo audio, recording cadence, maximum-depth stress, and allocation
+bounds. Its Sega CD exclusion case uses only the generated firmware/disc fixtures
+documented below.
 
 ## Generated 8-bit Z80 RAM marker ROMs
 

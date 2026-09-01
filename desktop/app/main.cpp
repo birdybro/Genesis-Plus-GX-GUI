@@ -29,6 +29,7 @@
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/rewind_settings.h"
+#include "genplusgx/settings/run_ahead_settings.h"
 #include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/speed_settings.h"
 #include "genplusgx/settings/system_settings.h"
@@ -444,6 +445,16 @@ int main(int argc, char* argv[])
     recordStartupIssue("Rewind settings", loadedRewindSettings.status.message);
   }
   auto rewindSettings = loadedRewindSettings.settings;
+  genplusgx::settings::RunAheadSettingsStore runAheadSettingsStore{
+    applicationPaths.configDirectory() / "run-ahead-settings.json"};
+  auto loadedRunAheadSettings = runAheadSettingsStore.load();
+  if (!loadedRunAheadSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedRunAheadSettings.status.message);
+    recordStartupIssue(
+      "Run-ahead settings", loadedRunAheadSettings.status.message);
+  }
+  auto runAheadSettings = loadedRunAheadSettings.settings;
   genplusgx::settings::SpeedSettingsStore speedSettingsStore{
     applicationPaths.configDirectory() / "speed-settings.json"};
   auto loadedSpeedSettings = speedSettingsStore.load();
@@ -617,6 +628,16 @@ int main(int argc, char* argv[])
   if (!initialRewindSettings) {
     qWarning().noquote() << QString::fromStdString(initialRewindSettings.message);
     recordStartupIssue("Rewind runtime settings", initialRewindSettings.message);
+  }
+  std::uint64_t runAheadSettingsOperationId = 855'000U;
+  const auto initialRunAheadSettings = worker.submit(
+    genplusgx::EmulationCommand::updateRunAheadSettings(
+      ++runAheadSettingsOperationId, runAheadSettings));
+  if (!initialRunAheadSettings) {
+    qWarning().noquote() << QString::fromStdString(
+      initialRunAheadSettings.message);
+    recordStartupIssue(
+      "Run-ahead runtime settings", initialRunAheadSettings.message);
   }
   std::uint64_t speedSettingsOperationId = 860'000U;
   const auto initialSpeedSettings = worker.submit(
@@ -874,6 +895,25 @@ int main(int argc, char* argv[])
         return workerPersistenceFailure(submitted.message);
       }
       rewindSettings = settings;
+      return genplusgx::PersistenceStatus{};
+    });
+  window.setRunAheadSettings(runAheadSettings);
+  window.setRunAheadSettingsSink(
+    [&runAheadSettings, &runAheadSettingsOperationId, &runAheadSettingsStore,
+     &worker](const genplusgx::RunAheadConfiguration& settings) {
+      const auto previous = runAheadSettings;
+      const auto saved = runAheadSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateRunAheadSettings(
+          ++runAheadSettingsOperationId, settings));
+      if (!submitted) {
+        static_cast<void>(runAheadSettingsStore.save(previous));
+        return workerPersistenceFailure(submitted.message);
+      }
+      runAheadSettings = settings;
       return genplusgx::PersistenceStatus{};
     });
   window.setSpeedSettings(speedSettings);
@@ -1579,7 +1619,8 @@ int main(int argc, char* argv[])
   window.setDiagnosticsSnapshotProvider(
     [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
-     &recordingService, &rewindSettings, &speedSettings, &window, &worker] {
+     &recordingService, &rewindSettings, &runAheadSettings, &speedSettings,
+     &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
@@ -1622,6 +1663,19 @@ int main(int argc, char* argv[])
       snapshot.rewindSnapshots = workerMetrics.rewindSnapshotCount;
       snapshot.rewindPayloadBytes = workerMetrics.rewindPayloadBytes;
       snapshot.rewindMemoryLimitBytes = workerMetrics.rewindMemoryLimitBytes;
+      snapshot.runAheadEnabled = runAheadSettings.enabled;
+      snapshot.runAheadSupported = workerMetrics.runAheadSupported;
+      snapshot.runAheadActive = workerMetrics.runAheadActive;
+      snapshot.runAheadVerified = workerMetrics.runAheadVerified;
+      snapshot.runAheadFrames = runAheadSettings.frames;
+      snapshot.runAheadSpeculativeFrames =
+        workerMetrics.runAheadSpeculativeFrames;
+      snapshot.runAheadRollbacks = workerMetrics.runAheadRollbacks;
+      snapshot.runAheadDeterminismFailures =
+        workerMetrics.runAheadDeterminismFailures;
+      snapshot.runAheadStateBytes = workerMetrics.runAheadStateBytes;
+      snapshot.runAheadStateCapacityBytes =
+        workerMetrics.runAheadStateCapacityBytes;
       const auto recordingMetrics = recordingService->metrics();
       snapshot.recordingActive = recordingMetrics.active;
       snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
@@ -2154,6 +2208,18 @@ int main(int argc, char* argv[])
           event->speedPercent,
           event->rewinding,
           event->rewindAvailable);
+        window.setRunAheadRuntimeState(
+          event->runAheadSupported,
+          event->runAheadActive,
+          event->runAheadVerified);
+      }
+      if (event->type == genplusgx::EmulationEventType::runAheadDisabled) {
+        const auto detail = event->message.empty()
+          ? std::string{"Run-ahead was suspended after a determinism check."}
+          : event->message;
+        qWarning().noquote() << QString::fromStdString(detail);
+        window.showEmulationRuntimeError(
+          detail + " Normal authoritative emulation remains active.");
       }
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
@@ -2284,6 +2350,10 @@ int main(int argc, char* argv[])
           window.setEmulationControlState(
             true, event->fastForward, event->slowMotion, event->speedPercent,
             event->rewinding, event->rewindAvailable);
+          window.setRunAheadRuntimeState(
+            event->runAheadSupported,
+            event->runAheadActive,
+            event->runAheadVerified);
           if (activePerGameIdentity) {
             window.setPerGameSettingsSession(
               activePerGameSettings, globalGameSettings());
@@ -3358,6 +3428,7 @@ int main(int argc, char* argv[])
   window.setPerGameSettingsSink({});
   window.setAppearanceSettingsSink({});
   window.setSessionSettingsSink({});
+  window.setRunAheadSettingsSink({});
   window.setDiagnosticsSnapshotProvider({});
   window.setDebugRequestSink({});
   window.setVideoSettingsSink({});

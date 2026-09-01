@@ -31,6 +31,9 @@ if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
   file(WRITE
     "${GENPLUSGX_SMOKE_ROOT}/config/speed-settings.json"
     "{ this is intentionally invalid startup-test JSON")
+  file(WRITE
+    "${GENPLUSGX_SMOKE_ROOT}/config/run-ahead-settings.json"
+    "{ this is intentionally invalid startup-test JSON")
 endif()
 
 execute_process(
@@ -86,6 +89,7 @@ if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
   foreach(required_error_message IN ITEMS
       "audio settings file"
       "speed settings file"
+      "run-ahead settings file"
       "Startup issues presented:")
     string(FIND
       "${frontend_log_text}" "${required_error_message}" error_message_position)

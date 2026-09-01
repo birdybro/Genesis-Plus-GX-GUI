@@ -1,6 +1,7 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
+#include "genplusgx/ui/run_ahead_settings_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/speed_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -42,6 +43,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .bios = {},
     .screenshots = {.directory = root / "custom-shots"},
     .rewind = genplusgx::settings::defaultRewindSettings(),
+    .runAhead = genplusgx::settings::defaultRunAheadSettings(),
     .session = genplusgx::settings::defaultSessionSettings(),
     .speed = genplusgx::settings::defaultSpeedSettings(),
     .paths = genplusgx::ApplicationPaths{root},
@@ -109,11 +111,15 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   QTest::mouseClick(
     dialog.findChild<QPushButton*>(QStringLiteral("configureRewindButton")),
     Qt::LeftButton);
+  QTest::mouseClick(
+    dialog.findChild<QPushButton*>(QStringLiteral("configureRunAheadButton")),
+    Qt::LeftButton);
   const std::vector expectedActions{
     genplusgx::ui::SettingsPageAction::video,
     genplusgx::ui::SettingsPageAction::playerAssignments,
     genplusgx::ui::SettingsPageAction::speed,
-    genplusgx::ui::SettingsPageAction::rewind};
+    genplusgx::ui::SettingsPageAction::rewind,
+    genplusgx::ui::SettingsPageAction::runAhead};
   QCOMPARE(actions, expectedActions);
 
   auto* perGame =
@@ -179,6 +185,14 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
     QStringLiteral("rewindSettingsDialog"));
   QVERIFY(rewind != nullptr);
   rewind->reject();
+
+  QTest::mouseClick(center->findChild<QPushButton*>(
+    QStringLiteral("configureRunAheadButton")), Qt::LeftButton);
+  QApplication::processEvents();
+  auto* runAhead = window.findChild<genplusgx::ui::RunAheadSettingsDialog*>(
+    QStringLiteral("runAheadSettingsDialog"));
+  QVERIFY(runAhead != nullptr);
+  runAhead->reject();
 
   settingsAction->trigger();
   QApplication::processEvents();

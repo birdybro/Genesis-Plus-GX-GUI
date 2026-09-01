@@ -686,17 +686,46 @@ int main(int argc, char** argv)
       !check(workerFrameIsNonBlack(worker),
         "The real-ROM normal-speed frame was black") ||
       !check(worker.audioFrames()->occupancyFrames() > 0U,
-        "The real-ROM normal-speed frame did not queue host audio") ||
-      !check(submitAndSucceed(worker,
+        "The real-ROM normal-speed frame did not queue host audio")) {
+    return 13;
+  }
+
+  for (std::uint32_t depth = genplusgx::minimumRunAheadFrames;
+       depth <= genplusgx::maximumRunAheadFrames; ++depth) {
+    worker.audioFrames()->clear();
+    if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateRunAheadSettings(
+            10U + (depth * 2U), {.enabled = true, .frames = depth}), event),
+          "A real-ROM run-ahead depth was rejected") ||
+        !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::unloadGame, 9U), event),
-        "The real-ROM speed worker could not unload") ||
-      !check(worker.stop(), "The real-ROM speed worker could not stop")) {
+            genplusgx::EmulationCommandType::frameAdvance,
+            11U + (depth * 2U)), event),
+          "A real-ROM run-ahead frame failed") ||
+        !check(event.runAheadActive && event.runAheadVerified &&
+            event.runAheadFrames == depth,
+          "A real-ROM run-ahead depth failed deterministic activation") ||
+        !check(workerFrameIsNonBlack(worker),
+          "A real-ROM run-ahead frame was black") ||
+        !check(worker.audioFrames()->occupancyFrames() > 0U,
+          "A real-ROM run-ahead frame lost authoritative host audio") ||
+        !check(worker.metrics().runAheadDeterminismFailures == 0U &&
+            worker.metrics().runAheadStateCapacityBytes <= 4U * 1024U * 1024U,
+          "Real-ROM run-ahead was non-deterministic or unbounded")) {
+      return 13;
+    }
+  }
+  if (!check(submitAndSucceed(worker,
+        genplusgx::EmulationCommand::simple(
+          genplusgx::EmulationCommandType::unloadGame, 30U), event),
+      "The real-ROM speed/run-ahead worker could not unload") ||
+      !check(worker.stop(), "The real-ROM speed/run-ahead worker could not stop")) {
     return 13;
   }
   std::cout << "PASS: 13 core video cases, 35 core audio cases, 12 input "
                "devices, 36 accelerated presentation cases, 17 system "
-               "reload cases, 3 emulation speed modes, and one non-destructive "
+               "reload cases, 3 emulation speed modes, 4 run-ahead depths, "
+               "and one non-destructive "
                "IPS launch. Comparison PNGs: "
             << outputDirectory << '\n';
   return 0;

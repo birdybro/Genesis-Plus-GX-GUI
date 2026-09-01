@@ -17,6 +17,7 @@
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
+#include "genplusgx/ui/run_ahead_settings_dialog.h"
 #include "genplusgx/ui/session_settings_dialog.h"
 #include "genplusgx/ui/speed_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
@@ -268,6 +269,18 @@ void MainWindow::buildMenus()
     *emulation, tr("Rewind &Settings…"), "rewindSettingsAction");
   connect(rewindSettings, &QAction::triggered,
     this, &MainWindow::showRewindSettings);
+  auto* runAhead = addAction(
+    *emulation, tr("Run-&Ahead"), "runAheadAction");
+  runAhead->setCheckable(true);
+  connect(runAhead, &QAction::toggled, this, [this](bool enabled) {
+    auto candidate = runAheadSettings_;
+    candidate.enabled = enabled;
+    static_cast<void>(applyRunAheadSettings(candidate, true));
+  });
+  auto* runAheadSettings = addAction(
+    *emulation, tr("Run-Ahead Se&ttings…"), "runAheadSettingsAction");
+  connect(runAheadSettings, &QAction::triggered,
+    this, &MainWindow::showRunAheadSettings);
   auto* frameAdvance = addAction(
     *emulation, tr("Frame &Advance"), "frameAdvanceAction", QKeySequence{tr("N")});
   connect(frameAdvance, &QAction::triggered, this, [this] {
@@ -796,6 +809,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateStateActions();
   updateScreenshotAction();
   updateRecordingAction();
+  updateRunAheadAction();
   updateCheatAction();
   updatePerGameSettingsAction();
   updateEmulationControls();
@@ -1791,6 +1805,9 @@ void MainWindow::showSettings(SettingsPage page)
       case SettingsPageAction::speed:
         showSpeedSettings();
         break;
+      case SettingsPageAction::runAhead:
+        showRunAheadSettings();
+        break;
     }
   });
   dialog->openPage(page);
@@ -1845,6 +1862,129 @@ void MainWindow::showRewindSettings()
     return PersistenceStatus{};
   });
   dialog->open();
+}
+
+void MainWindow::setRunAheadSettings(RunAheadConfiguration settings)
+{
+  if (!validateRunAheadConfiguration(settings)) {
+    return;
+  }
+  runAheadSettings_ = settings;
+  if (!runAheadSettings_.enabled) {
+    runAheadActive_ = false;
+    runAheadVerified_ = false;
+  }
+  if (auto* dialog = findChild<RunAheadSettingsDialog*>(
+        QStringLiteral("runAheadSettingsDialog"))) {
+    dialog->setSettings(runAheadSettings_);
+  }
+  updateRunAheadAction();
+  refreshSettingsDialog();
+}
+
+void MainWindow::setRunAheadSettingsSink(RunAheadSettingsSink sink)
+{
+  runAheadSettingsSink_ = std::move(sink);
+  updateRunAheadAction();
+}
+
+const RunAheadConfiguration& MainWindow::runAheadSettings() const noexcept
+{
+  return runAheadSettings_;
+}
+
+void MainWindow::setRunAheadRuntimeState(
+  bool supported,
+  bool active,
+  bool verified)
+{
+  const bool nextSupported = isGameLoaded() && supported;
+  const bool nextActive = nextSupported && active;
+  const bool nextVerified = nextActive && verified;
+  if (runAheadSupported_ == nextSupported &&
+      runAheadActive_ == nextActive &&
+      runAheadVerified_ == nextVerified) {
+    return;
+  }
+  runAheadSupported_ = nextSupported;
+  runAheadActive_ = nextActive;
+  runAheadVerified_ = nextVerified;
+  updateRunAheadAction();
+  refreshSettingsDialog();
+}
+
+void MainWindow::showRunAheadSettings()
+{
+  if (auto* existing = findChild<RunAheadSettingsDialog*>(
+        QStringLiteral("runAheadSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new RunAheadSettingsDialog(runAheadSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const RunAheadConfiguration& settings) {
+    if (runAheadSettingsSink_) {
+      const auto saved = runAheadSettingsSink_(settings);
+      if (!saved) {
+        return saved;
+      }
+    }
+    setRunAheadSettings(settings);
+    statusBar()->showMessage(tr("Run-ahead settings applied."), 3'000);
+    return PersistenceStatus{};
+  });
+  dialog->open();
+}
+
+bool MainWindow::applyRunAheadSettings(
+  const RunAheadConfiguration& settings,
+  bool notifySink)
+{
+  if (!validateRunAheadConfiguration(settings)) {
+    updateRunAheadAction();
+    return false;
+  }
+  if (notifySink && runAheadSettingsSink_) {
+    const auto saved = runAheadSettingsSink_(settings);
+    if (!saved) {
+      statusBar()->showMessage(tr("Run-ahead settings could not be applied."), 5'000);
+      dialogService_->showError(
+        this, tr("Run-Ahead Error"), QString::fromStdString(saved.message));
+      updateRunAheadAction();
+      return false;
+    }
+  }
+  setRunAheadSettings(settings);
+  statusBar()->showMessage(settings.enabled
+      ? tr("Run-ahead enabled: %1 frame(s).").arg(settings.frames)
+      : tr("Run-ahead disabled."),
+    3'000);
+  return true;
+}
+
+void MainWindow::updateRunAheadAction()
+{
+  auto* action = findChild<QAction*>(QStringLiteral("runAheadAction"));
+  if (action == nullptr) {
+    return;
+  }
+  const QSignalBlocker blocker{action};
+  action->setChecked(runAheadSettings_.enabled);
+  action->setText(tr("Run-&Ahead (%1 Frame%2)")
+    .arg(runAheadSettings_.frames)
+    .arg(runAheadSettings_.frames == 1U ? QString{} : tr("s")));
+  action->setEnabled(isGameLoaded() && !gameLoading_ && runAheadSupported_ &&
+    static_cast<bool>(runAheadSettingsSink_));
+  if (isGameLoaded() && !runAheadSupported_) {
+    action->setToolTip(tr("Run-ahead is unavailable for the current system or controller configuration."));
+  } else if (runAheadActive_) {
+    action->setToolTip(runAheadVerified_
+      ? tr("Run-ahead is active and deterministic state restoration is verified.")
+      : tr("Run-ahead is active; deterministic state restoration will be verified on the next frame."));
+  } else {
+    action->setToolTip(tr("Reduce controller latency with bounded speculative frames."));
+  }
 }
 
 void MainWindow::setSpeedSettings(EmulationSpeedConfiguration settings)
@@ -2580,6 +2720,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .bios = biosSnapshot_,
     .screenshots = screenshotSettings_,
     .rewind = rewindSettings_,
+    .runAhead = runAheadSettings_,
     .session = sessionSettings_,
     .speed = speedSettings_,
     .paths = applicationPaths_,
@@ -3047,6 +3188,9 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   rewindAvailable_ = false;
   rewindHeld_ = false;
   rewindToggled_ = false;
+  runAheadSupported_ = false;
+  runAheadActive_ = false;
+  runAheadVerified_ = false;
   gameInformationBusy_ = false;
   pendingGamePath_ = path;
   if (!pendingGameTarget_.valid() || pendingGameTarget_.sourcePath != path) {
@@ -3205,6 +3349,9 @@ void MainWindow::setNoGameLoaded()
   rewindAvailable_ = false;
   rewindHeld_ = false;
   rewindToggled_ = false;
+  runAheadSupported_ = false;
+  runAheadActive_ = false;
+  runAheadVerified_ = false;
   segaCdSession_ = false;
   discEjected_ = false;
   discPresent_ = false;

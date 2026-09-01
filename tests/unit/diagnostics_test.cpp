@@ -83,6 +83,15 @@ int main()
   snapshot.rewindSnapshots = 12U;
   snapshot.rewindPayloadBytes = 12U * 1024U * 1024U;
   snapshot.rewindMemoryLimitBytes = 128U * 1024U * 1024U;
+  snapshot.runAheadEnabled = true;
+  snapshot.runAheadSupported = true;
+  snapshot.runAheadActive = true;
+  snapshot.runAheadVerified = true;
+  snapshot.runAheadFrames = 2U;
+  snapshot.runAheadSpeculativeFrames = 288U;
+  snapshot.runAheadRollbacks = 144U;
+  snapshot.runAheadStateBytes = 384U * 1024U;
+  snapshot.runAheadStateCapacityBytes = 512U * 1024U;
   snapshot.recordingActive = true;
   snapshot.recordingQueuedFrames = 2U;
   snapshot.recordingQueueCapacity = 8U;
@@ -107,6 +116,10 @@ int main()
                report.find("Sega CD USA: Valid") != std::string::npos &&
                report.find("Rewind: Enabled (active)") != std::string::npos &&
                report.find("Rewind snapshots: 12") != std::string::npos &&
+               report.find("Run-ahead: Enabled (active)") != std::string::npos &&
+               report.find("Run-ahead determinism: Verified") != std::string::npos &&
+               report.find("Run-ahead speculative frames: 288") != std::string::npos &&
+               report.find("Run-ahead state bytes: 393216 / 524288") != std::string::npos &&
                report.find("Lossless recording: Active") != std::string::npos &&
                report.find("Recording queue: 2 / 8") != std::string::npos &&
                report.find("Recording frames: 144 written, 1 dropped") != std::string::npos &&

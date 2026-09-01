@@ -399,6 +399,53 @@ void sound_reset(void)
   fm_cycles_start = fm_cycles_count = 0;
 }
 
+size_t sound_rollback_state_size(void)
+{
+  return sizeof(fm_last) + sizeof(fm_cycles_start) +
+    sizeof(fm_cycles_count) + sizeof(fm_cycles_busy) +
+    sizeof(genplusgx_debug_fm_registers) +
+    sizeof(genplusgx_debug_fm_latch);
+}
+
+int sound_rollback_state_save(uint8 *state, size_t state_size)
+{
+  uint8 *cursor = state;
+  if (!state || state_size != sound_rollback_state_size())
+  {
+    return 0;
+  }
+#define SAVE_SOUND_ROLLBACK_FIELD(field) \
+  memcpy(cursor, &(field), sizeof(field)); cursor += sizeof(field)
+  SAVE_SOUND_ROLLBACK_FIELD(fm_last);
+  SAVE_SOUND_ROLLBACK_FIELD(fm_cycles_start);
+  SAVE_SOUND_ROLLBACK_FIELD(fm_cycles_count);
+  SAVE_SOUND_ROLLBACK_FIELD(fm_cycles_busy);
+  SAVE_SOUND_ROLLBACK_FIELD(genplusgx_debug_fm_registers);
+  SAVE_SOUND_ROLLBACK_FIELD(genplusgx_debug_fm_latch);
+#undef SAVE_SOUND_ROLLBACK_FIELD
+  return 1;
+}
+
+int sound_rollback_state_load(const uint8 *state, size_t state_size)
+{
+  const uint8 *cursor = state;
+  if (!state || state_size != sound_rollback_state_size())
+  {
+    return 0;
+  }
+#define LOAD_SOUND_ROLLBACK_FIELD(field) \
+  memcpy(&(field), cursor, sizeof(field)); cursor += sizeof(field)
+  LOAD_SOUND_ROLLBACK_FIELD(fm_last);
+  LOAD_SOUND_ROLLBACK_FIELD(fm_cycles_start);
+  LOAD_SOUND_ROLLBACK_FIELD(fm_cycles_count);
+  LOAD_SOUND_ROLLBACK_FIELD(fm_cycles_busy);
+  LOAD_SOUND_ROLLBACK_FIELD(genplusgx_debug_fm_registers);
+  LOAD_SOUND_ROLLBACK_FIELD(genplusgx_debug_fm_latch);
+#undef LOAD_SOUND_ROLLBACK_FIELD
+  fm_ptr = fm_buffer;
+  return 1;
+}
+
 int sound_update(unsigned int cycles)
 {
   /* Run PSG chip until end of frame */

@@ -45,6 +45,31 @@ static struct
   uint8 Table[12];
 } teamplayer[2];
 
+size_t teamplayer_rollback_state_size(void)
+{
+  return sizeof(teamplayer);
+}
+
+int teamplayer_rollback_state_save(uint8 *state, size_t state_size)
+{
+  if (!state || state_size != teamplayer_rollback_state_size())
+  {
+    return 0;
+  }
+  memcpy(state, teamplayer, sizeof(teamplayer));
+  return 1;
+}
+
+int teamplayer_rollback_state_load(const uint8 *state, size_t state_size)
+{
+  if (!state || state_size != teamplayer_rollback_state_size())
+  {
+    return 0;
+  }
+  memcpy(teamplayer, state, sizeof(teamplayer));
+  return 1;
+}
+
 
 void teamplayer_init(int port)
 {

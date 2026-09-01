@@ -23,6 +23,7 @@
 #include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/state_manager_dialog.h"
 #include "genplusgx/settings/rewind_settings.h"
+#include "genplusgx/settings/run_ahead_settings.h"
 
 #include <QMainWindow>
 
@@ -115,6 +116,8 @@ public:
     const settings::AppearanceSettings&)>;
   using RewindSettingsSink = std::function<PersistenceStatus(
     const RewindConfiguration&)>;
+  using RunAheadSettingsSink = std::function<PersistenceStatus(
+    const RunAheadConfiguration&)>;
   using SessionSettingsSink = std::function<PersistenceStatus(bool)>;
   using SpeedSettingsSink = std::function<PersistenceStatus(
     const EmulationSpeedConfiguration&)>;
@@ -165,6 +168,15 @@ public:
   void setRewindSettingsSink(RewindSettingsSink sink);
   [[nodiscard]] const RewindConfiguration& rewindSettings() const noexcept;
   void showRewindSettings();
+  void setRunAheadSettings(RunAheadConfiguration settings);
+  void setRunAheadSettingsSink(RunAheadSettingsSink sink);
+  [[nodiscard]] const RunAheadConfiguration&
+    runAheadSettings() const noexcept;
+  void setRunAheadRuntimeState(
+    bool supported,
+    bool active,
+    bool verified);
+  void showRunAheadSettings();
   void setSessionSettings(settings::SessionSettings settings);
   void setSessionSettingsSink(SessionSettingsSink sink);
   [[nodiscard]] const settings::SessionSettings& sessionSettings() const noexcept;
@@ -338,6 +350,10 @@ private:
   bool applySpeedSettings(
     const EmulationSpeedConfiguration& settings,
     bool notifySink);
+  bool applyRunAheadSettings(
+    const RunAheadConfiguration& settings,
+    bool notifySink);
+  void updateRunAheadAction();
   void updateSpeedActionChecks();
   void updateEmulationControls();
   void updateStateActions();
@@ -398,6 +414,7 @@ private:
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
   RewindSettingsSink rewindSettingsSink_;
+  RunAheadSettingsSink runAheadSettingsSink_;
   SessionSettingsSink sessionSettingsSink_;
   SpeedSettingsSink speedSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
@@ -409,6 +426,7 @@ private:
   settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
   RewindConfiguration rewindSettings_;
+  RunAheadConfiguration runAheadSettings_;
   settings::SessionSettings sessionSettings_;
   EmulationSpeedConfiguration speedSettings_;
   ApplicationPaths applicationPaths_;
@@ -442,6 +460,9 @@ private:
   bool rewindAvailable_{false};
   bool rewindHeld_{false};
   bool rewindToggled_{false};
+  bool runAheadSupported_{false};
+  bool runAheadActive_{false};
+  bool runAheadVerified_{false};
   bool segaCdSession_{false};
   bool discEjected_{false};
   bool discPresent_{false};

@@ -67,6 +67,22 @@ set_tests_properties(
   PROPERTIES LABELS "core;integration;debug;fixture;concurrency" TIMEOUT 30
 )
 
+add_executable(genplusgx_run_ahead_worker_test run_ahead_worker_test.cpp)
+target_link_libraries(
+  genplusgx_run_ahead_worker_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME integration.run_ahead COMMAND genplusgx_run_ahead_worker_test)
+set_tests_properties(
+  integration.run_ahead
+  PROPERTIES
+    LABELS "core;integration;run-ahead;state;input;audio;video;sega-cd;fixture;concurrency"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_core_cheat_test core_cheat_test.cpp)
 target_link_libraries(
   genplusgx_core_cheat_test

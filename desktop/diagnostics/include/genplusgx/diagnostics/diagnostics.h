@@ -108,6 +108,16 @@ struct DiagnosticsSnapshot final {
   std::size_t rewindSnapshots{0};
   std::size_t rewindPayloadBytes{0};
   std::size_t rewindMemoryLimitBytes{0};
+  bool runAheadEnabled{false};
+  bool runAheadSupported{false};
+  bool runAheadActive{false};
+  bool runAheadVerified{false};
+  std::uint32_t runAheadFrames{1U};
+  std::uint64_t runAheadSpeculativeFrames{0U};
+  std::uint64_t runAheadRollbacks{0U};
+  std::uint64_t runAheadDeterminismFailures{0U};
+  std::size_t runAheadStateBytes{0U};
+  std::size_t runAheadStateCapacityBytes{0U};
   bool recordingActive{false};
   std::size_t recordingQueuedFrames{0};
   std::size_t recordingQueueCapacity{0};

@@ -7,6 +7,7 @@
 #include "genplusgx/settings/appearance_settings.h"
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/rewind_settings.h"
+#include "genplusgx/settings/run_ahead_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/speed_settings.h"
@@ -50,6 +51,7 @@ enum class SettingsPageAction {
   rewind,
   session,
   speed,
+  runAhead,
 };
 
 struct SettingsOverview final {
@@ -61,6 +63,7 @@ struct SettingsOverview final {
   platform::BiosSnapshot bios;
   settings::ScreenshotSettings screenshots;
   RewindConfiguration rewind;
+  RunAheadConfiguration runAhead;
   settings::SessionSettings session;
   EmulationSpeedConfiguration speed;
   ApplicationPaths paths;

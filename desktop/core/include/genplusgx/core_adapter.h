@@ -148,6 +148,12 @@ struct CoreDiscInfo final {
   std::filesystem::path path;
 };
 
+struct CoreRollbackState final {
+  std::vector<std::uint8_t> rawState;
+  std::vector<std::uint8_t> transientSystemState;
+  std::uint64_t frameNumber{0U};
+};
+
 [[nodiscard]] std::uint64_t hashAudioFrames(
   std::span<const StereoAudioFrame> frames) noexcept;
 
@@ -186,6 +192,9 @@ public:
   [[nodiscard]] CoreResult loadRawState(
     std::span<const std::uint8_t> state,
     std::uint64_t emulatedFrameNumber);
+  [[nodiscard]] CoreResult saveRollbackState(CoreRollbackState& output);
+  [[nodiscard]] CoreResult restoreRollbackState(
+    const CoreRollbackState& state);
   [[nodiscard]] CoreResult backupMemoryInfo(
     BackupMemoryKind kind,
     BackupMemoryInfo& output) const;
@@ -232,6 +241,10 @@ public:
   [[nodiscard]] CoreResourceMetrics resourceMetrics() const;
 
 private:
+  [[nodiscard]] CoreResult loadRawStateImpl(
+    std::span<const std::uint8_t> state,
+    std::uint64_t emulatedFrameNumber,
+    bool invalidateVideo);
   [[nodiscard]] CoreResult requireOwner(bool requireLoaded) const;
   [[nodiscard]] CoreResult describeVideoFrame(CoreVideoFrameInfo& output) const;
   [[nodiscard]] CoreResult describeAudioBatch(CoreAudioBatchInfo& output) const;

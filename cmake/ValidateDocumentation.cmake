@@ -24,6 +24,7 @@ set(required_documents
   docs/INPUT_CONFIGURATION.md
   docs/LIBRETRO_SHADERS.md
   docs/RECORDING.md
+  docs/RUN_AHEAD.md
   docs/BIOS.md
   docs/GAME_LIBRARY.md
   docs/SAVE_STATES.md

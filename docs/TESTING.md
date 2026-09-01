@@ -18,7 +18,7 @@ ctest --preset release
 
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
-`rewind`, `packaging`, `release`, and `documentation`:
+`rewind`, `run-ahead`, `packaging`, `release`, and `documentation`:
 
 ```bash
 ctest --preset debug -L gui --output-on-failure
@@ -41,6 +41,19 @@ numbers through the real worker/core state path, verifies the audio ring remains
 then resumes forward. `gui.rewind_settings`, `gui.emulation_controls`, and
 `gui.input_configuration` cover settings transactions, toggle/hold/focus behavior,
 hotkey migration, and stable widget identifiers.
+
+`unit.run_ahead_settings` covers disabled defaults, atomic schema-1 persistence, strict
+one-through-four-frame validation, bounded malformed input, and cartridge/Sega CD
+support classification. `integration.run_ahead` drives the generated Genesis fixture
+through exact raw plus transient rollback, compares authoritative state/audio/input
+with an independent core baseline, verifies only the final speculative native frame is
+displayed/recorded, exercises fast-forward/slow-motion/rewind suspension and return,
+directly restores a mutated Team Player handshake, and runs 120 host frames at maximum
+depth without allocation growth. The same test
+loads generated Sega CD firmware/disc data and requires authoritative-only fallback.
+`gui.run_ahead_settings`, `gui.settings`, and `gui.main_window` cover transactions,
+persistence failure, Settings Center routing, menu state, and unsupported-hardware
+gating.
 
 `unit.speed_settings` covers safe defaults, exact atomic round trips, every domain
 boundary, fractional/malformed/future-schema input, and the 32 KiB read cap.
@@ -113,7 +126,9 @@ slow-motion, and fast-forward rates. Every mode must publish a non-black frame; 
 audio must remain empty outside 100%. Shader images must be closer to the unshaded
 upright image than to its vertical mirror. It also creates a temporary IPS record that
 changes one Genesis header byte, runs the separately cached result for 120 frames, and
-requires a non-black frame without touching the supplied source.
+requires a non-black frame without touching the supplied source. Finally, it exercises
+all four run-ahead depths with deterministic restoration, non-black future video,
+authoritative audio, and bounded rollback storage.
 
 Run it on a native desktop backend with an output directory outside the source tree:
 

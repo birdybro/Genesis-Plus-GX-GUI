@@ -256,12 +256,14 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::gameLibrary},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Advanced"),
-    tr("Emulation speed, rewind history, per-game overrides, and runtime diagnostics."),
+    tr("Emulation speed, run-ahead latency, rewind history, per-game overrides, and runtime diagnostics."),
     "advancedSettingsPage", "advancedSettingsSummary", advancedSummary_, {
       {tr("Emulation Speed Settings…"), "configureSpeedButton",
         SettingsPageAction::speed},
       {tr("Rewind Settings…"), "configureRewindButton",
         SettingsPageAction::rewind},
+      {tr("Run-Ahead Settings…"), "configureRunAheadButton",
+        SettingsPageAction::runAhead},
       {tr("Per-Game Settings…"), "configurePerGameButton",
         SettingsPageAction::perGame},
       {tr("Log and Diagnostics…"), "openDiagnosticsButton",
@@ -391,11 +393,14 @@ void SettingsDialog::refresh()
     .arg(overview_.speed.normalPercent)
     .arg(overview_.speed.slowMotionPercent)
     .arg(overview_.speed.fastForwardPercent);
+  const auto runAheadSummary = overview_.runAhead.enabled
+    ? tr("Run-ahead: enabled, %1 frame(s)").arg(overview_.runAhead.frames)
+    : tr("Run-ahead: disabled");
   advancedSummary_->setText(overview_.gameLoaded
-    ? tr("%1\n%2\nPer-game overrides are available. Diagnostics omit personal secrets.")
-        .arg(speedSummary, rewindSummary)
-    : tr("%1\n%2\nLoad a game to configure per-game overrides. Diagnostics remain available.")
-        .arg(speedSummary, rewindSummary));
+    ? tr("%1\n%2\n%3\nPer-game overrides are available. Diagnostics omit personal secrets.")
+        .arg(speedSummary, rewindSummary, runAheadSummary)
+    : tr("%1\n%2\n%3\nLoad a game to configure per-game overrides. Diagnostics remain available.")
+        .arg(speedSummary, rewindSummary, runAheadSummary));
   perGameButton_->setEnabled(overview_.gameLoaded);
 }
 

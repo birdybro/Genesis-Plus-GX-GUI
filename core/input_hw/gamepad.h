@@ -40,6 +40,8 @@
 #ifndef _GAMEPAD_H_
 #define _GAMEPAD_H_
 
+#include <stddef.h>
+
 /* Function prototypes */
 extern void gamepad_reset(int port);
 extern void gamepad_refresh(int port);
@@ -58,5 +60,9 @@ extern unsigned char mastertap_1_read(void);
 extern unsigned char mastertap_2_read(void);
 extern void mastertap_1_write(unsigned char data, unsigned char mask);
 extern void mastertap_2_write(unsigned char data, unsigned char mask);
+/* Transient controller handshake state for same-process rollback only. */
+extern size_t gamepad_rollback_state_size(void);
+extern int gamepad_rollback_state_save(unsigned char *state, size_t state_size);
+extern int gamepad_rollback_state_load(const unsigned char *state, size_t state_size);
 
 #endif

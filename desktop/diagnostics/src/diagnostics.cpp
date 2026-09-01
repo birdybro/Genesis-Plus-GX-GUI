@@ -394,6 +394,20 @@ std::string formatDiagnostics(
          << "Rewind snapshots: " << snapshot.rewindSnapshots << '\n'
          << "Rewind payload bytes: " << snapshot.rewindPayloadBytes << " / "
          << snapshot.rewindMemoryLimitBytes << '\n'
+         << "Run-ahead: " << (snapshot.runAheadEnabled ? "Enabled" : "Disabled")
+         << (snapshot.runAheadActive ? " (active)" : "") << '\n'
+         << "Run-ahead support: "
+         << (snapshot.runAheadSupported ? "Available" : "Unavailable") << '\n'
+         << "Run-ahead frames: " << snapshot.runAheadFrames << '\n'
+         << "Run-ahead determinism: "
+         << (snapshot.runAheadVerified ? "Verified" : "Not verified") << '\n'
+         << "Run-ahead speculative frames: "
+         << snapshot.runAheadSpeculativeFrames << '\n'
+         << "Run-ahead rollbacks: " << snapshot.runAheadRollbacks << '\n'
+         << "Run-ahead determinism failures: "
+         << snapshot.runAheadDeterminismFailures << '\n'
+         << "Run-ahead state bytes: " << snapshot.runAheadStateBytes << " / "
+         << snapshot.runAheadStateCapacityBytes << '\n'
          << "Lossless recording: "
          << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
          << "Recording queue: " << snapshot.recordingQueuedFrames << " / "

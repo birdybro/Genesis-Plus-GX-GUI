@@ -3,6 +3,7 @@
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/emulation_capture_sink.h"
 #include "genplusgx/input_snapshot.h"
+#include "genplusgx/run_ahead_configuration.h"
 #include "genplusgx/rewind_configuration.h"
 #include "genplusgx/audio_ring_buffer.h"
 #include "genplusgx/timing/frame_pacer.h"
@@ -46,6 +47,7 @@ enum class EmulationCommandType {
   speedSettings,
   setRewinding,
   rewindSettings,
+  runAheadSettings,
   inputSnapshot,
   inputSettings,
   videoSettings,
@@ -72,6 +74,7 @@ struct EmulationCommand final {
   CoreSystemSettings coreSystemSettings;
   CoreFirmwareSettings coreFirmwareSettings;
   RewindConfiguration rewindConfiguration;
+  RunAheadConfiguration runAheadConfiguration;
   EmulationSpeedConfiguration speedConfiguration;
   std::vector<std::uint8_t> rawState;
   std::vector<CoreCheatPatch> coreCheats;
@@ -98,6 +101,9 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand updateRewindSettings(
     std::uint64_t operationId,
     RewindConfiguration configuration);
+  [[nodiscard]] static EmulationCommand updateRunAheadSettings(
+    std::uint64_t operationId,
+    RunAheadConfiguration configuration);
   [[nodiscard]] static EmulationCommand updateInput(
     std::uint64_t operationId,
     InputSnapshot input);
@@ -160,6 +166,7 @@ enum class EmulationEventType {
   stateCaptured,
   debugResponse,
   debugBreakpointHit,
+  runAheadDisabled,
   workerStopped,
 };
 
@@ -180,6 +187,11 @@ struct EmulationEvent final {
   std::uint32_t speedPercent{100U};
   bool rewinding{false};
   bool rewindAvailable{false};
+  bool runAheadEnabled{false};
+  bool runAheadSupported{false};
+  bool runAheadActive{false};
+  bool runAheadVerified{false};
+  std::uint32_t runAheadFrames{1U};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
   CoreDiscInfo disc;
@@ -204,6 +216,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedFirmwareSettingsCommands{0};
   std::uint64_t coalescedCheatCommands{0};
   std::uint64_t coalescedRewindSettingsCommands{0};
+  std::uint64_t coalescedRunAheadSettingsCommands{0};
   std::uint64_t coalescedSpeedSettingsCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
@@ -221,6 +234,16 @@ struct EmulationWorkerMetrics final {
   std::size_t rewindPayloadBytes{0U};
   std::size_t rewindMemoryLimitBytes{0U};
   std::uint64_t discardedRewindSnapshots{0U};
+  bool runAheadEnabled{false};
+  bool runAheadSupported{false};
+  bool runAheadActive{false};
+  bool runAheadVerified{false};
+  std::uint32_t runAheadFrames{1U};
+  std::uint64_t runAheadSpeculativeFrames{0U};
+  std::uint64_t runAheadRollbacks{0U};
+  std::uint64_t runAheadDeterminismFailures{0U};
+  std::size_t runAheadStateBytes{0U};
+  std::size_t runAheadStateCapacityBytes{0U};
 };
 
 class EmulationWorker final {

@@ -54,6 +54,10 @@ Resolve conflicts by responsibility:
   update [THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).
 - Shared core source manifests in `desktop/core/CMakeLists.txt`: reconcile added,
   removed, or renamed core files explicitly; do not silently omit a new hardware module.
+- The desktop-only in-process rollback helpers in `core/system.*` and `core/sound/*`:
+  retain their opaque transient-context contract when upstream changes the 68000,
+  viewport, filter, or blip-buffer layouts. They do not alter the portable Genesis Plus
+  GX save-state format and are exercised by `integration.run_ahead`.
 
 Keep fixes in separate commits after the upstream merge when possible. That makes it
 clear whether a line came from upstream or from compatibility work.

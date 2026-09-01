@@ -150,6 +150,12 @@ frames and core audio into a self-contained `.gpgx-recording` directory. The wri
 bounded and asynchronous, so storage cannot block the emulation thread. See the
 [recording guide](docs/RECORDING.md) for the PNG/WAV format and limits.
 
+Choose **Emulation → Run-Ahead** to reduce cartridge-game input latency with one to four
+bounded speculative frames. It is disabled by default, automatically suspends during
+rewind or alternate-speed play, and fails closed if its first continuation is not
+deterministic. Sega CD is currently excluded from speculation. See the
+[run-ahead guide](docs/RUN_AHEAD.md) for accuracy, performance, and diagnostics details.
+
 For Sega CD, configure your own USA, Europe, and/or Japan firmware under
 **Tools → BIOS Settings** before opening a disc. Firmware is validated locally and is
 never downloaded by the application. See [BIOS.md](docs/BIOS.md).
@@ -236,6 +242,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Debug tools](docs/DEBUG_TOOLS.md)
 - [Libretro shaders](docs/LIBRETRO_SHADERS.md)
 - [Lossless recording](docs/RECORDING.md)
+- [Run-ahead](docs/RUN_AHEAD.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

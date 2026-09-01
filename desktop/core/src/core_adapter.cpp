@@ -756,12 +756,51 @@ CoreResult CoreAdapter::saveRawState(std::vector<std::uint8_t>& output)
 
 CoreResult CoreAdapter::loadRawState(std::span<const std::uint8_t> state)
 {
-  return loadRawState(state, 0U);
+  return loadRawStateImpl(state, 0U, true);
 }
 
 CoreResult CoreAdapter::loadRawState(
   std::span<const std::uint8_t> state,
   std::uint64_t emulatedFrameNumber)
+{
+  return loadRawStateImpl(state, emulatedFrameNumber, true);
+}
+
+CoreResult CoreAdapter::saveRollbackState(CoreRollbackState& output)
+{
+  if (const auto saved = saveRawState(output.rawState); !saved) {
+    return saved;
+  }
+  output.frameNumber = frameCount_;
+  output.transientSystemState.resize(system_rollback_state_size());
+  if (!system_rollback_state_save(
+        output.transientSystemState.data(),
+        output.transientSystemState.size())) {
+    return failure(CoreError::stateSaveFailed,
+      "Genesis Plus GX could not capture its transient rollback context.");
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::restoreRollbackState(const CoreRollbackState& state)
+{
+  auto restored = loadRawStateImpl(state.rawState, state.frameNumber, false);
+  if (!restored) {
+    return restored;
+  }
+  if (!system_rollback_state_load(
+        state.transientSystemState.data(),
+        state.transientSystemState.size())) {
+    return failure(CoreError::stateLoadFailed,
+      "Genesis Plus GX could not restore its transient rollback context.");
+  }
+  return success();
+}
+
+CoreResult CoreAdapter::loadRawStateImpl(
+  std::span<const std::uint8_t> state,
+  std::uint64_t emulatedFrameNumber,
+  bool invalidateVideo)
 {
   std::scoped_lock lock{coreMutex};
   if (const auto owner = requireOwner(true); !owner) {
@@ -790,7 +829,9 @@ CoreResult CoreAdapter::loadRawState(
 
   private_->pendingAudioFrames = 0;
   private_->pendingAudioFrameNumber = 0;
-  bitmap.viewport.changed = 3;
+  if (invalidateVideo) {
+    bitmap.viewport.changed = 3;
+  }
   frameCount_ = emulatedFrameNumber;
   return success();
 }

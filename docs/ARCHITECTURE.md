@@ -168,6 +168,33 @@ rewind command -> earlier state restore <-+ -> video exchange
                                                 (audio ring cleared)
 ```
 
+Run-ahead is a separate forward-only path on that same owner thread. The worker captures
+the portable raw state plus an opaque in-process rollback context for transient 68000,
+viewport, pause-input, filter, and resampler state. It executes one through four future
+frames without publishing their audio or intermediate video, retains only the final
+native framebuffer, restores the exact context and latest input snapshot, then executes
+one authoritative frame. That authoritative frame supplies host audio, frame count,
+rewind history, save data, and recording cadence; the speculative final frame supplies
+only the displayed/captured video.
+
+```text
+                    +--> speculative frames -> final native video --+
+current state/input |                                               |
+                    +--> exact rollback -> authoritative frame -----+-> one publish
+                                             |                          video + audio
+                                             +-> audio / state / history
+```
+
+The first speculative and authoritative one-frame continuations must serialize to the
+same raw state. A mismatch permanently suspends speculation for that loaded session and
+falls back to its already-completed authoritative frame. Fast-forward, slow motion, and
+rewind suspend run-ahead without discarding its verified status. Lifecycle or
+state-affecting setting changes clear verification. Sega CD reports run-ahead as
+unsupported. Standard pad handshake state is part of the transient context; specialized
+devices without an exact transient snapshot report the feature as unsupported. Reused
+vectors and the fixed native-video scratch buffer bound allocation;
+their current/capacity bytes and execution counters are exposed through worker metrics.
+
 The core adapter exposes observation-only capacities for its fixed framebuffer, audio,
 save-state, and state-load scratch buffers. Worker metrics likewise expose command/event
 queue depths together with configured capacities. The long-running regression samples

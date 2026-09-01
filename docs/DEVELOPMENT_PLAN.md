@@ -97,7 +97,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
 | 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
 | 85 Recording and frame dumps | COMPLETE | Add bounded audio/video recording and deterministic frame export | capture services/UI | 95-test local and ten-job hosted matrices; encoder, timing, lifecycle, GUI, package/log audit | Recording cannot stall or grow queues without bound | `59beedd` |
-| 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
+| 86 Run-ahead | IN PROGRESS | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | determinism, audio/input/recording, lifecycle/stress, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
 | 88 Overlays and bezels | PLANNED | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | pending |
 | 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
@@ -3779,6 +3779,56 @@ normal video; schema-1 settings migrate safely; global and sparse per-game selec
 persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
 software/no-feature builds remain usable; required runtimes/resources/licenses ship on
 all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 86 detail
+
+**Status:** IN PROGRESS (implementation and local gates; hosted exact-commit gate
+required before completion)
+
+**Goal:** Add optional latency-reducing run-ahead for cartridge systems without
+allowing speculative execution to alter authoritative state, input, audio, persistence,
+recording cadence, or thread ownership.
+
+**Files changed:**
+
+- narrowly scoped transient rollback support in `core/system.*`, `core/sound/*`, and
+  `desktop/core`
+- bounded worker configuration, execution, metrics, and fail-closed determinism checks
+- versioned settings and accessible Qt editor/menu/Settings Center integration
+- startup composition, diagnostics, tests, packaging manifest, and user/developer docs
+
+**Tests added:** `unit.run_ahead_settings` covers schema, bounds, corruption, hardware
+classification, and the fail-closed determinism guard. `integration.run_ahead` uses
+generated legal Genesis and Sega CD fixtures to prove authoritative raw
+state/input/stereo audio, final speculative video, recording isolation, exact Team
+Player handshake restoration, fast/slow/rewind interactions, unsupported-disc fallback,
+and 120-frame maximum-depth allocation stability. `gui.run_ahead_settings` verifies
+Apply/Cancel/OK/defaults, validation, injected persistence failure, MainWindow action
+state, and runtime support. Existing settings, diagnostics, shell, and executable-smoke
+tests cover routing, metrics, action inventory, and corrupt-startup recovery.
+
+**Gate evidence:** Complete warning-as-error Debug, optimized Release, ASan/UBSan,
+fresh Clang 22, and CHD-disabled graphs each pass 98/98 tests; the shader-disabled graph
+passes all 96 applicable tests. The sanitizer run has no finding. A strict legacy Unix
+libretro build links warning-clean as x86-64 ELF and cleans. A fresh Release install
+passes self-contained-package verification, installed CLI and real XCB/OpenGL event-loop
+smokes, dependency inspection across all 22 ELF objects, and prohibited-runtime-payload
+inspection; CPack emits the expected Linux x86-64 TGZ with a verified SHA-256 manifest.
+The adversarial pre-commit review found that pad multitaps also require the private Team
+Player protocol counter; the rollback context and direct save/mutate/restore test now
+cover it. The supplied NAS path is currently mounted without files, so the optional
+Phantasy Star IV acceptance runner is unavailable; required generated programs exercise
+the same worker/core path. Exact hosted CI, full-log, and artifact evidence remain
+required before the milestone changes to COMPLETE.
+
+**Acceptance criteria:** Disabled behavior is unchanged; all core access remains on the
+single worker thread; one through four speculative frames use bounded reusable storage;
+only final speculative video is published while authoritative audio/state advances once;
+incompatible modes suspend safely; Sega CD remains authoritative-only; a determinism
+mismatch fails closed; and every local/hosted/package regression passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
