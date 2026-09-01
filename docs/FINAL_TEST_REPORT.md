@@ -2,8 +2,8 @@
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
-debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist, and
-cartridge soft-patch verification through 2026-09-01
+debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
+cartridge soft-patch, and enhanced save-state verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -25,6 +25,8 @@ cartridge soft-patch verification through 2026-09-01
   `3b828babc13e9a620161a556e1984221358b771d`
 - Exact cartridge soft-patch implementation and hosted evidence baseline:
   `da80552964855fe5ab7ec17689526b8cabdb7d8c`
+- Exact enhanced save-state implementation and hosted evidence baseline:
+  `30ed5d7e378c7107db3be844fc80cfd0c96deec2`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -286,9 +288,9 @@ worker, GUI, migration, and long-running boundedness regressions pass on every h
 ## Operating-system CI matrix
 
 Continuous Integration run
-[`33098836359`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33098836359)
-completed successfully against the exact shader and native-package implementation
-baseline.
+[`33499366503`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33499366503)
+completed successfully against the exact enhanced save-state implementation and current
+native-package baseline.
 
 | Hosted job | Configuration | Result |
 | --- | --- | --- |
@@ -303,8 +305,8 @@ baseline.
 | macOS Intel x86-64 | Debug | Passed |
 | macOS Intel x86-64 | Release + app/ZIP/DMG | Passed |
 
-Each hosted CMake job registered all 77 tests. Linux and both macOS architectures pass
-77/77, including real OpenGL/librashader rendering. Windows passes 76 and reports only
+Each hosted CMake job registered all 93 tests. Linux and both macOS architectures pass
+93/93, including real OpenGL/librashader rendering. Windows passes 92 and reports only
 the intentional capability skip for that render test because the hosted software
 OpenGL context is below desktop 3.3; the application retains normal unshaded video in
 that condition. Package jobs staged and verified native runtimes before uploading
@@ -363,6 +365,16 @@ executables identify as the four expected native architectures. The Linux archiv
 86 entries, Windows has 75, and each macOS app ZIP has 123. Required Qt, SDL3,
 librashader, CRT, license/documentation, and Windows redistributable payloads are
 present, with no ROM, disc, BIOS, save/state, private-key, or environment payload.
+
+Exact enhanced save-state run `33499366503` supersedes those tester artifacts with
+Linux x86-64 (40,082,683 bytes), Windows x86-64 (52,595,396 bytes), macOS arm64
+(63,987,624 bytes), and macOS x86_64 (65,603,781 bytes). All six contained SHA-256
+manifests verify; TGZ, ZIP, and DMG structural checks pass. The Linux archive has 86
+entries, Windows has 75, and each macOS app ZIP has 123. Extracted executables identify
+as the four advertised native architectures; all 22 Linux ELF objects resolve; packaged
+help, version, and real XCB event-loop smokes pass. Required Qt, SDL3, SQLite,
+librashader, CRT, license/documentation, and Windows redistributable resources are
+present, with no ROM, disc, BIOS, save/state, credential, or private-key payload.
 
 All four exact-commit artifact families were downloaded after run `33098836359`. The
 six individual SHA-256 manifests verify. Extracted executables identify as Windows
@@ -564,6 +576,42 @@ All 22 Linux ELF objects resolve their dependencies, `--help` and `--version` ru
 the archive, and a simulated Wayland-session plugin trace directly loads bundled XCB
 without the former missing-Wayland diagnostic.
 
+## Enhanced save-state management verification
+
+Milestone 84 upgrades the checked frontend state envelope to schema 2 while preserving
+the raw Genesis Plus GX payload and schema-1 compatibility. Optional UTF-8 names and
+native-frame PNG previews have strict byte/dimension caps, their own SHA-256 integrity
+field, and real image decoding before acceptance. Manual import validates game identity,
+hardware, envelope lengths, presentation metadata, payload signature, and both hashes
+before atomically replacing the selected slot. Export validates first; rename atomically
+rewraps the unchanged core state, timestamp, frame, and preview.
+
+The non-modal, keyboard-accessible ten-slot browser exposes previews, names, timestamps,
+frame and payload sizes, invalid-state diagnostics, Save/Replace, Load, Import, Export,
+Rename, and Delete through stable object names and injectable native dialog seams. All
+disk work remains on the bounded state-storage service, core capture/restore remains on
+the emulation owner thread, and the final review fixed and regression-tested the browser's
+busy-state propagation so repeated clicks cannot queue overlapping work.
+
+Warning-as-error Debug, optimized Release, leak-detecting ASan/UBSan, fresh Clang 22,
+and CHD-disabled builds pass 93/93; the shader-disabled graph passes 91/91. Tests cover
+schema-2 round trips, schema-1 compatibility, names/previews, corrupt and oversized PNGs,
+invalid UTF-8/control characters, deterministic mutations across every envelope region,
+wrong-game protection without destination changes, async rename/import/export, every
+browser action, dialog injection, and a generated-ROM capture/export/rename/import/load
+workflow that restores the exact core payload. A fresh Linux stage/package, legacy
+libretro build/link/clean, and real packaged XCB event-loop smoke also pass.
+
+Exact run
+[`33499366503`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33499366503)
+passes all ten jobs against `30ed5d7e378c7107db3be844fc80cfd0c96deec2`.
+Each of the nine native configurations passes 93/93, including hosted ASan/UBSan;
+Windows capability-skips only the established real-OpenGL shader test. The full
+14,426-line, 1,923,154-byte log contains no authored compiler/linker warning, sanitizer
+finding, runtime error, timeout, failure, or unexpected skip. All four downloaded
+artifact families, six checksum manifests, archives, application architectures, Linux
+dependencies, required runtime/legal resources, and prohibited-payload scans pass.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -587,8 +635,9 @@ without the former missing-Wayland diagnostic.
 - [x] Atomic identity-keyed cartridge SRAM, Sega CD internal BRAM/RAM cartridge,
   automatic load/flush, platform-standard application-data paths, and composite CUE
   identities covering the sheet plus every validated track without path dependence.
-- [x] State slots 0-9, quick operations, timestamps, delete, corruption/wrong-game
-  rejection, thumbnails, and deterministic restoration.
+- [x] State slots 0-9, quick operations, names, native-frame previews, a complete
+  browser, validated manual import/export, timestamps, delete, schema migration,
+  corruption/wrong-game rejection, and deterministic restoration.
 - [x] Opt-in automatic clean-shutdown session checkpoint, identity-checked restore,
   command-line precedence, explicit-close clearing, and safe normal-launch fallback.
 - [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
@@ -641,8 +690,9 @@ directories.
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
 - The previously supplied external-ROM mount was unmounted/empty during the
-  configurable-speed and soft-patch runs, so its speed workflows and temporary
-  header-only IPS case were not executed locally. The required suites use legal
+  configurable-speed, soft-patch, and enhanced save-state runs, so its speed workflows,
+  temporary header-only IPS case, and optional real-game state browser smoke were not
+  executed locally. The required suites use legal
   generated 68000 and Z80 programs through the same production GUI/worker/core route;
   the earlier 113-case Phantasy Star IV option acceptance remains recorded above. No
   degraded RAID assembly or mount was attempted.

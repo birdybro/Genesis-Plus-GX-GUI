@@ -95,7 +95,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 81 Configurable emulation speed | COMPLETE | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test local and ten-job hosted matrices; package and full-log audit | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | `253c043` |
 | 82 Archive browsing and M3U playlists | COMPLETE | Add safe ZIP cartridge browsing and local Sega CD playlists | archive/game-file services, source/runtime identity, accessible chooser, playlist controls, tests/docs | 91-test local and ten-job hosted matrices; sanitizer, package, and full-log audit | Containers remain bounded and off-thread; source identity and validated runtime content remain distinct | `3b828ba` |
 | 83 Cartridge soft patching | COMPLETE | Apply IPS/BPS/UPS without modifying source games | patch parser/cache, launch target, UI/CLI/session composition, package bootstrap, tests/docs | 93-test local and ten-job hosted matrices; sanitizer, compiler, package, full-log, and artifact audit | Every format is bounded; patched bytes own persistence identity; source paths remain intact | `da80552` |
-| 84 Enhanced save-state UX | IN PROGRESS | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | unit, core round-trip, GUI, corruption, hosted matrix | Richer state operations retain strict game/hardware validation | pending |
+| 84 Enhanced save-state UX | COMPLETE | Add thumbnails, named/manual import/export, and richer state browsing | state service/model/UI | 93-test local and ten-job hosted matrices; corruption, sanitizer, package, and full-log audit | Richer state operations retain strict game/hardware validation | `30ed5d7` |
 | 85 Recording and frame dumps | PLANNED | Add bounded audio/video recording and deterministic frame export | capture services/UI | encoder, timing, lifecycle, GUI, hosted matrix | Recording cannot stall or grow queues without bound | pending |
 | 86 Run-ahead | PLANNED | Add optional latency-reducing speculative frames | core worker/state scheduling | determinism, audio/input, lifecycle, hosted matrix | Accuracy is unchanged when disabled; speculation remains owner-thread only | pending |
 | 87 Display synchronization | PLANNED | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | pending |
@@ -3867,7 +3867,7 @@ exact; all local/hosted gates pass; and full hosted logs/artifacts contain no ne
 
 ## Milestone 84 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Make the ten identity-bound save-state slots easier to understand and manage
 with native-frame previews, optional names, a complete browser, and explicit local-file
@@ -3895,9 +3895,23 @@ builds warning-clean under its strict diagnostic gate, links as x86-64 ELF, and 
 A fresh Release stage passes package verification, dependency/prohibited-payload scans,
 installed help/version checks, and a real bundled-XCB event-loop startup/shutdown; CPack
 emits the expected 0.1.1 Linux x86-64 TGZ and a verified SHA-256 manifest. Exact hosted
-validation remains pending. The previously supplied NAS ROM path is not mounted on this
-host; the required end-to-end workflow instead runs the legal generated Genesis program
-through the real core, storage worker, and GUI operation path.
+run [`33499366503`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33499366503)
+then passed all ten jobs against `30ed5d7e378c7107db3be844fc80cfd0c96deec2`.
+Each of its nine native configurations passed all 93 tests, including hosted ASan/UBSan;
+Windows capability-skipped only the established real-OpenGL shader test. The complete
+14,426-line, 1,923,154-byte log contains no authored compiler/linker warning, sanitizer
+finding, runtime error, timeout, failure, or unexpected skip.
+
+All four artifacts and six package checksum manifests pass integrity verification. The
+applications identify as Linux ELF x86-64, Windows PE32+ x86-64, macOS Mach-O arm64,
+and macOS Mach-O x86-64; both DMGs pass structural inspection. Extracted payloads contain
+the expected Qt, SDL3, SQLite, librashader, CRT, documentation, notices, and Windows
+redistributable resources, with no ROM, disc, BIOS, save/state, credential, or private-key
+payload. All 22 Linux ELF objects resolve their runtime dependencies; installed
+`--help`/`--version` and a real bundled-XCB event-loop startup/shutdown pass. The
+previously supplied NAS ROM path is not mounted on this host; the required end-to-end
+workflow instead runs the legal generated Genesis program through the real core,
+storage worker, and GUI operation path.
 
 **Acceptance criteria:** Slot previews are captured from the native core framebuffer;
 names and previews are bounded and checksummed; every state is validated before load,
@@ -3906,8 +3920,7 @@ dialogs remain injectable and keyboard accessible; all operations stay off the G
 thread where appropriate; every local and exact hosted gate passes; and complete hosted
 logs and packages are inspected before completion.
 
-**Commit SHA:** pending until the tested implementation is committed and exact hosted
-verification succeeds.
+**Commit SHA:** `30ed5d7e378c7107db3be844fc80cfd0c96deec2`
 
 ## Milestone 70 detail
 
