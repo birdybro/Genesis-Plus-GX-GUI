@@ -33,7 +33,7 @@ ctest --preset debug -L gui --output-on-failure
 | Game information | Asynchronous request, bounded parsed metadata fields, failure recovery | `gui.main_window` |
 | Screenshots | Native frame capture request, busy/error/success states, directory chooser and settings | `gui.main_window` |
 | Lossless recording | Real generated-ROM A/V capture, native PNG/dynamic geometry, stereo WAV/manifest/index, bounded queue/drop accounting, start/stop/replace GUI state, hotkey migration, shutdown finalization | `unit.recording_service`, `integration.recording`, `core.emulation_worker`, `gui.main_window`, `unit.input_profile` |
-| Cheats | Valid/invalid code behavior, enable/remove, persistence failure, game-session gating | `gui.cheats` |
+| Cheats | Valid/invalid code behavior, enable/remove, persistence failure, game-session gating, atomic bounded RetroArch/plain-text import, duplicate suppression, disabled-by-default review, token-isolated work-RAM search, generated typed code, and explicit patch application | `unit.cheats`, `core.cheats`, `gui.cheats`, `core.debug_tools` |
 | Per-game settings | Sparse overrides, nested editors, Use Global Settings, persistence failure, game-session gating | `gui.per_game_settings` |
 | Appearance/accessibility | Settings-center routing, system/light/dark themes, Apply/OK/Cancel/defaults, live summary refresh, persistence failure, keyboard navigation, high-DPI policy | `gui.appearance_accessibility`, `gui.settings` |
 | Diagnostics | Live snapshot refresh, privacy filtering, read-only report, clipboard equality, one-dialog ownership | `gui.diagnostics` |

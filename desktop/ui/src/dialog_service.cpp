@@ -62,6 +62,13 @@ QString stateFileDialogFilter()
   return QObject::tr("Genesis Plus GX GUI states (*.gpgxstate);;All files (*)");
 }
 
+QString cheatFileDialogFilter()
+{
+  return QObject::tr(
+    "Cheat lists (*.cht *.txt);;RetroArch cheat lists (*.cht);;"
+    "Plain-text cheat lists (*.txt);;All files (*)");
+}
+
 std::optional<std::filesystem::path> DialogService::chooseDisc(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -105,6 +112,13 @@ std::optional<std::filesystem::path> DialogService::chooseShaderPreset(
 }
 
 std::optional<std::filesystem::path> DialogService::chooseStateImport(
+  QWidget*,
+  const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseCheatImport(
   QWidget*,
   const std::filesystem::path&)
 {
@@ -242,6 +256,20 @@ std::optional<std::filesystem::path> QtDialogService::chooseStateImport(
     QObject::tr("Import Save State"),
     pathToQString(initialDirectory),
     stateFileDialogFilter());
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseCheatImport(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent,
+    QObject::tr("Import Cheat List"),
+    pathToQString(initialDirectory),
+    cheatFileDialogFilter());
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};

@@ -42,6 +42,9 @@ public:
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseStateImport(
     QWidget* parent,
     const std::filesystem::path& initialDirectory);
+  [[nodiscard]] virtual std::optional<std::filesystem::path> chooseCheatImport(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory);
   [[nodiscard]] virtual std::optional<std::filesystem::path> chooseStateExport(
     QWidget* parent,
     const std::filesystem::path& suggestedPath);
@@ -81,6 +84,9 @@ public:
   [[nodiscard]] std::optional<std::filesystem::path> chooseStateImport(
     QWidget* parent,
     const std::filesystem::path& initialDirectory) override;
+  [[nodiscard]] std::optional<std::filesystem::path> chooseCheatImport(
+    QWidget* parent,
+    const std::filesystem::path& initialDirectory) override;
   [[nodiscard]] std::optional<std::filesystem::path> chooseStateExport(
     QWidget* parent,
     const std::filesystem::path& suggestedPath) override;
@@ -98,6 +104,7 @@ public:
 [[nodiscard]] QString discFileDialogFilter();
 [[nodiscard]] QString patchFileDialogFilter();
 [[nodiscard]] QString stateFileDialogFilter();
+[[nodiscard]] QString cheatFileDialogFilter();
 [[nodiscard]] QString pathToQString(const std::filesystem::path& path);
 [[nodiscard]] std::filesystem::path pathFromQString(const QString& path);
 

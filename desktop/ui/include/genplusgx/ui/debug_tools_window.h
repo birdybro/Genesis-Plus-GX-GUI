@@ -63,7 +63,7 @@ public:
   void setGameLoaded(bool loaded);
   void setPaused(bool paused);
   void presentResponse(CoreDebugResponse response);
-  void showRequestError(const std::string& detail);
+  void showRequestError(const std::string& detail, std::uint64_t clientToken);
   [[nodiscard]] std::shared_ptr<const CoreDebugSnapshot> snapshot() const;
   void requestRefresh();
 

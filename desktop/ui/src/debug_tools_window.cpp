@@ -39,6 +39,8 @@
 namespace genplusgx::ui {
 namespace {
 
+constexpr std::uint64_t debugToolsClientToken = 0x4445425547ULL;
+
 QTableWidget* makeTable(
   QWidget* parent,
   const char* objectName,
@@ -826,6 +828,10 @@ void DebugToolsWindow::requestRefresh()
 
 void DebugToolsWindow::presentResponse(CoreDebugResponse response)
 {
+  if (response.clientToken != 0U &&
+      response.clientToken != debugToolsClientToken) {
+    return;
+  }
   if (!gameLoaded_) {
     if (response.type == CoreDebugRequestType::captureSnapshot) {
       snapshotPending_ = false;
@@ -891,8 +897,12 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
   requestMemory();
 }
 
-void DebugToolsWindow::showRequestError(const std::string& detail)
+void DebugToolsWindow::showRequestError(
+  const std::string& detail, std::uint64_t clientToken)
 {
+  if (clientToken != 0U && clientToken != debugToolsClientToken) {
+    return;
+  }
   snapshotPending_ = false;
   memoryPending_ = false;
   setStatus(tr("Debug request failed: %1").arg(QString::fromStdString(detail)),
@@ -906,6 +916,7 @@ std::shared_ptr<const CoreDebugSnapshot> DebugToolsWindow::snapshot() const
 
 bool DebugToolsWindow::submit(CoreDebugRequest request)
 {
+  request.clientToken = debugToolsClientToken;
   if (!requestSink_ || !requestSink_(std::move(request))) {
     setStatus(tr("The debug request queue is unavailable."), 5'000);
     return false;

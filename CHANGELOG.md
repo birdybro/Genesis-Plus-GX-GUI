@@ -9,6 +9,9 @@ platform documentation.
 
 ### Added
 
+- Bounded, atomic import of emulator-handled RetroArch `.cht` and simple local
+  plain-text cheat lists, plus a system-aware live RAM search that creates disabled
+  reviewable codes without exposing core globals or implicitly patching memory.
 - Local-only bezel and foreground-alpha-overlay presentation with bounded cached
   PNG/JPEG/BMP decoding, opacity, explicit game-aperture insets, quick menus,
   schema-migrated global/per-game settings, privacy-safe diagnostics, and identical

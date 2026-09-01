@@ -145,6 +145,7 @@ struct CoreDebugRequest final {
   std::uint8_t vdpRegister{0};
   std::uint8_t vdpValue{0};
   std::vector<CoreDebugBreakpoint> breakpoints;
+  std::uint64_t clientToken{0};
 };
 
 struct CoreDebugResponse final {
@@ -154,6 +155,7 @@ struct CoreDebugResponse final {
   std::shared_ptr<const CoreDebugSnapshot> snapshot;
   std::vector<std::uint8_t> bytes;
   std::optional<CoreDebugBreakpoint> breakpointHit;
+  std::uint64_t clientToken{0};
 };
 
 [[nodiscard]] std::array<CoreDebugMemoryRegionInfo, 7>

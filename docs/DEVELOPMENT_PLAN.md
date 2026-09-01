@@ -100,7 +100,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
-| 89 Cheat import and search | PLANNED | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI | parser, search, persistence, GUI, hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
+| 89 Cheat import and search | IN PROGRESS | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | 100-test local graphs plus pending hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
@@ -4002,6 +4002,54 @@ menus, diagnostics, docs, packages, and tests agree; and all local/hosted gates 
 
 **Commit SHA:** implementation `632cfbcbb62303b206f01922fb4d58a94cbefc9b`;
 Windows test-path correction `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
+
+## Milestone 89 detail
+
+**Status:** IN PROGRESS — LOCAL IMPLEMENTATION GATE PASSED; HOSTED GATE PENDING
+
+**Goal:** Add bounded local cheat-list import and an accessible system-aware work-RAM
+search without permitting untrusted content or GUI timing to patch core memory.
+
+**Files changed:**
+
+- bounded RetroArch/plain-text parser, imported-code validation, typed RAM-code
+  generation, and native file chooser under `desktop/cheats` and `desktop/ui`
+- a normal Cheat Manager search tab backed by immutable owner-thread debug snapshots
+- opaque debug client routing through `CoreAdapter`, `EmulationWorker`, Cheat Manager,
+  MainWindow, and the hidden debugger
+- unit, core, GUI, fixture, architecture, user, testing, changelog, and README coverage
+
+**Tests added:** `unit.cheats` covers valid imports, quoted descriptions, forced-disabled
+entries, absolute temporary-file reads, format selection, duplicate/out-of-range fields,
+wrong-system codes, direct-memory-only records, invalid UTF-8/NUL, size limits, typed
+RAM-code bounds/alignment, and a deterministic 2000-case mutation corpus. `gui.cheats`
+drives real tab widgets and the injected native-dialog seam, verifies atomic failure and
+duplicate suppression, obtains a token-routed snapshot, filters an exact Genesis word,
+creates a disabled `FFxxxx:XXXX` row, proves no implicit core call, then explicitly
+enables and applies it. `core.cheats` runs generated 68000 and Z80 cartridges, finds
+live RAM markers in both hardware families, generates and applies their typed codes
+through the real adapter, and verifies each value after a frame. `core.debug_tools`
+requires client tokens to survive direct responses and asynchronous breakpoint hits.
+
+**Gate evidence:** Complete warning-as-error Debug, optimized Release, leak-detecting
+ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 100/100 tests; the
+shader-disabled graph passes all 98 applicable tests. Focused cheat unit, GUI,
+live-core, MainWindow-routing, and debugger regressions pass. A fresh staged Linux
+install passes dependency/package verification, installed offscreen `--version`, TGZ,
+and checksum generation. The strict inherited Unix libretro target builds, links as
+x86-64 ELF, and cleans without a diagnostic. This host lacks `xvfb-run`, so the exact
+hosted Linux job must provide the required downloaded-package XCB/OpenGL process smoke.
+The exact ten-job GitHub Actions run and downloaded artifact/log audit are required
+before this milestone becomes COMPLETE.
+
+**Acceptance criteria:** A local list is UTF-8/size/count bounded and imported
+atomically; only active-system emulator-handled codes are accepted; every imported or
+searched result is disabled until explicit Apply; Genesis searches use aligned
+big-endian words while 8-bit systems use active work-RAM bytes; all core access stays
+on its owner thread; normal cheat and hidden debugger traffic cannot consume one
+another; every local and hosted gate passes.
+
+**Commit SHA:** pending
 
 ## Milestone 83 detail
 

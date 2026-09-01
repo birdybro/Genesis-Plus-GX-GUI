@@ -68,8 +68,8 @@ rewritten.
   checksum validation, patched-content save/state identity, and session resume
 - Recent games, searchable asynchronous SQLite library, favorites, play history, and
   user-provided local artwork
-- Header metadata and SHA-256 game information, Game Genie/PAR cheats, and sparse
-  per-game setting overrides
+- Header metadata and SHA-256 game information, Game Genie/PAR cheats, bounded
+  RetroArch/plain-text cheat import, live RAM search, and sparse per-game overrides
 - System/light/dark themes, structured rotating logs, and copyable privacy-filtered
   diagnostics
 - Unified General/Video/Audio/Input/System/BIOS/Paths/Advanced settings center with

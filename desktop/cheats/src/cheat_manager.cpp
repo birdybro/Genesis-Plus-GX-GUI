@@ -8,10 +8,13 @@
 
 #include <algorithm>
 #include <array>
+#include <charconv>
 #include <cctype>
 #include <cstdint>
+#include <limits>
 #include <optional>
 #include <span>
+#include <system_error>
 #include <utility>
 
 namespace genplusgx::cheats {
@@ -23,6 +26,15 @@ constexpr std::string_view genesisGameGenieAlphabet =
 CheatStatus cheatFailure(CheatError error, std::string message)
 {
   return {.error = error, .message = std::move(message)};
+}
+
+CheatImportResult importFailure(std::string message)
+{
+  return {
+    .status = cheatFailure(CheatError::invalidImport, std::move(message)),
+    .configuration = {},
+    .format = CheatListFormat::autoDetect,
+  };
 }
 
 PersistenceStatus persistenceFailure(std::string message)
@@ -54,6 +66,319 @@ std::string trimAndUpper(std::string_view input)
     return static_cast<char>(std::toupper(value));
   });
   return output;
+}
+
+bool validUtf8(std::string_view input) noexcept
+{
+  std::size_t index = 0U;
+  while (index < input.size()) {
+    const auto first = static_cast<std::uint8_t>(input[index]);
+    if (first <= 0x7FU) {
+      ++index;
+      continue;
+    }
+    std::size_t continuationCount = 0U;
+    std::uint32_t value = 0U;
+    std::uint32_t minimum = 0U;
+    if ((first & 0xE0U) == 0xC0U) {
+      continuationCount = 1U;
+      value = first & 0x1FU;
+      minimum = 0x80U;
+    } else if ((first & 0xF0U) == 0xE0U) {
+      continuationCount = 2U;
+      value = first & 0x0FU;
+      minimum = 0x800U;
+    } else if ((first & 0xF8U) == 0xF0U) {
+      continuationCount = 3U;
+      value = first & 0x07U;
+      minimum = 0x10000U;
+    } else {
+      return false;
+    }
+    if (continuationCount > input.size() - index - 1U) {
+      return false;
+    }
+    for (std::size_t continuation = 0U;
+         continuation < continuationCount; ++continuation) {
+      const auto next = static_cast<std::uint8_t>(input[index + continuation + 1U]);
+      if ((next & 0xC0U) != 0x80U) {
+        return false;
+      }
+      value = (value << 6U) | (next & 0x3FU);
+    }
+    if (value < minimum || value > 0x10FFFFU ||
+        (value >= 0xD800U && value <= 0xDFFFU)) {
+      return false;
+    }
+    index += continuationCount + 1U;
+  }
+  return true;
+}
+
+bool validImportedName(std::string_view name) noexcept
+{
+  if (trimWhitespace(name).empty() || name.size() > maximumCheatNameBytes) {
+    return false;
+  }
+  return std::ranges::none_of(name, [](unsigned char value) {
+    return value < 0x20U || value == 0x7FU;
+  });
+}
+
+bool parseUnsignedDecimal(std::string_view input, std::size_t& output) noexcept
+{
+  input = trimWhitespace(input);
+  if (input.empty()) {
+    return false;
+  }
+  std::size_t parsed = 0U;
+  const auto result = std::from_chars(
+    input.data(), input.data() + input.size(), parsed, 10);
+  if (result.ec != std::errc{} || result.ptr != input.data() + input.size()) {
+    return false;
+  }
+  output = parsed;
+  return true;
+}
+
+bool parseConfigValue(std::string_view input, std::string& output)
+{
+  input = trimWhitespace(input);
+  output.clear();
+  if (input.empty()) {
+    return true;
+  }
+  if (input.front() != '"') {
+    output.assign(input);
+    return true;
+  }
+  bool escaped = false;
+  std::size_t index = 1U;
+  for (; index < input.size(); ++index) {
+    const char value = input[index];
+    if (escaped) {
+      switch (value) {
+        case '"': output.push_back('"'); break;
+        case '\\': output.push_back('\\'); break;
+        case 'n': output.push_back('\n'); break;
+        case 'r': output.push_back('\r'); break;
+        case 't': output.push_back('\t'); break;
+        default: return false;
+      }
+      escaped = false;
+      continue;
+    }
+    if (value == '\\') {
+      escaped = true;
+      continue;
+    }
+    if (value == '"') {
+      const auto tail = trimWhitespace(input.substr(index + 1U));
+      return tail.empty() || tail.front() == '#';
+    }
+    output.push_back(value);
+  }
+  return false;
+}
+
+struct ImportedEntry final {
+  std::optional<std::string> name;
+  std::optional<std::string> code;
+  std::optional<bool> enabled;
+};
+
+CheatImportResult parseRetroArchList(
+  CheatSystem system, std::string_view text)
+{
+  std::array<ImportedEntry, maximumCheatDefinitions> imported{};
+  std::optional<std::size_t> declaredCount;
+  std::size_t lineNumber = 0U;
+  std::size_t begin = 0U;
+  while (begin <= text.size()) {
+    ++lineNumber;
+    const auto separator = text.find('\n', begin);
+    const auto end = separator == std::string_view::npos ? text.size() : separator;
+    auto line = text.substr(begin, end - begin);
+    if (!line.empty() && line.back() == '\r') {
+      line.remove_suffix(1U);
+    }
+    if (line.size() > 4U * 1024U) {
+      return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+        " exceeds the 4096-byte limit.");
+    }
+    line = trimWhitespace(line);
+    if (!line.empty() && line.front() != '#' && line.front() != ';') {
+      const auto equals = line.find('=');
+      if (equals == std::string_view::npos) {
+        return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+          " is not a key/value entry.");
+      }
+      const auto key = trimWhitespace(line.substr(0U, equals));
+      std::string value;
+      if (key.empty() || !parseConfigValue(line.substr(equals + 1U), value)) {
+        return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+          " has an invalid quoted value.");
+      }
+      if (key == "cheats") {
+        std::size_t count = 0U;
+        if (declaredCount || !parseUnsignedDecimal(value, count) || count == 0U ||
+            count > maximumCheatDefinitions) {
+          return importFailure(
+            "The RetroArch cheat count is missing, duplicated, or out of range.");
+        }
+        declaredCount = count;
+      } else if (key.starts_with("cheat")) {
+        std::size_t digitEnd = 5U;
+        while (digitEnd < key.size() &&
+               std::isdigit(static_cast<unsigned char>(key[digitEnd])) != 0) {
+          ++digitEnd;
+        }
+        if (digitEnd == 5U || digitEnd >= key.size() || key[digitEnd] != '_') {
+          return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+            " has an invalid indexed key.");
+        }
+        std::size_t index = 0U;
+        if (!parseUnsignedDecimal(key.substr(5U, digitEnd - 5U), index) ||
+            index >= maximumCheatDefinitions) {
+          return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+            " has an out-of-range cheat index.");
+        }
+        const auto field = key.substr(digitEnd + 1U);
+        auto& entry = imported[index];
+        if (field == "desc") {
+          if (entry.name) {
+            return importFailure("A RetroArch cheat description is duplicated.");
+          }
+          entry.name = std::move(value);
+        } else if (field == "code") {
+          if (entry.code) {
+            return importFailure("A RetroArch cheat code is duplicated.");
+          }
+          entry.code = std::move(value);
+        } else if (field == "enable") {
+          if (entry.enabled ||
+              (value != "true" && value != "false" && value != "1" &&
+               value != "0")) {
+            return importFailure("A RetroArch cheat enable value is invalid.");
+          }
+          entry.enabled = value == "true" || value == "1";
+        }
+      }
+    }
+    if (separator == std::string_view::npos) {
+      break;
+    }
+    begin = separator + 1U;
+  }
+
+  if (!declaredCount) {
+    return importFailure("The RetroArch cheat list has no bounded cheat count.");
+  }
+  CheatConfiguration configuration;
+  configuration.entries.reserve(*declaredCount);
+  for (std::size_t index = 0U; index < imported.size(); ++index) {
+    const auto& entry = imported[index];
+    const bool used = entry.name.has_value() || entry.code.has_value() ||
+      entry.enabled.has_value();
+    if (index >= *declaredCount) {
+      if (used) {
+        return importFailure(
+          "A RetroArch cheat index exceeds the declared cheat count.");
+      }
+      continue;
+    }
+    if (!entry.code) {
+      return importFailure("RetroArch cheat " + std::to_string(index) +
+        " has no emulator-handled code. Direct-memory records are not imported.");
+    }
+    const auto parsed = parseCheatCode(system, *entry.code);
+    if (!parsed.status) {
+      return importFailure("RetroArch cheat " + std::to_string(index) +
+        " is invalid for the loaded system: " + parsed.status.message);
+    }
+    auto name = entry.name.value_or(
+      "Imported cheat " + std::to_string(index + 1U));
+    if (!validImportedName(name)) {
+      return importFailure("RetroArch cheat " + std::to_string(index) +
+        " has an invalid description.");
+    }
+    configuration.entries.push_back({
+      .name = std::move(name),
+      .code = parsed.normalizedCode,
+      .enabled = false,
+    });
+  }
+  return {
+    .status = {},
+    .configuration = std::move(configuration),
+    .format = CheatListFormat::retroArch,
+  };
+}
+
+CheatImportResult parsePlainTextList(
+  CheatSystem system, std::string_view text)
+{
+  CheatConfiguration configuration;
+  std::size_t lineNumber = 0U;
+  std::size_t begin = 0U;
+  while (begin <= text.size()) {
+    ++lineNumber;
+    const auto separator = text.find('\n', begin);
+    const auto end = separator == std::string_view::npos ? text.size() : separator;
+    auto line = text.substr(begin, end - begin);
+    if (!line.empty() && line.back() == '\r') {
+      line.remove_suffix(1U);
+    }
+    if (line.size() > 4U * 1024U) {
+      return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+        " exceeds the 4096-byte limit.");
+    }
+    line = trimWhitespace(line);
+    if (!line.empty() && line.front() != '#' && line.front() != ';') {
+      if (configuration.entries.size() >= maximumCheatDefinitions) {
+        return importFailure("The cheat list contains more than 150 entries.");
+      }
+      std::string name;
+      auto code = line;
+      if (const auto delimiter = line.find('|'); delimiter != std::string_view::npos) {
+        if (line.find('|', delimiter + 1U) != std::string_view::npos) {
+          return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+            " contains more than one name/code delimiter.");
+        }
+        name.assign(trimWhitespace(line.substr(0U, delimiter)));
+        code = trimWhitespace(line.substr(delimiter + 1U));
+      } else {
+        name = "Imported cheat " +
+          std::to_string(configuration.entries.size() + 1U);
+      }
+      if (!validImportedName(name)) {
+        return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+          " has an invalid description.");
+      }
+      const auto parsed = parseCheatCode(system, code);
+      if (!parsed.status) {
+        return importFailure("Cheat-list line " + std::to_string(lineNumber) +
+          " is invalid for the loaded system: " + parsed.status.message);
+      }
+      configuration.entries.push_back({
+        .name = std::move(name),
+        .code = parsed.normalizedCode,
+        .enabled = false,
+      });
+    }
+    if (separator == std::string_view::npos) {
+      break;
+    }
+    begin = separator + 1U;
+  }
+  if (configuration.entries.empty()) {
+    return importFailure("The cheat list contains no supported entries.");
+  }
+  return {
+    .status = {},
+    .configuration = std::move(configuration),
+    .format = CheatListFormat::plainText,
+  };
 }
 
 std::optional<std::uint8_t> hexadecimal(char value)
@@ -310,6 +635,30 @@ QString systemName(CheatSystem system)
                                         : QStringLiteral("master-system");
 }
 
+bool looksLikeRetroArchList(std::string_view text)
+{
+  std::size_t begin = 0U;
+  while (begin <= text.size()) {
+    const auto separator = text.find('\n', begin);
+    const auto end = separator == std::string_view::npos ? text.size() : separator;
+    auto line = trimWhitespace(text.substr(begin, end - begin));
+    if (!line.empty() && line.front() != '#' && line.front() != ';') {
+      const auto equals = line.find('=');
+      if (equals != std::string_view::npos) {
+        const auto key = trimWhitespace(line.substr(0U, equals));
+        if (key == "cheats" || key.starts_with("cheat")) {
+          return true;
+        }
+      }
+    }
+    if (separator == std::string_view::npos) {
+      break;
+    }
+    begin = separator + 1U;
+  }
+  return false;
+}
+
 } // namespace
 
 CheatParseResult parseCheatCode(CheatSystem system, std::string_view code)
@@ -368,6 +717,41 @@ CheatParseResult parseCheatCode(CheatSystem system, std::string_view code)
   return result;
 }
 
+CheatParseResult makeRamCheatCode(
+  CheatSystem system, std::uint32_t offset, std::uint32_t value)
+{
+  if (system == CheatSystem::genesis) {
+    if (offset > 0xFFFEU || (offset & 1U) != 0U || value > 0xFFFFU) {
+      return {
+        .status = cheatFailure(CheatError::invalidDefinition,
+          "A Genesis RAM cheat needs an aligned 16-bit value inside 68K RAM."),
+        .normalizedCode = {},
+        .patches = {},
+        .formats = {},
+      };
+    }
+    const auto code = QStringLiteral("%1:%2")
+      .arg(0xFF0000U + offset, 6, 16, QLatin1Char('0'))
+      .arg(value, 4, 16, QLatin1Char('0'))
+      .toUpper();
+    return parseCheatCode(system, code.toStdString());
+  }
+  if (offset > 0x1FFFU || value > 0xFFU) {
+    return {
+      .status = cheatFailure(CheatError::invalidDefinition,
+        "An 8-bit RAM cheat needs one byte inside the active 8 KiB work RAM."),
+      .normalizedCode = {},
+      .patches = {},
+      .formats = {},
+    };
+  }
+  const auto code = QStringLiteral("%1:%2")
+    .arg(0xC000U + offset, 4, 16, QLatin1Char('0'))
+    .arg(value, 2, 16, QLatin1Char('0'))
+    .toUpper();
+  return parseCheatCode(system, code.toStdString());
+}
+
 CheatStatus validateCheatConfiguration(CheatSystem system,
   const CheatConfiguration& configuration,
   std::vector<CoreCheatPatch>* enabledPatches)
@@ -378,8 +762,7 @@ CheatStatus validateCheatConfiguration(CheatSystem system,
   }
   std::vector<CoreCheatPatch> decodedPatches;
   for (const auto& entry : configuration.entries) {
-    if (trimWhitespace(entry.name).empty() ||
-        entry.name.size() > maximumCheatNameBytes ||
+    if (!validImportedName(entry.name) ||
         entry.code.size() > maximumCheatCodeBytes) {
       return cheatFailure(
         CheatError::invalidDefinition, "Every cheat needs a bounded name and code.");
@@ -401,6 +784,61 @@ CheatStatus validateCheatConfiguration(CheatSystem system,
     *enabledPatches = std::move(decodedPatches);
   }
   return {};
+}
+
+CheatImportResult parseCheatList(
+  CheatSystem system, std::string_view text, CheatListFormat format)
+{
+  if (text.empty()) {
+    return importFailure("The cheat list is empty.");
+  }
+  if (text.size() > maximumCheatImportBytes) {
+    return importFailure("The cheat list exceeds the 128 KiB limit.");
+  }
+  if (text.find('\0') != std::string_view::npos || !validUtf8(text)) {
+    return importFailure("The cheat list is not valid UTF-8 text.");
+  }
+  constexpr std::string_view utf8ByteOrderMark{"\xEF\xBB\xBF"};
+  if (text.starts_with(utf8ByteOrderMark)) {
+    text.remove_prefix(utf8ByteOrderMark.size());
+  }
+  if (text.empty()) {
+    return importFailure("The cheat list contains only a UTF-8 byte-order mark.");
+  }
+  if (format == CheatListFormat::autoDetect) {
+    format = looksLikeRetroArchList(text)
+      ? CheatListFormat::retroArch : CheatListFormat::plainText;
+  }
+  switch (format) {
+    case CheatListFormat::retroArch: return parseRetroArchList(system, text);
+    case CheatListFormat::plainText: return parsePlainTextList(system, text);
+    case CheatListFormat::autoDetect: break;
+  }
+  return importFailure("The cheat-list format is not supported.");
+}
+
+CheatImportResult importCheatList(
+  CheatSystem system, const std::filesystem::path& path)
+{
+  if (path.empty() || !path.is_absolute()) {
+    return importFailure("The cheat-list path must be absolute.");
+  }
+  const auto loaded = readFileBounded(path, maximumCheatImportBytes);
+  if (!loaded.status) {
+    return importFailure("The cheat list could not be read: " + loaded.status.message);
+  }
+  if (!loaded.exists) {
+    return importFailure("The cheat-list file does not exist.");
+  }
+  std::string text{
+    reinterpret_cast<const char*>(loaded.data.data()), loaded.data.size()};
+  auto extension = path.extension().string();
+  std::ranges::transform(extension, extension.begin(), [](unsigned char value) {
+    return static_cast<char>(std::tolower(value));
+  });
+  return parseCheatList(system, text,
+    extension == ".cht" ? CheatListFormat::retroArch
+                         : CheatListFormat::autoDetect);
 }
 
 CheatStore::CheatStore(std::filesystem::path root) : root_(std::move(root)) {}

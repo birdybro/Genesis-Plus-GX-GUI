@@ -1211,6 +1211,11 @@ void MainWindow::showCheats()
   auto* dialog = new CheatManagerDialog(
     cheatSystem_, cheatConfiguration_, this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setDialogService(dialogService_,
+    applicationPaths_.configDirectory() / "cheats");
+  dialog->setDebugRequestSink([this](CoreDebugRequest request) {
+    return debugRequestSink_ && debugRequestSink_(std::move(request));
+  });
   dialog->setConfigurationSink(
     [this](const cheats::CheatConfiguration& configuration) {
       if (cheatConfigurationSink_) {
@@ -2299,17 +2304,26 @@ void MainWindow::showDebugTools()
 
 void MainWindow::presentDebugResponse(CoreDebugResponse response)
 {
+  if (auto* cheats = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    cheats->presentDebugResponse(response);
+  }
   if (auto* debugger = findChild<DebugToolsWindow*>(
         QStringLiteral("debugToolsWindow"))) {
     debugger->presentResponse(std::move(response));
   }
 }
 
-void MainWindow::showDebugRequestError(const std::string& detail)
+void MainWindow::showDebugRequestError(
+  const std::string& detail, std::uint64_t clientToken)
 {
+  if (auto* cheats = findChild<CheatManagerDialog*>(
+        QStringLiteral("cheatManagerDialog"))) {
+    cheats->showDebugRequestError(detail, clientToken);
+  }
   if (auto* debugger = findChild<DebugToolsWindow*>(
         QStringLiteral("debugToolsWindow"))) {
-    debugger->showRequestError(detail);
+    debugger->showRequestError(detail, clientToken);
   }
 }
 

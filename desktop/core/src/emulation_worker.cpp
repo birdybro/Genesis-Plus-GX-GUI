@@ -274,6 +274,7 @@ public:
     latestInput_ = {};
     hasLatestInput_ = false;
     frameBreakpoints_.clear();
+    frameBreakpointClientToken_ = 0U;
     lastBreakpointHit_.reset();
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
     try {
@@ -722,6 +723,7 @@ private:
     switch (command.type) {
       case EmulationCommandType::loadGame: {
         frameBreakpoints_.clear();
+        frameBreakpointClientToken_ = 0U;
         lastBreakpointHit_.reset();
         rewinding_ = false;
         fastForward_ = false;
@@ -768,6 +770,7 @@ private:
       }
       case EmulationCommandType::unloadGame:
         frameBreakpoints_.clear();
+        frameBreakpointClientToken_ = 0U;
         lastBreakpointHit_.reset();
         rewinding_ = false;
         slowMotion_ = false;
@@ -1065,6 +1068,7 @@ private:
         }
         break;
       case EmulationCommandType::debugRequest: {
+        debugResponse.clientToken = command.coreDebugRequest.clientToken;
         const auto requestType = command.coreDebugRequest.type;
         const auto writesCore = requestType !=
             CoreDebugRequestType::captureSnapshot &&
@@ -1076,6 +1080,10 @@ private:
           if (requestType == CoreDebugRequestType::setFrameBreakpoints) {
             coreResult = setFrameBreakpoints(
               command.coreDebugRequest.breakpoints, debugResponse);
+            debugResponse.clientToken = command.coreDebugRequest.clientToken;
+            if (coreResult) {
+              frameBreakpointClientToken_ = command.coreDebugRequest.clientToken;
+            }
           } else {
             coreResult = adapter.debugRequest(
               command.coreDebugRequest, debugResponse);
@@ -1203,6 +1211,7 @@ private:
         populateRunAheadEvent(event, adapter);
         event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
         event.debug.breakpointHit = breakpoint;
+        event.debug.clientToken = frameBreakpointClientToken_;
         publishOperation(std::move(event));
       }
     }
@@ -1732,6 +1741,7 @@ private:
   std::vector<std::uint8_t> backupScratch_;
   std::vector<CoreDebugBreakpoint> frameBreakpoints_;
   std::optional<CoreDebugBreakpoint> lastBreakpointHit_;
+  std::uint64_t frameBreakpointClientToken_{0};
   RewindBuffer rewindBuffer_;
   EmulationSpeedConfiguration speedConfiguration_;
   RewindBufferMetrics rewindBufferMetrics_;

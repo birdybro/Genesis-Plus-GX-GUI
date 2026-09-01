@@ -4,6 +4,7 @@
 #include "genplusgx/persistence.h"
 
 #include <cstddef>
+#include <cstdint>
 #include <filesystem>
 #include <string>
 #include <string_view>
@@ -31,6 +32,7 @@ enum class CheatError {
   invalidFormat,
   tooManyPatches,
   invalidDefinition,
+  invalidImport,
 };
 
 struct CheatStatus final {
@@ -65,12 +67,32 @@ struct CheatConfiguration final {
 inline constexpr std::size_t maximumCheatDefinitions = 150U;
 inline constexpr std::size_t maximumCheatNameBytes = 120U;
 inline constexpr std::size_t maximumCheatCodeBytes = 256U;
+inline constexpr std::size_t maximumCheatImportBytes = 128U * 1024U;
+
+enum class CheatListFormat {
+  autoDetect,
+  retroArch,
+  plainText,
+};
+
+struct CheatImportResult final {
+  CheatStatus status;
+  CheatConfiguration configuration;
+  CheatListFormat format{CheatListFormat::autoDetect};
+};
 
 [[nodiscard]] CheatParseResult parseCheatCode(
   CheatSystem system, std::string_view code);
+[[nodiscard]] CheatParseResult makeRamCheatCode(
+  CheatSystem system, std::uint32_t offset, std::uint32_t value);
 [[nodiscard]] CheatStatus validateCheatConfiguration(CheatSystem system,
   const CheatConfiguration& configuration,
   std::vector<CoreCheatPatch>* enabledPatches = nullptr);
+[[nodiscard]] CheatImportResult parseCheatList(CheatSystem system,
+  std::string_view text,
+  CheatListFormat format = CheatListFormat::autoDetect);
+[[nodiscard]] CheatImportResult importCheatList(
+  CheatSystem system, const std::filesystem::path& path);
 
 struct CheatLoadResult final {
   PersistenceStatus status;

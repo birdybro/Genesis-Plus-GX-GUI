@@ -275,6 +275,12 @@ accumulate configuration artifacts.
 ## Cheat data flow
 
 ```text
+local .cht/.txt ----> bounded system-aware import ----> disabled table rows
+                                                        |
+RAM snapshot <---- token-routed owner-thread request     |
+     |                                                  |
+bounded search ----> generated disabled RAM code --------+
+                                                        |
 Qt table text -> exact system-aware decoder -> atomic per-game JSON
                          |                         |
                          +--> enabled typed patches
@@ -299,6 +305,14 @@ byte patches after bank changes while retaining the prior bank byte for restorat
 RAM updates use the same VBlank/input callback point as the existing libretro frontend,
 including Sega CD program and word RAM. All mutation occurs under `CoreAdapter`'s
 thread/lease checks; the GUI cannot call these functions directly.
+
+Cheat-list import accepts only bounded valid UTF-8 and typed code strings for the
+active hardware. It is atomic and forces every imported row disabled. RAM search uses
+the existing immutable debug snapshot bridge but is available in the normal cheat
+manager; opaque client tokens isolate its replies and errors from the opt-in debugger.
+Search results are bounded display data and become disabled table rows, never direct
+memory writes. Thus both discovery routes rejoin the same validation, persistence, and
+owner-thread application boundary shown above.
 
 The implemented `EmulationWorker` owns `CoreAdapter` inside a dedicated `std::thread`.
 Its public calls never execute core work: they validate and enqueue operations with

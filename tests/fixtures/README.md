@@ -215,6 +215,16 @@ fixed examples and 10,000-case deterministic bounded text corpus exercise the ch
 decoder and temporary JSON store. No commercial cheat database, game code, or copied
 code list is included.
 
+The cheat-import extensions create short RetroArch-style configuration text and simple
+`Name | Code` lists inside Qt temporary directories. Fixed invalid UTF-8, NUL, oversized,
+duplicate-field, direct-memory-only, and wrong-system cases plus a deterministic
+2000-input bounded mutation corpus are original test inputs. The core integration also
+writes `0xCAFE` into the generated Genesis ROM's otherwise-unused work RAM and `0x7D`
+into the generated Master System fixture's work RAM, locates both through the production
+snapshot/search model, creates typed Action Replay/Fusion RAM codes, applies them
+through the real core boundary, and verifies the values are restored. No imported list
+or generated artifact is committed.
+
 ## Generated ZIP and M3U container fixtures
 
 `unit.game_file`, `integration.archive_playlist`, `gui.game_loading`, and

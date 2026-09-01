@@ -2354,9 +2354,11 @@ int main(int argc, char* argv[])
                genplusgx::EmulationEventType::debugBreakpointHit)) {
           window.presentDebugResponse(std::move(event->debug));
         } else if (!event->succeeded()) {
-          window.showDebugRequestError(event->message.empty()
-            ? "The emulator rejected a debug request."
-            : event->message);
+          window.showDebugRequestError(
+            event->message.empty()
+              ? "The emulator rejected a debug request."
+              : event->message,
+            event->debug.clientToken);
         }
       }
       if (pendingCheatOperation &&

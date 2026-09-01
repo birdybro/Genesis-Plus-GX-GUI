@@ -28,7 +28,7 @@ or final test report.
 | 19. Per-game settings | Implemented | Sparse identity-keyed overrides support global inheritance and video/audio/system/input/BIOS precedence without writing empty override files. |
 | 20. Game information | Implemented | The bounded background parser displays header titles, system/region, sizes, checksums, path, mapper/media, Sega CD details, and the shared SHA-256 identifier. |
 | 21. Game library | Implemented | An asynchronous recoverable SQLite library supports roots, recursion, search, system/region filters, favorites, play history, sorting, local art, information, and launch. Validated CUE payload tracks are suppressed as duplicate rows. |
-| 22. Cheats | Implemented | System-aware Genesis and 8-bit Game Genie/Action Replay grammars, enable/disable, descriptions, atomic per-game persistence, validation, and core-thread application are covered. |
+| 22. Cheats | Implemented | System-aware Genesis and 8-bit Game Genie/Action Replay grammars, bounded RetroArch/plain-text import, token-isolated work-RAM search, enable/disable, descriptions, atomic per-game persistence, validation, and core-thread application are covered. |
 | 23. Screenshots | Implemented | Native RGB565 frames are asynchronously written as collision-safe timestamped PNG files to a configurable directory with visible completion/failure. |
 | 24. Themes/accessibility | Implemented | System/light/dark themes, pre-application high-DPI policy, native Qt accessibility, labels/buddies, focus order, and keyboard navigation are tested. |
 | 25. Command line | Implemented | Positional game loading, `--fullscreen`, `--help`, `--version`, diagnostics, and process exit behavior are unit/smoke tested. |

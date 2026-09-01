@@ -149,7 +149,8 @@ public:
   void setDebugRequestSink(DebugRequestSink sink);
   void showDebugTools();
   void presentDebugResponse(CoreDebugResponse response);
-  void showDebugRequestError(const std::string& detail);
+  void showDebugRequestError(
+    const std::string& detail, std::uint64_t clientToken);
   void setGameLoadSink(GameLoadSink sink);
   void setArchiveCacheDirectory(std::filesystem::path directory);
   void setPatchCacheDirectory(std::filesystem::path directory);

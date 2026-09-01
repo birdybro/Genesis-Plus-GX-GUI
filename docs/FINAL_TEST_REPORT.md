@@ -40,6 +40,8 @@ synchronization, and local bezel/overlay verification through 2026-09-01
   `632cfbcbb62303b206f01922fb4d58a94cbefc9b`
 - Exact cross-platform artwork test-path correction and hosted evidence baseline:
   `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
+- Cheat import/RAM-search implementation: the current implementation pending its exact
+  hosted evidence gate
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -89,6 +91,22 @@ the repository. The resulting code passes 77/77 in Release, Debug, and leak-dete
 ASan/UBSan builds plus 75/75 with shader support disabled. The same 113-case native
 Wayland workload passes with ASan/UBSan address and undefined-behavior instrumentation;
 the required real-context shader test supplies the leak-detecting GPU gate.
+
+Milestone 89 adds atomic, bounded local import for the emulator-handled RetroArch
+`.cht` subset and simple text lists. It rejects invalid UTF-8, NULs, oversized input,
+wrong-system codes, direct-memory-only records, and the complete import on any invalid
+entry; every accepted entry is forced disabled. The normal Cheat Manager also obtains
+immutable RAM snapshots through the core-owner queue, performs bounded typed search,
+and converts selected aligned Genesis words or 8-bit work-RAM bytes into disabled
+reviewable codes. Opaque client tokens isolate these replies and asynchronous failures
+from the hidden developer debugger. The 100-test local Debug graph and focused
+parser/GUI/generated-core/debug-routing tests pass. Optimized Release, leak-detecting
+ASan/UBSan, fresh warning-as-error Clang 22, and CHD-disabled graphs also pass 100/100;
+shader-disabled passes 98/98. A verified staged Linux install, installed offscreen
+version smoke, TGZ/checksum generation, and strict inherited libretro build/link/clean
+pass. Live core coverage executes both generated 68000 and Z80 cartridges and proves
+the generated Action Replay and Fusion RAM patches restore searched values after a real
+frame. Exact hosted evidence remains required before milestone closure.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,

@@ -100,6 +100,18 @@ emulation worker and executes both generated 68000 and Z80 programs through actu
 breakpoint pause and RAM-inspection workflows. None of these tests reads a commercial
 ROM or the user's settings.
 
+`unit.cheats` additionally parses bounded RetroArch-style and simple text lists,
+requires atomic rejection of malformed/oversized/invalid-UTF-8/direct-memory-only
+input, forces imports disabled, and runs a fixed-seed 2000-input mutation corpus.
+`gui.cheats` drives the injected chooser, duplicate suppression, no-implicit-apply
+rule, token-isolated live search, signed/value filtering, generated cheat row, and the
+subsequent explicit enable/Apply transition. `core.cheats` writes markers into generated
+Genesis and Master System work RAM, discovers them through the production debug
+snapshot and search model, converts them to Action Replay and Fusion RAM codes, applies
+each on the core owner, and verifies the patched value after a frame. `core.debug_tools`
+also requires request tokens to survive adapter, queue, and asynchronous breakpoint-hit
+paths.
+
 `gui.libretro_shader_render` intentionally uses a real OpenGL context. Linux CI installs
 Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1`, so
 failure to create or execute the OpenGL 3.3 shader path is fatal. The test samples a

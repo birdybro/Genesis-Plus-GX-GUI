@@ -3,6 +3,8 @@
 #include <QCoreApplication>
 #include <QTemporaryDir>
 
+#include <algorithm>
+#include <array>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
@@ -165,9 +167,132 @@ int main(int argc, char* argv[])
     return 7;
   }
 
+  const auto generatedGenesis = makeRamCheatCode(
+    CheatSystem::genesis, 0x20U, 0xCAFEU);
+  const auto generatedEightBit = makeRamCheatCode(
+    CheatSystem::masterSystem, 0x123U, 0x7FU);
+  if (!check(generatedGenesis.status &&
+        generatedGenesis.normalizedCode == "FF0020:CAFE" &&
+        generatedGenesis.patches.front().address == 0xFF0020U &&
+        generatedGenesis.patches.front().data == 0xCAFEU,
+      "Genesis RAM search result did not produce a typed cheat") ||
+    !check(generatedEightBit.status &&
+        generatedEightBit.normalizedCode == "C123:7F" &&
+        generatedEightBit.patches.front().address == 0xFF0123U &&
+        generatedEightBit.patches.front().width == genplusgx::CoreCheatWidth::byte,
+      "8-bit RAM search result did not produce a typed cheat") ||
+    !check(!makeRamCheatCode(CheatSystem::genesis, 1U, 1U).status &&
+        !makeRamCheatCode(CheatSystem::genesis, 0x10000U, 1U).status &&
+        !makeRamCheatCode(CheatSystem::masterSystem, 0x2000U, 1U).status &&
+        !makeRamCheatCode(CheatSystem::masterSystem, 0U, 0x100U).status,
+      "An unaligned or out-of-range RAM search result became a cheat")) {
+    return 8;
+  }
+
+  constexpr std::string_view retroArchList = R"(
+# Emulator-handled RetroArch entries. Other metadata is intentionally ignored.
+cheats = "2"
+cheat0_desc = "Infinite \"lives\""
+cheat0_code = "BAAA-AAAA"
+cheat0_enable = "true"
+cheat0_handler = "1"
+cheat1_desc = "Alternate mode"
+cheat1_code = "123456:abcd"
+cheat1_enable = "0"
+)";
+  const auto retroImported = parseCheatList(
+    CheatSystem::genesis, retroArchList, CheatListFormat::retroArch);
+  const auto bomRetroImported = parseCheatList(
+    CheatSystem::genesis,
+    std::string{"\xEF\xBB\xBF"} + std::string{retroArchList},
+    CheatListFormat::autoDetect);
+  const auto plainImported = parseCheatList(CheatSystem::masterSystem,
+    "# local list\nInfinite energy | C000:7f\nC123:42\n",
+    CheatListFormat::plainText);
+  if (!check(retroImported.status &&
+        retroImported.format == CheatListFormat::retroArch &&
+        retroImported.configuration.entries.size() == 2U &&
+        retroImported.configuration.entries.front().name == "Infinite \"lives\"" &&
+        retroImported.configuration.entries.front().code == "BAAA-AAAA" &&
+        !retroImported.configuration.entries.front().enabled,
+      "A bounded RetroArch cheat list was not imported disabled") ||
+    !check(bomRetroImported.status &&
+        bomRetroImported.configuration == retroImported.configuration,
+      "A UTF-8 BOM prevented RetroArch cheat-list import") ||
+    !check(plainImported.status &&
+        plainImported.format == CheatListFormat::plainText &&
+        plainImported.configuration.entries.size() == 2U &&
+        plainImported.configuration.entries[0].name == "Infinite energy" &&
+        plainImported.configuration.entries[1].name == "Imported cheat 2" &&
+        plainImported.configuration.entries[1].code == "C123:42" &&
+        !plainImported.configuration.entries[1].enabled,
+      "A bounded plain-text cheat list was not imported disabled")) {
+    return 9;
+  }
+
+  std::string invalidUtf8{"Name | C000:7F\n"};
+  invalidUtf8.push_back(static_cast<char>(0xC0));
+  invalidUtf8.push_back(static_cast<char>(0x80));
+  std::string embeddedNull{"Name | C000:7F"};
+  embeddedNull.push_back('\0');
+  embeddedNull += "ignored";
+  const std::string oversizedImport(maximumCheatImportBytes + 1U, 'A');
+  const std::string overlongLine(4U * 1024U + 1U, 'A');
+  std::string tooManyPlainEntries;
+  for (std::size_t index = 0U; index <= maximumCheatDefinitions; ++index) {
+    tooManyPlainEntries += "C000:00\n";
+  }
+  const std::array invalidImports{
+    parseCheatList(CheatSystem::genesis,
+      "cheats = 1\ncheat0_desc = Direct\ncheat0_address = 16\n",
+      CheatListFormat::retroArch),
+    parseCheatList(CheatSystem::genesis,
+      "cheats = 1\ncheat0_code = BAAA-AAAA\ncheat0_code = CAAA-AAAA\n",
+      CheatListFormat::retroArch),
+    parseCheatList(CheatSystem::genesis,
+      "cheats = 151\n", CheatListFormat::retroArch),
+    parseCheatList(CheatSystem::genesis,
+      "cheats = 1\ncheat0_code = BAAA-AAAA\ncheat0_enable = maybe\n",
+      CheatListFormat::retroArch),
+    parseCheatList(CheatSystem::masterSystem,
+      "Genesis code | BAAA-AAAR\n", CheatListFormat::plainText),
+    parseCheatList(CheatSystem::masterSystem, invalidUtf8),
+    parseCheatList(CheatSystem::masterSystem, embeddedNull),
+    parseCheatList(CheatSystem::masterSystem, oversizedImport),
+    parseCheatList(CheatSystem::masterSystem, overlongLine),
+    parseCheatList(CheatSystem::masterSystem, tooManyPlainEntries),
+  };
+  for (std::size_t index = 0U; index < invalidImports.size(); ++index) {
+    if (invalidImports[index].status ||
+        !invalidImports[index].configuration.entries.empty()) {
+      std::cerr << "Invalid imported list " << index
+                << " produced partial cheats\n";
+      return 10;
+    }
+  }
+
+  for (std::size_t iteration = 0U; iteration < 2'000U; ++iteration) {
+    const auto length = static_cast<std::size_t>(random() % 512U);
+    std::string candidate;
+    candidate.reserve(length);
+    for (std::size_t index = 0U; index < length; ++index) {
+      candidate.push_back(fuzzAlphabet[random() % fuzzAlphabet.size()]);
+    }
+    const auto imported = parseCheatList(
+      CheatSystem::genesis, candidate, CheatListFormat::autoDetect);
+    if (imported.status &&
+        (!validateCheatConfiguration(
+           CheatSystem::genesis, imported.configuration) ||
+         std::ranges::any_of(imported.configuration.entries,
+           [](const auto& entry) { return entry.enabled; }))) {
+      std::cerr << "A fuzzed cheat list bypassed validation or safe-disable\n";
+      return 11;
+    }
+  }
+
   QTemporaryDir temporary;
   if (!check(temporary.isValid(), "Temporary directory was unavailable")) {
-    return 8;
+    return 12;
   }
   const genplusgx::GameIdentity identity{
     .sha256 = std::string(64U, 'a'),
@@ -178,11 +303,24 @@ int main(int argc, char* argv[])
     .titleSlug = "Other_Game",
   };
   CheatStore store{temporaryPath(temporary) / "config" / "cheats"};
+  const auto importedPath = temporaryPath(temporary) / "local.cht";
+  if (!check(writeText(importedPath, retroArchList),
+        "The temporary import fixture could not be written") ||
+      !check(importCheatList(CheatSystem::genesis, importedPath).status &&
+          importCheatList(CheatSystem::genesis, importedPath)
+            .configuration.entries.size() == 2U &&
+          !importCheatList(CheatSystem::genesis,
+            temporaryPath(temporary) / "missing.cht").status &&
+          !importCheatList(CheatSystem::genesis,
+            std::filesystem::path{"relative.cht"}).status,
+        "File-backed cheat import did not enforce absolute bounded files")) {
+    return 13;
+  }
   if (!check(store.pathFor(identity).filename() == identity.directoryName() + ".json",
         "Per-game cheat path was not collision resistant") ||
       !check(store.save(identity, CheatSystem::genesis, configuration),
         "Cheat configuration could not be saved")) {
-    return 9;
+    return 14;
   }
   const auto loaded = store.load(identity, CheatSystem::genesis);
   configuration.entries.front().code = "BAAA-AAAA";
@@ -193,7 +331,7 @@ int main(int argc, char* argv[])
           store.load(otherIdentity, CheatSystem::genesis).status &&
           store.load(otherIdentity, CheatSystem::genesis).configuration.entries.empty(),
         "Wrong-system or missing-game cheat storage did not fail safely")) {
-    return 10;
+    return 15;
   }
   const CheatConfiguration invalidConfiguration{
     .entries = {{.name = "Broken", .code = "not-a-code", .enabled = true}},
@@ -208,7 +346,7 @@ int main(int argc, char* argv[])
       "Corrupt or future cheat storage did not fail closed") ||
     !check(!store.save(identity, CheatSystem::genesis, invalidConfiguration),
       "Invalid cheat data was persisted")) {
-    return 11;
+    return 16;
   }
   return 0;
 }

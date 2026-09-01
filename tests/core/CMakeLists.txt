@@ -87,6 +87,7 @@ add_executable(genplusgx_core_cheat_test core_cheat_test.cpp)
 target_link_libraries(
   genplusgx_core_cheat_test
   PRIVATE
+    GenesisPlusGX::Cheats
     GenesisPlusGX::CoreAdapter
     genplusgx_project_warnings
     genplusgx_test_utilities

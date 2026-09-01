@@ -108,9 +108,11 @@ int main()
   }
 
   genplusgx::CoreDebugRequest capture;
+  capture.clientToken = 0xCAFEU;
   if (!check(adapter.debugRequest(capture, response), "Debug snapshot failed") ||
       !check(response.snapshot != nullptr, "Snapshot response has no payload") ||
-      !check(response.snapshot->frameNumber == 1U &&
+      !check(response.clientToken == capture.clientToken &&
+          response.snapshot->frameNumber == 1U &&
           response.snapshot->romSize == 64U * 1024U &&
           response.snapshot->m68kActive,
         "Snapshot identity is incorrect") ||
@@ -297,6 +299,7 @@ int main()
 
   genplusgx::CoreDebugRequest breakpoints;
   breakpoints.type = genplusgx::CoreDebugRequestType::setFrameBreakpoints;
+  breakpoints.clientToken = 0xBEEFU;
   breakpoints.breakpoints = {
     {genplusgx::CoreDebugCpu::m68k, 0x250U},
     {genplusgx::CoreDebugCpu::m68k, 0x256U},
@@ -305,7 +308,8 @@ int main()
   if (!check(submitAndWait(worker,
           genplusgx::EmulationCommand::debug(16U, breakpoints), event) &&
           event.succeeded() &&
-          event.type == genplusgx::EmulationEventType::debugResponse,
+          event.type == genplusgx::EmulationEventType::debugResponse &&
+          event.debug.clientToken == breakpoints.clientToken,
         "Frame breakpoint configuration failed") ||
       !check(submitAndWait(worker,
           genplusgx::EmulationCommand::simple(
@@ -315,7 +319,8 @@ int main()
     return 11;
   }
   auto breakpoint = waitForBreakpoint(worker);
-  if (!check(breakpoint.has_value() && breakpoint->debug.breakpointHit.has_value(),
+  if (!check(breakpoint.has_value() && breakpoint->debug.breakpointHit.has_value() &&
+          breakpoint->debug.clientToken == breakpoints.clientToken,
         "Frame breakpoint did not pause the generated ROM") ||
       !check(breakpoint->workerState ==
           genplusgx::EmulationWorkerState::paused &&

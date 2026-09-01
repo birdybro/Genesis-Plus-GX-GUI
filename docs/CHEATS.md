@@ -36,6 +36,40 @@ the complete per-game list, and queues the decoded enabled patches at an emulate
 boundary. **Cancel** leaves unapplied edits alone. Select a row and choose **Remove** to
 delete it from the list, then Apply or OK.
 
+### Importing local lists
+
+Choose **Import…** on the Codes tab to add entries from a local `.cht` or `.txt` file.
+The supported `.cht` subset follows RetroArch's emulator-handled fields:
+`cheats`, `cheatN_desc`, `cheatN_code`, and `cheatN_enable`. Direct-memory
+`cheatN_address`/value records are intentionally not interpreted. Plain-text files use
+one code per line, optionally prefixed with `Name | `. Blank lines and lines beginning
+with `#` or `;` are ignored.
+
+Imports are limited to 128 KiB, 4096 bytes per line, valid UTF-8, and 150 entries. The
+entire file must parse for the active hardware family or nothing is added. Existing
+normalized codes are skipped. Imported entries are always disabled—even when a
+RetroArch file says `enable = true`—and remain only in the dialog until the user
+explicitly enables entries and chooses Apply or OK. This avoids silently trusting a
+downloaded code list. The format reference is the
+[RetroArch cheat-code guide](https://docs.libretro.com/guides/cheat-codes/); no online
+database or download service is used.
+
+### Searching RAM
+
+The **Search RAM** tab requests an immutable work-RAM snapshot from the emulation-owner
+thread. Start with an initial snapshot, change a value in the game, select an unsigned
+or signed exact/change comparison and optional value, then choose **Filter snapshot**.
+Repeat until the candidate set is useful. The table displays at most 1024 candidates,
+while the bounded search model keeps the complete applicable RAM range.
+
+Genesis-family searches use aligned, big-endian 16-bit words from the 64 KiB 68000 RAM
+and create `FFxxxx:XXXX` Action Replay codes. SG-1000, Mark III, Master System, and Game
+Gear searches use bytes from the active 8 KiB work RAM and create `Cxxx:XX` Fusion RAM
+codes. **Add selected as cheat** creates a disabled Codes-tab row; it does not patch or
+persist anything until explicitly enabled and applied. Search snapshots, failures, and
+breakpoint notifications carry separate client tokens so the normal manager cannot
+consume or interfere with the hidden developer debugger's traffic.
+
 ROM patches are installed when a list is applied and original bytes are restored in
 reverse order when the list changes or the game unloads. RAM patches run through the
 core's established input/VBlank update point. Master System and Game Gear bank changes

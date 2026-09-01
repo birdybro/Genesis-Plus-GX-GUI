@@ -322,6 +322,19 @@ wrong separators, partial/trailing data, invalid disabled rows, and lists above 
 150-patch core limit remain visible as an inline error and never reach emulated memory.
 Enabled changes take effect through the emulation worker without pausing the GUI.
 
+Use **Import…** on the Codes tab for a bounded local RetroArch `.cht` file containing
+emulator-handled code fields, or a `.txt` file containing `Name | Code` or code-only
+lines. An import is all-or-nothing, skips codes already in the table, and always adds
+entries disabled. Review and explicitly enable an entry before applying it.
+
+The **Search RAM** tab can narrow live work-RAM values by exact, changed/unchanged,
+increased, or decreased comparisons. Begin with **New search**, change the in-game
+value, and use **Filter snapshot** as often as needed. Signed or unsigned byte/word
+interpretation is selectable. Adding a selected result creates a disabled cheat row;
+the generated Genesis word or 8-bit byte code still requires explicit enable and Apply.
+Pause first when a stable snapshot is important. Search requests run on the emulation
+thread and do not grant the GUI direct access to core memory.
+
 Lists are stored atomically in `config/cheats/` using the game's complete SHA-256
 identity. Loading another game clears the live patch list before its own stored list is
 resolved. Corrupt, future-schema, wrong-game, and wrong-system files fail closed to an

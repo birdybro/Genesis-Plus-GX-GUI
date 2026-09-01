@@ -1277,11 +1277,6 @@ CoreResult CoreAdapter::debugRequest(
   CoreDebugResponse& response)
 {
   std::scoped_lock lock{coreMutex};
-  if (const auto owner = requireOwner(true); !owner) {
-    response = {};
-    return owner;
-  }
-
   response = {
     .type = request.type,
     .region = request.region,
@@ -1289,7 +1284,11 @@ CoreResult CoreAdapter::debugRequest(
     .snapshot = {},
     .bytes = {},
     .breakpointHit = {},
+    .clientToken = request.clientToken,
   };
+  if (const auto owner = requireOwner(true); !owner) {
+    return owner;
+  }
   const auto region = static_cast<unsigned int>(request.region);
   constexpr auto maximumRegion = static_cast<unsigned int>(
     CoreDebugMemoryRegion::vdpRegisters);
