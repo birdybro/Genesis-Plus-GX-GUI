@@ -2,6 +2,7 @@
 #include "genplusgx/ui/main_window.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
+#include "genplusgx/ui/speed_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 
 #include <QAction>
@@ -42,6 +43,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .screenshots = {.directory = root / "custom-shots"},
     .rewind = genplusgx::settings::defaultRewindSettings(),
     .session = genplusgx::settings::defaultSessionSettings(),
+    .speed = genplusgx::settings::defaultSpeedSettings(),
     .paths = genplusgx::ApplicationPaths{root},
     .connectedControllerCount = 2U,
     .pathsAvailable = true,
@@ -100,11 +102,15 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     dialog.findChild<QPushButton*>(QStringLiteral("configureAssignmentsButton")),
     Qt::LeftButton);
   QTest::mouseClick(
+    dialog.findChild<QPushButton*>(QStringLiteral("configureSpeedButton")),
+    Qt::LeftButton);
+  QTest::mouseClick(
     dialog.findChild<QPushButton*>(QStringLiteral("configureRewindButton")),
     Qt::LeftButton);
   const std::vector expectedActions{
     genplusgx::ui::SettingsPageAction::video,
     genplusgx::ui::SettingsPageAction::playerAssignments,
+    genplusgx::ui::SettingsPageAction::speed,
     genplusgx::ui::SettingsPageAction::rewind};
   QCOMPARE(actions, expectedActions);
 
@@ -156,6 +162,14 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
   video->reject();
 
   center->openPage(genplusgx::ui::SettingsPage::advanced);
+  QTest::mouseClick(center->findChild<QPushButton*>(
+    QStringLiteral("configureSpeedButton")), Qt::LeftButton);
+  QApplication::processEvents();
+  auto* speed = window.findChild<genplusgx::ui::SpeedSettingsDialog*>(
+    QStringLiteral("speedSettingsDialog"));
+  QVERIFY(speed != nullptr);
+  speed->reject();
+
   QTest::mouseClick(center->findChild<QPushButton*>(
     QStringLiteral("configureRewindButton")), Qt::LeftButton);
   QApplication::processEvents();

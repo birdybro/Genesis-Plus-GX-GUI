@@ -92,6 +92,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 78 Debug hosted evidence | COMPLETE | Audit exact-commit Linux, Windows, and macOS builds, tests, packages, and complete logs | CI evidence and final report | all ten hosted jobs, 13,564 log lines, and four artifacts | No cross-platform warning, failure, sanitizer issue, or packaging regression remains | pending |
 | 79 Bounded rewind | COMPLETE | Add owner-thread rewind with strict time and memory limits | core rewind buffer/worker, settings, UI, input, diagnostics, tests/docs | 85-test local and ten-job hosted matrices; package and full-log audit | Reverse playback is bounded, audio-silent, conflict-safe, and invalidated by incompatible state changes | `e44d4c2` |
 | 80 Automatic session resume | COMPLETE | Restore an opt-in cleanly closed session without weakening identity or ownership checks | session settings/UI, state manager/service, startup/shutdown composition, process tests/docs | 88-test local and ten-job hosted matrices; package and full-log audit | Atomic identity-checked checkpoints restore only after readiness; explicit game/close semantics remain authoritative | `3cce403` |
+| 81 Configurable emulation speed | IN PROGRESS | Add exact configurable normal, slow-motion, and fast-forward pacing | timing/worker, speed settings/UI, hotkeys/status/diagnostics, tests/docs | 90-test Debug/Release/ASan/Clang suites; 88-test shader-disabled graph; package and legacy gates | Every speed is owner-thread paced, bounded, mutually exclusive, visible, and persistence-safe | pending |
 
 ## Execution policy
 
@@ -4168,6 +4169,72 @@ missing, or corrupt data falls back safely; queues and payloads stay bounded; ev
 local and hosted regression passes; and complete CI logs contain no actionable issue.
 
 **Commit SHA:** `3cce4030f83c1ee7c057113eab1a811129c02858`
+
+## Milestone 81 detail
+
+**Status:** IN PROGRESS — LOCAL GATES PASSED; HOSTED GATE PENDING
+
+**Goal:** Add configurable normal-speed presets, slow motion, and fast forward without
+moving timing into the GUI thread, growing queues, or allowing accelerated audio to
+drift behind video.
+
+**Files changed:**
+
+- `desktop/timing/include/genplusgx/timing/speed_configuration.h`
+- `desktop/timing/include/genplusgx/timing/frame_pacer.h`
+- `desktop/timing/src/frame_pacer.cpp`
+- `desktop/core/include/genplusgx/emulation_worker.h`
+- `desktop/core/src/emulation_worker.cpp`
+- `desktop/settings/include/genplusgx/settings/speed_settings.h`
+- `desktop/settings/src/speed_settings.cpp`
+- `desktop/ui/include/genplusgx/ui/speed_settings_dialog.h`
+- `desktop/ui/src/speed_settings_dialog.cpp`
+- application composition, MainWindow, settings-center, input-profile, diagnostics,
+  CMake manifests, and embedded help under `desktop/`
+- timing, worker, stability, settings, input, diagnostics, GUI, and optional
+  external-ROM tests under `tests/`
+- README, changelog, architecture, user, input, shortcuts, testing, audit, and matrix
+  documentation
+
+**Tests added:** `unit.speed_settings` exercises schema/defaults, atomic persistence,
+every allowed endpoint, malformed/oversized input, and safe fallback. The frame-pacer
+suite proves exact rational deadlines at 25%, custom normal rates, 800%, and rejects
+mode-specific out-of-range values. `gui.speed_settings` exercises all stable controls,
+Apply/Cancel/OK/Restore Defaults, accessibility, validation, and save failure. Existing
+worker, measured timing, long-running stability, input migration/conflict, MainWindow,
+Settings center, diagnostics, help, startup, and optional real-ROM regressions now
+cover speed ownership and workflows. The stability test coalesces 1,000 speed-setting
+updates and runs normal, slow, and accelerated modes without queue or audio growth.
+
+**Local gate evidence:** Fresh warning-gated Debug and optimized Release builds pass
+90/90 tests. ASan/UBSan passes 90/90 with leak detection and halt-on-error enabled and
+reports no finding. A fresh shader-disabled graph passes all 88 applicable tests. A
+fresh Clang 22 warning-as-error build passes 90/90; its only diagnostics are inherited
+zlib/Tremor warnings outside the authored-code warning gate. The real OpenGL shader
+test passes where enabled. The staged self-contained Linux Release installation passes
+structural verification and reports version 0.1.1; CPack produces an integrity- and
+checksum-verified `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`. The preserved Unix
+libretro target builds, links, and cleans.
+
+The optional external-ROM runner contains three additional full worker workflows at
+custom normal, slow-motion, and fast-forward speeds, including non-black frame and
+audio-policy assertions. It was not executed locally for this milestone because the
+previously supplied `/mnt/qnapraid` volume is currently unmounted/empty. No attempt was
+made to assemble or mount its degraded RAID devices; the generated legal ROM suite
+exercises the same production adapter, worker, frame, audio, input, and setting paths.
+
+**Hosted gate:** Pending the exact implementation commit and required ten-job GitHub
+Actions run. Development of milestone 82 will not begin until every job passes and the
+complete logs and produced artifacts have been audited.
+
+**Acceptance criteria:** Configuration is versioned, bounded, atomic, and defaults to
+100%/50%/400%; normal 50–200%, slow 25–75%, and fast-forward 200–1600% are rationally
+paced from the emulation-owner thread; slow motion, fast forward, and rewind cannot be
+active together; input uses conflict-checked hold/toggle bindings; non-100% playback
+cannot create an audio backlog; status and diagnostics expose effective speed; all
+local gates pass; and the exact hosted matrix and logs are clean.
+
+**Commit SHA:** pending
 
 ## Milestone 65 detail
 

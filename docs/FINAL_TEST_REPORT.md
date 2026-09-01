@@ -2,7 +2,7 @@
 
 This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
-debugger, rewind, and automatic-session-resume verification through 2026-08-31
+debugger, rewind, automatic-session-resume, and configurable-speed verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -18,6 +18,8 @@ debugger, rewind, and automatic-session-resume verification through 2026-08-31
   `e44d4c2e6aeee926603e4318b28641888ada4909`
 - Exact automatic-resume implementation and hosted evidence baseline:
   `3cce4030f83c1ee7c057113eab1a811129c02858`
+- Configurable-speed implementation: the next milestone commit containing this report;
+  exact hosted evidence is pending that commit
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -116,6 +118,19 @@ pre-build GitHub API connection failure while the SDL setup action ran on Intel 
 retrying the same job and SHA passed dependency setup, compilation, 88/88 tests,
 packaging, and upload.
 
+Configurable emulation speed now uses exact rational owner-thread pacing for persisted
+normal 50–200%, slow-motion 25–75%, and fast-forward 200–1600% settings. The UI adds
+common normal-speed presets, slow-motion hold/toggle controls, an accessible settings
+editor, effective-speed status, and privacy-safe diagnostics. Slow motion, fast
+forward, and rewind are mutually exclusive, speed-setting commands coalesce in the
+bounded queue, and host audio is intentionally silent outside 100% effective speed so
+neither slow nor accelerated playback can accumulate stale audio. The input profile
+schema migrates existing users to two conflict-checked slow-motion bindings without
+changing their prior mappings. Fresh Debug, Release, ASan/UBSan, and Clang 22 suites
+each pass 90/90; the shader-disabled graph passes 88/88; Linux staging/package and the
+legacy libretro regression pass. Exact cross-platform hosted evidence remains pending
+the implementation commit and is required before the next feature begins.
+
 ## Build configurations tested
 
 The primary Debug, Release, and sanitizer configurations were rebuilt against the exact
@@ -124,11 +139,11 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 88/88 | Passed |
-| Release | Optimized native x86-64 | 88/88 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 88/88 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 86/86 | Passed |
-| Clang 22 | Warning-gated Debug | 88/88 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 90/90 | Passed |
+| Release | Optimized native x86-64 | 90/90 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 90/90 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 88/88 | Passed |
+| Clang 22 | Warning-gated Debug | 90/90 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -138,21 +153,21 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-The default shader-enabled build registers 88 distinct tests:
+The default shader-enabled build registers 90 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
 | Integration | 1 |
-| Unit | 35 |
-| GUI/smoke | 24 |
-| **Total** | **88** |
+| Unit | 36 |
+| GUI/smoke | 25 |
+| **Total** | **90** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 56 `unit`, 21 `core`, 35 `integration`, and 24 `gui`. Focused
-coverage also includes persistence (28), fixtures (26), concurrency (16), settings
-(16), input (9), video (8), audio (6), timing (4), rewind (4), state (8), release (4),
+layers. Label counts are 58 `unit`, 21 `core`, 36 `integration`, and 25 `gui`. Focused
+coverage also includes persistence (30), fixtures (26), concurrency (16), settings
+(18), input (9), video (8), audio (6), timing (6), rewind (4), state (8), release (4),
 fuzz/property (3), shader (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
@@ -167,7 +182,7 @@ project, librashader, Mesa, ASan, and UBSan frames remain unsuppressed and fatal
 Option-domain coverage is also explicit rather than inferred: core tests execute all
 13 video values, 35 audio enumerations/endpoints, 12 emulated device types, and 24
 system values. UI inventory checks require every corresponding choice, range, and all
-30 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
+32 configurable emulator hotkeys. Existing workflow tests continue to cover host audio
 mute/volume/device/latency, keyboard/controller event paths, persistence, states,
 library, cheats, BIOS, Sega CD, diagnostics, themes, and clean lifecycle behavior.
 Four debugger-labeled tests cover the analysis model, core/worker bridge, semantic GUI,
@@ -404,6 +419,9 @@ correction; the sanitizer suite reports no finding.
   adjustable built-in CRT output, and modern Libretro Slang preset chains.
 - [x] Bounded stereo audio, core mixing options, device/latency selection, live
   transactional reconfiguration, instrumentation, pause, and disconnect recovery.
+- [x] Exact configurable normal, slow-motion, and fast-forward pacing; mutually
+  exclusive run modes; conflict-checked hold/toggle bindings; bounded silent audio
+  behavior away from 100%; live status and diagnostics.
 - [x] Keyboard and SDL3 controllers, hot-plug, eight player assignments, button/axis
   capture, deadzones, profiles, specialized devices, multitaps, and configurable
   conflict-checked hotkeys including independent fast-forward hold/toggle.
@@ -465,10 +483,11 @@ directories.
   fetched. Real Sega CD boot testing needs a user-supplied regional BIOS and is an
   optional external-fixture suite; CI validates the frontend path with generated legal
   firmware and disc fixtures.
-- The previously supplied external-ROM mount was present but unpopulated during the
-  debugger hardening run, so that optional workload was not repeated. The required live
-  debugger test uses legal generated 68000 and Z80 programs through the same production
-  GUI/worker/core route; earlier real-ROM option acceptance remains recorded above.
+- The previously supplied external-ROM mount was unmounted/empty during the
+  configurable-speed run, so its three newly added speed workflows were not executed
+  locally. The required suites use legal generated 68000 and Z80 programs through the
+  same production GUI/worker/core route; the earlier 113-case Phantasy Star IV option
+  acceptance remains recorded above. No degraded RAID assembly or mount was attempted.
 - Controller and audio hot-plug behavior is deterministically tested with injected SDL
   events and the SDL dummy audio driver. Maintainers should still smoke-test target
   hardware and vendor drivers before a public release.

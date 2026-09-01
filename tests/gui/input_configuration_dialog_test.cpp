@@ -53,6 +53,10 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
     QStringLiteral("hotkeyFastForwardHoldButton"));
   auto* fastForwardToggle = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
     QStringLiteral("hotkeyFastForwardToggleButton"));
+  auto* slowMotionHold = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeySlowMotionHoldButton"));
+  auto* slowMotionToggle = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
+    QStringLiteral("hotkeySlowMotionToggleButton"));
   auto* rewindHold = dialog.findChild<genplusgx::ui::BindingCaptureButton*>(
     QStringLiteral("hotkeyRewindHoldButton"));
   auto* conflict = dialog.findChild<QLabel*>(QStringLiteral("inputConflictLabel"));
@@ -64,6 +68,8 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
   QVERIFY(softResetHotkey != nullptr);
   QVERIFY(fastForwardHold != nullptr);
   QVERIFY(fastForwardToggle != nullptr);
+  QVERIFY(slowMotionHold != nullptr);
+  QVERIFY(slowMotionToggle != nullptr);
   QVERIFY(rewindHold != nullptr);
   const auto tab =
     QKeyCombination{Qt::NoModifier, Qt::Key_Tab}.toCombined();
@@ -71,8 +77,14 @@ void InputConfigurationDialogTest::capturesBindingsAndReportsConflicts()
     QKeyCombination{Qt::NoModifier, Qt::Key_QuoteLeft}.toCombined();
   const auto backspace =
     QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined();
+  const auto slash =
+    QKeyCombination{Qt::NoModifier, Qt::Key_Slash}.toCombined();
+  const auto controlSlash =
+    QKeyCombination{Qt::ControlModifier, Qt::Key_Slash}.toCombined();
   QCOMPARE(fastForwardHold->bindingCode(), tab);
   QCOMPARE(fastForwardToggle->bindingCode(), quoteLeft);
+  QCOMPARE(slowMotionHold->bindingCode(), slash);
+  QCOMPARE(slowMotionToggle->bindingCode(), controlSlash);
   QCOMPARE(rewindHold->bindingCode(), backspace);
   QVERIFY(conflict != nullptr);
 

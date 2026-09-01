@@ -15,14 +15,14 @@ or final test report.
 | 6. Emulation thread | Implemented | `EmulationWorker` owns all core access and uses bounded commands/events for lifecycle, settings, input, state, disc, and frame operations. |
 | 7. Video | Implemented | `DisplayWidget`, `VideoFrameExchange`, and geometry/settings tests cover dynamic viewports, DPI, resize, aspect, integer scaling, filtering, overscan, Game Gear, PAL/NTSC, interlace, fullscreen, and native capture. |
 | 8. Audio | Implemented | SDL3 stereo output, the bounded ring, device/latency reconfiguration, gain/mute, reconnect handling, metrics, and every exposed core mixer/chip option are tested. |
-| 9. Timing | Implemented | Rational `steady_clock` pacing covers NTSC, PAL, Sega CD, pause, frame advance, bounded catch-up, and 4x fast-forward without a GUI timer or busy loop. |
+| 9. Timing | Implemented | Rational `steady_clock` pacing covers NTSC, PAL, Sega CD, pause, frame advance, bounded catch-up, configurable 25–1600% slow/normal/fast rates, and focus-safe mode changes without a GUI timer or busy loop. |
 | 10. Game loading | Implemented | Native Open, one-file drag/drop, command-line loading, recent history, replacement, typed validation, and conditional CHD are covered. ZIP is not advertised because this build has no archive enumerator. |
 | 11. Sega CD | Implemented | Regional BIOS, CUE/BIN/ISO/conditional CHD, CDDA, eject/change, BRAM, RAM cartridge, metadata, and optional external-firmware testing are documented in [BIOS.md](BIOS.md). |
 | 12. BIOS manager | Implemented | Eight firmware slots expose path, existence, detected type/region, SHA-256, validation, and local selection without downloading firmware. |
 | 13. Save RAM | Implemented | Platform paths, collision-resistant identities, atomic per-game SRAM/internal-BRAM/RAM-cartridge writes, automatic load/flush, and corruption guards are tested. |
 | 14. Save states | Implemented | Slots 0–9, save/load/delete, timestamp/frame metadata, shortcuts, wrong-game/core/corruption rejection, atomic replacement, and deterministic restoration are covered; thumbnails and raw import/export remain optional. |
 | 15. Input configuration | Implemented | Keyboard and SDL3 hot-plug controllers support eight assignments, remapping, axes, deadzones, profiles/defaults, standard pads, multitaps, and advanced core devices. |
-| 16. Hotkeys | Implemented | All requested actions, including independent fast-forward hold/toggle and slots, are capture-configurable and conflict-checked against gameplay bindings. |
+| 16. Hotkeys | Implemented | All requested actions, including independent fast-forward and slow-motion hold/toggle controls plus slots, are capture-configurable and conflict-checked against gameplay bindings. |
 | 17. Main GUI | Implemented | Conventional menus/status fields, stable object names, action gating, dialogs, accelerators, and semantic Qt tests are present. |
 | 18. Settings dialog | Implemented | The unified General/Video/Audio/Input/System/BIOS/Paths/Advanced center routes to versioned transactional editors with Apply/OK/Cancel/default behavior. |
 | 19. Per-game settings | Implemented | Sparse identity-keyed overrides support global inheritance and video/audio/system/input/BIOS precedence without writing empty override files. |

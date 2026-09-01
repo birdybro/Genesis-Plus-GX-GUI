@@ -42,6 +42,14 @@ then resumes forward. `gui.rewind_settings`, `gui.emulation_controls`, and
 `gui.input_configuration` cover settings transactions, toggle/hold/focus behavior,
 hotkey migration, and stable widget identifiers.
 
+`unit.speed_settings` covers safe defaults, exact atomic round trips, every domain
+boundary, fractional/malformed/future-schema input, and the 32 KiB read cap.
+`unit.frame_pacer` proves exact rational deadlines at custom normal, slow, and maximum
+fast-forward rates. `core.timing_pacing` measures all three modes through a generated
+Genesis program and requires alternate-speed audio to remain empty;
+`gui.speed_settings` and `gui.emulation_controls` cover presets, transactions,
+accessibility, status, mutual exclusion, and configurable hold/toggle semantics.
+
 Qt GUI tests use the offscreen platform automatically. Tests requiring frame
 presentation force the deterministic software display path. Native widget chrome is not
 pixel-compared across platforms; emulator framebuffers and geometry are tested below the
@@ -80,8 +88,10 @@ hosted environment provides no usable desktop OpenGL context.
 is intentionally not registered as a required CTest: it requires a game legally
 provided by the developer. It loads the file through the real `CoreAdapter`, executes
 13 core-video, 35 core-audio, 12 emulated-device, 36 accelerated-presentation, and 17
-compatible system-reload cases, and checks bounded output/lifecycle behavior. Shader
-images must be closer to the unshaded upright image than to its vertical mirror.
+compatible system-reload cases, then reloads it through `EmulationWorker` at normal,
+slow-motion, and fast-forward rates. Every mode must publish a non-black frame; host
+audio must remain empty outside 100%. Shader images must be closer to the unshaded
+upright image than to its vertical mirror.
 
 Run it on a native desktop backend with an output directory outside the source tree:
 
@@ -135,8 +145,10 @@ waiting in real time for its 20,000 direct core frames. It then verifies the act
 threaded scheduler and bounded exchanges with:
 
 - 20 direct load/run/unload cycles;
-- 10,000 rapidly submitted input snapshots and newest-command coalescing;
+- 10,000 rapidly submitted input snapshots plus 1,000 speed snapshots and
+  newest-command coalescing;
 - 90 normal paced frames that deliberately fill, but never exceed, the audio ring;
+- 20 quarter-speed frames with host audio suppressed;
 - 600 fast-forward frames with host audio suppressed;
 - fixed triple-buffer allocation and bounded command/event queue depths;
 - 12 worker start/load/frame/unload/stop cycles; and

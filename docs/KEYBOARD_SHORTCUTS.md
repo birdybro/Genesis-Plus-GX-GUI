@@ -44,6 +44,8 @@ shortcuts.
 | Soft reset | Ctrl+Shift+R |
 | Fast forward (hold) | Tab |
 | Fast forward (toggle) | ` |
+| Slow motion (hold) | / |
+| Slow motion (toggle) | Ctrl+/ |
 | Rewind (hold) | Backspace |
 | Frame advance | N |
 | Save selected state slot | F5 |
@@ -69,6 +71,12 @@ The hold shortcut enables fast-forward only while the combination is down. Relea
 it, deactivating the application, hiding the main window, or closing the game releases
 the hold so focus changes cannot leave acceleration stuck on. The toggle is an
 independent latch: releasing a temporary hold does not cancel an enabled toggle.
+
+Slow motion has the same focus-safe hold/toggle behavior. Fast forward, slow motion,
+and rewind are mutually exclusive; activating one releases either of the other modes.
+The exact percentages are configured under **Emulation → Emulation Speed → Speed
+Settings…**. Host audio is paused whenever effective speed is not 100% so a speed
+change cannot create pitch distortion or steadily growing audio backlog.
 
 The rewind hold is likewise focus-safe. Once history has accumulated, hold Backspace
 to move backward at normal display cadence or use **Emulation → Rewind Toggle** to latch

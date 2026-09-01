@@ -9,6 +9,12 @@ platform documentation.
 
 ### Added
 
+- Configurable exact-rational emulation pacing with 50–200% normal speed, 25–75%
+  slow motion, 200–1600% fast forward, normal-speed presets, a persistent accessible
+  editor, live status/diagnostics, mutually exclusive rewind/slow/fast modes, and
+  audio suppression whenever effective speed is not 100%.
+- Independently configurable slow-motion hold and toggle hotkeys with conflict-safe
+  input-schema migration, focus-loss release, and real worker/core pacing regressions.
 - Opt-in automatic session resume with a dedicated identity-checked shutdown
   checkpoint, explicit command-line precedence, corruption-safe fallback to normal
   emulation, and transactional settings/GUI controls.

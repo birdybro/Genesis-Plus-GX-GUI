@@ -9,6 +9,7 @@
 #include "genplusgx/settings/rewind_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/session_settings.h"
+#include "genplusgx/settings/speed_settings.h"
 #include "genplusgx/settings/video_settings.h"
 
 #include <QDialog>
@@ -48,6 +49,7 @@ enum class SettingsPageAction {
   perGame,
   rewind,
   session,
+  speed,
 };
 
 struct SettingsOverview final {
@@ -60,6 +62,7 @@ struct SettingsOverview final {
   settings::ScreenshotSettings screenshots;
   RewindConfiguration rewind;
   settings::SessionSettings session;
+  EmulationSpeedConfiguration speed;
   ApplicationPaths paths;
   std::size_t connectedControllerCount{0U};
   bool pathsAvailable{false};

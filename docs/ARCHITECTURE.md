@@ -135,7 +135,8 @@ producer ends of the video/audio buffers. Library scanning and controller discov
 separate workers only through their service interfaces.
 
 Commands are a finite tagged set: load, unload, start, pause, resume, hard reset, soft
-reset, frame advance, fast-forward mode, save/load/delete state, input snapshot,
+reset, frame advance, fast-forward/slow-motion modes, speed configuration,
+save/load/delete state, input snapshot,
 settings and firmware snapshots, decoded cheat patch lists, disc change/eject, and
 shutdown. Commands with
 superseding semantics (input and live settings) are coalesced. A failed coalescing
@@ -143,12 +144,14 @@ search does not move from the command that is subsequently queued. Lifecycle,
 persistence, and disc commands retain ordering. The queue has a fixed capacity and
 reports saturation rather than growing without bound.
 
-The GUI keeps fast-forward's configurable momentary hold and toggle latch as distinct
-states, then sends only their effective logical OR through the bounded command path.
-The application-wide Qt event filter consumes the hold combination for widgets owned by
-the main window and forces its release on focus loss, hide, game close, or configuration
-replacement. The core and worker continue to receive only the single canonical
-fast-forward boolean.
+The GUI keeps each of fast-forward and slow-motion's configurable momentary hold and
+toggle latch as distinct states, then sends only each mode's effective logical OR
+through the bounded command path. The application-wide Qt event filter consumes the
+hold combinations for widgets owned by the main window and forces their release on
+focus loss, hide, game close, or configuration replacement. Rewind, slow motion, and
+fast forward are mutually exclusive at both the GUI and worker boundaries. The core
+continues to receive complete ordinary frames; only the frontend's host deadline mode
+changes.
 
 Rewind history follows the same owner-thread rule. After a configured number of forward
 frames, the worker captures the core's unchanged raw state payload into a deque whose
@@ -316,7 +319,7 @@ after the current monotonic time instead of running an unbounded catch-up burst.
 
 Windows begins the worker thread with a scoped 1 ms Multimedia Timer resolution request
 and balances it during thread teardown. This is required because the platform's default
-scheduler tick is coarser than the 4.17 ms deadline used by bounded 4x fast-forward.
+scheduler tick is coarser than the shortest configurable fast-forward deadlines.
 macOS converts the remaining steady-clock duration to a native `mach_wait_until`
 deadline because hosted libc++ deadline sleeps can be coalesced far beyond a video
 interval; its dedicated worker also requests the user-interactive thread QoS class.
@@ -325,11 +328,19 @@ resolution; all cadence and drift decisions remain in the platform-independent
 `FramePacer`.
 
 Pause removes the active deadline. Resume starts immediately from a fresh origin, and
-frame advance runs exactly one frame without activating the pacer. Fast-forward rebuilds
-the same rational interval at a bounded 4x rate. Its core audio batch is drained but not
-queued because a real-time device cannot consume it at 4x; the composition root pauses
-and clears SDL until normal speed resumes. Metrics expose scheduled/late frames,
-resynchronizations, maximum lateness, effective target rate, and fast-forward state.
+frame advance runs exactly one frame without activating the pacer. A versioned speed
+snapshot selects 50–200% normal, 25–75% slow-motion, and 200–1600% fast-forward pacing.
+`FramePacer` multiplies the rational denominator by the exact integer percentage rather
+than rounding through floating point, so every mode retains long-run remainder
+accumulation. Configuration and mode commands are applied only by the core owner and
+reset the next absolute deadline without accumulating old schedule debt.
+
+Core audio batches are always drained, but enter the host ring only when effective speed
+is exactly 100%; the composition root also pauses and clears SDL at every other rate.
+This deliberately provides silence instead of pitch-shifted playback until a future
+time-stretch subsystem exists, while preventing an overrun or steadily growing A/V
+backlog. Metrics expose scheduled/late frames, resynchronizations, maximum lateness,
+configured/effective target rate, percentage, and fast/slow state.
 
 The composition root samples the worker's monotonic scheduled-frame counter every
 500 ms with `FrameRateSampler` and publishes the observed rate to the status bar. The

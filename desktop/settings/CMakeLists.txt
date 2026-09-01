@@ -4,6 +4,7 @@ add_library(genplusgx_settings STATIC
   include/genplusgx/settings/per_game_settings.h
   include/genplusgx/settings/rewind_settings.h
   include/genplusgx/settings/session_settings.h
+  include/genplusgx/settings/speed_settings.h
   include/genplusgx/settings/system_settings.h
   include/genplusgx/settings/screenshot_settings.h
   include/genplusgx/settings/video_settings.h
@@ -12,6 +13,7 @@ add_library(genplusgx_settings STATIC
   src/per_game_settings.cpp
   src/rewind_settings.cpp
   src/session_settings.cpp
+  src/speed_settings.cpp
   src/system_settings.cpp
   src/screenshot_settings.cpp
   src/video_settings.cpp
@@ -29,6 +31,7 @@ target_link_libraries(
     GenesisPlusGX::FrontendTypes
     GenesisPlusGX::Platform
     GenesisPlusGX::Persistence
+    GenesisPlusGX::Timing
     GenesisPlusGX::VideoExchange
     Qt6::Core
   PRIVATE

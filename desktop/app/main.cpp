@@ -28,6 +28,7 @@
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/rewind_settings.h"
 #include "genplusgx/settings/session_settings.h"
+#include "genplusgx/settings/speed_settings.h"
 #include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/theme_controller.h"
@@ -434,6 +435,16 @@ int main(int argc, char* argv[])
     recordStartupIssue("Rewind settings", loadedRewindSettings.status.message);
   }
   auto rewindSettings = loadedRewindSettings.settings;
+  genplusgx::settings::SpeedSettingsStore speedSettingsStore{
+    applicationPaths.configDirectory() / "speed-settings.json"};
+  auto loadedSpeedSettings = speedSettingsStore.load();
+  if (!loadedSpeedSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedSpeedSettings.status.message);
+    recordStartupIssue("Emulation speed settings",
+      loadedSpeedSettings.status.message);
+  }
+  auto speedSettings = loadedSpeedSettings.settings;
   genplusgx::settings::SessionSettingsStore sessionSettingsStore{
     applicationPaths.configDirectory() / "session-settings.json"};
   auto loadedSessionSettings = sessionSettingsStore.load();
@@ -567,6 +578,15 @@ int main(int argc, char* argv[])
   if (!initialRewindSettings) {
     qWarning().noquote() << QString::fromStdString(initialRewindSettings.message);
     recordStartupIssue("Rewind runtime settings", initialRewindSettings.message);
+  }
+  std::uint64_t speedSettingsOperationId = 860'000U;
+  const auto initialSpeedSettings = worker.submit(
+    genplusgx::EmulationCommand::updateSpeedSettings(
+      ++speedSettingsOperationId, speedSettings));
+  if (!initialSpeedSettings) {
+    qWarning().noquote() << QString::fromStdString(initialSpeedSettings.message);
+    recordStartupIssue(
+      "Emulation speed runtime settings", initialSpeedSettings.message);
   }
 
   genplusgx::ui::MainWindow window;
@@ -811,6 +831,25 @@ int main(int argc, char* argv[])
         return workerPersistenceFailure(submitted.message);
       }
       rewindSettings = settings;
+      return genplusgx::PersistenceStatus{};
+    });
+  window.setSpeedSettings(speedSettings);
+  window.setSpeedSettingsSink(
+    [&speedSettings, &speedSettingsOperationId, &speedSettingsStore,
+     &worker](const genplusgx::EmulationSpeedConfiguration& settings) {
+      const auto previous = speedSettings;
+      const auto saved = speedSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateSpeedSettings(
+          ++speedSettingsOperationId, settings));
+      if (!submitted) {
+        static_cast<void>(speedSettingsStore.save(previous));
+        return workerPersistenceFailure(submitted.message);
+      }
+      speedSettings = settings;
       return genplusgx::PersistenceStatus{};
     });
   window.setSessionSettings(sessionSettings);
@@ -1489,7 +1528,7 @@ int main(int argc, char* argv[])
   window.setDiagnosticsSnapshotProvider(
     [&audioOutput, &biosManager, &controllerInput, &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
-     &rewindSettings, &window, &worker] {
+     &rewindSettings, &speedSettings, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
@@ -1521,6 +1560,12 @@ int main(int argc, char* argv[])
         snapshot.audioCapacityFrames = ring->capacityFrames();
       }
       const auto workerMetrics = worker.metrics();
+      snapshot.normalSpeedPercent = speedSettings.normalPercent;
+      snapshot.slowMotionSpeedPercent = speedSettings.slowMotionPercent;
+      snapshot.fastForwardSpeedPercent = speedSettings.fastForwardPercent;
+      snapshot.activeSpeedPercent = workerMetrics.speedPercent;
+      snapshot.fastForwarding = workerMetrics.fastForward;
+      snapshot.slowMotion = workerMetrics.slowMotion;
       snapshot.rewindEnabled = rewindSettings.enabled;
       snapshot.rewinding = workerMetrics.rewinding;
       snapshot.rewindSnapshots = workerMetrics.rewindSnapshotCount;
@@ -1699,6 +1744,10 @@ int main(int argc, char* argv[])
           break;
         case UiOperation::setFastForward:
           command = genplusgx::EmulationCommand::fastForward(
+            operationId, enabled);
+          break;
+        case UiOperation::setSlowMotion:
+          command = genplusgx::EmulationCommand::slowMotion(
             operationId, enabled);
           break;
         case UiOperation::setRewinding:
@@ -1973,6 +2022,8 @@ int main(int argc, char* argv[])
         window.setEmulationControlState(
           event->workerState == genplusgx::EmulationWorkerState::paused,
           event->fastForward,
+          event->slowMotion,
+          event->speedPercent,
           event->rewinding,
           event->rewindAvailable);
       }
@@ -2098,7 +2149,8 @@ int main(int argc, char* argv[])
             : completedLoad.diagnosticRegion;
           window.setGameLoaded(loadedPath);
           window.setEmulationControlState(
-            true, event->fastForward, event->rewinding, event->rewindAvailable);
+            true, event->fastForward, event->slowMotion, event->speedPercent,
+            event->rewinding, event->rewindAvailable);
           if (activePerGameIdentity) {
             window.setPerGameSettingsSession(
               activePerGameSettings, globalGameSettings());
@@ -2402,7 +2454,7 @@ int main(int argc, char* argv[])
       }
       const bool audioShouldRun =
         event->workerState == genplusgx::EmulationWorkerState::running &&
-        !event->fastForward && !event->rewinding;
+        event->speedPercent == 100U && !event->rewinding;
       if (audioShouldRun &&
           audioOutput.isPaused()) {
         const auto resumed = audioOutput.resume();

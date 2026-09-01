@@ -83,6 +83,24 @@ EmulationCommand EmulationCommand::fastForward(
   return command;
 }
 
+EmulationCommand EmulationCommand::slowMotion(
+  std::uint64_t operationId,
+  bool enabled)
+{
+  auto command = simple(EmulationCommandType::setSlowMotion, operationId);
+  command.enabled = enabled;
+  return command;
+}
+
+EmulationCommand EmulationCommand::updateSpeedSettings(
+  std::uint64_t operationId,
+  EmulationSpeedConfiguration configuration)
+{
+  auto command = simple(EmulationCommandType::speedSettings, operationId);
+  command.speedConfiguration = configuration;
+  return command;
+}
+
 EmulationCommand EmulationCommand::rewinding(
   std::uint64_t operationId,
   bool enabled)
@@ -238,6 +256,7 @@ public:
     shutdownStatus_ = success();
     acceptingCommands_ = true;
     fastForward_ = false;
+    slowMotion_ = false;
     rewinding_ = false;
     rewindBuffer_.clear();
     frameBreakpoints_.clear();
@@ -359,6 +378,16 @@ public:
       wake_.notify_one();
       return success();
     }
+    if (command.type == EmulationCommandType::speedSettings &&
+        commands_.replaceNewestMatching(
+          [](const EmulationCommand& queued) {
+            return queued.type == EmulationCommandType::speedSettings;
+          },
+          std::move(command))) {
+      ++coalescedSpeedSettingsCommands_;
+      wake_.notify_one();
+      return success();
+    }
     if (!commands_.tryPush(std::move(command))) {
       return failure(
         EmulationWorkerError::queueFull,
@@ -420,6 +449,7 @@ public:
       .coalescedFirmwareSettingsCommands = coalescedFirmwareSettingsCommands_,
       .coalescedCheatCommands = coalescedCheatCommands_,
       .coalescedRewindSettingsCommands = coalescedRewindSettingsCommands_,
+      .coalescedSpeedSettingsCommands = coalescedSpeedSettingsCommands_,
       .replacedFrameEvents = replacedFrameEvents_,
       .droppedOperationEvents = droppedOperationEvents_,
       .pacedFrameCount = pacingMetrics_.scheduledFrames,
@@ -429,7 +459,9 @@ public:
         std::chrono::duration_cast<std::chrono::microseconds>(
           pacingMetrics_.maximumLateness).count(),
       .targetFramesPerSecond = pacingMetrics_.targetFramesPerSecond,
-      .fastForward = pacingMetrics_.fastForward,
+      .speedPercent = pacingMetrics_.speedPercent,
+      .fastForward = fastForwardMetrics_,
+      .slowMotion = slowMotionMetrics_,
       .rewinding = rewindingMetrics_,
       .rewindAvailable = rewindAvailableMetrics_,
       .rewindSnapshotCount = rewind.snapshotCount,
@@ -657,6 +689,8 @@ private:
         frameBreakpoints_.clear();
         lastBreakpointHit_.reset();
         rewinding_ = false;
+        fastForward_ = false;
+        slowMotion_ = false;
         rewindBuffer_.clear();
         coreResult = saveBackupMemory(adapter);
         if (!coreResult) {
@@ -668,6 +702,7 @@ private:
         if (!coreResult) {
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
+          slowMotion_ = false;
           pacer_.pause();
           break;
         }
@@ -683,10 +718,12 @@ private:
           endBackupGame();
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
+          slowMotion_ = false;
           pacer_.pause();
           break;
         }
         fastForward_ = false;
+        slowMotion_ = false;
         owner_.state_.store(
           EmulationWorkerState::paused, std::memory_order_release);
         break;
@@ -695,6 +732,7 @@ private:
         frameBreakpoints_.clear();
         lastBreakpointHit_.reset();
         rewinding_ = false;
+        slowMotion_ = false;
         rewindBuffer_.clear();
         coreResult = saveBackupMemory(adapter);
         if (coreResult) {
@@ -705,6 +743,7 @@ private:
           endBackupGame();
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
+          slowMotion_ = false;
           pacer_.pause();
         }
         break;
@@ -761,12 +800,20 @@ private:
         validTransition = current == EmulationWorkerState::paused ||
                           current == EmulationWorkerState::running;
         if (validTransition) {
+          const auto previousFastForward = fastForward_;
+          const auto previousSlowMotion = slowMotion_;
+          const auto previousRewinding = rewinding_;
           if (command.enabled) {
             rewinding_ = false;
+            slowMotion_ = false;
           }
-          if (pacer_.setFastForward(command.enabled, Clock::now())) {
-            fastForward_ = command.enabled;
+          fastForward_ = command.enabled;
+          if (applyConfiguredSpeed(Clock::now())) {
+            audioFrames_->clear();
           } else {
+            fastForward_ = previousFastForward;
+            slowMotion_ = previousSlowMotion;
+            rewinding_ = previousRewinding;
             coreResult = {
               CoreError::invalidTiming,
               "Fast-forward could not be applied to the current frame rate.",
@@ -774,6 +821,53 @@ private:
           }
         }
         break;
+      case EmulationCommandType::setSlowMotion:
+        validTransition = current == EmulationWorkerState::paused ||
+                          current == EmulationWorkerState::running;
+        if (validTransition) {
+          const auto previousFastForward = fastForward_;
+          const auto previousSlowMotion = slowMotion_;
+          const auto previousRewinding = rewinding_;
+          if (command.enabled) {
+            rewinding_ = false;
+            fastForward_ = false;
+          }
+          slowMotion_ = command.enabled;
+          if (applyConfiguredSpeed(Clock::now())) {
+            audioFrames_->clear();
+          } else {
+            fastForward_ = previousFastForward;
+            slowMotion_ = previousSlowMotion;
+            rewinding_ = previousRewinding;
+            coreResult = {
+              CoreError::invalidTiming,
+              "Slow motion could not be applied to the current frame rate.",
+            };
+          }
+        }
+        break;
+      case EmulationCommandType::speedSettings: {
+        if (!validateEmulationSpeedConfiguration(command.speedConfiguration)) {
+          coreResult = {
+            CoreError::invalidTiming,
+            "The emulation speed settings are outside their safe limits.",
+          };
+          break;
+        }
+        const auto previous = speedConfiguration_;
+        speedConfiguration_ = command.speedConfiguration;
+        if (adapter.state() == CoreLifecycleState::loaded &&
+            !applyConfiguredSpeed(Clock::now())) {
+          speedConfiguration_ = previous;
+          coreResult = {
+            CoreError::invalidTiming,
+            "The emulation speed settings cannot represent this core frame rate.",
+          };
+        } else {
+          audioFrames_->clear();
+        }
+        break;
+      }
       case EmulationCommandType::setRewinding:
         validTransition = current == EmulationWorkerState::running ||
           (!command.enabled && current == EmulationWorkerState::paused);
@@ -787,17 +881,23 @@ private:
               : "Rewind is disabled in the current settings.",
           };
         } else if (validTransition) {
+          const auto previousFastForward = fastForward_;
+          const auto previousSlowMotion = slowMotion_;
+          const auto previousRewinding = rewinding_;
           rewinding_ = command.enabled;
           if (rewinding_) {
             fastForward_ = false;
+            slowMotion_ = false;
             audioFrames_->clear();
           }
-          if (!pacer_.setFastForward(false, Clock::now())) {
+          if (!applyConfiguredSpeed(Clock::now())) {
             coreResult = {
               CoreError::invalidTiming,
               "Rewind could not restore normal frame pacing.",
             };
-            rewinding_ = false;
+            fastForward_ = previousFastForward;
+            slowMotion_ = previousSlowMotion;
+            rewinding_ = previousRewinding;
           }
         }
         break;
@@ -936,6 +1036,8 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      event.slowMotion = slowMotion_;
+      event.speedPercent = pacer_.speedPercent();
       event.rewinding = rewinding_;
       event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
       if (adapter.state() == CoreLifecycleState::loaded) {
@@ -956,6 +1058,8 @@ private:
       event.hardware = adapter.hardware();
       event.appliedInputSequence = adapter.appliedInputSequence();
       event.fastForward = fastForward_;
+      event.slowMotion = slowMotion_;
+      event.speedPercent = pacer_.speedPercent();
       event.rewinding = rewinding_;
       event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
       if (adapter.state() == CoreLifecycleState::loaded) {
@@ -974,6 +1078,8 @@ private:
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
+    event.slowMotion = slowMotion_;
+    event.speedPercent = pacer_.speedPercent();
     event.rewinding = rewinding_;
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     event.rawState = std::move(capturedState);
@@ -1019,6 +1125,8 @@ private:
         event.videoGeneration = videoFrames_->metrics().publishedFrames;
         event.appliedInputSequence = adapter.appliedInputSequence();
         event.fastForward = fastForward_;
+        event.slowMotion = slowMotion_;
+        event.speedPercent = pacer_.speedPercent();
         event.rewinding = rewinding_;
         event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
         event.debug.type = CoreDebugRequestType::setFrameBreakpoints;
@@ -1039,6 +1147,8 @@ private:
     event.videoGeneration = videoFrames_->metrics().publishedFrames;
     event.appliedInputSequence = adapter.appliedInputSequence();
     event.fastForward = fastForward_;
+    event.slowMotion = slowMotion_;
+    event.speedPercent = pacer_.speedPercent();
     event.rewinding = rewinding_;
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     latestFrame_ = std::move(event);
@@ -1165,7 +1275,7 @@ private:
       if (!copiedAudio) {
         return copiedAudio;
       }
-      if (writeAudio && !fastForward_) {
+      if (writeAudio && pacer_.speedPercent() == 100U) {
         static_cast<void>(audioFrames_->write(
           std::span<const StereoAudioFrame>{audioScratch_}.first(audioInfo.frameCount)));
       }
@@ -1219,8 +1329,7 @@ private:
       .framesNumerator = timing.masterClockHz,
       .framesDenominator = timing.masterCyclesPerFrame(),
     };
-    if (!pacer_.configure(rate) ||
-        !pacer_.setFastForward(fastForward_, Clock::now())) {
+    if (!pacer_.configure(rate) || !applyConfiguredSpeed(Clock::now())) {
       return {
         CoreError::invalidTiming,
         "The core frame rate cannot be represented by the frontend scheduler.",
@@ -1232,10 +1341,22 @@ private:
     return {};
   }
 
+  bool applyConfiguredSpeed(Clock::time_point now) noexcept
+  {
+    const auto mode = fastForward_
+      ? EmulationSpeedMode::fastForward
+      : slowMotion_ ? EmulationSpeedMode::slowMotion
+                    : EmulationSpeedMode::normal;
+    return pacer_.setSpeed(
+      mode, speedPercentForMode(speedConfiguration_, mode), now);
+  }
+
   void updateMetrics(CoreAdapter& adapter)
   {
     std::scoped_lock lock{mutex_};
     pacingMetrics_ = pacer_.metrics();
+    fastForwardMetrics_ = fastForward_;
+    slowMotionMetrics_ = slowMotion_;
     rewindBufferMetrics_ = rewindBuffer_.metrics();
     rewindingMetrics_ = rewinding_;
     rewindAvailableMetrics_ = rewindBuffer_.canRewind(adapter.frameCount());
@@ -1282,6 +1403,7 @@ private:
   bool acceptingCommands_{false};
   std::atomic_bool stopRequested_{false};
   bool fastForward_{false};
+  bool slowMotion_{false};
   bool rewinding_{false};
   EmulationWorkerStatus shutdownStatus_;
   std::shared_ptr<VideoFrameExchange> videoFrames_;
@@ -1293,7 +1415,10 @@ private:
   std::vector<CoreDebugBreakpoint> frameBreakpoints_;
   std::optional<CoreDebugBreakpoint> lastBreakpointHit_;
   RewindBuffer rewindBuffer_;
+  EmulationSpeedConfiguration speedConfiguration_;
   RewindBufferMetrics rewindBufferMetrics_;
+  bool fastForwardMetrics_{false};
+  bool slowMotionMetrics_{false};
   bool rewindingMetrics_{false};
   bool rewindAvailableMetrics_{false};
   FramePacer pacer_;
@@ -1306,6 +1431,7 @@ private:
   std::uint64_t coalescedFirmwareSettingsCommands_{0};
   std::uint64_t coalescedCheatCommands_{0};
   std::uint64_t coalescedRewindSettingsCommands_{0};
+  std::uint64_t coalescedSpeedSettingsCommands_{0};
   std::uint64_t replacedFrameEvents_{0};
   std::uint64_t droppedOperationEvents_{0};
 };

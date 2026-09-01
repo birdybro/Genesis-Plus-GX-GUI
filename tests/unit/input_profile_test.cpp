@@ -77,6 +77,13 @@ int main()
       !check(hotkeyCombination(configuration, EmulatorHotkeyAction::rewindHold) ==
           QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined(),
         "Rewind hold hotkey default is incorrect") ||
+      !check(hotkeyCombination(
+          configuration, EmulatorHotkeyAction::slowMotionHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Slash}.toCombined() &&
+        hotkeyCombination(
+          configuration, EmulatorHotkeyAction::slowMotionToggle) ==
+          QKeyCombination{Qt::ControlModifier, Qt::Key_Slash}.toCombined(),
+        "Slow-motion hold/toggle defaults are incorrect") ||
       !check(std::ranges::find(reservedDefaults, Qt::Key_M) !=
         reservedDefaults.end(),
         "Unmodified emulator hotkeys were not reserved from gameplay")) {
@@ -263,8 +270,43 @@ int main()
   if (!check(schemaThree.status && schemaThree.migrated &&
         hotkeyCombination(schemaThree.configuration,
           EmulatorHotkeyAction::rewindHold) ==
-          QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined(),
-        "Schema 3 did not add a conflict-free rewind hold binding")) {
+          QKeyCombination{Qt::NoModifier, Qt::Key_Backspace}.toCombined() &&
+        hotkeyCombination(schemaThree.configuration,
+          EmulatorHotkeyAction::slowMotionHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Slash}.toCombined() &&
+        hotkeyCombination(schemaThree.configuration,
+          EmulatorHotkeyAction::slowMotionToggle) ==
+          QKeyCombination{Qt::ControlModifier, Qt::Key_Slash}.toCombined(),
+        "Schema 3 did not add conflict-free rewind and slow-motion bindings")) {
+    return EXIT_FAILURE;
+  }
+
+  auto schemaFourRoot = legacyRoot;
+  schemaFourRoot.insert(QStringLiteral("schemaVersion"), 4);
+  auto schemaFourHotkeys =
+    schemaFourRoot.value(QStringLiteral("hotkeys")).toArray();
+  for (qsizetype index = schemaFourHotkeys.size() - 1; index >= 0; --index) {
+    const auto action = schemaFourHotkeys[index].toObject()
+      .value(QStringLiteral("action")).toString();
+    if (action == QStringLiteral("slow-motion-hold") ||
+        action == QStringLiteral("slow-motion-toggle")) {
+      schemaFourHotkeys.removeAt(index);
+    }
+  }
+  schemaFourRoot.insert(QStringLiteral("hotkeys"), schemaFourHotkeys);
+  if (!check(writeBytes(path, QJsonDocument{schemaFourRoot}.toJson()),
+        "Could not create the schema-4 slow-motion migration fixture")) {
+    return EXIT_FAILURE;
+  }
+  const auto schemaFour = store.load();
+  if (!check(schemaFour.status && schemaFour.migrated &&
+        hotkeyCombination(schemaFour.configuration,
+          EmulatorHotkeyAction::slowMotionHold) ==
+          QKeyCombination{Qt::NoModifier, Qt::Key_Slash}.toCombined() &&
+        hotkeyCombination(schemaFour.configuration,
+          EmulatorHotkeyAction::slowMotionToggle) ==
+          QKeyCombination{Qt::ControlModifier, Qt::Key_Slash}.toCombined(),
+        "Schema 4 did not add conflict-free slow-motion bindings")) {
     return EXIT_FAILURE;
   }
 

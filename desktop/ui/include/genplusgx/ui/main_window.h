@@ -14,6 +14,7 @@
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
 #include "genplusgx/settings/session_settings.h"
+#include "genplusgx/settings/speed_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
@@ -79,6 +80,7 @@ enum class EmulationUiOperation {
   softReset,
   frameAdvance,
   setFastForward,
+  setSlowMotion,
   setRewinding,
 };
 
@@ -121,6 +123,8 @@ public:
   using RewindSettingsSink = std::function<PersistenceStatus(
     const RewindConfiguration&)>;
   using SessionSettingsSink = std::function<PersistenceStatus(bool)>;
+  using SpeedSettingsSink = std::function<PersistenceStatus(
+    const EmulationSpeedConfiguration&)>;
   using DiagnosticsSnapshotProvider =
     std::function<diagnostics::DiagnosticsSnapshot()>;
   using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
@@ -158,6 +162,8 @@ public:
   void setEmulationControlState(
     bool paused,
     bool fastForward,
+    bool slowMotion,
+    std::uint32_t speedPercent,
     bool rewinding,
     bool rewindAvailable);
   void setRewindSettings(RewindConfiguration settings);
@@ -168,6 +174,11 @@ public:
   void setSessionSettingsSink(SessionSettingsSink sink);
   [[nodiscard]] const settings::SessionSettings& sessionSettings() const noexcept;
   void showSessionSettings();
+  void setSpeedSettings(EmulationSpeedConfiguration settings);
+  void setSpeedSettingsSink(SpeedSettingsSink sink);
+  [[nodiscard]] const EmulationSpeedConfiguration&
+    speedSettings() const noexcept;
+  void showSpeedSettings();
   void setVideoSettings(settings::VideoSettings settings);
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
@@ -308,7 +319,12 @@ private:
     EmulationUiOperation operation,
     bool enabled = false);
   void setFastForwardHeld(bool held);
+  void setSlowMotionHeld(bool held);
   void setRewindHeld(bool held);
+  bool applySpeedSettings(
+    const EmulationSpeedConfiguration& settings,
+    bool notifySink);
+  void updateSpeedActionChecks();
   void updateEmulationControls();
   void updateStateActions();
   void updateStateSlotPresentation();
@@ -334,6 +350,7 @@ private:
   QLabel* systemStatus_{nullptr};
   QLabel* regionStatus_{nullptr};
   QLabel* fpsStatus_{nullptr};
+  QLabel* speedStatus_{nullptr};
   QLabel* slotStatus_{nullptr};
   video::DisplayWidget* displayWidget_{nullptr};
   input::InputConfiguration inputConfiguration_{input::defaultInputConfiguration()};
@@ -365,6 +382,7 @@ private:
   AppearanceSettingsSink appearanceSettingsSink_;
   RewindSettingsSink rewindSettingsSink_;
   SessionSettingsSink sessionSettingsSink_;
+  SpeedSettingsSink speedSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   DebugRequestSink debugRequestSink_;
   cheats::CheatConfiguration cheatConfiguration_;
@@ -375,6 +393,7 @@ private:
   settings::ScreenshotSettings screenshotSettings_;
   RewindConfiguration rewindSettings_;
   settings::SessionSettings sessionSettings_;
+  EmulationSpeedConfiguration speedSettings_;
   ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
@@ -391,6 +410,10 @@ private:
   bool fastForwardActive_{false};
   bool fastForwardHeld_{false};
   bool fastForwardToggled_{false};
+  bool slowMotionActive_{false};
+  bool slowMotionHeld_{false};
+  bool slowMotionToggled_{false};
+  std::uint32_t activeSpeedPercent_{100U};
   bool rewindActive_{false};
   bool rewindAvailable_{false};
   bool rewindHeld_{false};

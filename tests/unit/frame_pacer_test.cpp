@@ -104,9 +104,67 @@ int main()
     return 7;
   }
 
+  const auto slowOrigin = origin + 50s;
+  if (!check(pacer.configure(ntsc), "Slow-motion pacer reconfiguration failed") ||
+      !check(pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::slowMotion, 25U, slowOrigin),
+        "Minimum slow-motion speed was rejected")) {
+    return 8;
+  }
+  pacer.resume(slowOrigin);
+  for (std::uint64_t frame = 0U; frame < 25U; ++frame) {
+    pacer.frameExecuted(*pacer.nextDeadline());
+  }
+  const auto expectedSlowElapsed = std::chrono::nanoseconds{
+    static_cast<std::chrono::nanoseconds::rep>(
+      (intervalNumerator * 100U * 25U) /
+      (ntsc.framesNumerator * 25U))};
+  const auto slowMetrics = pacer.metrics();
+  if (!check(pacer.nextDeadline() == slowOrigin + expectedSlowElapsed,
+        "Slow-motion rational accumulation drifted") ||
+      !check(pacer.isSlowMotion() && !pacer.isFastForward() &&
+          pacer.speedMode() == genplusgx::EmulationSpeedMode::slowMotion &&
+          pacer.speedPercent() == 25U && slowMetrics.slowMotion &&
+          slowMetrics.speedPercent == 25U &&
+          std::abs(slowMetrics.targetFramesPerSecond - ntsc.hertz() * 0.25) <
+            0.000001,
+        "Slow-motion mode or metrics were not exact")) {
+    return 9;
+  }
+
+  if (!check(pacer.configure(ntsc), "Custom normal pacer reconfiguration failed") ||
+      !check(pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::normal, 75U, origin),
+        "Custom normal speed was rejected") ||
+      !check(!pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::normal, 49U, origin),
+        "Out-of-range normal speed was accepted") ||
+      !check(!pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::slowMotion, 76U, origin),
+        "Out-of-range slow-motion speed was accepted") ||
+      !check(!pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::fastForward, 199U, origin),
+        "Out-of-range fast-forward speed was accepted") ||
+      !check(!pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::fastForward, 1'601U, origin),
+        "Excessive fast-forward speed was accepted") ||
+      !check(pacer.speedMode() == genplusgx::EmulationSpeedMode::normal &&
+          pacer.speedPercent() == 75U,
+        "Rejected speed update changed the active pacing mode")) {
+    return 10;
+  }
+  if (!check(pacer.setSpeed(
+          genplusgx::EmulationSpeedMode::fastForward, 1'600U, origin),
+        "Maximum fast-forward speed was rejected") ||
+      !check(std::abs(pacer.metrics().targetFramesPerSecond -
+          ntsc.hertz() * 16.0) < 0.000001,
+        "Maximum fast-forward target was not exact")) {
+    return 11;
+  }
+
   if (!check(pacer.configure({60U, 1U}), "Integer-rate pacer failed") ||
       !check(pacer.setFastForward(false, origin), "Normal-rate selection failed")) {
-    return 8;
+    return 12;
   }
   pacer.resume(origin);
   pacer.frameExecuted(origin + 50ms);
@@ -117,12 +175,12 @@ int main()
         "Late-frame instrumentation or bounded catch-up changed") ||
       !check(*pacer.nextDeadline() < origin + 50ms,
         "Bounded catch-up discarded a recoverable scheduling delay")) {
-    return 9;
+    return 13;
   }
 
   if (!check(pacer.configure({60U, 1U}),
         "Gross-stall pacer reconfiguration failed")) {
-    return 10;
+    return 14;
   }
   pacer.resume(origin);
   pacer.frameExecuted(origin + 500ms);
@@ -133,7 +191,7 @@ int main()
         "Gross-stall resynchronization metrics changed") ||
       !check(*pacer.nextDeadline() > origin + 500ms,
         "Grossly late scheduler retained an unbounded frame debt")) {
-    return 11;
+    return 15;
   }
 
   pacer.resetMetrics();
@@ -142,7 +200,7 @@ int main()
           pacer.metrics().resynchronizations == 0U &&
           pacer.metrics().targetFramesPerSecond == 60.0,
         "Metric reset changed configuration or retained counters")) {
-    return 12;
+    return 16;
   }
 
   const auto sleepStart = std::chrono::steady_clock::now();
@@ -150,41 +208,41 @@ int main()
   const auto sleepElapsed = std::chrono::steady_clock::now() - sleepStart;
   if (!check(sleepElapsed >= 4ms && sleepElapsed < 250ms,
         "Host deadline wait returned early or overslept wildly")) {
-    return 13;
+    return 17;
   }
 
   genplusgx::FrameRateSampler sampler{500ms};
   if (!check(!sampler.observe(100U, true, origin).has_value() &&
           !sampler.observe(129U, true, origin + 499ms).has_value(),
         "Frame-rate sampler did not establish a bounded baseline")) {
-    return 14;
+    return 18;
   }
   const auto ntscSample = sampler.observe(160U, true, origin + 1s);
   if (!check(ntscSample.has_value() && std::abs(*ntscSample - 60.0) < 0.000001,
         "Frame-rate sampler did not measure an irregular polling interval")) {
-    return 15;
+    return 19;
   }
   const auto pausedSample = sampler.observe(160U, false, origin + 1100ms);
   if (!check(pausedSample == 0.0 &&
           !sampler.observe(160U, false, origin + 2s).has_value() &&
           !sampler.observe(160U, true, origin + 3s).has_value(),
         "Frame-rate sampler did not report or leave pause cleanly")) {
-    return 16;
+    return 20;
   }
   if (!check(!sampler.observe(2U, true, origin + 4s).has_value(),
         "Frame counter reset produced a false rate spike")) {
-    return 17;
+    return 21;
   }
   const auto resumedSample = sampler.observe(32U, true, origin + 4500ms);
   if (!check(resumedSample.has_value() &&
           std::abs(*resumedSample - 60.0) < 0.000001,
         "Frame-rate sampler did not recover after a counter reset")) {
-    return 18;
+    return 22;
   }
   sampler.reset();
   if (!check(!sampler.observe(500U, true, origin + 5s).has_value(),
         "Frame-rate sampler reset retained a stale baseline")) {
-    return 19;
+    return 23;
   }
   return 0;
 }

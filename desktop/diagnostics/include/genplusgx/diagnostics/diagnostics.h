@@ -97,6 +97,12 @@ struct DiagnosticsSnapshot final {
   std::uint64_t audioOverruns{0};
   std::size_t audioBufferedFrames{0};
   std::size_t audioCapacityFrames{0};
+  std::uint32_t normalSpeedPercent{100U};
+  std::uint32_t slowMotionSpeedPercent{50U};
+  std::uint32_t fastForwardSpeedPercent{400U};
+  std::uint32_t activeSpeedPercent{100U};
+  bool fastForwarding{false};
+  bool slowMotion{false};
   bool rewindEnabled{false};
   bool rewinding{false};
   std::size_t rewindSnapshots{0};

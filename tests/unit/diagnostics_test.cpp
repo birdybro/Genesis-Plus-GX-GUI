@@ -83,6 +83,11 @@ int main()
   snapshot.rewindSnapshots = 12U;
   snapshot.rewindPayloadBytes = 12U * 1024U * 1024U;
   snapshot.rewindMemoryLimitBytes = 128U * 1024U * 1024U;
+  snapshot.normalSpeedPercent = 125U;
+  snapshot.slowMotionSpeedPercent = 50U;
+  snapshot.fastForwardSpeedPercent = 800U;
+  snapshot.activeSpeedPercent = 50U;
+  snapshot.slowMotion = true;
   snapshot.loggerActive = true;
   snapshot.bios.push_back({
     .name = "Sega CD USA",
@@ -96,6 +101,8 @@ int main()
                report.find("Sega CD USA: Valid") != std::string::npos &&
                report.find("Rewind: Enabled (active)") != std::string::npos &&
                report.find("Rewind snapshots: 12") != std::string::npos &&
+               report.find("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%") != std::string::npos &&
+               report.find("Active speed: 50% (slow motion)") != std::string::npos &&
                report.find("/users/alex") == std::string::npos &&
                report.find("hunter2") == std::string::npos &&
                report.find("Privacy:") != std::string::npos,

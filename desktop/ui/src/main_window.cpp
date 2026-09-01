@@ -16,6 +16,7 @@
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/session_settings_dialog.h"
+#include "genplusgx/ui/speed_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -48,6 +49,8 @@
 
 namespace genplusgx::ui {
 namespace {
+
+constexpr std::array speedPresets{50U, 75U, 100U, 125U, 150U, 200U};
 
 QLabel* statusLabel(
   QStatusBar& bar,
@@ -91,6 +94,7 @@ MainWindow::MainWindow(QWidget* parent)
   setGameActionsEnabled(false);
   applyVideoSettings(videoSettings_, false);
   applyAudioSettings(audioSettings_, false);
+  static_cast<void>(applySpeedSettings(speedSettings_, false));
   qApp->installEventFilter(this);
 }
 
@@ -183,6 +187,43 @@ void MainWindow::buildMenus()
       updateEmulationControls();
     }
   });
+  auto* slowMotion = addAction(
+    *emulation, tr("Slow Motion T&oggle"), "slowMotionAction");
+  slowMotion->setCheckable(true);
+  slowMotion->setToolTip(
+    tr("Toggle slow motion; hold the configured hotkey for momentary use"));
+  connect(slowMotion, &QAction::toggled, this, [this](bool enabled) {
+    const bool previous = slowMotionToggled_;
+    slowMotionToggled_ = enabled;
+    if (!requestEmulationControl(
+          EmulationUiOperation::setSlowMotion,
+          slowMotionToggled_ || slowMotionHeld_)) {
+      slowMotionToggled_ = previous;
+      updateEmulationControls();
+    }
+  });
+  auto* speedMenu = emulation->addMenu(tr("Emulation &Speed"));
+  speedMenu->setObjectName(QStringLiteral("emulationSpeedMenu"));
+  auto* speedGroup = new QActionGroup(this);
+  speedGroup->setObjectName(QStringLiteral("emulationSpeedActionGroup"));
+  speedGroup->setExclusive(true);
+  for (const auto percent : speedPresets) {
+    auto* action = speedMenu->addAction(tr("%1%").arg(percent));
+    action->setObjectName(QStringLiteral("emulationSpeed%1Action").arg(percent));
+    action->setCheckable(true);
+    action->setData(percent);
+    speedGroup->addAction(action);
+    connect(action, &QAction::triggered, this, [this, percent] {
+      auto candidate = speedSettings_;
+      candidate.normalPercent = percent;
+      static_cast<void>(applySpeedSettings(candidate, true));
+    });
+  }
+  speedMenu->addSeparator();
+  auto* speedSettings = addAction(
+    *speedMenu, tr("Speed &Settings…"), "speedSettingsAction");
+  connect(speedSettings, &QAction::triggered,
+    this, &MainWindow::showSpeedSettings);
   auto* rewind = addAction(
     *emulation, tr("&Rewind Toggle"), "rewindAction");
   rewind->setCheckable(true);
@@ -594,6 +635,8 @@ void MainWindow::applyHotkeyShortcuts()
     std::pair{input::EmulatorHotkeyAction::fullscreen, "fullscreenAction"},
     std::pair{input::EmulatorHotkeyAction::fastForwardToggle,
       "fastForwardAction"},
+    std::pair{input::EmulatorHotkeyAction::slowMotionToggle,
+      "slowMotionAction"},
     std::pair{input::EmulatorHotkeyAction::frameAdvance, "frameAdvanceAction"},
     std::pair{input::EmulatorHotkeyAction::saveState, "saveStateAction"},
     std::pair{input::EmulatorHotkeyAction::loadState, "loadStateAction"},
@@ -672,6 +715,8 @@ void MainWindow::buildStatusBar()
   systemStatus_ = statusLabel(*statusBar(), tr("System: —"), "systemStatusLabel");
   regionStatus_ = statusLabel(*statusBar(), tr("Region: —"), "regionStatusLabel");
   fpsStatus_ = statusLabel(*statusBar(), tr("0.0 FPS"), "fpsStatusLabel", 0, true);
+  speedStatus_ = statusLabel(
+    *statusBar(), tr("Speed 100%"), "speedStatusLabel", 0, true);
   slotStatus_ = statusLabel(*statusBar(), tr("Slot 0"), "stateSlotStatusLabel", 0, true);
 }
 
@@ -679,7 +724,8 @@ void MainWindow::setGameActionsEnabled(bool enabled)
 {
   static constexpr const char* gameActionNames[]{
     "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
-    "softResetAction", "fastForwardAction", "rewindAction", "frameAdvanceAction",
+    "softResetAction", "fastForwardAction", "slowMotionAction", "rewindAction",
+    "frameAdvanceAction",
     "cheatsAction",
     "gameInformationAction"};
   for (const auto* name : gameActionNames) {
@@ -703,20 +749,30 @@ void MainWindow::setEmulationControlSink(EmulationControlSink sink)
 void MainWindow::setEmulationControlState(
   bool paused,
   bool fastForward,
+  bool slowMotion,
+  std::uint32_t speedPercent,
   bool rewinding,
   bool rewindAvailable)
 {
   emulationPaused_ = isGameLoaded() && paused;
   fastForwardActive_ = isGameLoaded() && fastForward;
+  slowMotionActive_ = isGameLoaded() && slowMotion;
+  activeSpeedPercent_ = isGameLoaded()
+    ? speedPercent : speedSettings_.normalPercent;
   rewindActive_ = isGameLoaded() && rewinding;
   rewindAvailable_ = isGameLoaded() && rewindAvailable;
   if (!isGameLoaded()) {
     fastForwardHeld_ = false;
     fastForwardToggled_ = false;
+    slowMotionHeld_ = false;
+    slowMotionToggled_ = false;
     rewindHeld_ = false;
     rewindToggled_ = false;
   } else if (!fastForwardHeld_) {
     fastForwardToggled_ = fastForwardActive_;
+  }
+  if (isGameLoaded() && !slowMotionHeld_) {
+    slowMotionToggled_ = slowMotionActive_;
   }
   if (isGameLoaded() && !rewindHeld_) {
     rewindToggled_ = rewindActive_;
@@ -746,6 +802,19 @@ bool MainWindow::requestEmulationControl(
   } else if (operation == EmulationUiOperation::setFastForward) {
     fastForwardActive_ = enabled;
     if (enabled) {
+      slowMotionActive_ = false;
+      slowMotionHeld_ = false;
+      slowMotionToggled_ = false;
+      rewindActive_ = false;
+      rewindHeld_ = false;
+      rewindToggled_ = false;
+    }
+  } else if (operation == EmulationUiOperation::setSlowMotion) {
+    slowMotionActive_ = enabled;
+    if (enabled) {
+      fastForwardActive_ = false;
+      fastForwardHeld_ = false;
+      fastForwardToggled_ = false;
       rewindActive_ = false;
       rewindHeld_ = false;
       rewindToggled_ = false;
@@ -756,6 +825,9 @@ bool MainWindow::requestEmulationControl(
       fastForwardActive_ = false;
       fastForwardHeld_ = false;
       fastForwardToggled_ = false;
+      slowMotionActive_ = false;
+      slowMotionHeld_ = false;
+      slowMotionToggled_ = false;
     }
   }
   updateEmulationControls();
@@ -774,6 +846,20 @@ void MainWindow::setFastForwardHeld(bool held)
       !requestEmulationControl(
         EmulationUiOperation::setFastForward, effective)) {
     fastForwardHeld_ = previous;
+  }
+}
+
+void MainWindow::setSlowMotionHeld(bool held)
+{
+  if (held == slowMotionHeld_) {
+    return;
+  }
+  const bool previous = slowMotionHeld_;
+  slowMotionHeld_ = held;
+  const bool effective = slowMotionToggled_ || slowMotionHeld_;
+  if (effective != slowMotionActive_ &&
+      !requestEmulationControl(EmulationUiOperation::setSlowMotion, effective)) {
+    slowMotionHeld_ = previous;
   }
 }
 
@@ -797,6 +883,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
       (event->type() == QEvent::WindowDeactivate && watched == this) ||
       (event->type() == QEvent::Hide && watched == this)) {
     setFastForwardHeld(false);
+    setSlowMotionHeld(false);
     setRewindHeld(false);
   }
 
@@ -808,7 +895,9 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     inputConfiguration_, input::EmulatorHotkeyAction::fastForwardHold);
   const auto rewindCombination = input::hotkeyCombination(
     inputConfiguration_, input::EmulatorHotkeyAction::rewindHold);
-  if (!fastForwardCombination && !rewindCombination) {
+  const auto slowMotionCombination = input::hotkeyCombination(
+    inputConfiguration_, input::EmulatorHotkeyAction::slowMotionHold);
+  if (!fastForwardCombination && !slowMotionCombination && !rewindCombination) {
     return QMainWindow::eventFilter(watched, event);
   }
 
@@ -829,14 +918,17 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
     fastForwardCombination, fastForwardHeld_);
   const auto [rewindPress, rewindRelease] = matches(
     rewindCombination, rewindHeld_);
-  if (!fastPress && !fastRelease && !rewindPress && !rewindRelease) {
+  const auto [slowPress, slowRelease] = matches(
+    slowMotionCombination, slowMotionHeld_);
+  if (!fastPress && !fastRelease && !slowPress && !slowRelease &&
+      !rewindPress && !rewindRelease) {
     return QMainWindow::eventFilter(watched, event);
   }
 
   auto* widget = qobject_cast<QWidget*>(watched);
   const bool belongsToWindow = widget != nullptr && widget->window() == this;
   const auto* active = QApplication::activeWindow();
-  if ((fastPress || rewindPress) &&
+  if ((fastPress || slowPress || rewindPress) &&
       (!belongsToWindow || (active != nullptr && active != this) ||
        !isGameLoaded() || gameLoading_ || emulationPaused_ ||
        (rewindPress && !rewindAvailable_))) {
@@ -845,6 +937,9 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
   if (!keyEvent->isAutoRepeat()) {
     if (fastPress || fastRelease) {
       setFastForwardHeld(fastPress);
+    }
+    if (slowPress || slowRelease) {
+      setSlowMotionHeld(slowPress);
     }
     if (rewindPress || rewindRelease) {
       setRewindHeld(rewindPress);
@@ -861,6 +956,7 @@ void MainWindow::updateEmulationControls()
   auto* reset = findChild<QAction*>(QStringLiteral("resetAction"));
   auto* softReset = findChild<QAction*>(QStringLiteral("softResetAction"));
   auto* fastForward = findChild<QAction*>(QStringLiteral("fastForwardAction"));
+  auto* slowMotion = findChild<QAction*>(QStringLiteral("slowMotionAction"));
   auto* rewind = findChild<QAction*>(QStringLiteral("rewindAction"));
   auto* frameAdvance = findChild<QAction*>(QStringLiteral("frameAdvanceAction"));
   if (pause != nullptr) {
@@ -880,6 +976,11 @@ void MainWindow::updateEmulationControls()
     fastForward->setChecked(available && fastForwardToggled_);
     fastForward->setEnabled(available);
   }
+  if (slowMotion != nullptr) {
+    const QSignalBlocker blocker{slowMotion};
+    slowMotion->setChecked(available && slowMotionToggled_);
+    slowMotion->setEnabled(available);
+  }
   if (rewind != nullptr) {
     const QSignalBlocker blocker{rewind};
     rewind->setChecked(available && rewindToggled_);
@@ -888,6 +989,11 @@ void MainWindow::updateEmulationControls()
   }
   if (frameAdvance != nullptr) {
     frameAdvance->setEnabled(available && emulationPaused_);
+  }
+  if (speedStatus_ != nullptr) {
+    const auto prefix = fastForwardActive_
+      ? tr("Fast") : slowMotionActive_ ? tr("Slow") : tr("Speed");
+    speedStatus_->setText(tr("%1 %2%").arg(prefix).arg(activeSpeedPercent_));
   }
 }
 
@@ -1492,6 +1598,9 @@ void MainWindow::showSettings(SettingsPage page)
       case SettingsPageAction::session:
         showSessionSettings();
         break;
+      case SettingsPageAction::speed:
+        showSpeedSettings();
+        break;
     }
   });
   dialog->openPage(page);
@@ -1546,6 +1655,88 @@ void MainWindow::showRewindSettings()
     return PersistenceStatus{};
   });
   dialog->open();
+}
+
+void MainWindow::setSpeedSettings(EmulationSpeedConfiguration settings)
+{
+  static_cast<void>(applySpeedSettings(settings, false));
+}
+
+void MainWindow::setSpeedSettingsSink(SpeedSettingsSink sink)
+{
+  speedSettingsSink_ = std::move(sink);
+}
+
+const EmulationSpeedConfiguration& MainWindow::speedSettings() const noexcept
+{
+  return speedSettings_;
+}
+
+void MainWindow::showSpeedSettings()
+{
+  if (auto* existing = findChild<SpeedSettingsDialog*>(
+        QStringLiteral("speedSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new SpeedSettingsDialog(speedSettings_, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](const EmulationSpeedConfiguration& settings) {
+    if (speedSettingsSink_) {
+      const auto saved = speedSettingsSink_(settings);
+      if (!saved) {
+        return saved;
+      }
+    }
+    return applySpeedSettings(settings, false)
+      ? PersistenceStatus{}
+      : PersistenceStatus{
+          .error = PersistenceError::invalidData,
+          .message = "The emulation speed settings are invalid.",
+        };
+  });
+  dialog->open();
+}
+
+bool MainWindow::applySpeedSettings(
+  const EmulationSpeedConfiguration& settings,
+  bool notifySink)
+{
+  if (!validateEmulationSpeedConfiguration(settings)) {
+    return false;
+  }
+  if (notifySink && speedSettingsSink_) {
+    const auto saved = speedSettingsSink_(settings);
+    if (!saved) {
+      statusBar()->showMessage(tr("Speed settings could not be applied."), 5'000);
+      dialogService_->showError(
+        this, tr("Emulation Speed Error"), QString::fromStdString(saved.message));
+      updateSpeedActionChecks();
+      return false;
+    }
+  }
+  speedSettings_ = settings;
+  if (!fastForwardActive_ && !slowMotionActive_) {
+    activeSpeedPercent_ = speedSettings_.normalPercent;
+  }
+  updateSpeedActionChecks();
+  updateEmulationControls();
+  refreshSettingsDialog();
+  statusBar()->showMessage(
+    tr("Normal emulation speed: %1%").arg(speedSettings_.normalPercent), 3'000);
+  return true;
+}
+
+void MainWindow::updateSpeedActionChecks()
+{
+  for (const auto percent : speedPresets) {
+    if (auto* action = findChild<QAction*>(
+          QStringLiteral("emulationSpeed%1Action").arg(percent))) {
+      const QSignalBlocker blocker{action};
+      action->setChecked(speedSettings_.normalPercent == percent);
+    }
+  }
 }
 
 void MainWindow::setSessionSettings(settings::SessionSettings settings)
@@ -2189,6 +2380,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .screenshots = screenshotSettings_,
     .rewind = rewindSettings_,
     .session = sessionSettings_,
+    .speed = speedSettings_,
     .paths = applicationPaths_,
     .connectedControllerCount = controllers_.size(),
     .pathsAvailable = applicationPathsAvailable_,
@@ -2208,6 +2400,7 @@ void MainWindow::setInputConfiguration(input::InputConfiguration configuration)
 {
   if (input::validateInputConfiguration(configuration)) {
     setFastForwardHeld(false);
+    setSlowMotionHeld(false);
     setRewindHeld(false);
     inputConfiguration_ = std::move(configuration);
     applyHotkeyShortcuts();
@@ -2463,6 +2656,10 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
   fastForwardActive_ = false;
   fastForwardHeld_ = false;
   fastForwardToggled_ = false;
+  slowMotionActive_ = false;
+  slowMotionHeld_ = false;
+  slowMotionToggled_ = false;
+  activeSpeedPercent_ = speedSettings_.normalPercent;
   rewindActive_ = false;
   rewindAvailable_ = false;
   rewindHeld_ = false;
@@ -2480,6 +2677,8 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
     regionStatus_->setText(tr("Region: —"));
   }
   fpsStatus_->setText(tr("0.0 FPS"));
+  speedStatus_->setText(
+    tr("Speed %1%").arg(speedSettings_.normalPercent));
   statusBar()->showMessage(tr("Loading game…"));
   refreshSettingsDialog();
   if (auto* debugger = findChild<DebugToolsWindow*>(
@@ -2570,6 +2769,10 @@ void MainWindow::setNoGameLoaded()
   fastForwardActive_ = false;
   fastForwardHeld_ = false;
   fastForwardToggled_ = false;
+  slowMotionActive_ = false;
+  slowMotionHeld_ = false;
+  slowMotionToggled_ = false;
+  activeSpeedPercent_ = speedSettings_.normalPercent;
   rewindActive_ = false;
   rewindAvailable_ = false;
   rewindHeld_ = false;
@@ -2591,6 +2794,8 @@ void MainWindow::setNoGameLoaded()
   systemStatus_->setText(tr("System: —"));
   regionStatus_->setText(tr("Region: —"));
   fpsStatus_->setText(tr("0.0 FPS"));
+  speedStatus_->setText(
+    tr("Speed %1%").arg(speedSettings_.normalPercent));
   displayWidget_->clearFrame();
   updateStateSlotPresentation();
   refreshSettingsDialog();

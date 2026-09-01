@@ -1,5 +1,7 @@
 #pragma once
 
+#include "genplusgx/timing/speed_configuration.h"
+
 #include <chrono>
 #include <cstdint>
 #include <optional>
@@ -20,7 +22,9 @@ struct FramePacerMetrics final {
   std::uint64_t resynchronizations{0};
   std::chrono::nanoseconds maximumLateness{0};
   double targetFramesPerSecond{0.0};
+  std::uint32_t speedPercent{100U};
   bool fastForward{false};
+  bool slowMotion{false};
 };
 
 class FramePacer final {
@@ -29,6 +33,10 @@ public:
   using TimePoint = Clock::time_point;
 
   [[nodiscard]] bool configure(FrameRateRatio frameRate) noexcept;
+  [[nodiscard]] bool setSpeed(
+    EmulationSpeedMode mode,
+    std::uint32_t speedPercent,
+    TimePoint now) noexcept;
   [[nodiscard]] bool setFastForward(bool enabled, TimePoint now) noexcept;
 
   void resume(TimePoint now) noexcept;
@@ -38,6 +46,9 @@ public:
 
   [[nodiscard]] bool isActive() const noexcept;
   [[nodiscard]] bool isFastForward() const noexcept;
+  [[nodiscard]] bool isSlowMotion() const noexcept;
+  [[nodiscard]] EmulationSpeedMode speedMode() const noexcept;
+  [[nodiscard]] std::uint32_t speedPercent() const noexcept;
   [[nodiscard]] FrameRateRatio frameRate() const noexcept;
   [[nodiscard]] std::optional<TimePoint> nextDeadline() const noexcept;
   [[nodiscard]] std::chrono::nanoseconds nominalFrameDuration() const noexcept;
@@ -55,7 +66,8 @@ private:
   std::uint64_t accumulatedRemainder_{0};
   FramePacerMetrics metrics_;
   bool active_{false};
-  bool fastForward_{false};
+  EmulationSpeedMode speedMode_{EmulationSpeedMode::normal};
+  std::uint32_t speedPercent_{100U};
 };
 
 } // namespace genplusgx

@@ -345,9 +345,27 @@ int main()
   }
 
   if (!check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateSpeedSettings(140U, {
+            .normalPercent = 75U,
+            .slowMotionPercent = 25U,
+            .fastForwardPercent = 800U,
+          }), event),
+        "Worker speed settings update failed") ||
+      !check(event.speedPercent == 75U && !event.fastForward &&
+          !event.slowMotion,
+        "Worker did not report the configured normal speed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::slowMotion(141U, true), event),
+        "Slow-motion enable failed") ||
+      !check(event.slowMotion && !event.fastForward &&
+          event.speedPercent == 25U,
+        "Slow-motion state or configured speed was not reported") ||
+      !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::fastForward(14U, true), event),
         "Fast-forward enable failed") ||
-      !check(event.fastForward, "Fast-forward state was not reported") ||
+      !check(event.fastForward && !event.slowMotion &&
+          event.speedPercent == 800U,
+        "Fast-forward did not replace slow motion at the configured speed") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::resume, 15U), event),
@@ -380,6 +398,9 @@ int main()
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::load(18U, fixture.path()), event),
         "Worker did not recover from a failed replacement load") ||
+      !check(!event.fastForward && !event.slowMotion &&
+          event.speedPercent == 75U,
+        "Replacement load did not restore the configured normal speed") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::unloadGame, 19U), event),

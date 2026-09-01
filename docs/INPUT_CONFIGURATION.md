@@ -55,7 +55,7 @@ volume shortcuts. Restore Defaults resets the selected profile; Cancel leaves th
 configuration unchanged; Apply and OK validate before publishing changes.
 
 The Hotkeys tab captures a single keyboard combination for Open/Close, library,
-pause/reset, fullscreen, separate fast-forward hold and toggle controls, frame advance,
+pause/reset, fullscreen, separate fast-forward and slow-motion hold/toggle controls, frame advance,
 save-state operations and slots, screenshot, mute, and volume. Shortcuts must be unique.
 A shortcut that would consume a
 gameplay key in any stored profile is rejected, while Ctrl, Alt, and Command/Meta chords
@@ -69,6 +69,9 @@ left active after a focus transition. It composes with the menu toggle: the effe
 state stays enabled until both the held key and the independent toggle latch are off.
 Schema-2 profiles keep their existing fast-forward binding as the toggle and receive a
 non-conflicting default hold binding during the schema-3 migration.
+Schema-4 profiles receive conflict-free `/` hold and `Ctrl+/` toggle bindings during
+the schema-5 slow-motion migration. Slow-motion holds use the same forced release on
+focus loss as fast forward and rewind.
 
 The Advanced Devices tab configures the analog deadzone, the logical device selected
 for each of eight frontend players, and the emulated action produced by each left-stick
@@ -101,6 +104,6 @@ profile is applied immediately after a successful Apply or OK.
 
 Profiles are stored atomically as versioned JSON at
 `<application-data>/config/input-profiles.json`. The file contains no hardware secrets.
-Schema 0 and 1 data is migrated to schema 2 with explicit device, axis, and hotkey
-defaults for fields that did not previously exist. A missing file produces defaults; malformed, oversized,
+Schemas 0–4 migrate to the current schema with explicit device, axis, rewind, and
+slow-motion hotkey defaults for fields that did not previously exist. A missing file produces defaults; malformed, oversized,
 future-schema, or invalid data is rejected without partially applying it.

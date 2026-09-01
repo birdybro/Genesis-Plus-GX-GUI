@@ -41,6 +41,8 @@ enum class EmulationCommandType {
   softReset,
   frameAdvance,
   setFastForward,
+  setSlowMotion,
+  speedSettings,
   setRewinding,
   rewindSettings,
   inputSnapshot,
@@ -69,6 +71,7 @@ struct EmulationCommand final {
   CoreSystemSettings coreSystemSettings;
   CoreFirmwareSettings coreFirmwareSettings;
   RewindConfiguration rewindConfiguration;
+  EmulationSpeedConfiguration speedConfiguration;
   std::vector<std::uint8_t> rawState;
   std::vector<CoreCheatPatch> coreCheats;
   CoreDebugRequest coreDebugRequest;
@@ -82,6 +85,12 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand fastForward(
     std::uint64_t operationId,
     bool enabled);
+  [[nodiscard]] static EmulationCommand slowMotion(
+    std::uint64_t operationId,
+    bool enabled);
+  [[nodiscard]] static EmulationCommand updateSpeedSettings(
+    std::uint64_t operationId,
+    EmulationSpeedConfiguration configuration);
   [[nodiscard]] static EmulationCommand rewinding(
     std::uint64_t operationId,
     bool enabled);
@@ -166,6 +175,8 @@ struct EmulationEvent final {
   std::uint64_t videoGeneration{0};
   std::uint64_t appliedInputSequence{0};
   bool fastForward{false};
+  bool slowMotion{false};
+  std::uint32_t speedPercent{100U};
   bool rewinding{false};
   bool rewindAvailable{false};
   std::thread::id workerThreadId;
@@ -192,6 +203,7 @@ struct EmulationWorkerMetrics final {
   std::uint64_t coalescedFirmwareSettingsCommands{0};
   std::uint64_t coalescedCheatCommands{0};
   std::uint64_t coalescedRewindSettingsCommands{0};
+  std::uint64_t coalescedSpeedSettingsCommands{0};
   std::uint64_t replacedFrameEvents{0};
   std::uint64_t droppedOperationEvents{0};
   std::uint64_t pacedFrameCount{0};
@@ -199,7 +211,9 @@ struct EmulationWorkerMetrics final {
   std::uint64_t pacingResynchronizations{0};
   std::int64_t maximumLatenessMicroseconds{0};
   double targetFramesPerSecond{0.0};
+  std::uint32_t speedPercent{100U};
   bool fastForward{false};
+  bool slowMotion{false};
   bool rewinding{false};
   bool rewindAvailable{false};
   std::size_t rewindSnapshotCount{0U};

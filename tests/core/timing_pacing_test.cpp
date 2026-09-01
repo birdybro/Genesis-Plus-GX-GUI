@@ -82,11 +82,23 @@ int main()
   const auto loadedMetrics = worker.metrics();
   if (!check(loadedMetrics.targetFramesPerSecond > 59.92 &&
           loadedMetrics.targetFramesPerSecond < 59.93 &&
-          !loadedMetrics.fastForward,
+          loadedMetrics.speedPercent == 100U && !loadedMetrics.fastForward &&
+          !loadedMetrics.slowMotion,
         "Worker did not adopt the core's exact NTSC rate") ||
       !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateSpeedSettings(2U, {
+            .normalPercent = 75U,
+            .slowMotionPercent = 25U,
+            .fastForwardPercent = 800U,
+          })),
+        "Custom emulation speed settings were rejected") ||
+      !check(worker.metrics().speedPercent == 75U &&
+          std::abs(worker.metrics().targetFramesPerSecond -
+            loadedMetrics.targetFramesPerSecond * 0.75) < 0.000001,
+        "Custom normal speed was not applied exactly") ||
+      !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::start, 2U)),
+            genplusgx::EmulationCommandType::start, 3U)),
         "Timed emulation did not start")) {
     return 2;
   }
@@ -112,7 +124,7 @@ int main()
         "Measured normal frame rate is outside its integration tolerance") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::pause, 3U)),
+            genplusgx::EmulationCommandType::pause, 4U)),
         "Timed emulation did not pause")) {
     return 4;
   }
@@ -123,7 +135,7 @@ int main()
         "Paused emulation continued scheduling frames") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::frameAdvance, 4U)),
+            genplusgx::EmulationCommandType::frameAdvance, 5U)),
         "Paused frame advance failed") ||
       !check(worker.metrics().pacedFrameCount == pausedCount,
         "Frame advance incorrectly restarted the continuous scheduler")) {
@@ -132,21 +144,23 @@ int main()
   worker.audioFrames()->clear();
 
   if (!check(submitAndSucceed(
-          worker, genplusgx::EmulationCommand::fastForward(5U, true)),
+          worker, genplusgx::EmulationCommand::fastForward(6U, true)),
         "Fast-forward mode did not enable") ||
       !check(std::abs(worker.metrics().targetFramesPerSecond -
-          loadedMetrics.targetFramesPerSecond * 4.0) < 0.000001,
-        "Fast-forward target is not exactly four times the core rate") ||
+          loadedMetrics.targetFramesPerSecond * 8.0) < 0.000001 &&
+          worker.metrics().speedPercent == 800U &&
+          worker.metrics().fastForward && !worker.metrics().slowMotion,
+        "Configured fast-forward target is not exactly eight times the core rate") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::resume, 6U)),
+            genplusgx::EmulationCommandType::resume, 7U)),
         "Fast-forward emulation did not resume")) {
     return 6;
   }
 
   const auto fastBaseline = worker.metrics().pacedFrameCount;
   const auto fastStart = std::chrono::steady_clock::now();
-  constexpr std::uint64_t fastFrames = 40U;
+  constexpr std::uint64_t fastFrames = 60U;
   if (!check(waitForPacedFrames(
           worker, fastBaseline + fastFrames, fastStart + 1s),
         "Fast-forward pacing did not produce 40 frames")) {
@@ -156,39 +170,106 @@ int main()
   const auto fastRate =
     static_cast<double>(fastFrames) /
     std::chrono::duration<double>(fastElapsed).count();
-  if (!(fastElapsed > 100ms && fastElapsed < 400ms)) {
+  if (!(fastElapsed > 60ms && fastElapsed < 400ms)) {
     std::cerr << "Measured fast-forward cadence: "
               << std::chrono::duration<double>(fastElapsed).count() << " s, "
               << fastRate << " fps\n";
   }
-  if (!check(fastElapsed > 100ms && fastElapsed < 400ms,
-        "Fast-forward pacing ran outside its bounded 4x interval") ||
-      !check(fastRate > normalRate * 2.5 && fastRate < 350.0,
+  if (!check(fastElapsed > 60ms && fastElapsed < 400ms,
+        "Fast-forward pacing ran outside its bounded 8x interval") ||
+      !check(fastRate > normalRate * 5.0 && fastRate < 700.0,
         "Fast-forward did not materially accelerate without running wild") ||
       !check(worker.audioFrames()->occupancyFrames() == 0U,
         "Fast-forward accumulated host audio that cannot play in real time") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::pause, 7U)),
+            genplusgx::EmulationCommandType::pause, 8U)),
         "Fast-forward emulation did not pause") ||
       !check(worker.metrics().maximumLatenessMicroseconds < 1'000'000,
         "Pacing instrumentation reported an unbounded late frame")) {
     return 8;
   }
 
+  worker.audioFrames()->clear();
+  if (!check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::slowMotion(9U, true)),
+        "Slow-motion mode did not enable") ||
+      !check(std::abs(worker.metrics().targetFramesPerSecond -
+          loadedMetrics.targetFramesPerSecond * 0.25) < 0.000001 &&
+          worker.metrics().speedPercent == 25U &&
+          worker.metrics().slowMotion && !worker.metrics().fastForward,
+        "Configured slow-motion target is not exactly one quarter of the core rate") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::resume, 10U)),
+        "Slow-motion emulation did not resume")) {
+    return 9;
+  }
+  const auto slowBaseline = worker.metrics().pacedFrameCount;
+  const auto slowStart = std::chrono::steady_clock::now();
+  constexpr std::uint64_t slowFrames = 10U;
+  if (!check(waitForPacedFrames(
+          worker, slowBaseline + slowFrames, slowStart + 2s),
+        "Slow-motion pacing did not produce 10 frames")) {
+    return 10;
+  }
+  const auto slowElapsed = std::chrono::steady_clock::now() - slowStart;
+  const auto slowRate = static_cast<double>(slowFrames) /
+    std::chrono::duration<double>(slowElapsed).count();
+  if (!(slowElapsed > 500ms && slowElapsed < 1'200ms)) {
+    std::cerr << "Measured slow-motion cadence: "
+              << std::chrono::duration<double>(slowElapsed).count() << " s, "
+              << slowRate << " fps\n";
+  }
+  if (!check(slowElapsed > 500ms && slowElapsed < 1'200ms,
+        "Slow-motion pacing ran outside its bounded quarter-speed interval") ||
+      !check(slowRate > 8.0 && slowRate < normalRate * 0.6,
+        "Slow motion did not materially reduce the frame rate") ||
+      !check(worker.audioFrames()->occupancyFrames() == 0U,
+        "Slow motion accumulated host audio that cannot play in real time") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::pause, 11U)),
+        "Slow-motion emulation did not pause") ||
+      !check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::slowMotion(12U, false)),
+        "Slow-motion mode did not disable")) {
+    return 11;
+  }
+
+  constexpr std::uint64_t invalidId = 13U;
+  if (!check(worker.submit(genplusgx::EmulationCommand::updateSpeedSettings(
+          invalidId, {
+            .normalPercent = 49U,
+            .slowMotionPercent = 25U,
+            .fastForwardPercent = 800U,
+          })),
+        "Invalid speed command could not be submitted for validation")) {
+    return 12;
+  }
+  const auto invalidEvent = waitForOperation(worker, invalidId);
+  if (!check(invalidEvent && !invalidEvent->succeeded() &&
+          invalidEvent->error == genplusgx::EmulationWorkerError::coreFailure &&
+          invalidEvent->coreError == genplusgx::CoreError::invalidTiming &&
+          worker.metrics().speedPercent == 75U,
+        "Invalid speed settings were not rejected without changing pacing")) {
+    return 13;
+  }
+
   if (!check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::unloadGame, 8U)),
+            genplusgx::EmulationCommandType::unloadGame, 14U)),
         "NTSC timing fixture did not unload") ||
       !check(submitAndSucceed(
-          worker, genplusgx::EmulationCommand::load(9U, palFixture.path())),
+          worker, genplusgx::EmulationCommand::load(15U, palFixture.path())),
         "PAL timing fixture did not load") ||
-      !check(worker.metrics().targetFramesPerSecond > 49.70 &&
-          worker.metrics().targetFramesPerSecond < 49.71 &&
-          !worker.metrics().fastForward,
-        "Worker did not propagate the PAL core cadence") ||
+      !check(worker.metrics().targetFramesPerSecond > 37.27 &&
+          worker.metrics().targetFramesPerSecond < 37.29 &&
+          worker.metrics().speedPercent == 75U &&
+          !worker.metrics().fastForward && !worker.metrics().slowMotion,
+        "Worker did not propagate custom normal speed to the PAL cadence") ||
       !check(worker.stop(), "Timing worker did not stop cleanly")) {
-    return 9;
+    return 14;
   }
 
   return 0;

@@ -32,6 +32,17 @@ set_tests_properties(
   PROPERTIES LABELS "unit;rewind;settings;persistence;filesystem" TIMEOUT 30
 )
 
+add_executable(genplusgx_speed_settings_test speed_settings_test.cpp)
+target_link_libraries(
+  genplusgx_speed_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.speed_settings COMMAND genplusgx_speed_settings_test)
+set_tests_properties(
+  unit.speed_settings
+  PROPERTIES LABELS "unit;timing;settings;persistence;filesystem;security" TIMEOUT 30
+)
+
 add_executable(genplusgx_debug_analysis_test debug_analysis_test.cpp)
 target_link_libraries(
   genplusgx_debug_analysis_test

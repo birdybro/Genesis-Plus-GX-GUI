@@ -91,6 +91,7 @@ void NavigationRegressionTest::helpActionsOpenCompleteKeyboardAccessibleReferenc
   QVERIFY(!shortcutContent->accessibleName().isEmpty());
   QVERIFY(shortcutContent->toPlainText().contains(QStringLiteral("Open game")));
   QVERIFY(shortcutContent->toPlainText().contains(QStringLiteral("Fullscreen")));
+  QVERIFY(shortcutContent->toPlainText().contains(QStringLiteral("Slow motion")));
   QTest::keyClick(shortcuts, Qt::Key_Escape);
   QApplication::processEvents();
   QVERIFY(shortcutsGuard.isNull() || !shortcutsGuard->isVisible());

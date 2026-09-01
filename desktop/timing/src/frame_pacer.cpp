@@ -7,7 +7,7 @@ namespace genplusgx {
 namespace {
 
 constexpr std::uint64_t nanosecondsPerSecond = 1'000'000'000U;
-constexpr std::uint64_t fastForwardMultiplier = 4U;
+constexpr std::uint64_t percentDenominator = 100U;
 constexpr std::uint64_t maximumCatchUpFrames = 8U;
 
 } // namespace
@@ -16,13 +16,15 @@ bool FrameRateRatio::valid() const noexcept
 {
   if (framesNumerator == 0U || framesDenominator == 0U ||
       framesNumerator >
-        std::numeric_limits<std::uint64_t>::max() / fastForwardMultiplier ||
+        std::numeric_limits<std::uint64_t>::max() /
+          maximumFastForwardSpeedPercent ||
       framesDenominator >
-        std::numeric_limits<std::uint64_t>::max() / nanosecondsPerSecond) {
+        std::numeric_limits<std::uint64_t>::max() /
+          (nanosecondsPerSecond * percentDenominator)) {
     return false;
   }
-  return framesNumerator * fastForwardMultiplier <=
-         framesDenominator * nanosecondsPerSecond;
+  return framesNumerator * maximumFastForwardSpeedPercent <=
+    framesDenominator * nanosecondsPerSecond * percentDenominator;
 }
 
 double FrameRateRatio::hertz() const noexcept
@@ -41,23 +43,32 @@ bool FramePacer::configure(FrameRateRatio frameRate) noexcept
   }
   frameRate_ = frameRate;
   active_ = false;
-  fastForward_ = false;
+  speedMode_ = EmulationSpeedMode::normal;
+  speedPercent_ = 100U;
   accumulatedRemainder_ = 0U;
   metrics_ = {};
   return rebuildInterval();
 }
 
-bool FramePacer::setFastForward(bool enabled, TimePoint now) noexcept
+bool FramePacer::setSpeed(
+  EmulationSpeedMode mode,
+  std::uint32_t speedPercent,
+  TimePoint now) noexcept
 {
-  if (!frameRate_.valid()) {
+  if (!frameRate_.valid() ||
+      !validateEmulationSpeedForMode(mode, speedPercent)) {
     return false;
   }
-  if (fastForward_ == enabled) {
+  if (speedMode_ == mode && speedPercent_ == speedPercent) {
     return true;
   }
-  fastForward_ = enabled;
+  const auto previousMode = speedMode_;
+  const auto previousPercent = speedPercent_;
+  speedMode_ = mode;
+  speedPercent_ = speedPercent;
   if (!rebuildInterval()) {
-    fastForward_ = !enabled;
+    speedMode_ = previousMode;
+    speedPercent_ = previousPercent;
     static_cast<void>(rebuildInterval());
     return false;
   }
@@ -66,6 +77,15 @@ bool FramePacer::setFastForward(bool enabled, TimePoint now) noexcept
     accumulatedRemainder_ = 0U;
   }
   return true;
+}
+
+bool FramePacer::setFastForward(bool enabled, TimePoint now) noexcept
+{
+  return setSpeed(
+    enabled ? EmulationSpeedMode::fastForward
+            : EmulationSpeedMode::normal,
+    enabled ? 400U : 100U,
+    now);
 }
 
 void FramePacer::resume(TimePoint now) noexcept
@@ -124,7 +144,22 @@ bool FramePacer::isActive() const noexcept
 
 bool FramePacer::isFastForward() const noexcept
 {
-  return fastForward_;
+  return speedMode_ == EmulationSpeedMode::fastForward;
+}
+
+bool FramePacer::isSlowMotion() const noexcept
+{
+  return speedMode_ == EmulationSpeedMode::slowMotion;
+}
+
+EmulationSpeedMode FramePacer::speedMode() const noexcept
+{
+  return speedMode_;
+}
+
+std::uint32_t FramePacer::speedPercent() const noexcept
+{
+  return speedPercent_;
 }
 
 FrameRateRatio FramePacer::frameRate() const noexcept
@@ -159,17 +194,20 @@ bool FramePacer::rebuildInterval() noexcept
   if (!frameRate_.valid()) {
     return false;
   }
-  const auto multiplier = fastForward_ ? fastForwardMultiplier : 1U;
-  const auto intervalNumerator = frameRate_.framesDenominator * nanosecondsPerSecond;
-  intervalDenominator_ = frameRate_.framesNumerator * multiplier;
+  const auto intervalNumerator = frameRate_.framesDenominator *
+    nanosecondsPerSecond * percentDenominator;
+  intervalDenominator_ = frameRate_.framesNumerator * speedPercent_;
   intervalWholeNanoseconds_ = intervalNumerator / intervalDenominator_;
   intervalRemainder_ = intervalNumerator % intervalDenominator_;
   if (intervalWholeNanoseconds_ == 0U) {
     return false;
   }
   metrics_.targetFramesPerSecond =
-    frameRate_.hertz() * static_cast<double>(multiplier);
-  metrics_.fastForward = fastForward_;
+    frameRate_.hertz() * static_cast<double>(speedPercent_) /
+      static_cast<double>(percentDenominator);
+  metrics_.speedPercent = speedPercent_;
+  metrics_.fastForward = speedMode_ == EmulationSpeedMode::fastForward;
+  metrics_.slowMotion = speedMode_ == EmulationSpeedMode::slowMotion;
   return true;
 }
 

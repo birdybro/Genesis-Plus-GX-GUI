@@ -1,4 +1,5 @@
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/emulation_worker.h"
 #include "genplusgx/video/display_widget.h"
 
 #include <QApplication>
@@ -8,18 +9,22 @@
 
 #include <algorithm>
 #include <array>
+#include <chrono>
 #include <cmath>
 #include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace {
+
+using namespace std::chrono_literals;
 
 using genplusgx::CoreAudioSettings;
 using genplusgx::CoreInputDevice;
@@ -34,6 +39,37 @@ bool check(bool condition, const std::string& message)
     std::cerr << message << '\n';
   }
   return condition;
+}
+
+std::optional<genplusgx::EmulationEvent> waitForOperation(
+  genplusgx::EmulationWorker& worker,
+  std::uint64_t operationId)
+{
+  const auto deadline = std::chrono::steady_clock::now() + 5s;
+  while (std::chrono::steady_clock::now() < deadline) {
+    auto event = worker.waitForEvent(100ms);
+    if (event && event->operationId == operationId) {
+      return event;
+    }
+  }
+  return std::nullopt;
+}
+
+bool submitAndSucceed(
+  genplusgx::EmulationWorker& worker,
+  genplusgx::EmulationCommand command,
+  genplusgx::EmulationEvent& event)
+{
+  const auto operationId = command.operationId;
+  if (!worker.submit(std::move(command))) {
+    return false;
+  }
+  auto completed = waitForOperation(worker, operationId);
+  if (!completed || !completed->succeeded()) {
+    return false;
+  }
+  event = std::move(*completed);
+  return true;
 }
 
 CoreInputSettings oneDevice(CoreInputDevice device)
@@ -58,6 +94,21 @@ bool copyCurrentFrame(
   pixels.resize(frame.pixelCount());
   return adapter.copyVideoFrame(pixels, frame).ok() &&
     std::ranges::any_of(pixels, [](std::uint16_t pixel) { return pixel != 0U; });
+}
+
+bool workerFrameIsNonBlack(genplusgx::EmulationWorker& worker)
+{
+  std::vector<std::uint16_t> pixels(
+    genplusgx::VideoFrameExchange::maximumSurfacePixels);
+  CoreVideoFrameInfo frame;
+  std::uint64_t generation = 0U;
+  return worker.videoFrames()->copyLatest(pixels, frame, generation).ok() &&
+    generation > 0U && frame.pixelCount() > 0U &&
+    frame.pixelCount() <= pixels.size() &&
+    std::ranges::any_of(
+      pixels.begin(), pixels.begin() +
+        static_cast<std::ptrdiff_t>(frame.pixelCount()),
+      [](std::uint16_t pixel) { return pixel != 0U; });
 }
 
 bool publishFrame(
@@ -523,9 +574,74 @@ int main(int argc, char** argv)
         "The real-ROM acceptance session did not shut down cleanly")) {
     return 12;
   }
+  genplusgx::EmulationWorker worker;
+  genplusgx::EmulationEvent event;
+  if (!check(worker.start() && worker.waitForEvent(2s).has_value(),
+        "The real-ROM speed worker could not start") ||
+      !check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::load(1U, rom), event),
+        "The real ROM could not load through the speed worker") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::updateSpeedSettings(2U, {
+            .normalPercent = 100U,
+            .slowMotionPercent = 25U,
+            .fastForwardPercent = 800U,
+          }), event),
+        "The real-ROM speed settings were rejected") ||
+      !check(event.speedPercent == 100U,
+        "The real-ROM worker did not retain normal speed") ||
+      !check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::slowMotion(3U, true), event),
+        "The real-ROM slow-motion mode failed") ||
+      !check(event.slowMotion && !event.fastForward &&
+          event.speedPercent == 25U,
+        "The real-ROM slow-motion state was incorrect") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 4U), event),
+        "The real-ROM slow-motion frame failed") ||
+      !check(workerFrameIsNonBlack(worker),
+        "The real-ROM slow-motion frame was black") ||
+      !check(worker.audioFrames()->occupancyFrames() == 0U,
+        "The real-ROM slow-motion frame queued host audio") ||
+      !check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::fastForward(5U, true), event),
+        "The real-ROM fast-forward mode failed") ||
+      !check(event.fastForward && !event.slowMotion &&
+          event.speedPercent == 800U,
+        "The real-ROM fast-forward state was incorrect") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 6U), event),
+        "The real-ROM fast-forward frame failed") ||
+      !check(workerFrameIsNonBlack(worker),
+        "The real-ROM fast-forward frame was black") ||
+      !check(worker.audioFrames()->occupancyFrames() == 0U,
+        "The real-ROM fast-forward frame queued host audio") ||
+      !check(submitAndSucceed(
+          worker, genplusgx::EmulationCommand::fastForward(7U, false), event),
+        "The real-ROM normal-speed restore failed") ||
+      !check(event.speedPercent == 100U && !event.fastForward &&
+          !event.slowMotion,
+        "The real-ROM worker did not restore normal speed") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::frameAdvance, 8U), event),
+        "The real-ROM normal-speed frame failed") ||
+      !check(workerFrameIsNonBlack(worker),
+        "The real-ROM normal-speed frame was black") ||
+      !check(worker.audioFrames()->occupancyFrames() > 0U,
+        "The real-ROM normal-speed frame did not queue host audio") ||
+      !check(submitAndSucceed(worker,
+          genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::unloadGame, 9U), event),
+        "The real-ROM speed worker could not unload") ||
+      !check(worker.stop(), "The real-ROM speed worker could not stop")) {
+    return 13;
+  }
   std::cout << "PASS: 13 core video cases, 35 core audio cases, 12 input "
-               "devices, 36 accelerated presentation cases, and 17 system "
-               "reload cases. Comparison PNGs: "
+               "devices, 36 accelerated presentation cases, 17 system "
+               "reload cases, and 3 emulation speed modes. Comparison PNGs: "
             << outputDirectory << '\n';
   return 0;
 }

@@ -118,6 +118,31 @@ set_tests_properties(
 )
 
 qt_add_executable(
+  genplusgx_speed_settings_dialog_test speed_settings_dialog_test.cpp
+)
+set_target_properties(
+  genplusgx_speed_settings_dialog_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_speed_settings_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(
+  NAME gui.speed_settings COMMAND genplusgx_speed_settings_dialog_test
+)
+set_tests_properties(
+  gui.speed_settings
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;integration;timing;settings;persistence;accessibility"
+    TIMEOUT 30
+)
+
+qt_add_executable(
   genplusgx_session_settings_dialog_test session_settings_dialog_test.cpp
 )
 set_target_properties(

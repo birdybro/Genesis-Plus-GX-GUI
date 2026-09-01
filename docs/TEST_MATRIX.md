@@ -19,13 +19,13 @@ ctest --preset debug -L gui --output-on-failure
 | Settings center | General/Video/Audio/Input/System/BIOS/Paths/Advanced navigation, live summaries, typed editor routing, loaded-game gating, visible rejection with prior snapshot/menu preservation | `gui.settings`, `gui.main_window`, `gui.input_configuration`, `gui.appearance_accessibility` |
 | Navigation and help | Unique action IDs/shortcuts, live configurable hotkeys, embedded User Guide and Keyboard Shortcuts, one-dialog ownership, Escape/Close behavior | `gui.navigation_regression`, `gui.input_configuration` |
 | Loading | Injected Open dialog, invalid input errors, drag/drop, transactional recent-history clear/failure, replace/close, live generated-ROM frame | `gui.game_loading`, `gui.main_window` |
-| Emulation controls | Live Pause/Resume, hard/soft reset, independent fast-forward hold/toggle composition, focus-safe hold release, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `gui.emulation_controls` |
+| Emulation controls and speed | Live Pause/Resume, hard/soft reset, configurable exact normal/slow/fast rates, independent hold/toggle composition, focus-safe release, mutually exclusive rewind/slow/fast modes, paused frame advance, canonical worker-state synchronization, rejected-command rollback | `unit.speed_settings`, `unit.frame_pacer`, `core.timing_pacing`, `gui.speed_settings`, `gui.emulation_controls` |
 | Save states | Slots 0–9, save/load/delete, timestamps, changed execution, deterministic restore, wrong-game rejection, cancellable identity activation | `unit.state_storage_service`, `gui.save_state_workflow`, `gui.main_window` |
 | Session resume | Opt-in/defaults, absolute Unicode path persistence, invalid-data rejection, dedicated state save/load/delete, four-process checkpoint creation/restore, explicit command-line precedence, and corruption fallback | `unit.session_settings`, `unit.state_manager`, `unit.state_storage_service`, `gui.session_settings`, `gui.session_resume_application` |
 | Video | Native/4:3/stretch, fit/integer scaling, nearest/bilinear, overscan, NTSC filter, Game Gear extension, interlace, fullscreen, built-in/custom Libretro shader selection and parameters, real OpenGL pass-through input sampling, actual CRT widget output, Apply/Cancel/defaults | `unit.shader_configuration`, `gui.main_window`, `gui.display_widget`, `gui.libretro_shader_render` |
 | Audio | Mute/volume/core controls, live latency/device changes without ring replacement, transactional failure, stopped-output retry, concurrent logical-capacity changes, bounded hot-plug refresh/recovery, Apply/Cancel/defaults | `unit.audio_ring_buffer`, `unit.audio_output`, `gui.main_window` |
 | Keyboard input | Defaults, custom maps, focus-safe event filter, snapshots reaching a generated controller-test ROM | `gui.keyboard_input` |
-| Controller/input UI | Gameplay/hotkey capture, separate fast-forward hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
+| Controller/input UI | Gameplay/hotkey capture, separate fast-forward and slow-motion hold/toggle defaults and schema migration, duplicate and cross-domain conflicts, persistence, assignments, live specialized ports, Team Player/Master Tap, stable tabs | `core.input_devices`, `unit.input_profile`, `gui.input_configuration` |
 | BIOS | Missing/valid/invalid generated firmware, all eight paths propagated into the core, browse seam, validation status, persistence failure and Cancel | `core.firmware_application`, `gui.main_window` |
 | Sega CD | Typed change/eject requests, current-disc status, invalid image errors, tray state, bounded CUE syntax/reference preflight, composite sheet/track identity, and invalid preflight without mounted-disc mutation | `unit.game_file`, `unit.persistence`, `unit.game_metadata`, `core.sega_cd_workflow`, `gui.main_window` |
 | Game library | Directory add/remove, async scan/cancellation, CUE-track deduplication, search/system filter, favorite, sorting, local art, launch | `unit.game_library_scanner`, `gui.game_library` |
@@ -62,9 +62,10 @@ Core option-domain regressions explicitly execute 13 video choices, 35 audio
 enumeration/range-endpoint choices, all 12 exposed emulated input devices, and all 24
 system enumeration/toggle values. The generated 8-bit fixtures additionally execute
 every compatible hardware override and both Game Gear viewport modes. GUI inventory
-assertions require the corresponding combo counts/ranges plus all 30 emulator hotkeys.
+assertions require the corresponding combo counts/ranges plus all 32 emulator hotkeys.
 The optional external-ROM runner described in [TESTING.md](TESTING.md) repeats 113
-compatible runtime cases on a user-owned game and emits local comparison images.
+option cases plus three speed-mode workflows on a user-owned game and emits local
+comparison images.
 
 ## Supporting layers
 
@@ -76,7 +77,8 @@ the same deterministic corpus; optional user-supplied Sega CD BIOS tests remain 
 CI and are never counted as required.
 
 The required `core.long_running_stability` test adds accelerated 20,000-frame core
-execution, bounded queue/audio/video saturation, and repeated worker lifecycle coverage.
+execution, input/speed-command coalescing, normal/slow/fast bounded queue/audio/video
+saturation, and repeated worker lifecycle coverage.
 Detailed sanitizer and stress commands are in [TESTING.md](TESTING.md).
 
 `unit.persistence` and `unit.game_metadata` also prove that the raw SHA-256 for ordinary

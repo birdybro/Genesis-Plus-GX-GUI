@@ -150,7 +150,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "fileMenu", "emulationMenu", "videoMenu", "audioMenu", "inputMenu",
     "toolsMenu", "helpMenu", "openRecentMenu", "stateSlotMenu", "videoScaleMenu",
     "aspectRatioMenu", "filteringMenu", "overscanMenu", "ntscFilterMenu",
-    "interlacedRenderMenu", "shaderMenu"};
+    "interlacedRenderMenu", "shaderMenu", "emulationSpeedMenu"};
   for (const auto* name : menuNames) {
     QVERIFY2(window.findChild<QMenu*>(QString::fromLatin1(name)) != nullptr, name);
   }
@@ -163,7 +163,10 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     "systemSettingsAction", "biosSettingsAction", "screenshotSettingsAction",
     "diagnosticsAction", "userGuideAction", "keyboardShortcutsAction", "aboutAction",
     "aboutQtAction", "shaderDisabledAction", "builtinCrtShaderAction",
-    "loadShaderPresetAction"};
+    "loadShaderPresetAction", "speedSettingsAction", "emulationSpeed50Action",
+    "emulationSpeed75Action", "emulationSpeed100Action",
+    "emulationSpeed125Action", "emulationSpeed150Action",
+    "emulationSpeed200Action"};
   for (const auto* name : enabledNames) {
     auto* action = window.findChild<QAction*>(QString::fromLatin1(name));
     QVERIFY2(action != nullptr, name);
@@ -172,7 +175,8 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
 
   const char* gameOnlyNames[]{
     "closeGameAction", "screenshotAction", "pauseAction", "resetAction",
-    "softResetAction", "fastForwardAction", "frameAdvanceAction", "saveStateAction",
+    "softResetAction", "fastForwardAction", "slowMotionAction",
+    "frameAdvanceAction", "saveStateAction",
     "loadStateAction", "changeDiscAction", "ejectDiscAction", "cheatsAction",
     "gameInformationAction"};
   for (const auto* name : gameOnlyNames) {
@@ -184,6 +188,7 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
   QVERIFY(!window.findChild<QMenu*>(QStringLiteral("stateSlotMenu"))->isEnabled());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("pauseAction"))->isCheckable());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("fastForwardAction"))->isCheckable());
+  QVERIFY(window.findChild<QAction*>(QStringLiteral("slowMotionAction"))->isCheckable());
   QVERIFY(window.findChild<QAction*>(QStringLiteral("fullscreenAction"))->isCheckable());
 }
 
@@ -201,6 +206,8 @@ void MainWindowTest::emptyStatusIsDescriptive()
     QStringLiteral("0.0 FPS"));
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("stateSlotStatusLabel"))->text(),
     QStringLiteral("Slot 0"));
+  QCOMPARE(window.findChild<QLabel*>(QStringLiteral("speedStatusLabel"))->text(),
+    QStringLiteral("Speed 100%"));
 }
 
 void MainWindowTest::runtimeStatusReportsIdentityAndMeasuredFrameRate()

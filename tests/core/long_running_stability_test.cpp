@@ -219,29 +219,43 @@ int main()
       return 7;
     }
   }
+  for (std::uint64_t sequence = 1U; sequence <= 1'000U; ++sequence) {
+    const genplusgx::EmulationSpeedConfiguration settings{
+      .normalPercent = 100U,
+      .slowMotionPercent = (sequence % 2U) == 0U ? 25U : 50U,
+      .fastForwardPercent = (sequence % 2U) == 0U ? 800U : 400U,
+    };
+    if (!check(worker.submit(
+          genplusgx::EmulationCommand::updateSpeedSettings(
+            21'000U + sequence, settings)),
+        "Coalescing stress speed submission failed")) {
+      return 8;
+    }
+  }
   genplusgx::EmulationEvent completed;
   if (!check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
           genplusgx::EmulationCommandType::hardReset, 30'001U), &completed),
         "Coalescing stress sentinel failed")) {
-    return 8;
+    return 9;
   }
   const auto coalesced = worker.metrics();
-  if (!check(coalesced.coalescedInputCommands > 0U,
-        "Input burst did not exercise command coalescing") ||
+  if (!check(coalesced.coalescedInputCommands > 0U &&
+          coalesced.coalescedSpeedSettingsCommands > 0U,
+        "Input and speed bursts did not exercise command coalescing") ||
       !check(coalesced.commandQueueDepth <= coalesced.commandQueueCapacity &&
           coalesced.eventQueueDepth <= coalesced.eventQueueCapacity &&
           coalesced.commandQueueCapacity == 8U &&
           coalesced.eventQueueCapacity == 9U,
         "Worker queues exceeded their configured bounds")) {
-    return 9;
+    return 10;
   }
 
   if (!check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
           genplusgx::EmulationCommandType::start, 30'002U)),
         "Normal stress pacing did not start")) {
-    return 10;
+    return 11;
   }
   const auto normalTarget = worker.metrics().pacedFrameCount + 90U;
   const auto reachedNormalTarget = waitForScheduledFrames(
@@ -256,25 +270,53 @@ int main()
         genplusgx::EmulationCommand::simple(
           genplusgx::EmulationCommandType::pause, 30'003U)),
         "Normal stress pacing did not pause")) {
-    return 11;
+    return 12;
   }
   const auto audioMetrics = audioRing->metrics();
   if (!check(audioRing->occupancyFrames() <= audioRing->capacityFrames() &&
           audioMetrics.peakOccupancyFrames <= audioRing->capacityFrames() &&
           audioMetrics.overrunCount > 0U,
         "Sustained playback did not remain inside the bounded audio ring")) {
-    return 12;
+    return 13;
   }
 
   audioRing->clear();
   if (!check(submitAndSucceed(
-        worker, genplusgx::EmulationCommand::fastForward(30'004U, true)),
-        "Stress fast-forward could not enable") ||
+        worker, genplusgx::EmulationCommand::slowMotion(30'004U, true)),
+        "Stress slow motion could not enable") ||
+      !check(worker.metrics().slowMotion &&
+          worker.metrics().speedPercent == 25U,
+        "Stress slow motion did not use the last coalesced setting") ||
       !check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
           genplusgx::EmulationCommandType::resume, 30'005U)),
+        "Stress slow motion could not resume")) {
+    return 14;
+  }
+  const auto slowTarget = worker.metrics().pacedFrameCount + 20U;
+  if (!check(waitForScheduledFrames(
+        worker, slowTarget, std::chrono::steady_clock::now() + 3s),
+        "Slow-motion stress did not reach 20 scheduled frames") ||
+      !check(submitAndSucceed(worker,
+        genplusgx::EmulationCommand::simple(
+          genplusgx::EmulationCommandType::pause, 30'006U)),
+        "Slow-motion stress did not pause") ||
+      !check(audioRing->occupancyFrames() == 0U,
+        "Slow motion accumulated host audio")) {
+    return 15;
+  }
+
+  if (!check(submitAndSucceed(
+        worker, genplusgx::EmulationCommand::fastForward(30'007U, true)),
+        "Stress fast-forward could not enable") ||
+      !check(worker.metrics().fastForward && !worker.metrics().slowMotion &&
+          worker.metrics().speedPercent == 800U,
+        "Stress fast-forward did not replace slow motion at configured speed") ||
+      !check(submitAndSucceed(worker,
+        genplusgx::EmulationCommand::simple(
+          genplusgx::EmulationCommandType::resume, 30'008U)),
         "Stress fast-forward could not resume")) {
-    return 13;
+    return 16;
   }
   const auto fastTarget = worker.metrics().pacedFrameCount + 600U;
   const auto reachedFastTarget = waitForScheduledFrames(
@@ -287,9 +329,9 @@ int main()
         "Fast-forward stress did not reach 600 scheduled frames") ||
       !check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
-          genplusgx::EmulationCommandType::pause, 30'006U)),
+          genplusgx::EmulationCommandType::pause, 30'009U)),
         "Fast-forward stress did not pause")) {
-    return 14;
+    return 17;
   }
   const auto workerMetrics = worker.metrics();
   const auto videoMetrics = videoExchange->metrics();
@@ -304,15 +346,15 @@ int main()
             genplusgx::VideoFrameExchange::maximumSurfacePixels &&
           videoMetrics.publishedFrames >= 690U,
         "Sustained emulation changed the fixed video exchange allocation")) {
-    return 15;
+    return 18;
   }
 
   if (!check(submitAndSucceed(worker,
         genplusgx::EmulationCommand::simple(
-          genplusgx::EmulationCommandType::unloadGame, 30'007U)),
+          genplusgx::EmulationCommandType::unloadGame, 30'010U)),
         "Stress worker unload failed") ||
       !check(worker.stop(), "Stress worker stop failed")) {
-    return 16;
+    return 19;
   }
 
   std::uint64_t lifecycleOperation = 40'000U;
@@ -335,7 +377,7 @@ int main()
             ++lifecycleOperation)),
           "Repeated stress worker unload failed") ||
         !check(worker.stop(), "Repeated stress worker stop failed")) {
-      return 17;
+      return 20;
     }
   }
 
@@ -345,5 +387,5 @@ int main()
       check(finalLeaseProbe.shutdown(),
         "Final stress core lease shutdown failed")
     ? 0
-    : 18;
+    : 21;
 }

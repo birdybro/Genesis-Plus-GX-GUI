@@ -40,6 +40,8 @@ region-appropriate BIOS supplied by the user.
   controller profiles, deadzones, assignments, capture-based remapping, and specialized
   Genesis Plus GX device choices
 - Keyboard play controls plus capture-configurable, conflict-checked emulator hotkeys
+- Exact configurable 50–200% normal pacing, 25–75% slow motion, and 200–1600%
+  fast forward with focus-safe hold/toggle controls and an always-visible speed status
 - Bounded rewind with configurable capture interval/memory budget, focus-safe hold and
   menu-toggle controls, muted backward playback, and deterministic forward resume
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
@@ -102,6 +104,12 @@ genesis-plus-gx-gui --version
 Use **Input → Controller Configuration** to assign or remap keyboard and SDL controllers.
 Default keyboard controls and application hotkeys are listed in
 [KEYBOARD_SHORTCUTS.md](docs/KEYBOARD_SHORTCUTS.md).
+
+Choose a normal rate under **Emulation → Emulation Speed**, or open **Speed Settings…**
+to configure the normal, slow-motion, and fast-forward percentages. Hold `/` for
+momentary slow motion, use `Ctrl+/` to toggle it, hold `Tab` for fast forward, or use
+`` ` `` to toggle fast forward. Non-100% pacing intentionally pauses host audio rather
+than allowing pitch distortion or buffer drift.
 
 To continue exactly where a clean exit left off, open **Tools → Settings → General
 → Session Settings** and enable automatic session resume. The application writes a

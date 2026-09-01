@@ -66,8 +66,21 @@ Hold `Tab` for momentary fast-forward, or use **Emulation → Fast Forward Toggl
 to latch it. The two controls compose safely, and releasing the hold—or moving focus away
 from the application—cannot cancel an independently enabled toggle. While active, the
 worker uses its bounded high-rate pacing path and suppresses host audio so samples cannot
-accumulate. Disable the toggle and release the hold to return to the loaded system's exact
-PAL, NTSC, or Sega CD target. **Frame Advance**
+accumulate. Hold `/` for momentary slow motion or use **Emulation → Slow Motion Toggle**
+(`Ctrl+/`) to latch it with the same focus-safe behavior. Slow motion, fast forward, and
+rewind are mutually exclusive.
+
+**Emulation → Emulation Speed** selects a 50%, 75%, 100%, 125%, 150%, or 200% normal
+speed preset. **Speed Settings…**, also available from **Settings → Advanced**, accepts
+an exact 50–200% normal rate, 25–75% slow-motion rate, and 200–1600% fast-forward rate.
+These values persist in versioned settings and affect only frontend pacing: the core
+still executes complete frames with its authoritative PAL, NTSC, or Sega CD clocks and
+algorithms. Host audio plays only at an effective 100%; other rates deliberately pause
+and clear playback rather than adding pitch distortion, unbounded buffering, or A/V
+drift. The status bar distinguishes `Speed`, `Slow`, and `Fast` and reports the current
+percentage.
+
+**Frame Advance**
 (`N`) is available while paused and executes exactly one frame before returning to the
 paused state. The status bar reports measured FPS without using a GUI timer to drive
 emulation. It observes the worker's completed-frame counter twice per second, displays
@@ -311,7 +324,7 @@ controller button; Escape cancels capture. Duplicate bindings and unmodified key
 by emulator actions are rejected before Apply or OK can publish the profile.
 
 The **Hotkeys** tab captures unique keyboard combinations for Open/Close, the library,
-pause, hard/soft reset, fullscreen, fast forward, frame advance, save-state slots,
+pause, hard/soft reset, fullscreen, fast forward, slow motion, frame advance, save-state slots,
 screenshots, mute, and volume. Apply updates the live menu shortcuts immediately;
 Restore Defaults on this tab resets only emulator shortcuts. See
 [KEYBOARD_SHORTCUTS.md](KEYBOARD_SHORTCUTS.md) for the complete default table.

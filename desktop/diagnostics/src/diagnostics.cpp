@@ -383,6 +383,12 @@ std::string formatDiagnostics(
          << snapshot.audioCapacityFrames << '\n'
          << "Audio underruns: " << snapshot.audioUnderruns << '\n'
          << "Audio overruns: " << snapshot.audioOverruns << '\n'
+         << "Active speed: " << snapshot.activeSpeedPercent << "%"
+         << (snapshot.fastForwarding ? " (fast forward)"
+             : snapshot.slowMotion ? " (slow motion)" : "") << '\n'
+         << "Configured speeds: Normal " << snapshot.normalSpeedPercent
+         << "%, slow motion " << snapshot.slowMotionSpeedPercent
+         << "%, fast forward " << snapshot.fastForwardSpeedPercent << "%\n"
          << "Rewind: " << (snapshot.rewindEnabled ? "Enabled" : "Disabled")
          << (snapshot.rewinding ? " (active)" : "") << '\n'
          << "Rewind snapshots: " << snapshot.rewindSnapshots << '\n'

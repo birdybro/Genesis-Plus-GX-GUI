@@ -35,6 +35,11 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.rewindSnapshots = 7U;
     snapshot.rewindPayloadBytes = 7U * 1024U;
     snapshot.rewindMemoryLimitBytes = 64U * 1024U;
+    snapshot.normalSpeedPercent = 125U;
+    snapshot.slowMotionSpeedPercent = 50U;
+    snapshot.fastForwardSpeedPercent = 800U;
+    snapshot.activeSpeedPercent = 50U;
+    snapshot.slowMotion = true;
     snapshot.loggerActive = true;
     snapshot.logger.writtenMessages = 42U;
     snapshot.bios.push_back({
@@ -67,6 +72,10 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
   QVERIFY(report->toPlainText().contains(QStringLiteral("Controllers: 2")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind: Enabled")));
   QVERIFY(report->toPlainText().contains(QStringLiteral("Rewind snapshots: 7")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Active speed: 50% (slow motion)")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("do-not-copy")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("/users/private")));
 

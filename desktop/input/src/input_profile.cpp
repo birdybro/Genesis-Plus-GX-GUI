@@ -61,6 +61,8 @@ constexpr std::array hotkeyActions{
   EmulatorHotkeyAction::fullscreen,
   EmulatorHotkeyAction::fastForwardHold,
   EmulatorHotkeyAction::fastForwardToggle,
+  EmulatorHotkeyAction::slowMotionHold,
+  EmulatorHotkeyAction::slowMotionToggle,
   EmulatorHotkeyAction::rewindHold,
   EmulatorHotkeyAction::frameAdvance,
   EmulatorHotkeyAction::saveState,
@@ -506,6 +508,63 @@ InputProfileLoadResult parseConfiguration(const QByteArray& bytes)
     configuration.hotkeys.push_back(
       {EmulatorHotkeyAction::rewindHold, *available});
   }
+  const auto addMigratedHotkey =
+    [&configuration](EmulatorHotkeyAction action, const auto& candidates) {
+      if (std::ranges::any_of(
+            configuration.hotkeys, [action](const HotkeyBinding& binding) {
+              return binding.action == action;
+            })) {
+        return true;
+      }
+      const auto available = std::ranges::find_if(candidates,
+        [&configuration](int candidate) {
+          const auto combination = QKeyCombination::fromCombined(candidate);
+          const auto key = combination.key();
+          const bool hotkeyUsed = std::ranges::any_of(
+            configuration.hotkeys, [candidate](const HotkeyBinding& binding) {
+              return binding.keyCombination == candidate;
+            });
+          const bool gameplayUsed = std::ranges::any_of(
+            configuration.profiles, [key](const InputProfile& profile) {
+              return std::ranges::any_of(
+                profile.keyboardBindings, [key](const KeyboardBinding& binding) {
+                  return binding.key == key;
+                });
+            });
+          return !hotkeyUsed &&
+            (combination.keyboardModifiers().testAnyFlags(
+               Qt::ControlModifier | Qt::AltModifier | Qt::MetaModifier) ||
+             !gameplayUsed);
+        });
+      if (available == candidates.end()) {
+        return false;
+      }
+      configuration.hotkeys.push_back({action, *available});
+      return true;
+    };
+  if (schema >= 2 && schema < 5) {
+    const std::array slowHoldCandidates{
+      combined(Qt::NoModifier, Qt::Key_Slash),
+      combined(Qt::ShiftModifier, Qt::Key_Slash),
+      combined(Qt::NoModifier, Qt::Key_F10),
+    };
+    const std::array slowToggleCandidates{
+      combined(Qt::ControlModifier, Qt::Key_Slash),
+      combined(Qt::AltModifier, Qt::Key_Slash),
+      combined(Qt::NoModifier, Qt::Key_F9),
+    };
+    if (!addMigratedHotkey(
+          EmulatorHotkeyAction::slowMotionHold, slowHoldCandidates) ||
+        !addMigratedHotkey(
+          EmulatorHotkeyAction::slowMotionToggle, slowToggleCandidates)) {
+      return {
+        .status = failure(InputProfileError::parseFailed,
+          "No conflict-free keys are available for the slow-motion hotkey migration."),
+        .exists = true,
+        .configuration = defaultInputConfiguration(),
+      };
+    }
+  }
   const auto validation = validateInputConfiguration(configuration);
   if (!validation) {
     return {
@@ -545,6 +604,10 @@ std::string_view emulatorHotkeyActionName(EmulatorHotkeyAction action) noexcept
     return "fast-forward-hold";
   case EmulatorHotkeyAction::fastForwardToggle:
     return "fast-forward-toggle";
+  case EmulatorHotkeyAction::slowMotionHold:
+    return "slow-motion-hold";
+  case EmulatorHotkeyAction::slowMotionToggle:
+    return "slow-motion-toggle";
   case EmulatorHotkeyAction::rewindHold:
     return "rewind-hold";
   case EmulatorHotkeyAction::frameAdvance:
@@ -724,6 +787,10 @@ std::vector<HotkeyBinding> defaultEmulatorHotkeys()
       combined(Qt::NoModifier, Qt::Key_Tab)},
     {EmulatorHotkeyAction::fastForwardToggle,
       combined(Qt::NoModifier, Qt::Key_QuoteLeft)},
+    {EmulatorHotkeyAction::slowMotionHold,
+      combined(Qt::NoModifier, Qt::Key_Slash)},
+    {EmulatorHotkeyAction::slowMotionToggle,
+      combined(control, Qt::Key_Slash)},
     {EmulatorHotkeyAction::rewindHold,
       combined(Qt::NoModifier, Qt::Key_Backspace)},
     {EmulatorHotkeyAction::frameAdvance, combined(Qt::NoModifier, Qt::Key_N)},
