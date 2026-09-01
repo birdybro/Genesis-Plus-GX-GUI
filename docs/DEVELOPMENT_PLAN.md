@@ -101,7 +101,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
-| 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
+| 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
@@ -4133,9 +4133,22 @@ DMG creation then encountered a transient `hdiutil: create failed - Resource bus
 DMG packaging now retries only that condition at most three times, waits five/ten
 seconds, removes only its normalized CPack staging subtree, and fails permanent errors
 immediately. The deterministic infrastructure test covers every branch. All six
-updated local graphs pass at the counts above. Cross-platform completion requires the
-exact second corrective CI and artifact/log audit; its traceable evidence is recorded
-in the closure commit after that run passes.
+updated local graphs pass at the counts above.
+
+Exact second-correction run
+[`33557517745`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33557517745)
+against `a87c6c0791fcd89fccfa6a824595036d944dbfa7` passes all ten jobs. Each of the
+nine native configurations registers 103 tests; Linux, ASan/UBSan, and both macOS
+architectures execute all 103 in Debug and Release, while Windows Debug/Release pass
+every supported test and capability-skip only the known real-OpenGL context test. The
+14,880-line, 1,992,436-byte complete log contains no annotation, authored warning,
+sanitizer finding, failed test, timeout, unexpected skip, or packaging diagnostic.
+All six package checksums, four extracted ZIP/TGZ layouts, both DMG containers, safe
+archive paths and symlinks, and the expected x86-64/arm64 executable and shader-runtime
+architectures pass independent inspection. The Linux artifact resolves all 22 packaged
+ELF dependency graphs and its downloaded executable completes a native-XCB portable
+event-loop startup/shutdown without an external library path. Every archive excludes
+pre-created user data, ROM/BIOS content, credentials, and other prohibited payloads.
 
 **Acceptance criteria:** Portable selection is explicit per process; placement is
 executable-relative and independent of the working directory; macOS data remains
@@ -4143,8 +4156,9 @@ outside the signed app bundle; initialization failure is fatal and descriptive;
 normal profile data is never redirected or migrated; packages contain no user data;
 and local plus exact hosted gates pass.
 
-**Commit SHA:** pending (resolve with `git log -1 -- desktop/persistence/src/persistence.cpp`;
-a commit cannot contain its own SHA)
+**Commit SHA:** implementation `538eedb8b4be7aa305ffbaca3091044a6870be3a`;
+test-timeout correction `a30bbdf6005acdaf31a2758fa13ab53c6b7a7000`;
+cross-platform release-gate correction `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
 
 ## Milestone 83 detail
 

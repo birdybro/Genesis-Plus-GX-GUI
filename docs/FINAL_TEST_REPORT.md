@@ -43,9 +43,10 @@ verification through 2026-09-01
   `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
 - Exact cheat import/RAM-search implementation and hosted evidence baseline:
   `63eaa554634b138f8f0ce2025a7d28f88324b9d6`
-- Exact portable-mode implementation: the current commit containing the
-  `ApplicationPaths::fromPortableExecutable()` change; the subsequent evidence closure
-  records its immutable SHA and exact hosted run
+- Exact portable-mode implementation:
+  `538eedb8b4be7aa305ffbaca3091044a6870be3a`
+- Exact portable-mode cross-platform release-gate and hosted evidence baseline:
+  `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -165,8 +166,30 @@ portable startup, and ZIP generation before `hdiutil` reports a transient
 `Resource busy` during DMG creation. Both workflows now use a tested three-attempt
 transient-only wrapper with scoped staging cleanup, bounded waits, immediate permanent-
 error failure, and filesystem-root rejection. All six current local graphs pass at
-the 103/101 counts above. Exact second-correction hosted and artifact/log evidence is
-added after the pushed run completes.
+the 103/101 counts above.
+
+Exact second-correction run
+[`33557517745`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33557517745)
+passes all ten jobs at `a87c6c0791fcd89fccfa6a824595036d944dbfa7`. All nine native
+configurations register 103 tests. Linux, ASan/UBSan, and Apple Silicon/Intel macOS
+Debug/Release execute all 103; Windows Debug/Release pass every supported test and
+capability-skip only the known real-OpenGL test. GitHub reports zero annotations. The
+complete 14,880-line, 1,992,436-byte log has no authored warning, sanitizer signature,
+failed test, timeout, unexpected skip, DMG retry, or packaging error. Expected MSVC
+pthread probes and absent optional Vulkan headers remain non-actionable configure
+messages.
+
+All six downloaded SHA-256 files verify. The Linux TGZ is 40,240,569 bytes; the
+Windows ZIP is 52,713,873 bytes; the macOS arm64 ZIP/DMG are 32,129,528/32,071,619
+bytes; and the macOS x86-64 ZIP/DMG are 32,957,754/32,885,412 bytes. Four extracted
+layouts pass the production package verifier, both DMGs pass container inspection,
+all archive paths and symlinks remain contained, and primary binaries are the expected
+Linux/Windows x86-64 and macOS arm64/x86-64 architectures. The downloaded Linux
+artifact resolves all 22 ELF dependency graphs and runs `--version` without an
+external library path. Its actual executable then enters and exits the native XCB
+event loop in portable mode and writes exactly the documented data hierarchy beside
+the executable. No archive ships `portable-data`, a ROM/BIOS, credentials, or another
+prohibited payload.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,
