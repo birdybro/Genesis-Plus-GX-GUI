@@ -114,14 +114,18 @@ int main()
   const auto normalElapsed = std::chrono::steady_clock::now() - normalStart;
   const auto normalSeconds = std::chrono::duration<double>(normalElapsed).count();
   const auto normalRate = static_cast<double>(normalFrames) / normalSeconds;
-  if (!(normalElapsed > 400ms && normalElapsed < 800ms)) {
+  const bool normalCadenceIsBounded =
+    normalElapsed > 400ms && normalElapsed < 800ms;
+  if (!normalCadenceIsBounded) {
     std::cerr << "Measured normal cadence: " << normalSeconds << " s, "
               << normalRate << " fps\n";
   }
-  if (!check(normalElapsed > 400ms && normalElapsed < 800ms,
+  // The elapsed-time gate already measures the effective frame rate. Keep one
+  // internally consistent integration tolerance: 30 frames in 400--800 ms is
+  // 37.5--75 fps. A separate 40 fps floor made the accepted 750--800 ms part
+  // of that window fail nondeterministically on loaded CI hosts.
+  if (!check(normalCadenceIsBounded,
         "Normal pacing ran wildly outside the NTSC frame interval") ||
-      !check(normalRate > 40.0 && normalRate < 80.0,
-        "Measured normal frame rate is outside its integration tolerance") ||
       !check(submitAndSucceed(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::pause, 4U)),
