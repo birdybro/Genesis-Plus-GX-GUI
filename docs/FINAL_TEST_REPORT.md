@@ -97,8 +97,11 @@ waits for game identity/hardware activation before restoring and starting playba
 Three new tests cover the versioned settings model, GUI editor, and a real four-launch
 desktop process workflow; state-manager/service tests also cover the dedicated
 checkpoint. Debug, Release, and ASan/UBSan suites each pass 88/88 locally; the
-shader-disabled graph passes 86/86. Cross-platform hosted verification for this
-milestone is pending its implementation commit.
+shader-disabled graph passes 86/86. A fresh warning-as-error Clang 22 build passes
+88/88 after the first hosted attempt identified and corrected two Apple Clang unused
+lambda-capture diagnostics. A simultaneously loaded local matrix exposed and corrected
+a test-only rewind-metrics observation race; the command event remains the authoritative
+invalidation result. Cross-platform hosted verification of the corrections is pending.
 
 ## Build configurations tested
 
@@ -112,6 +115,7 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 | Release | Optimized native x86-64 | 88/88 | Passed |
 | ASan + UBSan | Debug instrumentation, leak detection | 88/88 | Passed; no finding |
 | Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 86/86 | Passed |
+| Clang 22 | Warning-gated Debug | 88/88 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;

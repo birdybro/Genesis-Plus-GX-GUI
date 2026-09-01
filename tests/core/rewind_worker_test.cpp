@@ -163,8 +163,7 @@ int main()
   if (!check(submitAndSucceed(worker,
         EmulationCommand::updateAudioSettings(7U, changedAudio), event),
         "State-changing audio settings were rejected") ||
-      !check(!event.rewindAvailable &&
-        worker.metrics().rewindSnapshotCount == 1U,
+      !check(!event.rewindAvailable,
         "State-changing audio settings did not invalidate old rewind history")) {
     static_cast<void>(worker.stop());
     return EXIT_FAILURE;

@@ -4108,7 +4108,15 @@ that replaces the invalid file after normal emulation.
 the ASan/UBSan build passes 88/88 with leak detection and halt-on-error enabled; and a
 fresh warning-gated shader-disabled graph passes 86/86. Those runs include the real
 OpenGL/librashader gate where configured and the four-launch application workflow. A
-staged self-contained Linux install passes structural verification and reports version
+fresh warning-as-error Clang 22 Debug build also passes 88/88. The first hosted attempt,
+run `33469439029`, found two unused lambda captures rejected by Apple Clang; removing
+them preserves the capture list's ownership semantics. Running the four local matrices
+concurrently also exposed a test-only observation race: the state-changing command's
+published event correctly reported invalidated rewind history, while a later live
+metrics read could legitimately observe the next frame's new snapshot. The regression
+now asserts the command event rather than racing subsequent emulation, and passed 25
+consecutive loaded Clang runs before every complete local matrix was repeated. A staged
+self-contained Linux install passes structural verification and reports version
 0.1.1; CPack produces a checksum-verified
 `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`; and the preserved Unix libretro target
 builds, links, and cleans. Exact cross-platform hosted verification remains required

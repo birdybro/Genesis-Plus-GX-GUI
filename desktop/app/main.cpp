@@ -1869,7 +1869,7 @@ int main(int argc, char* argv[])
      &deferredLibraryLaunches, &flushDeferredLibraryLaunches, &gameGeneration,
      &gameLibraryScanner, &globalGameSettings,
      &diagnosticLoadedGame, &diagnosticLoadedRegion, &diagnosticLoadedSystem,
-     &inputAggregator, &inputConfiguration, &inputOperationId,
+     &inputConfiguration,
      &libraryScansInFlight,
      &lifecycleOperationId,
      &metadataService, &pendingDisc,
