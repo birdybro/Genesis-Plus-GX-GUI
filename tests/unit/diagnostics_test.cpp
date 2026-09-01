@@ -74,6 +74,9 @@ int main()
 
   auto snapshot = staticDiagnosticsSnapshot();
   snapshot.applicationDataMode = "Portable";
+  snapshot.requestedInterfaceLanguage = "system";
+  snapshot.effectiveInterfaceLanguage = "en";
+  snapshot.interfaceLanguageFallback = true;
   snapshot.renderer = "OpenGL";
   snapshot.presentationSync =
     "Adaptive requested; effective swap interval -1";
@@ -136,6 +139,9 @@ int main()
                !snapshot.qtVersion.empty() && !snapshot.sdlVersion.empty() &&
                report.find("OpenGL") != std::string::npos &&
                report.find("Application data mode: Portable") != std::string::npos &&
+               report.find("Requested interface language: system") != std::string::npos &&
+               report.find("Effective interface language: en") != std::string::npos &&
+               report.find("Interface language fallback: Yes") != std::string::npos &&
                report.find("Presentation sync: Adaptive") != std::string::npos &&
                report.find("Video artwork: Overlay active") != std::string::npos &&
                report.find("Video artwork dimensions: 1920 x 1080") != std::string::npos &&

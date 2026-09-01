@@ -1,5 +1,7 @@
 #include "genplusgx/ui/settings_dialog.h"
 
+#include "genplusgx/localization/localization.h"
+
 #include <QDialogButtonBox>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -351,9 +353,12 @@ void SettingsDialog::dispatch(SettingsPageAction action)
 void SettingsDialog::refresh()
 {
   generalSummary_->setText(
-    tr("Theme: %1\nHigh-DPI policy: operating-system scaling\nDebug tools: %2\n"
-       "Resume last session: %3")
+    tr("Theme: %1\nLanguage: %2 (changes after restart)\n"
+       "High-DPI policy: operating-system scaling\nDebug tools: %3\n"
+       "Resume last session: %4")
       .arg(themeName(overview_.appearance.theme),
+        localization::languagePreferenceDisplayName(
+          overview_.appearance.language),
         overview_.appearance.developerToolsEnabled ? tr("enabled") : tr("hidden"),
         overview_.session.resumeOnLaunch ? tr("enabled") : tr("disabled")));
   videoSummary_->setText(

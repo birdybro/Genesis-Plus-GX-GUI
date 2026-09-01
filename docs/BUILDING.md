@@ -10,7 +10,7 @@ regenerate those legacy builds.
 - Ninja
 - Git (for embedded commit diagnostics; source archives fall back to `unknown`)
 - A C++20 compiler: GCC/Clang, Visual Studio 2022, or current Apple Clang
-- Qt 6.5 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, and Test
+- Qt 6.5 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools
 - SDL 3.2 or newer with its CMake config package
 - Rust and Cargo 1.88 or newer for the default Libretro shader runtime
 - Platform OpenGL/window-system development files on Linux
@@ -41,6 +41,12 @@ The CHD, zlib, zstd, LZMA, FLAC, Tremor, and minimp3 decoder sources needed by t
 are bundled. With shader support enabled, CMake downloads the checksum-pinned
 librashader 0.12.0 source archive and Cargo builds its OpenGL C API runtime. CMake never
 downloads ROM/BIOS material or an external shader pack.
+
+Qt LinguistTools provides `lupdate` and `lrelease`. The normal desktop build compiles
+the committed translation catalog and stages it beside the build-tree executable;
+install and package targets place it in the platform resource directory. Translation
+maintainers can use `genplusgx_update_translations` and `genplusgx_lrelease`; the exact
+workflow and placeholder rules are in [LOCALIZATION.md](LOCALIZATION.md).
 
 ## Linux
 

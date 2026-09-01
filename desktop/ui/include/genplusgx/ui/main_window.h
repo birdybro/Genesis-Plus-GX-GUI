@@ -77,6 +77,8 @@ enum class EmulationUiOperation {
 };
 
 class MainWindow final : public QMainWindow {
+  Q_OBJECT
+
 public:
   using InputConfigurationSink =
     std::function<PersistenceStatus(const input::InputConfiguration&)>;

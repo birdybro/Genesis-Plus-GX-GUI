@@ -40,6 +40,8 @@ if(VERIFY_PLATFORM STREQUAL "windows")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
   set(portable_data_directory "${package_root}/bin/portable-data")
+  set(translation_directory
+    "${package_root}/share/Genesis-Plus-GX-GUI/translations")
 elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(bundle "${package_root}/genesis-plus-gx-gui.app")
   require_file(
@@ -55,6 +57,7 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(librashader_license
     "${bundle}/Contents/Resources/licenses/librashader-MPL-2.0.md")
   set(portable_data_directory "${package_root}/portable-data")
+  set(translation_directory "${bundle}/Contents/Resources/translations")
 elseif(VERIFY_PLATFORM STREQUAL "linux")
   require_file(
     "${package_root}/bin/genesis-plus-gx-gui"
@@ -103,6 +106,8 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
   set(portable_data_directory "${package_root}/bin/portable-data")
+  set(translation_directory
+    "${package_root}/share/Genesis-Plus-GX-GUI/translations")
 else()
   message(FATAL_ERROR "Unsupported VERIFY_PLATFORM value: ${VERIFY_PLATFORM}")
 endif()
@@ -117,5 +122,8 @@ require_file(
 require_file(
   "${shader_directory}/genplusgx-crt.slang" "built-in CRT shader source")
 require_file("${librashader_license}" "librashader MPL-2.0 license")
+require_file(
+  "${translation_directory}/genplusgx_en_XA.qm"
+  "pseudo-localization catalog")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

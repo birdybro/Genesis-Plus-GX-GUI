@@ -72,6 +72,9 @@ rewritten.
   RetroArch/plain-text cheat import, live RAM search, and sparse per-game overrides
 - System/light/dark themes, structured rotating logs, and copyable privacy-filtered
   diagnostics
+- Startup-safe Qt localization with persisted system/English selection, explicit
+  English fallback, and a packaged expanded pseudo-language for cross-platform layout
+  and untranslated-string regression testing
 - Unified General/Video/Audio/Input/System/BIOS/Paths/Advanced settings center with
   live summaries and direct access to each validated category editor
 - Opt-in native debug workspace with live CPU, memory, VDP, sound, input, and validated
@@ -173,7 +176,9 @@ never downloaded by the application. See [BIOS.md](docs/BIOS.md).
 The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
 cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),
 [the game library](docs/GAME_LIBRARY.md), [cheats](docs/CHEATS.md), and
-[appearance/accessibility](docs/APPEARANCE_AND_ACCESSIBILITY.md).
+[appearance/accessibility](docs/APPEARANCE_AND_ACCESSIBILITY.md). Interface language,
+fallback behavior, and translation contributions are documented in
+[LOCALIZATION.md](docs/LOCALIZATION.md).
 
 ## User data and saves
 
@@ -207,9 +212,9 @@ for platform launch examples and relocation rules.
 ## Building from source
 
 The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.5+ with Core,
-Gui, Widgets, OpenGLWidgets, Sql, and Test modules, SDL 3.2+, and Rust/Cargo 1.88+ for
-the default Libretro shader runtime. Once CMake can locate the Qt and SDL config
-packages:
+Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools modules, SDL 3.2+, and
+Rust/Cargo 1.88+ for the default Libretro shader runtime. Once CMake can locate the Qt
+and SDL config packages:
 
 ```bash
 cmake --preset debug

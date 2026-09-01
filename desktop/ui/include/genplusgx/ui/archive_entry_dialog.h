@@ -14,6 +14,8 @@ class QListWidget;
 namespace genplusgx::ui {
 
 class ArchiveEntryDialog final : public QDialog {
+  Q_OBJECT
+
 public:
   ArchiveEntryDialog(
     const std::filesystem::path& archivePath,

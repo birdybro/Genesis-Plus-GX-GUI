@@ -1830,6 +1830,8 @@ void MainWindow::showAppearanceSettings()
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setSettingsSink(
     [this](const settings::AppearanceSettings& settings) {
+      const bool languageChanged =
+        appearanceSettings_.language != settings.language;
       if (appearanceSettingsSink_) {
         const auto saved = appearanceSettingsSink_(settings);
         if (!saved) {
@@ -1838,7 +1840,10 @@ void MainWindow::showAppearanceSettings()
       }
       appearanceSettings_ = settings;
       refreshSettingsDialog();
-      statusBar()->showMessage(tr("Appearance settings applied."), 3'000);
+      statusBar()->showMessage(languageChanged
+          ? tr("Appearance settings saved. Language changes after restart.")
+          : tr("Appearance settings applied."),
+        5'000);
       return PersistenceStatus{};
     });
   dialog->open();

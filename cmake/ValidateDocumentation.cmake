@@ -23,6 +23,7 @@ set(required_documents
   docs/KEYBOARD_SHORTCUTS.md
   docs/INPUT_CONFIGURATION.md
   docs/LIBRETRO_SHADERS.md
+  docs/LOCALIZATION.md
   docs/ARTWORK_OVERLAYS.md
   docs/DISPLAY_SYNCHRONIZATION.md
   docs/RECORDING.md
@@ -79,6 +80,8 @@ require_document_text(README.md "currently version ${EXPECTED_VERSION}")
 require_document_text(README.md "official upstream Genesis Plus GX project")
 require_document_text(README.md "Windows 10/11 x64")
 require_document_text(README.md "macOS Apple Silicon and Intel")
+require_document_text(docs/LOCALIZATION.md "unit.translation_catalog")
+require_document_text(docs/LOCALIZATION.md "Pseudo-localization (layout testing)")
 
 foreach(component IN ITEMS
     "Qt 6"

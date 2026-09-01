@@ -1,5 +1,7 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 
+#include "genplusgx/localization/localization.h"
+
 #include <QComboBox>
 #include <QCheckBox>
 #include <QDialogButtonBox>
@@ -20,7 +22,7 @@ AppearanceSettingsDialog::AppearanceSettingsDialog(
   setObjectName(QStringLiteral("appearanceSettingsDialog"));
   setWindowTitle(tr("Appearance Settings"));
   setModal(false);
-  setMinimumSize(480, 300);
+  setMinimumSize(520, 440);
 
   auto* root = new QVBoxLayout(this);
   auto* introduction =
@@ -48,6 +50,32 @@ AppearanceSettingsDialog::AppearanceSettingsDialog(
   themeLabel->setBuddy(theme_);
   form->addRow(themeLabel, theme_);
   root->addWidget(group);
+
+  auto* languageGroup = new QGroupBox(tr("Interface language"), this);
+  languageGroup->setObjectName(QStringLiteral("languageGroup"));
+  auto* languageLayout = new QFormLayout(languageGroup);
+  language_ = new QComboBox(languageGroup);
+  language_->setObjectName(QStringLiteral("languageCombo"));
+  language_->setAccessibleName(tr("Interface language"));
+  language_->setAccessibleDescription(tr(
+    "Select the operating-system language, English, or the layout-test locale."));
+  for (const auto& choice : localization::languageChoices()) {
+    language_->addItem(choice.displayName,
+      QString::fromStdString(choice.preference));
+  }
+  auto* languageLabel = new QLabel(tr("&Language:"), languageGroup);
+  languageLabel->setObjectName(QStringLiteral("languageLabel"));
+  languageLabel->setBuddy(language_);
+  languageLayout->addRow(languageLabel, language_);
+  auto* languageNotice = new QLabel(
+    tr("Language changes take effect the next time the application starts. "
+       "The pseudo-localization option is intentionally expanded and accented "
+       "so contributors can find clipping and untranslated text."),
+    languageGroup);
+  languageNotice->setObjectName(QStringLiteral("languageRestartNotice"));
+  languageNotice->setWordWrap(true);
+  languageLayout->addRow(languageNotice);
+  root->addWidget(languageGroup);
 
   auto* developerGroup = new QGroupBox(tr("Developer features"), this);
   developerGroup->setObjectName(QStringLiteral("developerFeaturesGroup"));
@@ -111,7 +139,8 @@ AppearanceSettingsDialog::AppearanceSettingsDialog(
   connect(cancel, &QPushButton::clicked, this, &QDialog::reject);
   root->addWidget(buttons);
 
-  QWidget::setTabOrder(theme_, developerTools_);
+  QWidget::setTabOrder(theme_, language_);
+  QWidget::setTabOrder(language_, developerTools_);
   QWidget::setTabOrder(developerTools_, restore);
   QWidget::setTabOrder(restore, applyButton);
   QWidget::setTabOrder(applyButton, ok);
@@ -128,6 +157,7 @@ settings::AppearanceSettings AppearanceSettingsDialog::settings() const
 {
   return {
     .theme = static_cast<settings::ThemeMode>(theme_->currentData().toInt()),
+    .language = language_->currentData().toString().toStdString(),
     .developerToolsEnabled = developerTools_->isChecked(),
   };
 }
@@ -141,6 +171,11 @@ void AppearanceSettingsDialog::setSettings(const settings::AppearanceSettings& v
   if (index >= 0) {
     theme_->setCurrentIndex(index);
   }
+  const auto languageIndex = language_->findData(
+    QString::fromStdString(value.language));
+  if (languageIndex >= 0) {
+    language_->setCurrentIndex(languageIndex);
+  }
   developerTools_->setChecked(value.developerToolsEnabled);
   validation_->clear();
   validation_->hide();
@@ -150,7 +185,8 @@ bool AppearanceSettingsDialog::apply()
 {
   const auto value = settings();
   if (!settings::validateAppearanceSettings(value)) {
-    validation_->setText(tr("Select a valid application theme."));
+    validation_->setText(
+      tr("Select a valid application theme and interface language."));
     validation_->show();
     return false;
   }

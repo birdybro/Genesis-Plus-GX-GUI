@@ -102,7 +102,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
-| 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
+| 91 Localization | IN PROGRESS | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 107-test local graphs; extraction, fallback, layout, package, hosted matrix | English fallback, locale behavior, and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
@@ -4159,6 +4159,57 @@ and local plus exact hosted gates pass.
 **Commit SHA:** implementation `538eedb8b4be7aa305ffbaca3091044a6870be3a`;
 test-timeout correction `a30bbdf6005acdaf31a2758fa13ab53c6b7a7000`;
 cross-platform release-gate correction `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
+
+## Milestone 91 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Add a secure Qt Linguist localization boundary, persisted language choice,
+English fallback, packaged catalog, and locale/layout regression coverage without
+making translated text part of persistence, automation, or core behavior.
+
+**Files changed:**
+
+- catalog selection/discovery/status under `desktop/localization`
+- application startup composition, schema-3 appearance persistence, language UI,
+  settings summary, diagnostics, and stable translation contexts
+- Qt `lupdate`/`lrelease` CMake targets, deterministic pseudo generator, 991-message
+  `en_XA` TS catalog, platform install paths, and package verification
+- unit, GUI, actual-process, package-fixture, workflow, architecture, build, user,
+  testing, changelog, localization, test-report, and milestone documentation
+
+**Tests added:** `unit.localization` covers the closed preference set, exact catalog
+loading and replacement, unavailable/invalid fallback, host locale preservation, and
+absolute package-relative search roots. `unit.translation_catalog` independently
+extracts every desktop string and rejects source/context drift, missing meta-object
+contexts, unfinished messages, placeholder damage, unjustified identity translations,
+or an invalid compiled QM. `gui.localization` constructs the real translated shell and
+appearance workflow, checks all named actions and display text, stable object names and
+model data, expanded layout/wrapping, RTL inheritance, and keyboard navigation.
+`gui.desktop_pseudo_localization_smoke` enters the actual application event loop with a
+schema-3 pseudo preference and requires structured requested/effective/fallback proof.
+
+**Gate evidence:** Warning-as-error GCC Debug and optimized Release, leak-detecting
+ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 107/107 tests. The
+shader-disabled graph passes all 105 applicable tests. All four localization tests pass
+in every local graph; the generated pseudo catalog is byte-for-byte deterministic and
+Qt extraction emits no context warning. A strict inherited Unix libretro build/link/
+clean succeeds. A fresh staged Linux install and TGZ pass the production package
+verifier and checksum, contain the catalog and guide, exclude portable user data, run
+the installed pseudo-language event-loop smoke, resolve all 22 ELF files, and start the
+extracted executable with no external library path. Workflow YAML parses. The
+implementation commit, exact ten-job hosted matrix, complete-log audit, and native
+artifact audit are still pending; no Milestone 92 work may start first.
+
+**Acceptance criteria:** Translation is installed before widgets exist; preferences
+cannot select arbitrary files; missing/invalid catalogs leave a complete English UI;
+System language preserves locale direction and formatting; source English, placeholders,
+object names, settings keys, and core values remain stable; the complete desktop UI is
+extractable and pseudo-translated; every package carries the tested catalog; all local
+and exact hosted gates pass; and no natural-language quality is claimed without fluent
+review.
+
+**Commit SHA:** pending
 
 ## Milestone 83 detail
 

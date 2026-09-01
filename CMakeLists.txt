@@ -51,7 +51,10 @@ set(GENPLUSGX_APP_NAME "Genesis Plus GX GUI")
 set(GENPLUSGX_APP_ID "org.genesisplusgx.gui")
 set(GENPLUSGX_VERSION "${PROJECT_VERSION}")
 
-find_package(Qt6 6.5 REQUIRED COMPONENTS Core Gui Widgets OpenGLWidgets Sql Test)
+find_package(
+  Qt6 6.5 REQUIRED
+  COMPONENTS Core Gui Widgets LinguistTools OpenGLWidgets Sql Test
+)
 if(UNIX AND NOT APPLE)
   find_package(Qt6 6.5 REQUIRED COMPONENTS DBus)
 endif()
@@ -120,6 +123,7 @@ add_subdirectory(desktop/screenshots)
 add_subdirectory(desktop/capture)
 add_subdirectory(desktop/input)
 add_subdirectory(desktop/platform)
+add_subdirectory(desktop/localization)
 add_subdirectory(desktop/settings)
 add_subdirectory(desktop/library)
 

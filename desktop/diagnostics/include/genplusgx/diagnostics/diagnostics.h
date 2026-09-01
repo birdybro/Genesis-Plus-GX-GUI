@@ -88,6 +88,9 @@ struct DiagnosticsSnapshot final {
   std::string operatingSystem;
   std::string architecture;
   std::string applicationDataMode;
+  std::string requestedInterfaceLanguage;
+  std::string effectiveInterfaceLanguage;
+  bool interfaceLanguageFallback{false};
   std::string renderer;
   std::string presentationSync;
   std::string presentationBuffering;

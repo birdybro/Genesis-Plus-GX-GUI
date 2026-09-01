@@ -29,6 +29,7 @@ add_library(genplusgx_video_widget STATIC
   src/display_widget.cpp
   src/libretro_shader_runtime.cpp
 )
+set_target_properties(genplusgx_video_widget PROPERTIES AUTOMOC ON)
 add_library(GenesisPlusGX::VideoWidget ALIAS genplusgx_video_widget)
 target_include_directories(
   genplusgx_video_widget

@@ -63,6 +63,12 @@ Normal packages must also contain the platform librashader runtime, the original
 treats each as required. Custom user shader packs are never copied into or downloaded
 by packaging.
 
+Every package also contains `genplusgx_en_XA.qm` in its platform translation resource
+directory. This expanded catalog is the deterministic localization/layout test and is
+compiled by Qt `lrelease` as part of the desktop target. The verifier rejects a package
+without it. English remains built-in source text, and no unreviewed natural-language
+catalog is advertised. See [LOCALIZATION.md](LOCALIZATION.md).
+
 Verification also rejects a pre-created `portable-data` directory. The Release jobs
 then launch each installed application through a complete `--portable` event-loop smoke,
 requiring all eight data subdirectories, the SQLite library, mode-tagged structured log,
@@ -111,7 +117,7 @@ Wayland plugin on Wayland/XWayland desktops. Source builds with a native Wayland
 and explicit user platform selections continue to use those choices.
 
 Packages contain the root license/notices plus the complete user, BIOS, input, save,
-build, test, packaging, and maintenance guides under the platform documentation
+localization, build, test, packaging, and maintenance guides under the platform documentation
 directory. They contain no games, firmware, save data, or downloaded artwork.
 
 The repository license requires source availability for modified redistribution. Keep

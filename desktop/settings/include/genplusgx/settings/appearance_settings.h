@@ -5,6 +5,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
+#include <string>
 
 namespace genplusgx::settings {
 
@@ -16,6 +17,7 @@ enum class ThemeMode : std::uint8_t {
 
 struct AppearanceSettings final {
   ThemeMode theme{ThemeMode::system};
+  std::string language{"system"};
   bool developerToolsEnabled{false};
 
   [[nodiscard]] bool operator==(const AppearanceSettings&) const = default;
@@ -33,7 +35,7 @@ struct AppearanceSettingsLoadResult final {
 
 class AppearanceSettingsStore final {
 public:
-  static constexpr std::uint32_t schemaVersion = 2U;
+  static constexpr std::uint32_t schemaVersion = 3U;
   static constexpr std::size_t maximumFileBytes = 16U * 1024U;
 
   explicit AppearanceSettingsStore(std::filesystem::path path);

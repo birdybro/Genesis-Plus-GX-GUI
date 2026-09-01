@@ -18,12 +18,13 @@ ctest --preset release
 
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
-`rewind`, `run-ahead`, `packaging`, `release`, and `documentation`:
+`rewind`, `run-ahead`, `localization`, `packaging`, `release`, and `documentation`:
 
 ```bash
 ctest --preset debug -L gui --output-on-failure
 ctest --preset debug -L stress --output-on-failure
 ctest --preset debug -L documentation --output-on-failure
+ctest --preset debug -L localization --output-on-failure
 ```
 
 The documentation gate requires every published guide, checks the release-facing README
@@ -33,6 +34,17 @@ Markdown links. It never follows external links or requires network access.
 Hosted builds enable `GENPLUSGX_WARNINGS_AS_ERRORS`, so a new frontend/test compiler
 warning fails the relevant platform job before CTest. This is intentionally not applied
 wholesale to inherited core or bundled third-party sources.
+
+`unit.localization` covers supported choices, catalog search paths, successful
+installation/replacement, and invalid or unavailable fallback. `unit.translation_catalog`
+runs Qt `lupdate` into a temporary directory, compares the complete source/context set
+with the complete committed pseudo catalog, rejects missing meta-object contexts,
+unfinished or placeholder-damaging translations, and loads the compiled QM.
+`gui.localization` constructs the real translated shell and appearance editor, checks
+stable object names/data, expanded-layout bounds and wrapping, English fallback,
+right-to-left inheritance, and keyboard navigation. The real-process pseudo-language
+smoke additionally requires requested/effective/fallback fields in the startup log.
+See [LOCALIZATION.md](LOCALIZATION.md).
 
 `unit.command_line` and `unit.persistence` cover explicit portable selection,
 executable-relative and macOS-bundle placement, relocation, unsafe roots, and stable

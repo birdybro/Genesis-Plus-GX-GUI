@@ -77,7 +77,10 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   QVERIFY(validation != nullptr);
   auto* developerTools = dialog.findChild<QCheckBox*>(
     QStringLiteral("developerToolsEnabledCheck"));
+  auto* language = dialog.findChild<QComboBox*>(
+    QStringLiteral("languageCombo"));
   QVERIFY(developerTools != nullptr);
+  QVERIFY(language != nullptr);
   QVERIFY(!developerTools->isChecked());
   QVERIFY(!developerTools->accessibleDescription().isEmpty());
   QCOMPARE(label->buddy(), theme);
@@ -88,7 +91,10 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   QCOMPARE(QApplication::focusWidget(), theme);
   theme->setCurrentIndex(
     theme->findData(static_cast<int>(genplusgx::settings::ThemeMode::dark)));
+  language->setCurrentIndex(language->findData(QStringLiteral("en_XA")));
   QTest::keyClick(theme, Qt::Key_Tab);
+  QCOMPARE(QApplication::focusWidget(), language);
+  QTest::keyClick(language, Qt::Key_Tab);
   QCOMPARE(QApplication::focusWidget(), developerTools);
   developerTools->setChecked(true);
   QTest::keyClick(developerTools, Qt::Key_Tab);
@@ -96,11 +102,13 @@ void AppearanceAccessibilityTest::dialogSupportsKeyboardApplyRestoreAndFailure()
   QTest::mouseClick(apply, Qt::LeftButton);
   QVERIFY(applied.has_value());
   QCOMPARE(applied->theme, genplusgx::settings::ThemeMode::dark);
+  QVERIFY(applied->language == "en_XA");
   QVERIFY(applied->developerToolsEnabled);
 
   QTest::mouseClick(restore, Qt::LeftButton);
   QCOMPARE(theme->currentData().toInt(),
     static_cast<int>(genplusgx::settings::ThemeMode::system));
+  QCOMPARE(language->currentData().toString(), QStringLiteral("system"));
   QVERIFY(!developerTools->isChecked());
 
   dialog.setSettingsSink([](const genplusgx::settings::AppearanceSettings&) {

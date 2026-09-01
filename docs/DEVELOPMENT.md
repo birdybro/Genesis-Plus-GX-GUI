@@ -14,6 +14,7 @@ desktop/audio/        Bounded SDL3 audio output and metrics
 desktop/input/        Neutral mappings, profiles, SDL controller service
 desktop/persistence/  Platform roots, save RAM, state wrappers, recents
 desktop/settings/     Versioned global and sparse per-game settings
+desktop/localization/ Qt catalog selection, discovery, fallback, and status
 desktop/library/      Metadata, SQLite store, asynchronous scanner
 desktop/ui/           Qt windows, dialogs, models, injectable dialog seams
 desktop/app/          Composition root, CLI, application lifecycle
@@ -61,6 +62,12 @@ test.
 
 The repository has no mandatory formatter that rewrites upstream code. Match nearby
 frontend style and keep builds free of avoidable new warnings.
+
+When adding or changing user-facing text, refresh the committed pseudo catalog and run
+the localization label before the full suite. Preserve placeholders and give every
+`tr()` call a stable meta-object context; never translate persistence keys, object
+names, core values, log fields, or command-line switches. See
+[LOCALIZATION.md](LOCALIZATION.md).
 
 ## Test design
 

@@ -17,6 +17,7 @@
 #include "genplusgx/library/game_library_database.h"
 #include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/library/game_metadata_service.h"
+#include "genplusgx/localization/localization.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/recent_games.h"
@@ -40,6 +41,7 @@
 #include <QApplication>
 #include <QCoreApplication>
 #include <QDebug>
+#include <QLocale>
 #include <QMessageBox>
 #include <QTextStream>
 #include <QTimer>
@@ -257,6 +259,9 @@ int main(int argc, char* argv[])
   QCoreApplication::setApplicationName(QString::fromLatin1(GENPLUSGX_APP_NAME));
   QCoreApplication::setApplicationVersion(QString::fromLatin1(GENPLUSGX_VERSION));
   QApplication::setDesktopFileName(QString::fromLatin1(GENPLUSGX_APP_ID));
+  genplusgx::localization::TranslationManager translationManager{application};
+  static_cast<void>(translationManager.apply(
+    genplusgx::localization::systemLanguage));
   genplusgx::ui::ThemeController themeController{application};
 
   const auto commandLine = genplusgx::app::parseCommandLine(
@@ -382,6 +387,20 @@ int main(int argc, char* argv[])
       "Appearance settings", loadedAppearanceSettings.status.message);
   }
   auto appearanceSettings = loadedAppearanceSettings.settings;
+  const auto translationApplied = translationManager.apply(
+    appearanceSettings.language);
+  if (!translationApplied) {
+    qWarning().noquote() << QString::fromStdString(translationApplied.message);
+    recordStartupIssue("Interface localization", translationApplied.message);
+  }
+  application.setLayoutDirection(QLocale{}.textDirection());
+  qInfo().noquote()
+    << "Interface language: requested"
+    << QString::fromStdString(translationManager.requestedLanguage())
+    << "effective"
+    << QString::fromStdString(translationManager.effectiveLanguage())
+    << "English fallback"
+    << translationManager.usedEnglishFallback();
   if (!themeController.apply(appearanceSettings)) {
     appearanceSettings = genplusgx::settings::defaultAppearanceSettings();
     static_cast<void>(themeController.apply(appearanceSettings));
@@ -1712,10 +1731,16 @@ int main(int argc, char* argv[])
      &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
      &recordingService, &rewindSettings, &runAheadSettings, &speedSettings,
-     &window, &worker] {
+     &translationManager, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.applicationDataMode = std::string{
         genplusgx::applicationDataModeName(applicationPaths.mode())};
+      snapshot.requestedInterfaceLanguage =
+        translationManager.requestedLanguage();
+      snapshot.effectiveInterfaceLanguage =
+        translationManager.effectiveLanguage();
+      snapshot.interfaceLanguageFallback =
+        translationManager.usedEnglishFallback();
       snapshot.renderer = window.displayWidget()->usesAcceleratedRenderer()
         ? "OpenGL texture renderer"
         : "Qt software painter";

@@ -31,6 +31,7 @@ private:
   void restoreDefaults();
 
   QComboBox* theme_{nullptr};
+  QComboBox* language_{nullptr};
   QCheckBox* developerTools_{nullptr};
   QLabel* validation_{nullptr};
   SettingsSink settingsSink_;

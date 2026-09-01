@@ -1,5 +1,43 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_localization_test localization_test.cpp)
+target_link_libraries(
+  genplusgx_localization_test
+  PRIVATE GenesisPlusGX::Localization genplusgx_project_warnings Qt6::Core
+)
+add_dependencies(genplusgx_localization_test genplusgx_release_translations)
+add_test(
+  NAME unit.localization
+  COMMAND genplusgx_localization_test "${genplusgx_test_pseudo_qm}"
+)
+set_tests_properties(
+  unit.localization
+  PROPERTIES LABELS "unit;localization;settings;fallback;filesystem"
+)
+
+add_executable(
+  genplusgx_translation_catalog_test translation_catalog_test.cpp
+)
+target_link_libraries(
+  genplusgx_translation_catalog_test
+  PRIVATE genplusgx_project_warnings Qt6::Core
+)
+add_dependencies(
+  genplusgx_translation_catalog_test genplusgx_release_translations
+)
+add_test(
+  NAME unit.translation_catalog
+  COMMAND genplusgx_translation_catalog_test
+    "${PROJECT_SOURCE_DIR}"
+    "${PROJECT_SOURCE_DIR}/translations/genplusgx_en_XA.ts"
+    "$<TARGET_FILE:Qt6::lupdate>"
+    "${genplusgx_test_pseudo_qm}"
+)
+set_tests_properties(
+  unit.translation_catalog
+  PROPERTIES LABELS "unit;localization;catalog;extraction;placeholders"
+)
+
 add_executable(genplusgx_presentation_test presentation_test.cpp)
 target_link_libraries(
   genplusgx_presentation_test

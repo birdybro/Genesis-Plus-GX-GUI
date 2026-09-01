@@ -18,8 +18,23 @@ already applied. Restore Defaults stages System default. If saving fails, the di
 stays open and exposes the error as visible text; an unsupported or corrupt settings
 file falls back to System default without destroying that file.
 
-The schema-1 setting is stored atomically in
+## Interface language
+
+The same dialog offers **System language**, **English**, and the deliberately expanded
+**Pseudo-localization (layout testing)** catalog. A language change is persisted by
+Apply/OK but takes effect after restart so startup-created menus and windows never form
+a partially translated interface. If a selected catalog is absent or invalid, the
+application keeps a complete English UI and reports the fallback through logging and
+Diagnostics. System selection preserves the operating-system locale even when English
+text is used as the fallback.
+
+The pseudo-language is shipped to test expansion, wrapping, focus order, and hard-coded
+English; it is not a natural-language translation. See [LOCALIZATION.md](LOCALIZATION.md)
+for catalog paths and contribution rules.
+
+The schema-3 setting is stored atomically in
 `config/appearance-settings.json` beneath the platform application-data directory.
+Schema 1 and 2 files migrate to System language without losing the existing theme.
 
 ## Keyboard access
 
@@ -28,9 +43,9 @@ Audio, Input, System, BIOS, Paths, and Advanced, and every category action is an
 ordinary accessible Qt button. Menu titles and significant dialog labels include
 mnemonics. On platforms that show
 mnemonic underlines only while Alt is held, press Alt first. In Appearance Settings,
-`Alt+A` focuses Application theme. Tab then visits Restore Defaults, Apply, OK, and
-Cancel in a stable order. Enter activates the focused/default button and Escape closes
-the dialog without applying staged changes.
+`Alt+A` focuses Application theme and `Alt+L` focuses Interface language. Tab visits
+both choices, Restore Defaults, Apply, OK, and Cancel in a stable order. Enter activates
+the focused/default button and Escape closes the dialog without applying staged changes.
 
 Input-binding capture, game-library search and tables, BIOS paths, game information,
 and standard dialog buttons remain in the normal Qt focus chain. Emulator gameplay

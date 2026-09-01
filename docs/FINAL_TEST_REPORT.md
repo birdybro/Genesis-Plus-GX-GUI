@@ -4,8 +4,8 @@ This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
-synchronization, local bezel/overlay, cheat import/search, and portable-mode
-verification through 2026-09-01
+synchronization, local bezel/overlay, cheat import/search, portable-mode, and
+localization verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -47,6 +47,8 @@ verification through 2026-09-01
   `538eedb8b4be7aa305ffbaca3091044a6870be3a`
 - Exact portable-mode cross-platform release-gate and hosted evidence baseline:
   `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
+- Localization implementation: the current uncommitted candidate; exact hosted evidence
+  remains a milestone gate before it can be marked complete
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -253,6 +255,37 @@ legacy libretro regression pass. Exact hosted run `33477974149` passes every one
 ten Linux, Windows, Apple Silicon, and Intel macOS jobs against the implementation SHA;
 the complete logs and native artifacts have also passed the audit recorded below.
 
+## Localization verification
+
+Milestone 91 adds a process-lifetime Qt translation manager, a schema-3 persisted
+System/English language choice, package-relative catalog discovery, explicit English
+fallback, locale direction/formatting preservation, settings and diagnostics reporting,
+and a deterministic expanded `en_XA` pseudo-language. The catalog contains 991 finished
+messages across every current application, localization, UI, and display source. It is
+a layout and untranslated-string test rather than an unreviewed natural-language claim.
+
+`unit.translation_catalog` independently runs Qt `lupdate` into a temporary directory
+and requires an exact context/source match, no missing `Q_OBJECT` context, no unfinished
+message, unchanged placeholders, only permitted technical identity strings, and a
+loadable compiled QM. `unit.localization` covers closed selection, successful catalog
+replacement, host-locale-preserving system fallback, explicit failure, and absolute
+package-relative discovery. `gui.localization` constructs the real translated main
+window and settings workflow, requires every named action and empty-display message to
+be translated, preserves object names and model data, bounds expanded layouts, and
+exercises RTL inheritance and keyboard navigation. A fourth test enters the actual
+desktop event loop with the pseudo preference and checks the structured requested,
+effective, and fallback record.
+
+Warning-as-error Debug, optimized Release, ASan/UBSan, Clang 22, and CHD-disabled
+graphs pass 107/107; the shader-disabled graph passes all 105 applicable tests. The
+strict inherited libretro build/link/clean succeeds. A fresh staged Linux install and
+TGZ contain the compiled catalog and Localization guide, pass the production package
+verifier and checksum, exclude `portable-data`, resolve all 22 ELF files, and run the
+extracted executable without an external library path. The package's actual event-loop
+smoke loads the pseudo catalog from the installed location. Exact Linux, Windows, Apple
+Silicon, and Intel macOS CI plus full-log/artifact inspection remain required after the
+implementation commit is pushed.
+
 ## Build configurations tested
 
 The primary Debug, Release, and sanitizer configurations were rebuilt against the exact
@@ -261,12 +294,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 103/103 | Passed |
-| Release | Optimized native x86-64 | 103/103 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 103/103 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 101/101 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 103/103 | Passed |
-| Clang 22 | Warning-gated Debug | 103/103 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 107/107 | Passed |
+| Release | Optimized native x86-64 | 107/107 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 107/107 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 105/105 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 107/107 | Passed |
+| Clang 22 | Warning-gated Debug | 107/107 | Passed; frontend warning-clean |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -279,23 +312,23 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 103 distinct tests:
+The default shader-enabled build registers 107 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 9 |
 | Core | 20 |
 | Integration | 5 |
-| Unit | 41 |
-| GUI/smoke | 28 |
-| **Total** | **103** |
+| Unit | 43 |
+| GUI/smoke | 30 |
+| **Total** | **107** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 65 `unit`, 25 `core`, 43 `integration`, and 28 `gui`. Focused
+layers. Label counts are 68 `unit`, 25 `core`, 44 `integration`, and 30 `gui`. Focused
 coverage also includes persistence (33), fixtures (30), concurrency (19), settings
 (20), input (10), video (13), audio (9), timing (7), presentation (1), rewind (4),
 run-ahead (3), state (9), release (5), fuzz/property (4), shader (2), recording (2),
-packaging (4), and portable mode (2).
+packaging (4), portable mode (2), and localization (4).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -964,8 +997,9 @@ startup and clean shutdown, and prohibited-payload scans pass.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, and missing-firmware errors without bundled firmware.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,
-  sparse per-game overrides, themes, accessibility, metadata, cheats, diagnostics, and
-  privacy-filtered structured logs.
+  sparse per-game overrides, themes, startup-safe locale selection with complete English
+  fallback, accessibility, metadata, cheats, diagnostics, and privacy-filtered structured
+  logs.
 - [x] Hidden-by-default native debugger with CPU/RAM/VDP/sound/input inspection, paused
   edits, RAM search/watch, validated states, and bounded frame-boundary breakpoints.
 - [x] Recoverable asynchronous SQLite game library with scanning, CUE-owned track
@@ -1003,6 +1037,11 @@ libretro output was cleaned; ignored output is confined to intentional build/pac
 directories.
 
 ## Known limitations and optional tests
+
+- English source text and the expanded pseudo-localization are currently packaged;
+  reviewed natural-language catalogs still require fluent community contributors. The
+  pseudo-language is exposed explicitly as layout testing and is not represented as a
+  translation for ordinary play.
 
 - No commercial ROM, proprietary Sega BIOS, or copyrighted box art is distributed or
   fetched. Real Sega CD boot testing needs a user-supplied regional BIOS and is an

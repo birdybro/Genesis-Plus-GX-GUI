@@ -1,5 +1,7 @@
 #include "genplusgx/settings/appearance_settings.h"
 
+#include "genplusgx/localization/localization.h"
+
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QJsonParseError>
@@ -62,7 +64,8 @@ AppearanceSettings defaultAppearanceSettings() noexcept { return {}; }
 bool validateAppearanceSettings(const AppearanceSettings& settings) noexcept
 {
   return static_cast<unsigned>(settings.theme) <=
-         static_cast<unsigned>(ThemeMode::dark);
+           static_cast<unsigned>(ThemeMode::dark) &&
+         localization::isSupportedLanguagePreference(settings.language);
 }
 
 AppearanceSettingsStore::AppearanceSettingsStore(std::filesystem::path path)
@@ -109,8 +112,8 @@ AppearanceSettingsLoadResult AppearanceSettingsStore::load() const
     }
     settings.theme = darkTheme.toBool() ? ThemeMode::dark : ThemeMode::light;
     migrated = true;
-  } else if (schema.toInt(-1) == 1 ||
-             schema.toInt(-1) == static_cast<int>(schemaVersion)) {
+  } else if (schema.toInt(-1) >= 1 &&
+             schema.toInt(-1) <= static_cast<int>(schemaVersion)) {
     const auto appearance = root.value(QStringLiteral("appearance"));
     if (!appearance.isObject()) {
       return invalidResult("The appearance settings values are invalid.");
@@ -124,9 +127,21 @@ AppearanceSettingsLoadResult AppearanceSettingsStore::load() const
       return invalidResult("The appearance theme is invalid.");
     }
     settings.theme = *parsed;
+    if (schema.toInt(-1) <= 2) {
+      settings.language = std::string{localization::systemLanguage};
+    } else {
+      const auto language = appearance.toObject().value(
+        QStringLiteral("language"));
+      if (!language.isString()) {
+        return invalidResult("The interface language is missing.");
+      }
+      settings.language = language.toString().toStdString();
+      if (!localization::isSupportedLanguagePreference(settings.language)) {
+        return invalidResult("The interface language is invalid.");
+      }
+    }
     if (schema.toInt(-1) == 1) {
       settings.developerToolsEnabled = false;
-      migrated = true;
     } else {
       const auto developerTools = appearance.toObject().value(
         QStringLiteral("developerToolsEnabled"));
@@ -136,6 +151,7 @@ AppearanceSettingsLoadResult AppearanceSettingsStore::load() const
       }
       settings.developerToolsEnabled = developerTools.toBool();
     }
+    migrated = schema.toInt(-1) < static_cast<int>(schemaVersion);
   } else {
     return invalidResult("The appearance settings schema version is not supported.");
   }
@@ -158,6 +174,8 @@ PersistenceStatus AppearanceSettingsStore::save(
       {QStringLiteral("appearance"),
         QJsonObject{
           {QStringLiteral("theme"), themeName(settings.theme)},
+          {QStringLiteral("language"),
+            QString::fromStdString(settings.language)},
           {QStringLiteral("developerToolsEnabled"),
             settings.developerToolsEnabled},
         }},

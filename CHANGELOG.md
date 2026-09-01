@@ -9,6 +9,12 @@ platform documentation.
 
 ### Added
 
+- Qt Linguist localization infrastructure with a schema-migrated System/English
+  preference, startup-before-widgets catalog installation, package-relative resource
+  discovery, safe English fallback, diagnostics, and a complete compiled expanded
+  pseudo-language catalog used by unit, GUI, process, and package regressions on every
+  supported platform.
+
 - Explicit `--portable` application-data isolation beside the executable (or beside a
   macOS app bundle), with fail-closed startup, visible mode reporting, relocation-safe
   paths, native-package event-loop verification, and no implicit migration or fallback

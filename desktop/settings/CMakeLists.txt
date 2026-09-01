@@ -31,6 +31,7 @@ target_link_libraries(
   genplusgx_settings
   PUBLIC
     GenesisPlusGX::FrontendTypes
+    GenesisPlusGX::Localization
     GenesisPlusGX::Platform
     GenesisPlusGX::Persistence
     GenesisPlusGX::Timing

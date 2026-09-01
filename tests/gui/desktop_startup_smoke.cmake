@@ -27,6 +27,19 @@ endif()
 
 file(REMOVE_RECURSE "${GENPLUSGX_SMOKE_ROOT}")
 file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}")
+if(GENPLUSGX_SMOKE_PSEUDO_LANGUAGE)
+  file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}/config")
+  file(WRITE
+    "${GENPLUSGX_SMOKE_ROOT}/config/appearance-settings.json"
+    "{\n"
+    "  \"schemaVersion\": 3,\n"
+    "  \"appearance\": {\n"
+    "    \"theme\": \"system\",\n"
+    "    \"language\": \"en_XA\",\n"
+    "    \"developerToolsEnabled\": false\n"
+    "  }\n"
+    "}\n")
+endif()
 if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
   file(MAKE_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}/config")
   file(WRITE
@@ -62,7 +75,6 @@ list(APPEND smoke_command "${GENPLUSGX_SMOKE_EXECUTABLE}")
 if(GENPLUSGX_SMOKE_PORTABLE)
   list(APPEND smoke_command "--portable")
 endif()
-
 execute_process(
   COMMAND ${smoke_command}
   RESULT_VARIABLE smoke_result
@@ -96,6 +108,10 @@ set(required_messages
     "Renderer selected:"
     "Automated startup smoke test entered the event loop."
     "Application shutdown complete.")
+if(GENPLUSGX_SMOKE_PSEUDO_LANGUAGE)
+  list(APPEND required_messages
+    "Interface language: requested en_XA effective en_XA English fallback false")
+endif()
 if(GENPLUSGX_SMOKE_PORTABLE)
   list(APPEND required_messages "Application data mode: Portable")
 else()

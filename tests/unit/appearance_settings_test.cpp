@@ -46,6 +46,7 @@ int main()
 
   const genplusgx::settings::AppearanceSettings dark{
     .theme = genplusgx::settings::ThemeMode::dark,
+    .language = "en_XA",
     .developerToolsEnabled = true,
   };
   if (!check(store.save(dark), "Dark appearance settings could not be saved") ||
@@ -63,17 +64,27 @@ int main()
     return 4;
   }
 
+  const genplusgx::settings::AppearanceSettings invalidLanguage{
+    .language = "../outside",
+  };
+  if (!check(!genplusgx::settings::validateAppearanceSettings(invalidLanguage) &&
+        store.save(invalidLanguage).error ==
+          genplusgx::PersistenceError::invalidData,
+      "An unrecognized language preference was accepted")) {
+    return 5;
+  }
+
   constexpr std::string_view legacy =
     R"json({"schemaVersion": 0, "darkTheme": false})json";
   if (!check(writeText(store.path(), legacy),
         "Legacy appearance settings could not be staged")) {
-    return 5;
+    return 6;
   }
   const auto migrated = store.load();
   if (!check(migrated.status && migrated.migrated &&
                migrated.settings.theme == genplusgx::settings::ThemeMode::light,
         "Schema-zero appearance settings did not migrate semantically")) {
-    return 6;
+    return 7;
   }
 
   constexpr std::string_view invalidTheme = R"json({
@@ -82,14 +93,14 @@ int main()
   })json";
   if (!check(writeText(store.path(), invalidTheme),
         "Invalid appearance settings could not be staged")) {
-    return 7;
+    return 8;
   }
   const auto invalidLoaded = store.load();
   if (!check(
         !invalidLoaded.status &&
           invalidLoaded.settings == genplusgx::settings::defaultAppearanceSettings(),
         "Invalid theme text did not fail closed")) {
-    return 8;
+    return 9;
   }
 
   constexpr std::string_view schemaOne = R"json({
@@ -98,7 +109,7 @@ int main()
   })json";
   if (!check(writeText(store.path(), schemaOne),
         "Schema-one appearance settings could not be staged")) {
-    return 9;
+    return 10;
   }
   const auto schemaOneLoaded = store.load();
   if (!check(schemaOneLoaded.status && schemaOneLoaded.migrated &&
@@ -106,25 +117,61 @@ int main()
             genplusgx::settings::ThemeMode::dark &&
           !schemaOneLoaded.settings.developerToolsEnabled,
         "Schema-one settings did not migrate with debug tools hidden")) {
-    return 10;
+    return 11;
+  }
+
+  constexpr std::string_view schemaTwo = R"json({
+    "schemaVersion": 2,
+    "appearance": {"theme": "light", "developerToolsEnabled": true}
+  })json";
+  if (!check(writeText(store.path(), schemaTwo),
+        "Schema-two appearance settings could not be staged")) {
+    return 12;
+  }
+  const auto schemaTwoLoaded = store.load();
+  if (!check(schemaTwoLoaded.status && schemaTwoLoaded.migrated &&
+          schemaTwoLoaded.settings.language == "system" &&
+          schemaTwoLoaded.settings.developerToolsEnabled,
+        "Schema-two settings did not migrate to the system language")) {
+    return 13;
+  }
+
+  constexpr std::string_view invalidStoredLanguage = R"json({
+    "schemaVersion": 3,
+    "appearance": {
+      "theme": "system",
+      "language": "../../outside",
+      "developerToolsEnabled": false
+    }
+  })json";
+  if (!check(writeText(store.path(), invalidStoredLanguage),
+        "Invalid stored language could not be staged")) {
+    return 14;
+  }
+  const auto invalidStoredLanguageResult = store.load();
+  if (!check(!invalidStoredLanguageResult.status &&
+          invalidStoredLanguageResult.settings ==
+            genplusgx::settings::defaultAppearanceSettings(),
+        "An invalid stored language did not fail closed")) {
+    return 15;
   }
 
   constexpr std::string_view future =
     R"json({"schemaVersion": 999, "appearance": {"theme": "system"}})json";
   if (!check(writeText(store.path(), future),
         "Future appearance settings could not be staged")) {
-    return 11;
+    return 16;
   }
   const auto unsupported = store.load();
   if (!check(!unsupported.status &&
                unsupported.status.message.find("not supported") != std::string::npos,
         "A future appearance schema was silently accepted")) {
-    return 12;
+    return 17;
   }
 
   if (!check(writeText(store.path(), "{broken"),
         "Corrupt appearance settings could not be staged")) {
-    return 13;
+    return 18;
   }
   const auto corrupt = store.load();
   return check(!corrupt.status &&
@@ -132,5 +179,5 @@ int main()
                  corrupt.settings == genplusgx::settings::defaultAppearanceSettings(),
            "Corrupt appearance settings did not fail closed")
            ? 0
-           : 14;
+           : 19;
 }

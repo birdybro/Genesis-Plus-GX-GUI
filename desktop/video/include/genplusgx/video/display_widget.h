@@ -44,6 +44,8 @@ struct DisplayPresentationMetrics final {
 };
 
 class DisplayWidget final : public QWidget {
+  Q_OBJECT
+
 public:
   explicit DisplayWidget(QWidget* parent = nullptr);
 

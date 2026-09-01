@@ -69,6 +69,7 @@ desktop/audio/           sample ring, SDL3 output device, A/V instrumentation
 desktop/input/           neutral snapshots, mappings, SDL3 controller service
 desktop/persistence/     application paths, atomic files, RAM and states
 desktop/settings/        versioned global and per-game configuration
+desktop/localization/    catalog discovery, installation, and fallback policy
 desktop/library/         metadata and asynchronous SQLite index
 desktop/cheats/          validation, persistence, adapter application
 desktop/platform/        platform paths, diagnostics, deployment helpers
@@ -83,6 +84,13 @@ cmake/                   target helpers and packaging modules
 `desktop/app` is the sole process composition root. It establishes the stable
 organization, application, desktop-file, and version identity before constructing the
 Qt shell. Command-line help and version reporting finish before the GUI event loop.
+For a GUI launch, it loads the versioned appearance preference and installs the selected
+`QTranslator` before constructing MainWindow or any settings dialog. The translation
+manager searches only application-owned resource directories, keeps one installed
+catalog alive for the process lifetime, and falls back atomically to English source
+text. A system-language fallback preserves the host locale; an explicit English choice
+uses a stable English locale. Language changes are restart-boundary transactions so
+existing widgets cannot form a mixed-language object graph.
 `desktop/ui` owns native widgets but has no dependency on core headers; later runtime
 services are connected through narrow coordinator interfaces rather than by giving the
 window direct core access.
@@ -735,6 +743,13 @@ The composition root stages the worker/runtime change, commits the appropriate g
 per-game store, and rolls runtime state back on commit failure. A rejection keeps the
 editor open, restores menu checks, and reaches a concise dialog while the log retains the
 low-level detail. Controller assignment uses the same typed rejection path.
+
+Appearance schema 3 stores a closed language preference (`system`, `en`, or the
+packaged testing locale `en_XA`) beside the theme. Older schemas migrate to `system`;
+unknown values fail validation rather than becoming arbitrary catalog paths. Requested,
+effective, and fallback status are copied into diagnostics without exposing a user
+path. Translatable presentation text is never used as an object name, settings key,
+log field, command value, or core-facing enum.
 
 The screenshot directory is stored independently in
 `config/screenshot-settings.json`. F12 takes one immutable RGB565 copy on the GUI

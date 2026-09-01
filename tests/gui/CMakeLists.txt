@@ -2,6 +2,30 @@ qt_add_executable(genplusgx_main_window_test
   main_window_test.cpp
 )
 
+qt_add_executable(genplusgx_localization_gui_test localization_test.cpp)
+set_target_properties(genplusgx_localization_gui_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_localization_gui_test
+  PRIVATE
+    GenesisPlusGX::Localization
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_dependencies(
+  genplusgx_localization_gui_test genplusgx_release_translations
+)
+add_test(NAME gui.localization COMMAND genplusgx_localization_gui_test)
+set_tests_properties(
+  gui.localization
+  PROPERTIES
+    ENVIRONMENT
+      "QT_QPA_PLATFORM=offscreen;GENPLUSGX_TEST_PSEUDO_QM=${genplusgx_test_pseudo_qm}"
+    LABELS "gui;unit;localization;fallback;layout;accessibility"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_debug_tools_window_test debug_tools_window_test.cpp)
 set_target_properties(genplusgx_debug_tools_window_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
@@ -588,6 +612,23 @@ set_tests_properties(
   gui.desktop_startup_smoke
   PROPERTIES
     LABELS "gui;integration;smoke;lifecycle;filesystem;logging"
+    TIMEOUT 40
+)
+
+add_test(
+  NAME gui.desktop_pseudo_localization_smoke
+  COMMAND
+    "${CMAKE_COMMAND}"
+    "-DGENPLUSGX_SMOKE_EXECUTABLE=$<TARGET_FILE:genplusgx_desktop>"
+    "-DGENPLUSGX_SMOKE_BASE=${CMAKE_CURRENT_BINARY_DIR}"
+    "-DGENPLUSGX_SMOKE_ROOT=${CMAKE_CURRENT_BINARY_DIR}/desktop-pseudo-smoke-$<CONFIG>"
+    "-DGENPLUSGX_SMOKE_PSEUDO_LANGUAGE=ON"
+    -P "${CMAKE_CURRENT_SOURCE_DIR}/desktop_startup_smoke.cmake"
+)
+set_tests_properties(
+  gui.desktop_pseudo_localization_smoke
+  PROPERTIES
+    LABELS "gui;integration;smoke;lifecycle;filesystem;logging;localization"
     TIMEOUT 40
 )
 

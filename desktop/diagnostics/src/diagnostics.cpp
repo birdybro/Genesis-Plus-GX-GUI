@@ -374,6 +374,10 @@ std::string formatDiagnostics(
   field("Operating system", snapshot.operatingSystem);
   field("Architecture", snapshot.architecture);
   field("Application data mode", snapshot.applicationDataMode);
+  field("Requested interface language", snapshot.requestedInterfaceLanguage);
+  field("Effective interface language", snapshot.effectiveInterfaceLanguage);
+  output << "Interface language fallback: "
+         << (snapshot.interfaceLanguageFallback ? "Yes" : "No") << '\n';
   field("Renderer", snapshot.renderer);
   field("Presentation sync", snapshot.presentationSync);
   field("Presentation buffering", snapshot.presentationBuffering);

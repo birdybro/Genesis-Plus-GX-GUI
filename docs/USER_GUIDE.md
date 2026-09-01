@@ -499,6 +499,13 @@ apply to every open application window. The selection is atomically stored in
 `config/appearance-settings.json`; unreadable, malformed, or newer unsupported files
 fall back to the system theme without being overwritten.
 
+Appearance Settings also selects **System language**, **English**, or the deliberately
+expanded **Pseudo-localization (layout testing)** catalog. Language changes take effect
+after restart so startup-created windows never mix languages. Unsupported, missing, or
+invalid catalogs fall back to complete English source text; the operating-system locale
+is retained under System language. The current choice, effective language, and fallback
+state appear in Diagnostics. See [LOCALIZATION.md](LOCALIZATION.md).
+
 The settings center is a navigation and status surface, so transactional **Apply**,
 **OK**, **Cancel**, and **Restore Defaults** stay in each typed editor. This prevents a
 failure in one persistence domain from partially applying unrelated categories.
@@ -511,7 +518,8 @@ scaling remains an independent Video setting. All menus have keyboard mnemonics,
 Preferences provides an explicit focus order and label buddy, and important controls
 expose stable accessible names through Qt's normal platform accessibility bridge. See
 [APPEARANCE_AND_ACCESSIBILITY.md](APPEARANCE_AND_ACCESSIBILITY.md) for keyboard and
-assistive-technology details.
+assistive-technology details and [LOCALIZATION.md](LOCALIZATION.md) for translation
+behavior and contribution requirements.
 
 ## Audio settings
 

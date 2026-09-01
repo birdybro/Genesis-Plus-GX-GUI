@@ -25,6 +25,7 @@ target_link_libraries(
   PRIVATE
     GenesisPlusGX::AppSupport
     GenesisPlusGX::Capture
+    GenesisPlusGX::Localization
     GenesisPlusGX::Screenshots
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
@@ -45,6 +46,36 @@ set_target_properties(
     MACOSX_BUNDLE_SHORT_VERSION_STRING "${PROJECT_VERSION}"
 )
 
+set(genplusgx_translation_sources
+  "${PROJECT_SOURCE_DIR}/translations/genplusgx_en_XA.ts"
+)
+qt_add_translations(
+  TARGETS genplusgx_desktop
+  SOURCE_TARGETS
+    genplusgx_app_support genplusgx_localization genplusgx_ui
+    genplusgx_video_widget genplusgx_desktop
+  TS_FILES ${genplusgx_translation_sources}
+  LUPDATE_TARGET genplusgx_update_translations
+  LRELEASE_TARGET genplusgx_release_translations
+  QM_FILES_OUTPUT_VARIABLE genplusgx_translation_catalogs
+  QM_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/translations"
+  LUPDATE_OPTIONS -no-obsolete -locations relative
+  LRELEASE_OPTIONS -nounfinished
+  IMMEDIATE_CALL
+)
+set(GENPLUSGX_TRANSLATION_CATALOGS
+  "${genplusgx_translation_catalogs}" PARENT_SCOPE)
+add_dependencies(genplusgx_desktop genplusgx_release_translations)
+add_custom_command(
+  TARGET genplusgx_desktop POST_BUILD
+  COMMAND "${CMAKE_COMMAND}" -E make_directory
+    "$<TARGET_FILE_DIR:genplusgx_desktop>/translations"
+  COMMAND "${CMAKE_COMMAND}" -E copy_if_different
+    ${genplusgx_translation_catalogs}
+    "$<TARGET_FILE_DIR:genplusgx_desktop>/translations"
+  VERBATIM
+)
+
 if(UNIX AND NOT APPLE)
   set_target_properties(
     genplusgx_desktop
@@ -57,6 +88,18 @@ install(
   TARGETS genplusgx_desktop
   BUNDLE DESTINATION .
   RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+)
+
+if(APPLE)
+  set(genplusgx_translation_destination
+    "genesis-plus-gx-gui.app/Contents/Resources/translations")
+else()
+  set(genplusgx_translation_destination
+    "${CMAKE_INSTALL_DATADIR}/Genesis-Plus-GX-GUI/translations")
+endif()
+install(
+  FILES ${genplusgx_translation_catalogs}
+  DESTINATION "${genplusgx_translation_destination}"
 )
 
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
