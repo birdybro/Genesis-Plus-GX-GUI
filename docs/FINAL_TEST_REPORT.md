@@ -505,9 +505,19 @@ The staged Linux installation passes package verification, dependency and CLI sm
 CPack emits the expected 0.1.1 x86-64 TGZ/checksum; and the inherited Unix libretro
 target builds, links, identifies as x86-64 ELF, and cleans. The supplied NAS ROM path
 was not mounted during this verification, so the optional header-only IPS acceptance
-case could not run against it. No degraded RAID mount was attempted. Exact hosted
-Windows, Linux, Apple Silicon, and Intel macOS evidence is recorded after the milestone
-implementation commit is pushed and audited.
+case could not run against it. No degraded RAID mount was attempted.
+
+The first exact hosted attempt, run `33489629492`, correctly failed Apple Silicon and
+Windows instead of hiding a platform defect: their case-insensitive filesystems made
+`.ips` and the uppercase `.IPS` discovery probe name the same file, but lexical
+deduplication reported them as two patches. Discovery now deduplicates by filesystem
+identity. A same-inode hard-link regression reproduces the alias on case-sensitive
+hosts and also covers native case-insensitive spelling. Windows additionally exposed a
+test-only issue where the schema-1 migration fixture concatenated an unescaped
+backslash path into JSON; the fixture now uses Qt's JSON writer. Corrected Debug,
+Release, and ASan/UBSan suites each pass 93/93 again. A new exact Windows, Linux, Apple
+Silicon, and Intel macOS run is required and will be recorded after it passes and is
+fully audited.
 
 ## Final feature checklist
 

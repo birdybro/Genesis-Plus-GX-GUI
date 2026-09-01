@@ -1,5 +1,7 @@
 #include "genplusgx/settings/session_settings.h"
 
+#include <QJsonDocument>
+#include <QJsonObject>
 #include <QTemporaryDir>
 
 #include <cstdlib>
@@ -91,19 +93,28 @@ int main()
     return EXIT_FAILURE;
   }
 
-  const std::string legacy =
-    "{\"schemaVersion\":1,\"resumeOnLaunch\":true,\"lastGamePath\":\"" +
-    (root / "legacy.md").string() + "\"}";
+  const auto legacyPath = root / "legacy.md";
+#if defined(_WIN32)
+  const auto legacyPathText = QString::fromStdWString(legacyPath.native());
+#else
+  const auto legacyPathText = QString::fromUtf8(legacyPath.native());
+#endif
+  const auto legacy = QJsonDocument{QJsonObject{
+    {QStringLiteral("schemaVersion"), 1},
+    {QStringLiteral("resumeOnLaunch"), true},
+    {QStringLiteral("lastGamePath"), legacyPathText},
+  }}.toJson(QJsonDocument::Compact);
   if (!check(writeFileAtomically(store.path(),
         std::span<const std::uint8_t>{
-          reinterpret_cast<const std::uint8_t*>(legacy.data()), legacy.size()},
+          reinterpret_cast<const std::uint8_t*>(legacy.constData()),
+          static_cast<std::size_t>(legacy.size())},
         SessionSettingsStore::maximumFileBytes),
         "Could not write legacy session fixture")) {
     return EXIT_FAILURE;
   }
   const auto migrated = store.load();
   if (!check(migrated.status && migrated.migrated &&
-        migrated.settings.lastGamePath == root / "legacy.md" &&
+        migrated.settings.lastGamePath == legacyPath &&
         !migrated.settings.lastPatchPath,
         "Schema-1 session settings were not migrated safely")) {
     return EXIT_FAILURE;

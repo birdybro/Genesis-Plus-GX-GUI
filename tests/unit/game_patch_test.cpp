@@ -291,6 +291,18 @@ int main()
   const auto discovered = discoverGamePatchSidecar(sourcePath);
   passed &= check(discovered.status && discovered.path == patchPath,
     "single same-stem sidecar is discovered");
+  const auto caseAlias = root / "Test Game.IPS";
+  std::error_code aliasError;
+  std::filesystem::create_hard_link(patchPath, caseAlias, aliasError);
+  if (aliasError) {
+    aliasError.clear();
+    passed &= check(std::filesystem::equivalent(
+        patchPath, caseAlias, aliasError) && !aliasError,
+      "case-insensitive sidecar alias resolves to the existing patch");
+  }
+  const auto aliasDiscovery = discoverGamePatchSidecar(sourcePath);
+  passed &= check(aliasDiscovery.status && aliasDiscovery.path == patchPath,
+    "filesystem aliases of one sidecar are not reported as multiple patches");
   const auto firstFile = applyGamePatchFile(sourcePath, patchPath, root / "cache");
   const auto secondFile = applyGamePatchFile(sourcePath, patchPath, root / "cache");
   passed &= check(firstFile.status && secondFile.status &&

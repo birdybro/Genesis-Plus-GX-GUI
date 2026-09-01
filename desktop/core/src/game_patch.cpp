@@ -636,8 +636,20 @@ GamePatchDiscoveryResult discoverGamePatchSidecar(
       appended += suffix;
       for (const auto& candidate : {replaced, appended}) {
         std::error_code error;
-        if (std::filesystem::is_regular_file(candidate, error) && !error &&
-            std::ranges::find(found, candidate) == found.end()) {
+        if (!std::filesystem::is_regular_file(candidate, error) || error) {
+          continue;
+        }
+        const auto duplicate = std::ranges::any_of(found,
+          [&candidate](const std::filesystem::path& existing) {
+            if (existing.lexically_normal() == candidate.lexically_normal()) {
+              return true;
+            }
+            std::error_code equivalentError;
+            return std::filesystem::equivalent(
+                     existing, candidate, equivalentError) &&
+              !equivalentError;
+          });
+        if (!duplicate) {
           found.push_back(candidate);
         }
       }

@@ -3815,8 +3815,14 @@ CLI/dependency smokes; CPack emits the expected versioned x86-64 TGZ and checksu
 legacy Unix libretro target builds, links, identifies as x86-64 ELF, and cleans. The
 previously supplied NAS path was not mounted during this gate, so the optional real-ROM
 acceptance case was unavailable; generated legal ROMs execute the same patch path in
-every required suite. Exact hosted evidence begins only after the milestone commit is
-pushed.
+every required suite. Exact hosted attempt `33489629492` then exposed a real
+case-insensitive-filesystem defect on Apple Silicon and Windows: lower- and uppercase
+probes of one IPS file were counted as two sidecars. Sidecar deduplication now uses
+filesystem identity, and a same-inode/case-alias regression reproduces the condition on
+every host. The same run also showed that the new schema-1 migration test hand-built
+invalid JSON from an unescaped Windows path; it now uses Qt's JSON writer. Corrected
+Debug, Release, and ASan/UBSan suites again pass 93/93. A new exact hosted run is
+required after the corrective commit is pushed.
 
 **Acceptance criteria:** IPS/BPS/UPS are parsed without unchecked offsets or unbounded
 output; BPS/UPS checksums and source identity are enforced; the source file is never
