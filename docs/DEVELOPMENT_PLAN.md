@@ -4197,9 +4197,9 @@ Qt extraction emits no context warning. A strict inherited Unix libretro build/l
 clean succeeds. A fresh staged Linux install and TGZ pass the production package
 verifier and checksum, contain the catalog and guide, exclude portable user data, run
 the installed pseudo-language event-loop smoke, resolve all 22 ELF files, and start the
-extracted executable with no external library path. Workflow YAML parses. The
-implementation commit, exact ten-job hosted matrix, complete-log audit, and native
-artifact audit are still pending; no Milestone 92 work may start first.
+extracted executable with no external library path. Workflow YAML parses. A replacement
+exact ten-job hosted matrix, complete-log audit, and native artifact audit are still
+pending after the cross-platform link correction; no Milestone 92 work may start first.
 
 Initial implementation run
 [`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)
@@ -4211,6 +4211,19 @@ supported by Qt 6.8, the documented/declared desktop baseline is 6.8, and
 `infrastructure.localization_cmake_compatibility` prevents the newer-only argument
 from returning. The 7,671-line failed-run corpus contains no second application issue.
 
+Corrected implementation run
+[`33566785545`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566785545)
+then passed all ten jobs and every applicable test on Linux, Windows, Apple Silicon,
+and Intel macOS. The required full-log audit nevertheless found eight Apple linker
+warnings: the desktop application and localization GUI test each received the same
+static localization archive twice in all four macOS configurations. The localization
+headers are now a dedicated interface target, settings consume only that API, and the
+UI owns the single implementation dependency. Local Ninja link-command inspection
+proves one archive occurrence for both affected targets; fresh GCC Debug, Release,
+ASan/UBSan, and Clang 22 graphs each pass 108/108, and a fresh stage/TGZ passes package,
+catalog, actual-process, and checksum verification. The replacement hosted run must be
+warning-clean before this milestone closes.
+
 **Acceptance criteria:** Translation is installed before widgets exist; preferences
 cannot select arbitrary files; missing/invalid catalogs leave a complete English UI;
 System language preserves locale direction and formatting; source English, placeholders,
@@ -4219,7 +4232,9 @@ extractable and pseudo-translated; every package carries the tested catalog; all
 and exact hosted gates pass; and no natural-language quality is claimed without fluent
 review.
 
-**Commit SHA:** pending
+**Commit SHA:** implementation `a9891e1c482332c7316c2b6e494b21aab0ccefb2`;
+Qt 6.8 baseline correction `aba5546001798cd25d05befdc065d669c82b2d5c`;
+Apple static-link correction pending
 
 ## Milestone 83 detail
 

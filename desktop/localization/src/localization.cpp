@@ -36,12 +36,6 @@ bool selectsEnglish(const QString& locale)
 
 } // namespace
 
-bool isSupportedLanguagePreference(std::string_view preference) noexcept
-{
-  return preference == systemLanguage || preference == englishLanguage ||
-         preference == pseudoLanguage;
-}
-
 std::vector<LanguageChoice> languageChoices()
 {
   return {

@@ -286,7 +286,17 @@ verifier and checksum, exclude `portable-data`, resolve all 22 ELF files, and ru
 extracted executable without an external library path. The package's actual event-loop
 smoke loads the pseudo catalog from the installed location. Exact Linux, Windows, Apple
 Silicon, and Intel macOS CI plus full-log/artifact inspection remain required after the
-implementation commit is pushed.
+cross-platform link correction is pushed.
+
+The initial implementation run `33566053906` exposed and led to correction of a Qt
+6.9-only translation-output argument before compilation on the pinned Qt 6.8.3 matrix.
+Corrected run `33566785545` subsequently passed all ten jobs and 108-test graphs, but
+the complete 15,593-line audit found eight duplicate-static-library warnings from the
+Apple linker (two affected targets in four macOS configurations). The localization API
+and implementation dependencies have been separated so both link commands now contain
+the archive once. Fresh GCC Debug, Release, ASan/UBSan, and Clang 22 graphs pass 108/108,
+and fresh staged/package verification passes; replacement exact hosted evidence is the
+remaining closure gate.
 
 Initial implementation run
 [`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)

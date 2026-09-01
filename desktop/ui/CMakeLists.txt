@@ -71,6 +71,7 @@ target_link_libraries(
     GenesisPlusGX::GameFiles
     GenesisPlusGX::Input
     GenesisPlusGX::Library
+    GenesisPlusGX::Localization
     GenesisPlusGX::Platform
     GenesisPlusGX::Settings
     GenesisPlusGX::VideoWidget

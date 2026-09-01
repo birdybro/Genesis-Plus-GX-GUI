@@ -7,7 +7,6 @@ set_target_properties(genplusgx_localization_gui_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_localization_gui_test
   PRIVATE
-    GenesisPlusGX::Localization
     genplusgx::ui
     genplusgx_project_warnings
     Qt6::Test

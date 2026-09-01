@@ -42,8 +42,12 @@ struct LanguageChoice final {
   bool testingOnly{false};
 };
 
-[[nodiscard]] bool isSupportedLanguagePreference(
-  std::string_view preference) noexcept;
+[[nodiscard]] inline constexpr bool isSupportedLanguagePreference(
+  std::string_view preference) noexcept
+{
+  return preference == systemLanguage || preference == englishLanguage ||
+         preference == pseudoLanguage;
+}
 [[nodiscard]] std::vector<LanguageChoice> languageChoices();
 [[nodiscard]] QString languagePreferenceDisplayName(
   std::string_view preference);

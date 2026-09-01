@@ -65,7 +65,7 @@ Arguments:
     <context>
         <name>Localization</name>
         <message>
-            <location filename="../desktop/localization/src/localization.cpp" line="+49" />
+            <location filename="../desktop/localization/src/localization.cpp" line="+43" />
             <source>System language</source>
             <translation>⟦Šÿšŧëḿ ŀåńɠüåɠë~~~~⟧</translation>
         </message>

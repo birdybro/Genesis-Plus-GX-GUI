@@ -31,13 +31,13 @@ target_link_libraries(
   genplusgx_settings
   PUBLIC
     GenesisPlusGX::FrontendTypes
-    GenesisPlusGX::Localization
     GenesisPlusGX::Platform
     GenesisPlusGX::Persistence
     GenesisPlusGX::Timing
     GenesisPlusGX::VideoExchange
     Qt6::Core
   PRIVATE
+    GenesisPlusGX::LocalizationApi
     genplusgx_project_options
     genplusgx_project_warnings
 )
