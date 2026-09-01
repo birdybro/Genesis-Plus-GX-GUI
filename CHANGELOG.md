@@ -7,6 +7,11 @@ platform documentation.
 
 ## [Unreleased]
 
+### Changed
+
+- The desktop Qt baseline is now 6.8 so the same supported Qt Linguist source-target
+  extraction API is used on development and packaged builds.
+
 ### Added
 
 - Qt Linguist localization infrastructure with a schema-migrated System/English

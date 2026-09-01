@@ -102,7 +102,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
-| 91 Localization | IN PROGRESS | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 107-test local graphs; extraction, fallback, layout, package, hosted matrix | English fallback, locale behavior, and stable object names remain intact | pending |
+| 91 Localization | IN PROGRESS | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 108-test local graphs; extraction, fallback, layout, package, hosted matrix | English fallback, locale behavior, and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
@@ -4190,8 +4190,8 @@ model data, expanded layout/wrapping, RTL inheritance, and keyboard navigation.
 schema-3 pseudo preference and requires structured requested/effective/fallback proof.
 
 **Gate evidence:** Warning-as-error GCC Debug and optimized Release, leak-detecting
-ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 107/107 tests. The
-shader-disabled graph passes all 105 applicable tests. All four localization tests pass
+ASan/UBSan, fresh Clang 22, and CHD-disabled builds pass 108/108 tests. The
+shader-disabled graph passes all 106 applicable tests. All five localization tests pass
 in every local graph; the generated pseudo catalog is byte-for-byte deterministic and
 Qt extraction emits no context warning. A strict inherited Unix libretro build/link/
 clean succeeds. A fresh staged Linux install and TGZ pass the production package
@@ -4200,6 +4200,16 @@ the installed pseudo-language event-loop smoke, resolve all 22 ELF files, and st
 extracted executable with no external library path. Workflow YAML parses. The
 implementation commit, exact ten-job hosted matrix, complete-log audit, and native
 artifact audit are still pending; no Milestone 92 work may start first.
+
+Initial implementation run
+[`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)
+exposed one configure-time compatibility defect on the hosted Qt 6.8.3 baseline:
+`QM_OUTPUT_DIRECTORY` was added only in Qt 6.9, while the development host's Qt 6.11
+accepted it. All nine CMake jobs correctly failed before compilation; the independent
+legacy libretro job passed. The catalog now uses the TS `OUTPUT_LOCATION` property
+supported by Qt 6.8, the documented/declared desktop baseline is 6.8, and
+`infrastructure.localization_cmake_compatibility` prevents the newer-only argument
+from returning. The 7,671-line failed-run corpus contains no second application issue.
 
 **Acceptance criteria:** Translation is installed before widgets exist; preferences
 cannot select arbitrary files; missing/invalid catalogs leave a complete English UI;

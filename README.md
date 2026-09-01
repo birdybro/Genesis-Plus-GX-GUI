@@ -211,7 +211,7 @@ for platform launch examples and relocation rules.
 
 ## Building from source
 
-The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.5+ with Core,
+The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.8+ with Core,
 Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools modules, SDL 3.2+, and
 Rust/Cargo 1.88+ for the default Libretro shader runtime. Once CMake can locate the Qt
 and SDL config packages:

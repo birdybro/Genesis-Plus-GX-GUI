@@ -39,6 +39,19 @@ if(GENPLUSGX_BUILD_DESKTOP)
     infrastructure.windows_package_verification
     PROPERTIES LABELS "unit;infrastructure;packaging"
   )
+
+  add_test(
+    NAME infrastructure.localization_cmake_compatibility
+    COMMAND
+      "${CMAKE_COMMAND}"
+      "-DSOURCE_ROOT=${PROJECT_SOURCE_DIR}"
+      "-DMINIMUM_QT_VERSION=${GENPLUSGX_MINIMUM_QT_VERSION}"
+      -P "${PROJECT_SOURCE_DIR}/cmake/ValidateLocalizationCMake.cmake"
+  )
+  set_tests_properties(
+    infrastructure.localization_cmake_compatibility
+    PROPERTIES LABELS "unit;infrastructure;localization"
+  )
 endif()
 
 add_test(

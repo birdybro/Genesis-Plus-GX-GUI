@@ -49,6 +49,10 @@ set_target_properties(
 set(genplusgx_translation_sources
   "${PROJECT_SOURCE_DIR}/translations/genplusgx_en_XA.ts"
 )
+set_source_files_properties(
+  ${genplusgx_translation_sources}
+  PROPERTIES OUTPUT_LOCATION "${CMAKE_CURRENT_BINARY_DIR}/translations"
+)
 qt_add_translations(
   TARGETS genplusgx_desktop
   SOURCE_TARGETS
@@ -58,7 +62,6 @@ qt_add_translations(
   LUPDATE_TARGET genplusgx_update_translations
   LRELEASE_TARGET genplusgx_release_translations
   QM_FILES_OUTPUT_VARIABLE genplusgx_translation_catalogs
-  QM_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/translations"
   LUPDATE_OPTIONS -no-obsolete -locations relative
   LRELEASE_OPTIONS -nounfinished
   IMMEDIATE_CALL

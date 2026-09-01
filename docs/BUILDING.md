@@ -10,7 +10,7 @@ regenerate those legacy builds.
 - Ninja
 - Git (for embedded commit diagnostics; source archives fall back to `unknown`)
 - A C++20 compiler: GCC/Clang, Visual Studio 2022, or current Apple Clang
-- Qt 6.5 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools
+- Qt 6.8 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools
 - SDL 3.2 or newer with its CMake config package
 - Rust and Cargo 1.88 or newer for the default Libretro shader runtime
 - Platform OpenGL/window-system development files on Linux
@@ -45,7 +45,8 @@ downloads ROM/BIOS material or an external shader pack.
 Qt LinguistTools provides `lupdate` and `lrelease`. The normal desktop build compiles
 the committed translation catalog and stages it beside the build-tree executable;
 install and package targets place it in the platform resource directory. Translation
-maintainers can use `genplusgx_update_translations` and `genplusgx_lrelease`; the exact
+maintainers can use `genplusgx_update_translations` and
+`genplusgx_release_translations`; the exact
 workflow and placeholder rules are in [LOCALIZATION.md](LOCALIZATION.md).
 
 ## Linux
@@ -58,7 +59,7 @@ sudo apt-get update
 sudo apt-get install ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev
 ```
 
-Install Qt 6.5+ and SDL3 through their official packages, a suitable distribution
+Install Qt 6.8+ and SDL3 through their official packages, a suitable distribution
 package, or locally built prefixes, then set `CMAKE_PREFIX_PATH` as above. Some stable
 Linux distributions do not yet package SDL3; do not substitute SDL2.
 
