@@ -148,7 +148,6 @@ add_executable(
 target_link_libraries(
   genplusgx_session_resume_application_test
   PRIVATE
-    GenesisPlusGX::Persistence
     GenesisPlusGX::Settings
     genplusgx_project_warnings
     genplusgx_test_utilities

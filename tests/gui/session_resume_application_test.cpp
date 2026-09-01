@@ -50,6 +50,8 @@ bool runDesktop(
   environment.insert(QStringLiteral("GENPLUSGX_TEST_MODE"), QStringLiteral("1"));
   environment.insert(QStringLiteral("GENPLUSGX_TEST_DATA_ROOT"), pathText(root));
   environment.insert(
+    QStringLiteral("GENPLUSGX_TEST_QUIT_WHEN_GAME_READY"), QStringLiteral("1"));
+  environment.insert(
     QStringLiteral("GENPLUSGX_TEST_AUTO_QUIT_MS"), QStringLiteral("1200"));
   QProcess process;
   process.setProcessEnvironment(environment);

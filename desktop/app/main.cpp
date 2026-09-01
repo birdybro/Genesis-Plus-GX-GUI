@@ -220,22 +220,29 @@ int main(int argc, char* argv[])
   const bool automatedTestMode =
     qEnvironmentVariable("GENPLUSGX_TEST_MODE") == QStringLiteral("1");
   std::optional<int> automatedQuitMilliseconds;
+  bool automatedQuitWhenGameReady = false;
   genplusgx::ApplicationPaths applicationPaths;
   if (automatedTestMode) {
     const auto testRoot = qEnvironmentVariable("GENPLUSGX_TEST_DATA_ROOT");
+    const auto readyQuitMode =
+      qEnvironmentVariable("GENPLUSGX_TEST_QUIT_WHEN_GAME_READY");
     bool quitDelayValid = false;
     const int quitDelay = qEnvironmentVariableIntValue(
       "GENPLUSGX_TEST_AUTO_QUIT_MS", &quitDelayValid);
     const auto root = genplusgx::ui::pathFromQString(testRoot);
     if (testRoot.isEmpty() || !root.is_absolute() || !quitDelayValid ||
+        (!readyQuitMode.isEmpty() &&
+         readyQuitMode != QStringLiteral("1")) ||
         quitDelay < 1 || quitDelay > 10'000) {
       QTextStream{stderr}
         << "Invalid automated startup-test environment. The data root must be "
-           "absolute and the quit delay must be between 1 and 10000 ms.\n";
+           "absolute, the quit delay must be between 1 and 10000 ms, and the "
+           "optional ready-quit mode must be 1.\n";
       return 2;
     }
     applicationPaths = genplusgx::ApplicationPaths{root};
     automatedQuitMilliseconds = quitDelay;
+    automatedQuitWhenGameReady = !readyQuitMode.isEmpty();
   } else {
     applicationPaths = genplusgx::ApplicationPaths::fromPlatform();
   }
@@ -1851,6 +1858,7 @@ int main(int argc, char* argv[])
   std::uint64_t loggedPacingResynchronizations = 0U;
   bool audioControlFailureReported = false;
   bool stateServiceFailureReported = false;
+  bool automatedReadyQuitScheduled = false;
   genplusgx::FrameRateSampler frameRateSampler;
   auto nextFrameRateSample = std::chrono::steady_clock::now();
   QTimer eventPump;
@@ -1860,6 +1868,7 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &automatedReadyQuitScheduled,
      &automaticResumePath,
      &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
      &controllerInput,
@@ -1884,7 +1893,8 @@ int main(int argc, char* argv[])
      &sessionSettings, &sessionSettingsStore, &startLoadedGame,
      &stateOperationId,
      &stateServiceFailureReported, &stateSessionAvailable, &stateStorage,
-     &reportRuntimeFailure, &runtimeFailureReported, &worker, &window] {
+     &reportRuntimeFailure, &runtimeFailureReported, &worker, &window,
+     automatedQuitMilliseconds, automatedQuitWhenGameReady] {
     static_cast<void>(controllerInput.pollEvents());
     const auto audioDeviceEvents = audioOutput.pollDeviceEvents();
     if (audioDeviceEvents.playbackDevicesChanged) {
@@ -2865,6 +2875,16 @@ int main(int argc, char* argv[])
           break;
       }
     }
+    if (automatedQuitWhenGameReady && automatedQuitMilliseconds &&
+        !automatedReadyQuitScheduled && window.isGameLoaded() &&
+        stateSessionAvailable && !pendingAutomaticResume &&
+        worker.state() == genplusgx::EmulationWorkerState::running) {
+      automatedReadyQuitScheduled = true;
+      QTimer::singleShot(
+        *automatedQuitMilliseconds,
+        QCoreApplication::instance(),
+        &QCoreApplication::quit);
+    }
   });
   eventPump.start();
   window.show();
@@ -2906,7 +2926,7 @@ int main(int argc, char* argv[])
         window.setSessionSettings(sessionSettings);
       });
   }
-  if (automatedQuitMilliseconds) {
+  if (automatedQuitMilliseconds && !automatedQuitWhenGameReady) {
     qInfo().noquote() << "Automated startup smoke test entered the event loop.";
     QTimer::singleShot(
       *automatedQuitMilliseconds, &application, &QCoreApplication::quit);

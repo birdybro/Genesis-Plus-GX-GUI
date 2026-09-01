@@ -4122,6 +4122,15 @@ self-contained Linux install passes structural verification and reports version
 builds, links, and cleans. Exact cross-platform hosted verification remains required
 before this milestone is marked complete.
 
+Corrective hosted run `33470249066` compiled the desktop past the Apple Clang finding,
+then its Apple Silicon Debug test exposed that the process workflow's fixed 1.2-second
+quit timer could fire before an asynchronously loaded game and state session became
+ready. The production checkpoint correctly refused that incomplete shutdown. The test
+seam now starts its bounded quit delay only after the game is running, state storage is
+ready, and any automatic restore has completed. The same job log also exposed a
+duplicate static persistence-library link warning in the new process-test target; its
+redundant direct dependency was removed.
+
 **Acceptance criteria:** The feature is disabled by default and persists transactionally;
 clean shutdown pauses/captures through the core owner and waits for atomic storage
 confirmation; startup does not run the core until identity/hardware validation and

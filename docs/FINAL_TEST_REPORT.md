@@ -101,7 +101,10 @@ shader-disabled graph passes 86/86. A fresh warning-as-error Clang 22 build pass
 88/88 after the first hosted attempt identified and corrected two Apple Clang unused
 lambda-capture diagnostics. A simultaneously loaded local matrix exposed and corrected
 a test-only rewind-metrics observation race; the command event remains the authoritative
-invalidation result. Cross-platform hosted verification of the corrections is pending.
+invalidation result. A second hosted attempt compiled past that issue and exposed a
+macOS process-test timer that began before asynchronous game/state readiness plus a
+duplicate test-only static-library link. The ready-gated test seam and dependency graph
+were corrected; cross-platform hosted verification of the corrections is pending.
 
 ## Build configurations tested
 
