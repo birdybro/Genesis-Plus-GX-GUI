@@ -100,7 +100,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 86 Run-ahead | COMPLETE | Add optional latency-reducing speculative frames | exact transient rollback, core worker scheduling, settings/UI/diagnostics | 98-test local and ten-job hosted matrices; sanitizer, package, full-log, and artifact audit | Accuracy is unchanged when disabled; speculation remains owner-thread only | `65d5f0b` |
 | 87 Display synchronization | COMPLETE | Add latency/vsync/presentation controls and instrumentation | video/timing/settings/UI | cadence, queue, GUI, native-host matrix | Options remain bounded and avoid uncontrolled drift | `b84af11` |
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
-| 89 Cheat import and search | IN PROGRESS | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | 100-test local graphs plus pending hosted matrix | Invalid/untrusted lists cannot silently patch memory | pending |
+| 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | PLANNED | Add explicit relocatable application-data mode | platform paths/CLI/UI | path isolation, package, hosted matrix | Portable mode is opt-in and never redirects normal user data | pending |
 | 91 Localization | PLANNED | Add translation catalogs and locale-safe UI coverage | UI/resources/docs | extraction, fallback, layout, hosted matrix | English fallback and stable object names remain intact | pending |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
@@ -4005,7 +4005,7 @@ Windows test-path correction `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
 
 ## Milestone 89 detail
 
-**Status:** IN PROGRESS — LOCAL IMPLEMENTATION GATE PASSED; HOSTED GATE PENDING
+**Status:** COMPLETE
 
 **Goal:** Add bounded local cheat-list import and an accessible system-aware work-RAM
 search without permitting untrusted content or GUI timing to patch core memory.
@@ -4039,8 +4039,24 @@ install passes dependency/package verification, installed offscreen `--version`,
 and checksum generation. The strict inherited Unix libretro target builds, links as
 x86-64 ELF, and cleans without a diagnostic. This host lacks `xvfb-run`, so the exact
 hosted Linux job must provide the required downloaded-package XCB/OpenGL process smoke.
-The exact ten-job GitHub Actions run and downloaded artifact/log audit are required
-before this milestone becomes COMPLETE.
+Exact implementation run
+[`33544359831`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33544359831)
+passes all ten jobs against `63eaa554634b138f8f0ce2025a7d28f88324b9d6`.
+Each of the nine native configurations registers 100 tests. Linux, Apple Silicon, and
+Intel macOS pass all tests including the real OpenGL presentation matrix; Windows
+passes all supported tests and capability-skips only that established real-context
+test on the hosted software renderer. All focused parser, live 68000/Z80 cheat,
+MainWindow GUI, and token-routing debugger tests pass on every native configuration.
+
+All 14,792 complete hosted log lines (1,980,119 bytes) were inspected. There is no
+GitHub annotation, authored compiler/linker warning, sanitizer finding, failed test,
+timeout, unexpected skip, duplicate link, or unresolved deployment diagnostic. All
+six downloaded package checksums, ZIP/TGZ/DMG integrity, safe archive paths, four
+extracted package layouts, app/shader architectures, both DMG contents, the installed
+cheat guide, and 22 Linux ELF dependency graphs verify. The downloaded Linux archive
+passes isolated offscreen and real XCB/OpenGL full event-loop startup and shutdown with
+no `LD_LIBRARY_PATH`; a prohibited-payload scan finds no game, firmware, save, state,
+patch, playlist, cheat-list, or secret file.
 
 **Acceptance criteria:** A local list is UTF-8/size/count bounded and imported
 atomically; only active-system emulator-handled codes are accepted; every imported or
@@ -4049,7 +4065,7 @@ big-endian words while 8-bit systems use active work-RAM bytes; all core access 
 on its owner thread; normal cheat and hidden debugger traffic cannot consume one
 another; every local and hosted gate passes.
 
-**Commit SHA:** pending
+**Commit SHA:** implementation `63eaa554634b138f8f0ce2025a7d28f88324b9d6`
 
 ## Milestone 83 detail
 

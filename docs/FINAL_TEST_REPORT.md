@@ -40,8 +40,8 @@ synchronization, and local bezel/overlay verification through 2026-09-01
   `632cfbcbb62303b206f01922fb4d58a94cbefc9b`
 - Exact cross-platform artwork test-path correction and hosted evidence baseline:
   `1698eaa49b7ac362bb31d615b0dcee5a51d04220`
-- Cheat import/RAM-search implementation: the current implementation pending its exact
-  hosted evidence gate
+- Exact cheat import/RAM-search implementation and hosted evidence baseline:
+  `63eaa554634b138f8f0ce2025a7d28f88324b9d6`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -106,7 +106,20 @@ shader-disabled passes 98/98. A verified staged Linux install, installed offscre
 version smoke, TGZ/checksum generation, and strict inherited libretro build/link/clean
 pass. Live core coverage executes both generated 68000 and Z80 cartridges and proves
 the generated Action Replay and Fusion RAM patches restore searched values after a real
-frame. Exact hosted evidence remains required before milestone closure.
+frame. The exact hosted evidence below closes the milestone.
+
+Exact hosted run
+[`33544359831`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33544359831)
+passes all ten jobs at that implementation SHA. All nine native configurations register
+100 tests; Linux, both macOS architectures, and ASan/UBSan execute all 100, while both
+Windows configurations pass every supported test and capability-skip only the known
+real OpenGL context test. The four milestone-focused tests pass in every native graph.
+The complete 14,792-line, 1,980,119-byte log has no actionable warning, annotation,
+sanitizer finding, failure, timeout, unexpected skip, duplicate link, or deployment
+diagnostic. Six checksums, four extracted package layouts, all archive/DMG integrity
+and safe-path checks, expected executable/shader architectures, DMG contents, installed
+cheat documentation, 22 Linux ELF dependency graphs, downloaded Linux offscreen and
+real XCB/OpenGL startup/shutdown, and the prohibited-payload scan pass.
 
 The opt-in debugger is hidden for new and migrated configurations and sends every
 request through the bounded emulation-owner queue. It exposes immutable CPU, RAM, VDP,
