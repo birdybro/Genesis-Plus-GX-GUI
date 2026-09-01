@@ -4074,6 +4074,56 @@ bytes).
 
 **Commit SHA:** `e44d4c2e6aeee926603e4318b28641888ada4909`
 
+## Milestone 80 detail
+
+**Status:** IMPLEMENTED; LOCAL GATES PASS; HOSTED VERIFICATION PENDING
+
+**Goal:** Add opt-in automatic resume of the last cleanly closed application session
+without weakening save-state identity checks or core-thread ownership.
+
+**Files changed:**
+
+- `desktop/app/main.cpp`
+- `desktop/persistence/include/genplusgx/state_manager.h`
+- `desktop/persistence/include/genplusgx/state_storage_service.h`
+- `desktop/persistence/src/state_manager.cpp`
+- `desktop/persistence/src/state_storage_service.cpp`
+- `desktop/settings/`
+- `desktop/ui/`
+- session, state-manager, state-service, GUI, and process tests under `tests/`
+- user, architecture, test-matrix, changelog, and release-candidate documentation
+
+**Tests added:** `unit.session_settings` validates opt-in defaults, absolute Unicode
+path round trips, atomic clearing, and malformed/working-directory-dependent rejection.
+Existing state manager/service tests now require dedicated resume save/load/delete and
+identity isolation. `gui.session_settings` exercises the accessible typed editor,
+Restore Defaults, persistence failure, Settings-center routing, and marker clearing.
+`gui.session_resume_application` executes the actual desktop process four times with a
+generated CC0 Genesis ROM: relative-CLI clean checkpoint creation with absolute-path
+normalization, argument-free restore/advance,
+explicit command-line precedence over a stored session, and corrupt-checkpoint fallback
+that replaces the invalid file after normal emulation.
+
+**Gate evidence:** Warning-gated Debug and optimized Release builds each pass 88/88;
+the ASan/UBSan build passes 88/88 with leak detection and halt-on-error enabled; and a
+fresh warning-gated shader-disabled graph passes 86/86. Those runs include the real
+OpenGL/librashader gate where configured and the four-launch application workflow. A
+staged self-contained Linux install passes structural verification and reports version
+0.1.1; CPack produces a checksum-verified
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`; and the preserved Unix libretro target
+builds, links, and cleans. Exact cross-platform hosted verification remains required
+before this milestone is marked complete.
+
+**Acceptance criteria:** The feature is disabled by default and persists transactionally;
+clean shutdown pauses/captures through the core owner and waits for atomic storage
+confirmation; startup does not run the core until identity/hardware validation and
+restore complete; an explicit game wins; explicit close clears the marker; stale,
+missing, or corrupt data falls back safely; queues and payloads stay bounded; every
+local and hosted regression passes; and complete CI logs contain no actionable issue.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
 ## Milestone 65 detail
 
 **Status:** COMPLETE

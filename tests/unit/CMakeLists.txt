@@ -15,6 +15,17 @@ target_link_libraries(
   genplusgx_rewind_settings_test
   PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
 )
+
+add_executable(genplusgx_session_settings_test session_settings_test.cpp)
+target_link_libraries(
+  genplusgx_session_settings_test
+  PRIVATE GenesisPlusGX::Settings genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.session_settings COMMAND genplusgx_session_settings_test)
+set_tests_properties(
+  unit.session_settings
+  PROPERTIES LABELS "unit;session;settings;persistence;filesystem" TIMEOUT 30
+)
 add_test(NAME unit.rewind_settings COMMAND genplusgx_rewind_settings_test)
 set_tests_properties(
   unit.rewind_settings

@@ -176,6 +176,21 @@ closing a game is temporarily disabled during an active state operation so its r
 cannot cross into another game session. See [SAVE_STATES.md](SAVE_STATES.md) for the
 format and recovery details.
 
+### Resume the last session on launch
+
+Open **Tools → Settings → General → Session Settings** to opt into automatic
+session resume. When the application exits cleanly with a game running, it pauses at a
+frame boundary and atomically writes a dedicated checkpoint. The next launch reopens
+that game, validates its full identity and hardware, restores the checkpoint, and then
+starts playback. A path passed on the command line always wins. Choosing **File →
+Close Game** clears the pending resume marker.
+
+Automatic resume is disabled by default. It does not overwrite slots 0–9 and it is not
+a substitute for SRAM or Sega CD backup RAM. If the game moved, the checkpoint is
+missing/corrupt, or the core rejects it, the frontend clears the stale marker and falls
+back to a normal launch instead of weakening validation or repeatedly failing at
+startup.
+
 ## Screenshots
 
 Press `F12` or choose **File → Screenshot** while a game has produced a visible frame.

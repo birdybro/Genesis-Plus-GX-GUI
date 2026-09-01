@@ -44,6 +44,8 @@ region-appropriate BIOS supplied by the user.
   menu-toggle controls, muted backward playback, and deterministic forward resume
 - Automatic per-game SRAM, Sega CD BRAM, and RAM-cartridge persistence using atomic files
 - Ten metadata-wrapped save-state slots with game-identity validation
+- Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
+  running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
 - Recent games, searchable asynchronous SQLite library, favorites, play history, and
   user-provided local artwork
@@ -100,6 +102,11 @@ genesis-plus-gx-gui --version
 Use **Input → Controller Configuration** to assign or remap keyboard and SDL controllers.
 Default keyboard controls and application hotkeys are listed in
 [KEYBOARD_SHORTCUTS.md](docs/KEYBOARD_SHORTCUTS.md).
+
+To continue exactly where a clean exit left off, open **Tools → Settings → General
+→ Session Settings** and enable automatic session resume. The application writes a
+separate validated checkpoint on shutdown and restores it only for the same game and
+hardware. Closing a game explicitly clears the pending session marker.
 
 Choose **Video → Shaders → Built-in CRT** for the included scanline/aperture-grille
 effect, or **Load Libretro Preset…** for a user-provided modern Slang `.slangp` preset.

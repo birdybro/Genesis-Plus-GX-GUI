@@ -15,6 +15,7 @@
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
+#include "genplusgx/ui/session_settings_dialog.h"
 #include "genplusgx/ui/screenshot_settings_dialog.h"
 #include "genplusgx/ui/system_settings_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
@@ -854,7 +855,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 
 void MainWindow::updateEmulationControls()
 {
-  const bool available = isGameLoaded() && !gameLoading_ &&
+  const bool available = isGameLoaded() && !gameLoading_ && !sessionResumeBusy_ &&
                          static_cast<bool>(emulationControlSink_);
   auto* pause = findChild<QAction*>(QStringLiteral("pauseAction"));
   auto* reset = findChild<QAction*>(QStringLiteral("resetAction"));
@@ -963,7 +964,8 @@ void MainWindow::showCheatError(const std::string& detail)
 void MainWindow::updateCheatAction()
 {
   if (auto* action = findChild<QAction*>(QStringLiteral("cheatsAction"))) {
-    action->setEnabled(isGameLoaded() && cheatSessionReady_);
+    action->setEnabled(
+      isGameLoaded() && !sessionResumeBusy_ && cheatSessionReady_);
   }
 }
 
@@ -1053,7 +1055,8 @@ void MainWindow::updatePerGameSettingsAction()
 {
   if (auto* action = findChild<QAction*>(
         QStringLiteral("perGameSettingsAction"))) {
-    action->setEnabled(isGameLoaded() && perGameSettingsSessionReady_);
+    action->setEnabled(
+      isGameLoaded() && !sessionResumeBusy_ && perGameSettingsSessionReady_);
   }
 }
 
@@ -1088,7 +1091,8 @@ void MainWindow::updateGameInformationAction()
 {
   auto* action = findChild<QAction*>(QStringLiteral("gameInformationAction"));
   action->setEnabled(
-    !loadedGamePath_.empty() && !gameLoading_ && !gameInformationBusy_);
+    !loadedGamePath_.empty() && !gameLoading_ && !sessionResumeBusy_ &&
+      !gameInformationBusy_);
 }
 
 void MainWindow::showGameInformation(const library::GameMetadata& metadata)
@@ -1339,7 +1343,7 @@ void MainWindow::requestScreenshot()
 void MainWindow::updateScreenshotAction()
 {
   if (auto* action = findChild<QAction*>(QStringLiteral("screenshotAction"))) {
-    action->setEnabled(isGameLoaded() && !screenshotBusy_ &&
+    action->setEnabled(isGameLoaded() && !sessionResumeBusy_ && !screenshotBusy_ &&
       displayWidget_->hasFrame() && static_cast<bool>(screenshotSink_));
   }
 }
@@ -1485,6 +1489,9 @@ void MainWindow::showSettings(SettingsPage page)
       case SettingsPageAction::rewind:
         showRewindSettings();
         break;
+      case SettingsPageAction::session:
+        showSessionSettings();
+        break;
     }
   });
   dialog->openPage(page);
@@ -1536,6 +1543,59 @@ void MainWindow::showRewindSettings()
     }
     setRewindSettings(settings);
     statusBar()->showMessage(tr("Rewind settings applied."), 3'000);
+    return PersistenceStatus{};
+  });
+  dialog->open();
+}
+
+void MainWindow::setSessionSettings(settings::SessionSettings settings)
+{
+  if (!settings::validateSessionSettings(settings)) {
+    return;
+  }
+  sessionSettings_ = std::move(settings);
+  if (auto* dialog = findChild<SessionSettingsDialog*>(
+        QStringLiteral("sessionSettingsDialog"))) {
+    dialog->setResumeOnLaunch(sessionSettings_.resumeOnLaunch);
+  }
+  refreshSettingsDialog();
+}
+
+void MainWindow::setSessionSettingsSink(SessionSettingsSink sink)
+{
+  sessionSettingsSink_ = std::move(sink);
+}
+
+const settings::SessionSettings& MainWindow::sessionSettings() const noexcept
+{
+  return sessionSettings_;
+}
+
+void MainWindow::showSessionSettings()
+{
+  if (auto* existing = findChild<SessionSettingsDialog*>(
+        QStringLiteral("sessionSettingsDialog"))) {
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new SessionSettingsDialog(
+    sessionSettings_.resumeOnLaunch, this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettingsSink([this](bool enabled) {
+    if (sessionSettingsSink_) {
+      const auto saved = sessionSettingsSink_(enabled);
+      if (!saved) {
+        return saved;
+      }
+    }
+    auto updated = sessionSettings_;
+    updated.resumeOnLaunch = enabled;
+    if (!enabled) {
+      updated.lastGamePath.reset();
+    }
+    setSessionSettings(std::move(updated));
+    statusBar()->showMessage(tr("Session settings applied."), 3'000);
     return PersistenceStatus{};
   });
   dialog->open();
@@ -2128,6 +2188,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .bios = biosSnapshot_,
     .screenshots = screenshotSettings_,
     .rewind = rewindSettings_,
+    .session = sessionSettings_,
     .paths = applicationPaths_,
     .connectedControllerCount = controllers_.size(),
     .pathsAvailable = applicationPathsAvailable_,
@@ -2348,7 +2409,7 @@ void MainWindow::showRecentGamesError(const std::string& detail)
 
 bool MainWindow::requestGameLoad(const std::filesystem::path& path)
 {
-  if (gameLoading_) {
+  if (gameLoading_ || sessionResumeBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
     return false;
   }
@@ -2366,8 +2427,24 @@ bool MainWindow::requestGameLoad(const std::filesystem::path& path)
   return true;
 }
 
+void MainWindow::setSessionResumeBusy(bool busy)
+{
+  sessionResumeBusy_ = busy && isGameLoaded();
+  setGameActionsEnabled(isGameLoaded() && !sessionResumeBusy_);
+  findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(
+    !gameLoading_ && !sessionResumeBusy_);
+  findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
+    hasRecentGames_ && !gameLoading_ && !sessionResumeBusy_);
+  if (sessionResumeBusy_) {
+    statusBar()->showMessage(tr("Restoring the previous session…"));
+  } else if (isGameLoaded()) {
+    statusBar()->showMessage(tr("Session restoration complete."), 3'000);
+  }
+}
+
 void MainWindow::setGameLoading(const std::filesystem::path& path)
 {
+  sessionResumeBusy_ = false;
   const bool replacingLoadedGame = !loadedGamePath_.empty();
   if (auto* information = findChild<GameInformationDialog*>(
         QStringLiteral("gameInformationDialog"))) {
@@ -2488,6 +2565,7 @@ void MainWindow::setNoGameLoaded()
   gameInformationBusy_ = false;
   stateSessionReady_ = false;
   stateOperationBusy_ = false;
+  sessionResumeBusy_ = false;
   emulationPaused_ = false;
   fastForwardActive_ = false;
   fastForwardHeld_ = false;
@@ -2563,7 +2641,8 @@ void MainWindow::updateDiscActions()
   if (change == nullptr || eject == nullptr) {
     return;
   }
-  const bool available = isGameLoaded() && segaCdSession_ && !discOperationBusy_;
+  const bool available = isGameLoaded() && !sessionResumeBusy_ &&
+    segaCdSession_ && !discOperationBusy_;
   change->setEnabled(available);
   eject->setEnabled(available);
   change->setToolTip(discPresent_ && !currentDiscPath_.empty()
@@ -2696,7 +2775,8 @@ void MainWindow::requestStateOperation(StateUiOperation operation)
 
 void MainWindow::updateStateActions()
 {
-  const bool ready = isGameLoaded() && stateSessionReady_ && !stateOperationBusy_;
+  const bool ready = isGameLoaded() && !sessionResumeBusy_ &&
+    stateSessionReady_ && !stateOperationBusy_;
   const auto selectedState = stateSlotViews_[selectedStateSlot_].state;
   findChild<QAction*>(QStringLiteral("saveStateAction"))->setEnabled(ready);
   findChild<QAction*>(QStringLiteral("loadStateAction"))->setEnabled(
@@ -2711,7 +2791,7 @@ void MainWindow::updateStateActions()
   findChild<QAction*>(QStringLiteral("previousStateSlotAction"))->setEnabled(ready);
   findChild<QAction*>(QStringLiteral("nextStateSlotAction"))->setEnabled(ready);
 
-  if (stateOperationBusy_) {
+  if (stateOperationBusy_ || sessionResumeBusy_) {
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
     findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(false);
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);

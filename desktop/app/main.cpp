@@ -27,6 +27,7 @@
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/rewind_settings.h"
+#include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/system_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/theme_controller.h"
@@ -46,6 +47,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <system_error>
 #include <utility>
 #include <vector>
 
@@ -425,6 +427,32 @@ int main(int argc, char* argv[])
     recordStartupIssue("Rewind settings", loadedRewindSettings.status.message);
   }
   auto rewindSettings = loadedRewindSettings.settings;
+  genplusgx::settings::SessionSettingsStore sessionSettingsStore{
+    applicationPaths.configDirectory() / "session-settings.json"};
+  auto loadedSessionSettings = sessionSettingsStore.load();
+  if (!loadedSessionSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedSessionSettings.status.message);
+    recordStartupIssue("Session settings", loadedSessionSettings.status.message);
+  }
+  auto sessionSettings = loadedSessionSettings.settings;
+  std::optional<std::filesystem::path> automaticResumePath;
+  if (!commandLine.gamePath && sessionSettings.resumeOnLaunch &&
+      sessionSettings.lastGamePath) {
+    std::error_code pathError;
+    if (std::filesystem::is_regular_file(
+          *sessionSettings.lastGamePath, pathError) && !pathError) {
+      automaticResumePath = *sessionSettings.lastGamePath;
+    } else {
+      sessionSettings.lastGamePath.reset();
+      const auto cleared = sessionSettingsStore.save(sessionSettings);
+      if (!cleared) {
+        qWarning().noquote() << QString::fromStdString(cleared.message);
+        recordStartupIssue("Session resume", cleared.message);
+      }
+      qWarning() << "The previous session game is unavailable; automatic resume was cleared.";
+    }
+  }
   genplusgx::platform::BiosManager biosManager{
     genplusgx::platform::BiosConfigurationStore{
       applicationPaths.configDirectory() / "bios.json"}};
@@ -777,6 +805,20 @@ int main(int argc, char* argv[])
       }
       rewindSettings = settings;
       return genplusgx::PersistenceStatus{};
+    });
+  window.setSessionSettings(sessionSettings);
+  window.setSessionSettingsSink(
+    [&sessionSettings, &sessionSettingsStore](bool enabled) {
+      auto candidate = sessionSettings;
+      candidate.resumeOnLaunch = enabled;
+      if (!enabled) {
+        candidate.lastGamePath.reset();
+      }
+      const auto saved = sessionSettingsStore.save(candidate);
+      if (saved) {
+        sessionSettings = std::move(candidate);
+      }
+      return saved;
     });
   window.setScreenshotSettings(
     screenshotSettings, applicationPaths.screenshotsDirectory());
@@ -1399,6 +1441,17 @@ int main(int argc, char* argv[])
   };
   std::optional<PendingState> pendingState;
   std::optional<std::uint64_t> stateActivationOperation;
+  enum class AutomaticResumePhase {
+    waitingForStateSession,
+    loadingCheckpoint,
+    restoringCheckpoint,
+  };
+  struct PendingAutomaticResume final {
+    std::uint64_t gameGeneration{0U};
+    std::uint64_t operationId{0U};
+    AutomaticResumePhase phase{AutomaticResumePhase::waitingForStateSession};
+  };
+  std::optional<PendingAutomaticResume> pendingAutomaticResume;
   struct PendingMetadata final {
     std::uint64_t operationId{0};
     std::filesystem::path path;
@@ -1541,9 +1594,15 @@ int main(int argc, char* argv[])
     });
   window.setGameLoadSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
-     &applyEffectiveSettings, &globalGameSettings, &lifecycleOperationId,
-     &loadMetadataOperationId, &metadataService, &pendingLoad, &window, &worker](
+     &applyEffectiveSettings, &automaticResumePath, &globalGameSettings,
+     &lifecycleOperationId, &loadMetadataOperationId, &metadataService,
+     &pendingAutomaticResume, &pendingLoad, &window, &worker](
       const std::filesystem::path& path) {
+      if (pendingAutomaticResume) {
+        pendingAutomaticResume.reset();
+        automaticResumePath.reset();
+        window.setSessionResumeBusy(false);
+      }
       const auto metadataId = ++loadMetadataOperationId;
       pendingLoad = PendingLoad{
         .operationId = 0U,
@@ -1765,6 +1824,25 @@ int main(int argc, char* argv[])
       activeCheatConfiguration = configuration;
       return genplusgx::PersistenceStatus{};
     });
+  const auto startLoadedGame =
+    [&inputAggregator, &inputOperationId, &lifecycleOperationId,
+     &reportRuntimeFailure, &worker] {
+      const auto inputSubmitted = worker.submit(
+        genplusgx::EmulationCommand::updateInput(
+          ++inputOperationId, inputAggregator.snapshot()));
+      if (!inputSubmitted) {
+        reportRuntimeFailure(
+          "The game loaded, but its initial input state could not reach "
+          "the emulation service: " + inputSubmitted.message);
+      }
+      const auto started = worker.submit(genplusgx::EmulationCommand::simple(
+        genplusgx::EmulationCommandType::start, ++lifecycleOperationId));
+      if (!started) {
+        reportRuntimeFailure(
+          "The game loaded, but emulation could not start: " +
+          started.message);
+      }
+    };
   auto nextInstrumentationLog = std::chrono::steady_clock::now() +
     std::chrono::seconds{5};
   std::uint64_t loggedAudioUnderruns = 0U;
@@ -1782,6 +1860,7 @@ int main(int argc, char* argv[])
     &QTimer::timeout,
     &window,
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
+     &automaticResumePath,
      &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
      &controllerInput,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
@@ -1794,13 +1873,15 @@ int main(int argc, char* argv[])
      &libraryScansInFlight,
      &lifecycleOperationId,
      &metadataService, &pendingDisc,
-     &pendingLoad, &pendingMetadata, &pendingState, &pendingUnload,
+     &pendingAutomaticResume, &pendingLoad, &pendingMetadata, &pendingState,
+     &pendingUnload,
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
      &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
      &pendingCheatMetadata, &pendingCheatOperation, &perGameSettingsStore,
      &pendingScreenshot, &screenshotService,
      &closingGamePath, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
+     &sessionSettings, &sessionSettingsStore, &startLoadedGame,
      &stateOperationId,
      &stateServiceFailureReported, &stateSessionAvailable, &stateStorage,
      &reportRuntimeFailure, &runtimeFailureReported, &worker, &window] {
@@ -1910,6 +1991,31 @@ int main(int argc, char* argv[])
           window.showCheatError(event->message);
         }
       }
+      if (pendingAutomaticResume &&
+          pendingAutomaticResume->phase ==
+            AutomaticResumePhase::restoringCheckpoint &&
+          event->operationId == pendingAutomaticResume->operationId &&
+          event->command == genplusgx::EmulationCommandType::restoreState) {
+        const bool restored = event->succeeded();
+        pendingAutomaticResume.reset();
+        automaticResumePath.reset();
+        window.setSessionResumeBusy(false);
+        if (restored) {
+          qInfo() << "Automatic session checkpoint restored.";
+        } else {
+          sessionSettings.lastGamePath.reset();
+          const auto cleared = sessionSettingsStore.save(sessionSettings);
+          if (!cleared) {
+            qWarning().noquote() << QString::fromStdString(cleared.message);
+          }
+          window.setSessionSettings(sessionSettings);
+          window.showStateOperationError(
+            genplusgx::ui::StateUiOperation::load,
+            "The automatic session checkpoint could not be restored. Normal "
+            "emulation has started instead: " + event->message);
+        }
+        startLoadedGame();
+      }
       if (pendingState && event->operationId == pendingState->operationId &&
           pendingState->gameGeneration == gameGeneration) {
         if (pendingState->phase == PendingStatePhase::capturing &&
@@ -2015,12 +2121,33 @@ int main(int argc, char* argv[])
           const auto stateActivated = stateStorage.submit(
             genplusgx::StateStorageCommand::activate(
               activationId, gameGeneration, loadedPath, event->hardware));
+          const bool automaticResumeCandidate = automaticResumePath &&
+            *automaticResumePath == loadedPath;
           if (!stateActivated) {
             stateActivationOperation.reset();
             stateSessionAvailable = false;
             window.showStateOperationError(
               genplusgx::ui::StateUiOperation::load,
               "Save states are unavailable: " + stateActivated.message);
+            if (automaticResumeCandidate) {
+              automaticResumePath.reset();
+              sessionSettings.lastGamePath.reset();
+              const auto cleared = sessionSettingsStore.save(sessionSettings);
+              if (!cleared) {
+                qWarning().noquote() << QString::fromStdString(cleared.message);
+              }
+              window.setSessionSettings(sessionSettings);
+            }
+          }
+          const bool shouldResumeAutomatically =
+            automaticResumeCandidate && stateActivated.ok();
+          if (shouldResumeAutomatically) {
+            pendingAutomaticResume = PendingAutomaticResume{
+              .gameGeneration = gameGeneration,
+              .operationId = 0U,
+              .phase = AutomaticResumePhase::waitingForStateSession,
+            };
+            window.setSessionResumeBusy(true);
           }
           const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
@@ -2050,20 +2177,8 @@ int main(int argc, char* argv[])
               window.showGameLibraryError(detail);
             }
           }
-          const auto inputSubmitted = worker.submit(
-            genplusgx::EmulationCommand::updateInput(
-              ++inputOperationId, inputAggregator.snapshot()));
-          if (!inputSubmitted) {
-            reportRuntimeFailure(
-              "The game loaded, but its initial input state could not reach "
-              "the emulation service: " + inputSubmitted.message);
-          }
-          const auto started = worker.submit(genplusgx::EmulationCommand::simple(
-            genplusgx::EmulationCommandType::start, ++lifecycleOperationId));
-          if (!started) {
-            reportRuntimeFailure(
-              "The game loaded, but emulation could not start: " +
-              started.message);
+          if (!shouldResumeAutomatically) {
+            startLoadedGame();
           }
           const auto cheatMetadataId = ++cheatMetadataOperationId;
           pendingCheatMetadata = PendingCheatMetadata{
@@ -2082,6 +2197,16 @@ int main(int argc, char* argv[])
         } else {
           qWarning().noquote() << "Game load failed:"
                                << QString::fromStdString(event->message);
+          if (automaticResumePath && *automaticResumePath == loadedPath) {
+            automaticResumePath.reset();
+            pendingAutomaticResume.reset();
+            sessionSettings.lastGamePath.reset();
+            const auto cleared = sessionSettingsStore.save(sessionSettings);
+            if (!cleared) {
+              qWarning().noquote() << QString::fromStdString(cleared.message);
+            }
+            window.setSessionSettings(sessionSettings);
+          }
           const bool previousGameRemainsLoaded =
             event->coreError == genplusgx::CoreError::persistenceFailed &&
             (event->workerState == genplusgx::EmulationWorkerState::paused ||
@@ -2153,6 +2278,23 @@ int main(int argc, char* argv[])
                  event->command == genplusgx::EmulationCommandType::unloadGame) {
         pendingUnload.reset();
         if (event->succeeded()) {
+          pendingAutomaticResume.reset();
+          automaticResumePath.reset();
+          window.setSessionResumeBusy(false);
+          if (sessionSettings.lastGamePath) {
+            auto clearedSession = sessionSettings;
+            clearedSession.lastGamePath.reset();
+            const auto cleared = sessionSettingsStore.save(clearedSession);
+            if (cleared) {
+              sessionSettings = std::move(clearedSession);
+              window.setSessionSettings(sessionSettings);
+            } else {
+              qWarning().noquote() << QString::fromStdString(cleared.message);
+              window.showRecentGamesError(
+                "The automatic session marker could not be cleared: " +
+                cleared.message);
+            }
+          }
           if (gameGeneration != 0U) {
             static_cast<void>(stateStorage.submit(
               genplusgx::StateStorageCommand::simple(
@@ -2287,10 +2429,62 @@ int main(int argc, char* argv[])
         stateSessionAvailable = true;
         window.setStateSlotViews(stateSlotViews(event->slotSummaries));
         window.setStateSessionReady(true);
+        if (pendingAutomaticResume &&
+            pendingAutomaticResume->gameGeneration == gameGeneration &&
+            pendingAutomaticResume->phase ==
+              AutomaticResumePhase::waitingForStateSession) {
+          const auto operationId = ++stateOperationId;
+          const auto submitted = stateStorage.submit(
+            genplusgx::StateStorageCommand::simple(
+              genplusgx::StateStorageCommandType::loadResume,
+              operationId,
+              gameGeneration));
+          if (submitted) {
+            pendingAutomaticResume->operationId = operationId;
+            pendingAutomaticResume->phase =
+              AutomaticResumePhase::loadingCheckpoint;
+          } else {
+            pendingAutomaticResume.reset();
+            automaticResumePath.reset();
+            window.setSessionResumeBusy(false);
+            sessionSettings.lastGamePath.reset();
+            const auto cleared = sessionSettingsStore.save(sessionSettings);
+            if (!cleared) {
+              qWarning().noquote() << QString::fromStdString(cleared.message);
+            }
+            window.setSessionSettings(sessionSettings);
+            window.showStateOperationError(
+              genplusgx::ui::StateUiOperation::load,
+              "The automatic checkpoint request could not be queued. Normal "
+              "emulation has started instead: " + submitted.message);
+            startLoadedGame();
+          }
+        }
         continue;
       }
       if (event->type == genplusgx::StateStorageEventType::operationFailed) {
-        if (stateActivationOperation &&
+        if (pendingAutomaticResume &&
+            event->operationId == pendingAutomaticResume->operationId &&
+            event->gameGeneration == pendingAutomaticResume->gameGeneration) {
+          const auto detail = event->message;
+          qWarning().noquote()
+            << "Automatic session resume failed safely:"
+            << QString::fromStdString(detail);
+          pendingAutomaticResume.reset();
+          automaticResumePath.reset();
+          window.setSessionResumeBusy(false);
+          sessionSettings.lastGamePath.reset();
+          const auto cleared = sessionSettingsStore.save(sessionSettings);
+          if (!cleared) {
+            qWarning().noquote() << QString::fromStdString(cleared.message);
+          }
+          window.setSessionSettings(sessionSettings);
+          window.showStateOperationError(
+            genplusgx::ui::StateUiOperation::load,
+            "The automatic session checkpoint is missing or invalid. Normal "
+            "emulation has started instead: " + detail);
+          startLoadedGame();
+        } else if (stateActivationOperation &&
             event->operationId == *stateActivationOperation &&
             event->gameGeneration == gameGeneration) {
           stateActivationOperation.reset();
@@ -2299,6 +2493,20 @@ int main(int argc, char* argv[])
           window.showStateOperationError(
             genplusgx::ui::StateUiOperation::load,
             "Save states are unavailable: " + event->message);
+          if (pendingAutomaticResume &&
+              pendingAutomaticResume->phase ==
+                AutomaticResumePhase::waitingForStateSession) {
+            pendingAutomaticResume.reset();
+            automaticResumePath.reset();
+            window.setSessionResumeBusy(false);
+            sessionSettings.lastGamePath.reset();
+            const auto cleared = sessionSettingsStore.save(sessionSettings);
+            if (!cleared) {
+              qWarning().noquote() << QString::fromStdString(cleared.message);
+            }
+            window.setSessionSettings(sessionSettings);
+            startLoadedGame();
+          }
         } else if (pendingState &&
                    event->operationId == pendingState->operationId &&
                    event->gameGeneration == pendingState->gameGeneration) {
@@ -2319,6 +2527,36 @@ int main(int argc, char* argv[])
               genplusgx::ui::StateUiOperation::load,
               "The save-state service is unavailable: " + event->message);
           }
+        }
+        continue;
+      }
+      if (pendingAutomaticResume &&
+          event->type == genplusgx::StateStorageEventType::resumeLoaded &&
+          event->operationId == pendingAutomaticResume->operationId &&
+          event->gameGeneration == pendingAutomaticResume->gameGeneration &&
+          event->gameGeneration == gameGeneration &&
+          pendingAutomaticResume->phase ==
+            AutomaticResumePhase::loadingCheckpoint) {
+        const auto restored = worker.submit(genplusgx::EmulationCommand::restore(
+          event->operationId, event->rawPayload));
+        if (restored) {
+          pendingAutomaticResume->phase =
+            AutomaticResumePhase::restoringCheckpoint;
+        } else {
+          pendingAutomaticResume.reset();
+          automaticResumePath.reset();
+          window.setSessionResumeBusy(false);
+          sessionSettings.lastGamePath.reset();
+          const auto cleared = sessionSettingsStore.save(sessionSettings);
+          if (!cleared) {
+            qWarning().noquote() << QString::fromStdString(cleared.message);
+          }
+          window.setSessionSettings(sessionSettings);
+          window.showStateOperationError(
+            genplusgx::ui::StateUiOperation::load,
+            "The automatic checkpoint could not reach the emulation worker. "
+            "Normal emulation has started instead: " + restored.message);
+          startLoadedGame();
         }
         continue;
       }
@@ -2645,11 +2883,28 @@ int main(int argc, char* argv[])
   if (commandLine.fullscreen) {
     window.setFullscreen(true);
   }
+  std::optional<std::filesystem::path> startupGame;
   if (commandLine.gamePath) {
-    const auto startupGame = genplusgx::ui::pathFromQString(*commandLine.gamePath);
-    QTimer::singleShot(0, &window, [&window, startupGame] {
-      static_cast<void>(window.requestGameLoad(startupGame));
-    });
+    startupGame = genplusgx::ui::pathFromQString(*commandLine.gamePath);
+  } else if (automaticResumePath) {
+    startupGame = *automaticResumePath;
+  }
+  if (startupGame) {
+    const bool automatic = automaticResumePath.has_value();
+    QTimer::singleShot(0, &window,
+      [&automaticResumePath, &sessionSettings, &sessionSettingsStore, &window,
+       automatic, startupGame = *startupGame] {
+        if (window.requestGameLoad(startupGame) || !automatic) {
+          return;
+        }
+        automaticResumePath.reset();
+        sessionSettings.lastGamePath.reset();
+        const auto cleared = sessionSettingsStore.save(sessionSettings);
+        if (!cleared) {
+          qWarning().noquote() << QString::fromStdString(cleared.message);
+        }
+        window.setSessionSettings(sessionSettings);
+      });
   }
   if (automatedQuitMilliseconds) {
     qInfo().noquote() << "Automated startup smoke test entered the event loop.";
@@ -2658,6 +2913,126 @@ int main(int argc, char* argv[])
   }
   const int result = application.exec();
   eventPump.stop();
+  genplusgx::app::ShutdownReport shutdownReport{result};
+  if (result == 0 && sessionSettings.resumeOnLaunch &&
+      window.isGameLoaded() && pendingAutomaticResume) {
+    shutdownReport.addFailure(
+      "Automatic session resume",
+      "Shutdown interrupted restoration of the previous checkpoint; the "
+      "earlier checkpoint was preserved.");
+  }
+  const bool resumeCheckpointRequested = result == 0 &&
+    sessionSettings.resumeOnLaunch && window.isGameLoaded() &&
+    !pendingAutomaticResume;
+  if (resumeCheckpointRequested && gameGeneration != 0U &&
+      stateSessionAvailable &&
+      (worker.state() == genplusgx::EmulationWorkerState::paused ||
+       worker.state() == genplusgx::EmulationWorkerState::running)) {
+    const auto waitForWorkerOperation = [&worker](std::uint64_t operationId) {
+      const auto deadline = std::chrono::steady_clock::now() +
+        std::chrono::seconds{3};
+      while (std::chrono::steady_clock::now() < deadline) {
+        auto event = worker.waitForEvent(std::chrono::milliseconds{100});
+        if (event && event->operationId == operationId) {
+          return event;
+        }
+      }
+      return std::optional<genplusgx::EmulationEvent>{};
+    };
+    const auto waitForStateOperation = [&stateStorage](
+                                       std::uint64_t operationId) {
+      const auto deadline = std::chrono::steady_clock::now() +
+        std::chrono::seconds{3};
+      while (std::chrono::steady_clock::now() < deadline) {
+        auto event = stateStorage.waitForEvent(std::chrono::milliseconds{100});
+        if (event && event->operationId == operationId) {
+          return event;
+        }
+      }
+      return std::optional<genplusgx::StateStorageEvent>{};
+    };
+
+    bool checkpointReady = true;
+    if (worker.state() == genplusgx::EmulationWorkerState::running) {
+      const auto pauseId = ++stateOperationId;
+      const auto submitted = worker.submit(genplusgx::EmulationCommand::simple(
+        genplusgx::EmulationCommandType::pause, pauseId));
+      const auto paused = submitted ? waitForWorkerOperation(pauseId)
+                                    : std::nullopt;
+      if (!submitted || !paused || !paused->succeeded()) {
+        checkpointReady = false;
+        shutdownReport.addFailure(
+          "Automatic session resume",
+          submitted
+            ? "The emulation worker did not pause for the shutdown checkpoint."
+            : submitted.message);
+      }
+    }
+    if (checkpointReady) {
+      const auto captureId = ++stateOperationId;
+      const auto submitted = worker.submit(genplusgx::EmulationCommand::simple(
+        genplusgx::EmulationCommandType::captureState, captureId));
+      auto captured = submitted ? waitForWorkerOperation(captureId)
+                                : std::nullopt;
+      if (!submitted || !captured || !captured->succeeded()) {
+        checkpointReady = false;
+        shutdownReport.addFailure(
+          "Automatic session resume",
+          submitted && captured
+            ? captured->message
+            : (submitted
+                ? "The emulation worker did not return a shutdown checkpoint."
+                : submitted.message));
+      } else {
+        const auto stored = stateStorage.submit(
+          genplusgx::StateStorageCommand::saveResumeState(
+            captureId,
+            gameGeneration,
+            captured->frameNumber,
+            std::move(captured->rawState)));
+        const auto stateEvent = stored ? waitForStateOperation(captureId)
+                                      : std::nullopt;
+        if (!stored || !stateEvent || !stateEvent->succeeded() ||
+            stateEvent->type != genplusgx::StateStorageEventType::resumeSaved) {
+          checkpointReady = false;
+          shutdownReport.addFailure(
+            "Automatic session resume",
+            stored && stateEvent
+              ? stateEvent->message
+              : (stored
+                  ? "The state service did not confirm the shutdown checkpoint."
+                  : stored.message));
+        }
+      }
+    }
+    if (checkpointReady) {
+      std::error_code absolutePathError;
+      auto checkpointGamePath = std::filesystem::absolute(
+        window.loadedGamePath(), absolutePathError);
+      if (absolutePathError || checkpointGamePath.empty()) {
+        shutdownReport.addFailure(
+          "Automatic session resume",
+          "The running game's absolute path could not be recorded.");
+      } else {
+        checkpointGamePath = checkpointGamePath.lexically_normal();
+        auto savedSession = sessionSettings;
+        savedSession.lastGamePath = std::move(checkpointGamePath);
+        const auto saved = sessionSettingsStore.save(savedSession);
+        if (saved) {
+          sessionSettings = std::move(savedSession);
+          qInfo().noquote() << "Automatic session checkpoint saved for"
+                            << genplusgx::ui::pathToQString(
+                                 *sessionSettings.lastGamePath);
+        } else {
+          shutdownReport.addFailure("Automatic session resume", saved.message);
+        }
+      }
+    }
+  } else if (resumeCheckpointRequested) {
+    shutdownReport.addFailure(
+      "Automatic session resume",
+      "The active game did not have a ready core/state session at shutdown.");
+  }
   window.displayWidget()->setRendererFailureSink({});
   keyboardInput.setSnapshotSink({});
   keyboardInput.detach();
@@ -2677,6 +3052,7 @@ int main(int argc, char* argv[])
   window.setCheatConfigurationSink({});
   window.setPerGameSettingsSink({});
   window.setAppearanceSettingsSink({});
+  window.setSessionSettingsSink({});
   window.setDiagnosticsSnapshotProvider({});
   window.setDebugRequestSink({});
   window.setVideoSettingsSink({});
@@ -2684,7 +3060,6 @@ int main(int argc, char* argv[])
   window.setSystemSettingsSink({});
   window.setBiosConfigurationSink({});
   inputAggregator.setSnapshotSink({});
-  genplusgx::app::ShutdownReport shutdownReport{result};
   const auto recordCleanup = [&shutdownReport](
                                const char* service, const auto& status) {
     if (status) {

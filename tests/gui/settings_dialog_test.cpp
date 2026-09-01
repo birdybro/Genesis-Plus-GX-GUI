@@ -41,6 +41,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .bios = {},
     .screenshots = {.directory = root / "custom-shots"},
     .rewind = genplusgx::settings::defaultRewindSettings(),
+    .session = genplusgx::settings::defaultSessionSettings(),
     .paths = genplusgx::ApplicationPaths{root},
     .connectedControllerCount = 2U,
     .pathsAvailable = true,

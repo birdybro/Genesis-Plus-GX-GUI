@@ -13,6 +13,7 @@
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/per_game_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
+#include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
@@ -119,6 +120,7 @@ public:
     const settings::AppearanceSettings&)>;
   using RewindSettingsSink = std::function<PersistenceStatus(
     const RewindConfiguration&)>;
+  using SessionSettingsSink = std::function<PersistenceStatus(bool)>;
   using DiagnosticsSnapshotProvider =
     std::function<diagnostics::DiagnosticsSnapshot()>;
   using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
@@ -162,6 +164,10 @@ public:
   void setRewindSettingsSink(RewindSettingsSink sink);
   [[nodiscard]] const RewindConfiguration& rewindSettings() const noexcept;
   void showRewindSettings();
+  void setSessionSettings(settings::SessionSettings settings);
+  void setSessionSettingsSink(SessionSettingsSink sink);
+  [[nodiscard]] const settings::SessionSettings& sessionSettings() const noexcept;
+  void showSessionSettings();
   void setVideoSettings(settings::VideoSettings settings);
   void setVideoSettingsSink(VideoSettingsSink sink);
   [[nodiscard]] const settings::VideoSettings& videoSettings() const noexcept;
@@ -246,6 +252,7 @@ public:
   void setRecentGames(std::vector<std::filesystem::path> paths);
   void showRecentGamesError(const std::string& detail);
   void setStateSessionReady(bool ready);
+  void setSessionResumeBusy(bool busy);
   void setStateOperationBusy(bool busy);
   void setStateSlotViews(std::array<StateSlotView, 10> views);
   void setSelectedStateSlot(std::uint32_t slot);
@@ -357,6 +364,7 @@ private:
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
   RewindSettingsSink rewindSettingsSink_;
+  SessionSettingsSink sessionSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   DebugRequestSink debugRequestSink_;
   cheats::CheatConfiguration cheatConfiguration_;
@@ -366,6 +374,7 @@ private:
   settings::GlobalGameSettings globalGameSettings_;
   settings::ScreenshotSettings screenshotSettings_;
   RewindConfiguration rewindSettings_;
+  settings::SessionSettings sessionSettings_;
   ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
@@ -377,6 +386,7 @@ private:
   bool gameLoading_{false};
   bool stateSessionReady_{false};
   bool stateOperationBusy_{false};
+  bool sessionResumeBusy_{false};
   bool emulationPaused_{false};
   bool fastForwardActive_{false};
   bool fastForwardHeld_{false};

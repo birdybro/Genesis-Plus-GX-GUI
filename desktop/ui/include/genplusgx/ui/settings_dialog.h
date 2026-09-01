@@ -8,6 +8,7 @@
 #include "genplusgx/settings/audio_settings.h"
 #include "genplusgx/settings/rewind_settings.h"
 #include "genplusgx/settings/screenshot_settings.h"
+#include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/video_settings.h"
 
 #include <QDialog>
@@ -46,6 +47,7 @@ enum class SettingsPageAction {
   diagnostics,
   perGame,
   rewind,
+  session,
 };
 
 struct SettingsOverview final {
@@ -57,6 +59,7 @@ struct SettingsOverview final {
   platform::BiosSnapshot bios;
   settings::ScreenshotSettings screenshots;
   RewindConfiguration rewind;
+  settings::SessionSettings session;
   ApplicationPaths paths;
   std::size_t connectedControllerCount{0U};
   bool pathsAvailable{false};

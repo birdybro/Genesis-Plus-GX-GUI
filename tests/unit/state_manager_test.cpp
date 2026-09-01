@@ -72,6 +72,29 @@ int main()
     return 4;
   }
 
+  if (!check(manager.saveResumeState(
+        firstIdentity, 0x80U, 43U, firstPayload, fixedTimestamp),
+        "Automatic-resume checkpoint write failed") ||
+      !check(manager.resumeStatePath(firstIdentity).filename() ==
+          "resume.gpgxstate",
+        "Automatic-resume filename was incorrect")) {
+    return 15;
+  }
+  const auto resumeLoad = manager.loadResumeState(firstIdentity, 0x80U);
+  if (!check(resumeLoad.status && resumeLoad.rawPayload == firstPayload &&
+        resumeLoad.metadata.slot == genplusgx::SaveStateManager::resumeSlot &&
+        resumeLoad.metadata.emulatedFrameNumber == 43U,
+        "Automatic-resume checkpoint did not round-trip") ||
+      !check(manager.loadResumeState(secondIdentity, 0x80U).status.error ==
+          genplusgx::SaveStateError::missingState,
+        "Missing per-game resume checkpoint was not isolated") ||
+      !check(manager.loadStateFile(manager.resumeStatePath(firstIdentity),
+          secondIdentity, 0x80U).status.error ==
+          genplusgx::SaveStateError::wrongGame,
+        "Wrong-game automatic-resume checkpoint was accepted")) {
+    return 16;
+  }
+
   auto replacement = fakeRawState(0x7AU);
   replacement[100] = 0xCCU;
   if (!check(manager.saveSlot(firstIdentity, 0U, 0x80U, 99U, replacement, fixedTimestamp),
@@ -162,6 +185,17 @@ int main()
           genplusgx::SaveStateError::missingState,
         "Repeated state deletion did not report missing state")) {
     return 14;
+  }
+
+  if (!check(manager.deleteResumeState(firstIdentity),
+        "Automatic-resume checkpoint deletion failed") ||
+      !check(manager.loadResumeState(firstIdentity, 0x80U).status.error ==
+          genplusgx::SaveStateError::missingState,
+        "Deleted automatic-resume checkpoint remained visible") ||
+      !check(manager.deleteResumeState(firstIdentity).error ==
+          genplusgx::SaveStateError::missingState,
+        "Repeated automatic-resume deletion did not report missing state")) {
+    return 17;
   }
 
   return 0;

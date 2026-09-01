@@ -9,6 +9,9 @@ platform documentation.
 
 ### Added
 
+- Opt-in automatic session resume with a dedicated identity-checked shutdown
+  checkpoint, explicit command-line precedence, corruption-safe fallback to normal
+  emulation, and transactional settings/GUI controls.
 - Bounded in-memory rewind on the emulation thread, with a configurable 16–1024 MiB
   budget and 1–60-frame capture interval, a focus-safe Backspace hold hotkey, a menu
   toggle, audio suppression, diagnostics, persisted settings, and state-history tests.

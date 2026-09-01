@@ -89,6 +89,17 @@ writes, and explicit state restores invalidate incompatible history. A persisted
 settings dialog, Backspace hold hotkey with schema migration/conflict checks, menu
 toggle, help, and privacy-safe diagnostics complete the user-facing workflow.
 
+Automatic session resume is opt-in and uses a dedicated state-kind marker inside the
+existing 128-byte checked envelope. Clean shutdown pauses and captures on the core
+owner, waits for atomic state-storage confirmation, and records the absolute game path
+only after success. Startup gives explicit command-line input precedence and otherwise
+waits for game identity/hardware activation before restoring and starting playback.
+Three new tests cover the versioned settings model, GUI editor, and a real four-launch
+desktop process workflow; state-manager/service tests also cover the dedicated
+checkpoint. Debug, Release, and ASan/UBSan suites each pass 88/88 locally; the
+shader-disabled graph passes 86/86. Cross-platform hosted verification for this
+milestone is pending its implementation commit.
+
 ## Build configurations tested
 
 The primary Debug, Release, and sanitizer configurations were rebuilt against the exact
@@ -97,10 +108,10 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 85/85 | Passed |
-| Release | Optimized native x86-64 | 85/85 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 85/85 | Passed; no project finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 83/83 | Passed |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 88/88 | Passed |
+| Release | Optimized native x86-64 | 88/88 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 88/88 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 86/86 | Passed |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All three CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -110,21 +121,21 @@ the accelerated 20,000-frame stability test. No suppression was added for projec
 
 ## Test totals
 
-The default shader-enabled build registers 85 distinct tests:
+The default shader-enabled build registers 88 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 8 |
 | Core | 20 |
 | Integration | 1 |
-| Unit | 34 |
-| GUI/smoke | 22 |
-| **Total** | **85** |
+| Unit | 35 |
+| GUI/smoke | 24 |
+| **Total** | **88** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 54 `unit`, 21 `core`, 34 `integration`, and 22 `gui`. Focused
-coverage also includes persistence (26), fixtures (25), concurrency (16), settings
-(14), input (9), video (8), audio (6), timing (4), rewind (4), state (7), release (4),
+layers. Label counts are 56 `unit`, 21 `core`, 35 `integration`, and 24 `gui`. Focused
+coverage also includes persistence (28), fixtures (26), concurrency (16), settings
+(16), input (9), video (8), audio (6), timing (4), rewind (4), state (8), release (4),
 fuzz/property (3), shader (2), and packaging (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
@@ -358,6 +369,8 @@ correction; the sanitizer suite reports no finding.
   identities covering the sheet plus every validated track without path dependence.
 - [x] State slots 0-9, quick operations, timestamps, delete, corruption/wrong-game
   rejection, thumbnails, and deterministic restoration.
+- [x] Opt-in automatic clean-shutdown session checkpoint, identity-checked restore,
+  command-line precedence, explicit-close clearing, and safe normal-launch fallback.
 - [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
   conflict-checked hotkey migration, muted reverse playback, and state invalidation.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,

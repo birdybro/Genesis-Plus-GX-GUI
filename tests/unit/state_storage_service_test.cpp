@@ -135,6 +135,42 @@ int main()
     return 10;
   }
 
+  if (!check(service.submit(genplusgx::StateStorageCommand::saveResumeState(
+        21U, generation, 78U, payload)),
+      "resume checkpoint could not be queued")) {
+    return 21;
+  }
+  const auto resumeSaved = waitForOperation(service, 21U);
+  if (!check(resumeSaved && resumeSaved->succeeded() &&
+        resumeSaved->type == genplusgx::StateStorageEventType::resumeSaved,
+      "resume checkpoint was not saved asynchronously") ||
+      !check(service.submit(genplusgx::StateStorageCommand::simple(
+        genplusgx::StateStorageCommandType::loadResume,
+        22U,
+        generation)),
+      "resume checkpoint load could not be queued")) {
+    return 22;
+  }
+  const auto resumeLoaded = waitForOperation(service, 22U);
+  if (!check(resumeLoaded && resumeLoaded->succeeded() &&
+        resumeLoaded->type == genplusgx::StateStorageEventType::resumeLoaded &&
+        resumeLoaded->rawPayload == payload &&
+        resumeLoaded->metadata.emulatedFrameNumber == 78U,
+      "resume checkpoint did not return validated payload") ||
+      !check(service.submit(genplusgx::StateStorageCommand::simple(
+        genplusgx::StateStorageCommandType::deleteResume,
+        23U,
+        generation)),
+      "resume checkpoint deletion could not be queued")) {
+    return 23;
+  }
+  const auto resumeDeleted = waitForOperation(service, 23U);
+  if (!check(resumeDeleted && resumeDeleted->succeeded() &&
+        resumeDeleted->type == genplusgx::StateStorageEventType::resumeDeleted,
+      "resume checkpoint was not deleted asynchronously")) {
+    return 24;
+  }
+
   if (!check(service.submit(genplusgx::StateStorageCommand::simple(
         genplusgx::StateStorageCommandType::loadSlot,
         13U,

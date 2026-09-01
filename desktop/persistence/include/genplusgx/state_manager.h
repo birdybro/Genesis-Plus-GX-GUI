@@ -54,6 +54,7 @@ public:
   static constexpr std::uint32_t currentSchemaVersion = 1U;
   static constexpr std::uint32_t minimumSlot = 0U;
   static constexpr std::uint32_t maximumSlot = 9U;
+  static constexpr std::uint32_t resumeSlot = 0xFFFF'FFFFU;
   static constexpr std::size_t maximumPayloadBytes = 2U * 1024U * 1024U;
 
   explicit SaveStateManager(ApplicationPaths paths);
@@ -64,6 +65,8 @@ public:
   [[nodiscard]] std::filesystem::path statePath(
     const GameIdentity& identity,
     std::uint32_t slot) const;
+  [[nodiscard]] std::filesystem::path resumeStatePath(
+    const GameIdentity& identity) const;
 
   [[nodiscard]] SaveStateStatus saveSlot(
     const GameIdentity& identity,
@@ -81,16 +84,39 @@ public:
     const std::filesystem::path& path,
     const GameIdentity& expectedIdentity,
     std::uint32_t expectedHardware) const;
+  [[nodiscard]] SaveStateStatus saveResumeState(
+    const GameIdentity& identity,
+    std::uint32_t hardware,
+    std::uint64_t emulatedFrameNumber,
+    std::span<const std::uint8_t> rawPayload,
+    std::chrono::system_clock::time_point timestamp =
+      std::chrono::system_clock::now()) const;
+  [[nodiscard]] SaveStateLoadResult loadResumeState(
+    const GameIdentity& identity,
+    std::uint32_t expectedHardware) const;
   [[nodiscard]] SaveStateStatus deleteSlot(
     const GameIdentity& identity,
     std::uint32_t slot) const;
+  [[nodiscard]] SaveStateStatus deleteResumeState(
+    const GameIdentity& identity) const;
 
 private:
+  [[nodiscard]] SaveStateStatus saveFile(
+    const std::filesystem::path& path,
+    const GameIdentity& identity,
+    std::uint32_t encodedSlot,
+    std::uint32_t hardware,
+    std::uint64_t emulatedFrameNumber,
+    std::span<const std::uint8_t> rawPayload,
+    std::chrono::system_clock::time_point timestamp) const;
   [[nodiscard]] SaveStateLoadResult loadFile(
     const std::filesystem::path& path,
     const GameIdentity& expectedIdentity,
     std::uint32_t expectedHardware,
     const std::uint32_t* expectedSlot) const;
+  [[nodiscard]] SaveStateStatus deleteFile(
+    const GameIdentity& identity,
+    const std::filesystem::path& path) const;
 
   ApplicationPaths paths_;
 };

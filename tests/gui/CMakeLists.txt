@@ -116,6 +116,55 @@ set_tests_properties(
     LABELS "gui;unit;settings;accessibility;filesystem"
     TIMEOUT 30
 )
+
+qt_add_executable(
+  genplusgx_session_settings_dialog_test session_settings_dialog_test.cpp
+)
+set_target_properties(
+  genplusgx_session_settings_dialog_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_session_settings_dialog_test
+  PRIVATE
+    genplusgx::ui
+    genplusgx_project_warnings
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(
+  NAME gui.session_settings COMMAND genplusgx_session_settings_dialog_test
+)
+set_tests_properties(
+  gui.session_settings
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
+    LABELS "gui;unit;session;settings;persistence;accessibility"
+    TIMEOUT 30
+)
+
+add_executable(
+  genplusgx_session_resume_application_test session_resume_application_test.cpp
+)
+target_link_libraries(
+  genplusgx_session_resume_application_test
+  PRIVATE
+    GenesisPlusGX::Persistence
+    GenesisPlusGX::Settings
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_dependencies(genplusgx_session_resume_application_test genplusgx_desktop)
+add_test(
+  NAME gui.session_resume_application
+  COMMAND genplusgx_session_resume_application_test $<TARGET_FILE:genplusgx_desktop>
+)
+set_tests_properties(
+  gui.session_resume_application
+  PROPERTIES
+    LABELS "gui;integration;session;state;lifecycle;fixture;process"
+    TIMEOUT 75
+)
 add_test(NAME gui.emulation_controls COMMAND genplusgx_emulation_controls_test)
 set_tests_properties(
   gui.emulation_controls

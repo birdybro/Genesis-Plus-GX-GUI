@@ -24,6 +24,7 @@ Files use this platform-data-relative layout:
 states/<sanitized-title>-<full-game-sha256>/slot-0.gpgxstate
 ...
 states/<sanitized-title>-<full-game-sha256>/slot-9.gpgxstate
+states/<sanitized-title>-<full-game-sha256>/resume.gpgxstate
 ```
 
 For ordinary cartridge and disc files, the identifier is the raw file SHA-256. For a
@@ -45,6 +46,25 @@ slot, game identity, hardware, timestamp, payload checksum, and core signature o
 storage thread. Only then is the raw payload submitted to the core-owning emulation
 thread. A failed core restore is transactional: the adapter reloads the state that was
 active before the rejected candidate.
+
+## Automatic session resume
+
+Automatic resume is opt-in under **Tools → Settings → General → Session
+Settings**. During a clean application exit, the composition root pauses the emulation
+worker, captures on the core-owning thread, commits `resume.gpgxstate` through the
+bounded state-storage service, and only then atomically records the absolute game path
+in `config/session-settings.json`. The dedicated checkpoint does not replace slots
+0–9.
+
+On the next launch, the stored game is opened only when no game was supplied on the
+command line. Emulation remains paused until state-storage activation has recalculated
+the game identity and hardware. The checkpoint then passes the same length, signature,
+SHA-256, game, system, and core validation as a manual slot before reaching the worker.
+After a successful restore normal execution and audio begin. A missing game, missing or
+corrupt checkpoint, rejected core restore, or unavailable state service clears the
+session marker and starts a normal game session when possible; it never weakens state
+validation. Explicitly closing the game clears the marker. A crash retains only the
+last checkpoint from an earlier clean exit.
 
 ## Invalid or incompatible states
 

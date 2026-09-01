@@ -37,6 +37,9 @@ enum class StateStorageCommandType {
   loadSlot,
   deleteSlot,
   refreshSlots,
+  saveResume,
+  loadResume,
+  deleteResume,
 };
 
 struct StateStorageCommand final {
@@ -63,6 +66,11 @@ struct StateStorageCommand final {
     std::uint64_t operationId,
     std::uint64_t gameGeneration,
     std::uint32_t slot,
+    std::uint64_t emulatedFrameNumber,
+    std::vector<std::uint8_t> rawPayload);
+  [[nodiscard]] static StateStorageCommand saveResumeState(
+    std::uint64_t operationId,
+    std::uint64_t gameGeneration,
     std::uint64_t emulatedFrameNumber,
     std::vector<std::uint8_t> rawPayload);
 };
@@ -102,6 +110,9 @@ enum class StateStorageEventType {
   slotLoaded,
   slotDeleted,
   slotsRefreshed,
+  resumeSaved,
+  resumeLoaded,
+  resumeDeleted,
   operationFailed,
   serviceStopped,
 };

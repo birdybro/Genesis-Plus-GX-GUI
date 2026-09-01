@@ -133,6 +133,12 @@ std::filesystem::path SaveStateManager::statePath(
   return gameStateDirectory(identity) / ("slot-" + std::to_string(slot) + ".gpgxstate");
 }
 
+std::filesystem::path SaveStateManager::resumeStatePath(
+  const GameIdentity& identity) const
+{
+  return gameStateDirectory(identity) / "resume.gpgxstate";
+}
+
 SaveStateStatus SaveStateManager::saveSlot(
   const GameIdentity& identity,
   std::uint32_t slot,
@@ -141,11 +147,35 @@ SaveStateStatus SaveStateManager::saveSlot(
   std::span<const std::uint8_t> rawPayload,
   std::chrono::system_clock::time_point timestamp) const
 {
-  if (!identity.valid()) {
-    return failure(SaveStateError::invalidGameIdentity, "The game identity is invalid.");
-  }
   if (!isValidSlot(slot)) {
     return failure(SaveStateError::invalidSlot, "The save-state slot must be between 0 and 9.");
+  }
+  return saveFile(statePath(identity, slot), identity, slot, hardware,
+    emulatedFrameNumber, rawPayload, timestamp);
+}
+
+SaveStateStatus SaveStateManager::saveResumeState(
+  const GameIdentity& identity,
+  std::uint32_t hardware,
+  std::uint64_t emulatedFrameNumber,
+  std::span<const std::uint8_t> rawPayload,
+  std::chrono::system_clock::time_point timestamp) const
+{
+  return saveFile(resumeStatePath(identity), identity, resumeSlot, hardware,
+    emulatedFrameNumber, rawPayload, timestamp);
+}
+
+SaveStateStatus SaveStateManager::saveFile(
+  const std::filesystem::path& path,
+  const GameIdentity& identity,
+  std::uint32_t encodedSlot,
+  std::uint32_t hardware,
+  std::uint64_t emulatedFrameNumber,
+  std::span<const std::uint8_t> rawPayload,
+  std::chrono::system_clock::time_point timestamp) const
+{
+  if (!identity.valid()) {
+    return failure(SaveStateError::invalidGameIdentity, "The game identity is invalid.");
   }
   if (rawPayload.size() < coreVersionBytes || rawPayload.size() > maximumPayloadBytes ||
       !std::ranges::equal(coreStatePrefix, rawPayload.first(coreStatePrefix.size()))) {
@@ -169,7 +199,7 @@ SaveStateStatus SaveStateManager::saveSlot(
   appendLittleEndian(file, static_cast<std::uint32_t>(headerBytes));
   appendLittleEndian(file, static_cast<std::uint64_t>(milliseconds));
   appendLittleEndian(file, hardware);
-  appendLittleEndian(file, slot);
+  appendLittleEndian(file, encodedSlot);
   appendLittleEndian(file, emulatedFrameNumber);
   appendLittleEndian(file, static_cast<std::uint64_t>(rawPayload.size()));
   file.insert(file.end(), gameHash->begin(), gameHash->end());
@@ -181,8 +211,17 @@ SaveStateStatus SaveStateManager::saveSlot(
   file.insert(file.end(), rawPayload.begin(), rawPayload.end());
 
   const auto written = writeFileAtomically(
-    statePath(identity, slot), file, headerBytes + maximumPayloadBytes);
+    path, file, headerBytes + maximumPayloadBytes);
   return written ? success() : persistenceFailure(written);
+}
+
+SaveStateLoadResult SaveStateManager::loadResumeState(
+  const GameIdentity& identity,
+  std::uint32_t expectedHardware) const
+{
+  constexpr auto expectedSlot = resumeSlot;
+  return loadFile(
+    resumeStatePath(identity), identity, expectedHardware, &expectedSlot);
 }
 
 SaveStateLoadResult SaveStateManager::loadSlot(
@@ -279,7 +318,8 @@ SaveStateLoadResult SaveStateManager::loadFile(
       .rawPayload = {},
     };
   }
-  if (!isValidSlot(*slot) || (expectedSlot != nullptr && *slot != *expectedSlot)) {
+  const bool knownStateKind = isValidSlot(*slot) || *slot == resumeSlot;
+  if (!knownStateKind || (expectedSlot != nullptr && *slot != *expectedSlot)) {
     return {
       .status = failure(SaveStateError::corruptState, "The save-state slot metadata is invalid."),
       .metadata = {},
@@ -356,15 +396,29 @@ SaveStateStatus SaveStateManager::deleteSlot(
   const GameIdentity& identity,
   std::uint32_t slot) const
 {
-  if (!identity.valid()) {
-    return failure(SaveStateError::invalidGameIdentity, "The game identity is invalid.");
-  }
   if (!isValidSlot(slot)) {
     return failure(SaveStateError::invalidSlot, "The save-state slot must be between 0 and 9.");
   }
 
+  return deleteFile(identity, statePath(identity, slot));
+}
+
+SaveStateStatus SaveStateManager::deleteResumeState(
+  const GameIdentity& identity) const
+{
+  return deleteFile(identity, resumeStatePath(identity));
+}
+
+SaveStateStatus SaveStateManager::deleteFile(
+  const GameIdentity& identity,
+  const std::filesystem::path& path) const
+{
+  if (!identity.valid()) {
+    return failure(SaveStateError::invalidGameIdentity, "The game identity is invalid.");
+  }
+
   std::error_code error;
-  const bool removed = std::filesystem::remove(statePath(identity, slot), error);
+  const bool removed = std::filesystem::remove(path, error);
   if (error) {
     return failure(SaveStateError::ioError, "Unable to delete the save-state file.");
   }

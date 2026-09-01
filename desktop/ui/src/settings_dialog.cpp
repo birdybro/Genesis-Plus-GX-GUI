@@ -216,6 +216,8 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
     "generalSettingsPage", "generalSettingsSummary", generalSummary_, {
       {tr("Appearance Settings…"), "configureAppearanceButton",
         SettingsPageAction::appearance},
+      {tr("Session Settings…"), "configureSessionButton",
+        SettingsPageAction::session},
     }));
   pages_->addWidget(makePage(*this, dispatch, tr("Video"),
     tr("Presentation geometry, scaling, CRT shaders, and Genesis Plus GX video output."),
@@ -318,9 +320,11 @@ void SettingsDialog::dispatch(SettingsPageAction action)
 void SettingsDialog::refresh()
 {
   generalSummary_->setText(
-    tr("Theme: %1\nHigh-DPI policy: operating-system scaling\nDebug tools: %2")
+    tr("Theme: %1\nHigh-DPI policy: operating-system scaling\nDebug tools: %2\n"
+       "Resume last session: %3")
       .arg(themeName(overview_.appearance.theme),
-        overview_.appearance.developerToolsEnabled ? tr("enabled") : tr("hidden")));
+        overview_.appearance.developerToolsEnabled ? tr("enabled") : tr("hidden"),
+        overview_.session.resumeOnLaunch ? tr("enabled") : tr("disabled")));
   videoSummary_->setText(
     tr("Aspect: %1\nScaling: %2\nTexture filter: %3\nShader: %4")
       .arg(aspectName(overview_.video.aspect),

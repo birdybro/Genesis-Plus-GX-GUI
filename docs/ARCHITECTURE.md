@@ -952,7 +952,14 @@ fatal because the single controlled core context cannot be reconstructed safely 
 the GUI thread.
 
 Normal exit first disconnects GUI producers, synchronously stops the emulation worker
-so dirty backup memory is flushed and the core is released, then stops audio,
+after an optional automatic-resume transaction. That transaction pauses the worker,
+captures raw state on its owner thread, writes the dedicated identity-bound checkpoint
+through the state-storage thread, and atomically records the absolute game path only
+after storage confirmation. Startup gives an explicit command-line game precedence;
+otherwise it holds the loaded core paused until identity activation validates and
+restores that checkpoint. Any failure clears the stale marker and starts normally.
+The regular shutdown then stops the emulation worker so dirty backup memory is flushed
+and the core is released, then stops audio,
 controllers, state storage, metadata, screenshots, and the library scanner. The display
 releases its frame exchange last. `ShutdownReport` retains every service failure, keeps
 an existing nonzero application result, upgrades an otherwise-success result when any

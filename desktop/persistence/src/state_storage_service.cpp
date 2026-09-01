@@ -77,6 +77,19 @@ StateStorageCommand StateStorageCommand::save(
   return command;
 }
 
+StateStorageCommand StateStorageCommand::saveResumeState(
+  std::uint64_t operationId,
+  std::uint64_t gameGeneration,
+  std::uint64_t emulatedFrameNumber,
+  std::vector<std::uint8_t> rawPayload)
+{
+  auto command = simple(
+    StateStorageCommandType::saveResume, operationId, gameGeneration);
+  command.emulatedFrameNumber = emulatedFrameNumber;
+  command.rawPayload = std::move(rawPayload);
+  return command;
+}
+
 class StateStorageService::Private final {
 public:
   Private(
@@ -128,8 +141,10 @@ public:
         StateStorageError::invalidCommand,
         "Save-state commands require nonzero operation and game-generation IDs.");
     }
-    if (command.type != StateStorageCommandType::activateGame &&
-        command.type != StateStorageCommandType::deactivateGame &&
+    const bool slotCommand = command.type == StateStorageCommandType::saveSlot ||
+      command.type == StateStorageCommandType::loadSlot ||
+      command.type == StateStorageCommandType::deleteSlot;
+    if (slotCommand &&
         command.slot > SaveStateManager::maximumSlot) {
       return failure(
         StateStorageError::invalidCommand,
@@ -345,6 +360,31 @@ private:
       case StateStorageCommandType::refreshSlots:
         event.type = StateStorageEventType::slotsRefreshed;
         event.slotSummaries = scanSlots();
+        break;
+      case StateStorageCommandType::saveResume:
+        status = manager_.saveResumeState(
+          *activeIdentity_, activeHardware_, command.emulatedFrameNumber,
+          command.rawPayload);
+        if (status) {
+          event.type = StateStorageEventType::resumeSaved;
+        }
+        break;
+      case StateStorageCommandType::loadResume: {
+        auto loaded = manager_.loadResumeState(
+          *activeIdentity_, activeHardware_);
+        status = loaded.status;
+        if (status) {
+          event.type = StateStorageEventType::resumeLoaded;
+          event.metadata = loaded.metadata;
+          event.rawPayload = std::move(loaded.rawPayload);
+        }
+        break;
+      }
+      case StateStorageCommandType::deleteResume:
+        status = manager_.deleteResumeState(*activeIdentity_);
+        if (status) {
+          event.type = StateStorageEventType::resumeDeleted;
+        }
         break;
       case StateStorageCommandType::activateGame:
       case StateStorageCommandType::deactivateGame:
