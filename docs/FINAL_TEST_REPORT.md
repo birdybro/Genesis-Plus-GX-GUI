@@ -1505,8 +1505,55 @@ the production package verifier, installed version and portable pseudo-language
 event-loop smokes. CPack produces a checksum-verified 105-entry
 `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` containing Qt Network, the Monocypher
 license, and `UPDATES.md`; its dependency and prohibited-payload scans pass. Exact
-hosted CI, complete successful-run log inspection, and all downloaded Windows/Linux/
-macOS package audits remain the milestone's final gate after its implementation commit.
+hosted validation is complete.
+
+The implementation run
+[`33677158580`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33677158580)
+identified a Linux-specific updater asset fixture, Windows OpenSSL reopening an active
+temporary file, older macOS OpenSSL CLIs without Ed25519 raw-input support, and a
+startup-timing-dependent rollback injection in the existing two-process netplay test.
+The first correction run
+[`33680236201`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33680236201)
+proved the updater fixes on every target and isolated the remaining netplay flake to
+translated Intel macOS Release. That process test now verifies authenticated sustained
+transport, bounded queues, lifecycle, and clean shutdown; deterministic rollback remains
+asserted by `unit.netplay_timeline` and `integration.netplay_worker`. The revised
+two-process test passes 50 consecutive local executions.
+
+Final exact CI run
+[`33682824067`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33682824067)
+at `c2579530cdd34ff7150aa010720a41f6ce57d790` passes all ten jobs. Linux
+Debug/Release/ASan+UBSan, Windows x64 Debug/Release, macOS arm64 Debug/Release, and
+macOS x86_64 Debug/Release each register and pass 131/131 tests; the legacy libretro
+job passes. Each of the four new updater tests passes in all nine native jobs. The
+17,134-line, 2,321,411-byte complete log contains no failed test, project warning,
+workflow error, ASan/LSan/UBSan finding, or undefined behavior. The only skips are the
+expected real-OpenGL shader execution on Windows Debug and Release, with equivalent
+coverage executing on Linux and both macOS architectures.
+
+All four final-CI artifacts were downloaded and inspected. Six package files match
+their sidecars; Linux, Windows, macOS arm64, and macOS x86_64 extracted layouts pass
+`VerifyPackage.cmake`; binaries report the correct ELF x86-64, PE32+ x86-64, Mach-O
+arm64, and Mach-O x86_64 identities; and the DMGs are valid Apple containers. The
+Linux artifact reports application version 0.1.1 outside its build tree. All packages
+contain Qt Network, the Monocypher notice, and `UPDATES.md`; safe-path and content scans
+find no ROM, disc image, BIOS/firmware, save/state, private release key, or pre-created
+user data.
+
+Non-publishing release rehearsal
+[`33685206665`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33685206665)
+at the same commit passes eight jobs: identity validation, five 131/131 Release/sanitizer
+suites, legacy libretro, all four packages, and final asset assembly. Its complete
+13,245-line, 2,973,156-byte log contains no authored warning, failed test, sanitizer
+finding, or workflow error; the only warnings are two harmless unused-option diagnostics
+inside the pinned SDL setup action on macOS. The downloaded release candidate contains
+the exact six packages, six sidecars, aggregate checksums, manifest, and signature.
+Every digest passes and each candidate package byte-matches its originating artifact.
+Independent `VerifyUpdateManifest.py` execution accepts the canonical six-asset manifest
+and its one-line 89-byte Ed25519 signature using the committed public key, key ID
+`704e04b184a939a4`, trusted repository URLs, sizes, and hashes. The protected signing
+secret is masked in the log and absent from packages; workflow-dispatch correctly skips
+the tag-only publication step. Milestone 98 is complete.
 
 ## Adversarial review
 

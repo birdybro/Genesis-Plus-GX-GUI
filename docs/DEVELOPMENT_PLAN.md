@@ -109,7 +109,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
-| 98 Signed updates | IN PROGRESS | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | pending |
+| 98 Signed updates | COMPLETE | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | `c257953` |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
 ## Execution policy
@@ -3785,9 +3785,9 @@ cannot contain its own SHA)
 
 ## Milestone 98 detail
 
-**Status:** IN PROGRESS — implementation and all local configuration, sanitizer,
-package, workflow-lint, and adversarial gates pass; exact hosted CI and downloaded
-cross-platform package evidence remain required after the implementation commit.
+**Status:** COMPLETE — implementation, every local configuration gate, sanitizers,
+package verification, adversarial review, exact hosted CI, complete-log inspection,
+downloaded cross-platform artifacts, and a non-publishing signed-release rehearsal pass.
 
 **Goal:** Add authenticated application-update discovery and verified package download
 without granting a remote service authority to silently install code, weakening normal
@@ -3842,6 +3842,47 @@ explicit signed-updates-disabled build. The production private key is present on
 the protected GitHub Actions secret; it was never retrieved, printed, packaged, or
 committed.
 
+**Hosted gate evidence:** The implementation run
+[`33677158580`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33677158580)
+exposed and recorded a Linux-only updater test asset, Windows temporary-file reopening,
+and a startup-speed-dependent synthetic rollback injection on translated Intel macOS.
+The first corrective run
+[`33680236201`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33680236201)
+proved the updater corrections on every host and exposed the remaining timing dependency
+in only Intel macOS Release. The end-to-end netplay test was narrowed to authenticated
+transport and lifecycle while `unit.netplay_timeline` and `integration.netplay_worker`
+retain deterministic late-input and rollback execution coverage. The final exact run
+[`33682824067`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33682824067)
+at `c2579530cdd34ff7150aa010720a41f6ce57d790` passes all ten jobs. Nine native
+Debug/Release/sanitizer jobs each register and pass 131/131 tests; the inherited Linux
+libretro build also passes. The signed-manifest, signed-update unit, real TLS, and GUI
+tests pass in all nine native jobs. The 17,134-line, 2,321,411-byte combined log contains
+no failed test, authored compiler/linker warning, workflow error annotation, sanitizer
+finding, or undefined behavior. Windows skips only the expected real OpenGL shader test
+in its two configurations; it is executed on Linux and both macOS architectures.
+
+All four artifacts from the final CI run were downloaded. Their six package files match
+their SHA-256 sidecars; `VerifyPackage.cmake` accepts every extracted Linux, Windows,
+macOS arm64, and macOS x86_64 layout; the binaries are respectively ELF x86-64, PE32+
+x86-64, Mach-O arm64, and Mach-O x86_64; both DMGs are valid Apple DMG containers; and
+the extracted Linux executable reports 0.1.1. Every package includes Qt Network,
+Monocypher's notice, and `UPDATES.md`. Safe-path and payload scans find no ROM, disc
+image, BIOS/firmware, save/state, production private key, or generated user data.
+
+Non-publishing release rehearsal
+[`33685206665`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33685206665)
+at the same commit passes release identity, five 131-test package/sanitizer suites,
+legacy libretro, all four platform package jobs, and final assembly. The 13,245-line,
+2,973,156-byte log has no authored warning, test failure, sanitizer issue, or workflow
+error; two diagnostics are harmless unused options emitted inside the pinned SDL setup
+action on macOS. All 15 assembled files were downloaded. Six packages match both their
+individual sidecars and `SHA256SUMS.txt`, byte-match the originating artifacts, pass
+layout/architecture/payload inspection, and are described by the exact canonical
+six-asset manifest. Independent verification with the committed public key accepts its
+89-byte canonical detached Ed25519 signature, version 0.1.1, key ID
+`704e04b184a939a4`, immutable GitHub URLs, sizes, and SHA-256 digests. The signing secret
+appears only as `***` in the log, and the tag-only publish step is correctly skipped.
+
 **Acceptance criteria:** Automatic checks are opt-in and rate-limited by attempts;
 signature verification precedes JSON parsing; manifests bind immutable exact-version
 packages to the trusted project/key; HTTPS redirects, response sizes, deadlines,
@@ -3850,8 +3891,9 @@ package is silently executed or installed; offline emulation is independent; req
 licenses and public trust material ship; every local and hosted native gate passes;
 and complete successful logs/packages contain no actionable issue or unintended secret.
 
-**Commit SHA:** pending (resolve after the implementation commit; a commit cannot
-contain its own SHA)
+**Commit SHA:** `c257953` (final implementation/test correction; evidence closure is
+recorded by the following documentation commit because a commit cannot contain its own
+SHA)
 
 ## Milestone 97 detail
 
