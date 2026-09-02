@@ -1447,10 +1447,36 @@ version and offscreen portable pseudo-language event-loop smokes. CPack produces
 `ONLINE_METADATA.md` and Qt Network, and the payload scan finds no ROM, disc, firmware,
 save/state, private key, certificate, or cached online content. Pinned `actionlint`
 1.7.7 and the strict inherited libretro build pass. `xvfb-run` is unavailable in this
-local host image, so native XCB startup and Windows/macOS layouts remain mandatory
-hosted gates. Exact hosted CI, complete-log inspection, and downloaded cross-platform
-artifact audit will be recorded after the implementation commit; Milestone 97 remains
-in progress until those gates pass.
+local host image, so native XCB startup was exercised by hosted CI.
+
+Exact implementation run
+[`33663439607`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33663439607)
+at `896090fc62c5791acd5cf40abe792d8672400df5` passes all ten jobs. Each of
+Linux Debug/Release/ASan+UBSan, Windows x64 Debug/Release, macOS arm64 Debug/Release,
+and macOS x86_64 Debug/Release registers and passes 127/127 tests; the inherited Linux
+libretro build also passes. `unit.online_metadata`, the production Qt Network path in
+`integration.online_metadata_https`, and `gui.online_metadata` pass in every native
+job. Windows skips only the two expected executions of the real OpenGL shader-render
+test because its hosted software context is below OpenGL 3.3; Linux and both macOS
+architectures execute it.
+
+The complete combined log contains 17,251 lines and 2,328,079 bytes. It has zero
+authored compiler/linker warnings, workflow error annotations, sanitizer or
+undefined-behavior findings, failed tests, nonzero commands, or unexpected skips.
+Expected diagnostic text is limited to CMake platform probes, deliberate negative-test
+names, timeout arguments, the two Windows renderer capability skips, and deployment's
+selection of the packaged Schannel TLS plugin instead of the optional OpenSSL plugin.
+
+Four downloaded artifact bundles contain six packages: Linux x86-64 TGZ, Windows
+x86-64 ZIP, and macOS arm64/x86_64 ZIP+DMG. All six SHA-256 sidecars verify; extraction
+and both complete HFS/DMG integrity checks pass; all four extracted platform layouts
+re-pass `VerifyPackage.cmake`; and binaries report the correct ELF x86-64, PE32+ x86-64,
+Mach-O arm64, and Mach-O x86_64 architectures. The downloaded Linux package also passes
+installed `--version`, `--help`, dependency resolution, and offscreen portable
+pseudo-language event-loop startup/shutdown. Each package contains `ONLINE_METADATA.md`,
+Qt Network, and its platform TLS support. No ROM, disc image, BIOS/firmware, save RAM,
+state, private key, certificate, cache, or downloaded artwork is present. Milestone 97
+is complete.
 
 ## Adversarial review
 

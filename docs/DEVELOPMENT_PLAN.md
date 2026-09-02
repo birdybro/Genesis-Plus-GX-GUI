@@ -108,7 +108,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
 | 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
-| 97 Online metadata and art | IN PROGRESS | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
+| 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
 | 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
@@ -3785,10 +3785,9 @@ cannot contain its own SHA)
 
 ## Milestone 97 detail
 
-**Status:** IN PROGRESS — implementation, every local configuration gate, sanitizer,
-package verification, and adversarial review pass. Commit/push, exact hosted CI,
-complete-log inspection, and artifact audit remain required before this milestone can
-become complete.
+**Status:** COMPLETE — implementation, every local configuration gate, sanitizer,
+package verification, adversarial review, exact hosted CI, complete-log inspection,
+and downloaded cross-platform artifact audit pass.
 
 **Goal:** Add explicit opt-in enrichment for the offline game library without sending
 game bytes or local paths, accepting unlicensed artwork, racing the emulation core, or
@@ -3830,8 +3829,31 @@ check on 2026-09-02.
 Required automated tests remain hermetic. The previous user-owned Phantasy Star IV path
 is not currently mounted (`/mnt/qnapraid` is empty), so no new external-ROM result is
 claimed; earlier completed core/presentation evidence remains unchanged and generated
-legal ROM workflows remain required here. Exact hosted evidence is pending the
-implementation commit.
+legal ROM workflows remain required here.
+
+Exact implementation run
+[`33663439607`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33663439607)
+at `896090fc62c5791acd5cf40abe792d8672400df5` passes all ten jobs. Each of Linux
+Debug/Release/ASan+UBSan, Windows x64 Debug/Release, macOS arm64 Debug/Release, and
+macOS x86_64 Debug/Release registers and passes 127/127 tests; the inherited Linux
+libretro build also passes. The new online-metadata unit, real production-path TLS, and
+GUI tests pass in all nine native jobs. Windows skips only its expected real OpenGL 3.3
+shader-render execution in each configuration; the test executes on Linux and both
+macOS architectures.
+
+The 17,251-line, 2,328,079-byte combined log has no authored compiler/linker warning,
+workflow error annotation, sanitizer/undefined-behavior finding, failed test, nonzero
+command, or unexpected skip. Expected diagnostic text is limited to CMake platform
+probes, deliberate negative tests, the Windows renderer capability skips, and Windows
+deployment selecting the packaged Schannel TLS backend instead of its optional OpenSSL
+backend. Four downloaded artifact bundles contain six checksum-verified payloads:
+Linux x86-64 TGZ, Windows x86-64 ZIP, and macOS arm64/x86_64 ZIP+DMG. Archive and DMG
+integrity checks pass; all four extracted layouts re-pass the production verifier; the
+binaries report the correct ELF/PE32+/Mach-O architectures; and the hosted Linux
+artifact passes installed help/version, dependency, and portable pseudo-language
+event-loop smokes. Every platform package contains Qt Network and `ONLINE_METADATA.md`.
+No ROM, disc, BIOS/firmware, save/state, private key, certificate, cached response, or
+downloaded artwork is present.
 
 **Acceptance criteria:** The feature is disabled by default; no ROM bytes, path, or
 filename leaves the machine; provider and artwork records require exact identity,
@@ -3840,7 +3862,7 @@ worker queues remain bounded; corrupt/stale/offline states fail safely; local ar
 wins; normal emulation is independent; every local and hosted platform gate passes; and
 complete successful logs/packages contain no actionable issue or unintended data asset.
 
-**Commit SHA:** pending
+**Commit SHA:** `896090fc62c5791acd5cf40abe792d8672400df5`
 
 ## Milestone 96 detail
 
