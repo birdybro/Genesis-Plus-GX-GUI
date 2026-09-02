@@ -9,19 +9,27 @@ directories at test runtime and removed by RAII cleanup.
 | Field | Value |
 | --- | --- |
 | Stored filenames | `cloud-test-ca.der`, `cloud-test-server.der`, `cloud-test-server-key.der` |
-| Generator | OpenSSL 3 command-line certificate/key generation on 2026-09-02 |
+| Generator | `generate_cloud_tls_fixtures.sh`, using OpenSSL 3 on 2026-09-02 |
 | Purpose | Exercise the production Qt HTTPS/WebDAV client against a real loopback TLS server, including trusted and deliberately untrusted certificate paths |
 | Scope | Server certificate SAN is limited to `localhost` and `127.0.0.1`; the CA is never installed into a host trust store |
-| Validity | 2026-09-02 through 2036-08-30; tests remain local and do not infer public trust from validity |
+| Validity | CA: 2026-09-02 through 2036-08-30; TLS leaf: 2026-09-02 through 2028-12-04 (824 days, within Apple's 825-day TLS-server limit) |
 | Provenance | Original project-only fixture dedicated to CC0-1.0; the private key is deliberately public test data and is not an account, production certificate, credential, or secret |
 | Expected behavior | `integration.cloud_webdav` trusts the CA only through its constructor seam; a production client without that injected CA rejects the same server |
 
 The key exists solely so all hosted platforms can run a deterministic local TLS server
 without external tools, accounts, or Internet access. It is stored as binary DER rather
-than secret-looking PEM text and is never installed or packaged. The CA SHA-256
-fingerprint is `ED7219614A77AB0505517AE7187904E31A28CC6EC88412D541DA1B43F008D0AB`;
+than secret-looking PEM text and is never installed or packaged. The CA uses critical
+`CA:TRUE` and certificate-signing constraints; the leaf uses critical `CA:FALSE` and
+TLS key-usage constraints. The CA SHA-256 fingerprint is
+`657D63A47F4EF0F13862C20BC03123DB2D0E574B3FBC0351864F55A992E7346D`;
 the server certificate fingerprint is
-`912A78E3E2DAD9B757AAF1BB7FB98AB1E5F22F7A3393E7C437FC4E698402286D`.
+`E327E33AD435B6D80E0C560239548D6B323E8752B0AC95850BA71C9F22B5C115`.
+
+To rotate the fixture before the TLS leaf expires, generate it into a temporary
+directory, inspect the certificate profile and fingerprints with `openssl x509`, then
+replace these three documented DER files. The generator deliberately discards the CA
+private key after each run so the checked-in fixture cannot be used to mint additional
+certificates.
 
 ## Original Libretro Slang pass-through preset
 
