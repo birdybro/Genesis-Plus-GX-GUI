@@ -5,6 +5,7 @@
 #include "genplusgx/game_patch.h"
 #include "genplusgx/ui/about_dialog.h"
 #include "genplusgx/ui/achievements_dialog.h"
+#include "genplusgx/ui/cloud_sync_dialog.h"
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
@@ -762,6 +763,14 @@ void MainWindow::buildMenus()
   achievements->setToolTip(
     tr("This build does not include RetroAchievements support."));
 #endif
+  auto* cloudSync = addAction(
+    *tools, tr("Cloud &Synchronization…"), "cloudSyncAction");
+  connect(cloudSync, &QAction::triggered, this, &MainWindow::showCloudSync);
+#if !defined(GENPLUSGX_HAVE_CLOUD_SYNC)
+  cloudSync->setEnabled(false);
+  cloudSync->setToolTip(
+    tr("This build does not include cloud synchronization support."));
+#endif
   auto* netplay = addAction(*tools, tr("&Netplay…"), "netplayAction");
   connect(netplay, &QAction::triggered, this, &MainWindow::showNetplay);
   tools->addSeparator();
@@ -1184,6 +1193,127 @@ void MainWindow::showAchievements()
   dialog->setLoginSink(achievementLoginSink_);
   dialog->setLogoutSink(achievementLogoutSink_);
   dialog->show();
+}
+
+void MainWindow::setCloudSettings(cloud::Settings settings)
+{
+  cloudSettings_ = std::move(settings);
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setSettings(cloudSettings_);
+  }
+}
+
+void MainWindow::setCloudSettingsSink(CloudSettingsSink sink)
+{
+  cloudSettingsSink_ = std::move(sink);
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setSettingsSink(cloudSettingsSink_);
+  }
+}
+
+void MainWindow::setCloudPasswordSink(CloudPasswordSink sink)
+{
+  cloudPasswordSink_ = std::move(sink);
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setPasswordSink(cloudPasswordSink_);
+  }
+}
+
+void MainWindow::setCloudForgetSink(CloudAccountSink sink)
+{
+  cloudForgetSink_ = std::move(sink);
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setForgetSink(cloudForgetSink_);
+  }
+}
+
+void MainWindow::setCloudSyncSink(CloudSyncSink sink)
+{
+  cloudSyncSink_ = std::move(sink);
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setSyncSink(cloudSyncSink_);
+  }
+}
+
+void MainWindow::setCloudSyncBusy(bool busy)
+{
+  cloudSyncBusy_ = busy;
+  updateCloudDialogState();
+  updateRecordingAction();
+  updatePhysicalMediaAction();
+}
+
+void MainWindow::showCloudSyncResult(const cloud::SyncResult& result)
+{
+  setCloudSyncBusy(false);
+  showCloudSync();
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->showResult(result);
+  }
+  statusBar()->showMessage(tr(
+    "Cloud sync complete: %1 uploaded, %2 downloaded, %3 conflicts")
+      .arg(result.summary.uploaded).arg(result.summary.downloaded)
+      .arg(result.summary.conflicts), 8'000);
+}
+
+void MainWindow::showCloudSyncError(const std::string& detail)
+{
+  setCloudSyncBusy(false);
+  showCloudSync();
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->showError(detail);
+  }
+  statusBar()->showMessage(tr("Cloud synchronization failed"), 8'000);
+}
+
+void MainWindow::showCloudSyncStatus(const std::string& detail)
+{
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->showStatus(detail);
+  }
+  statusBar()->showMessage(QString::fromStdString(detail), 8'000);
+}
+
+void MainWindow::showCloudSync()
+{
+#if !defined(GENPLUSGX_HAVE_CLOUD_SYNC)
+  return;
+#else
+  if (auto* existing = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    existing->show();
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new CloudSyncDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettings(cloudSettings_);
+  dialog->setSettingsSink(cloudSettingsSink_);
+  dialog->setPasswordSink(cloudPasswordSink_);
+  dialog->setForgetSink(cloudForgetSink_);
+  dialog->setSyncSink(cloudSyncSink_);
+  dialog->setGameActive(isGameLoaded() || isGameLoading());
+  dialog->setBusy(cloudSyncBusy_);
+  dialog->show();
+#endif
+}
+
+void MainWindow::updateCloudDialogState()
+{
+  if (auto* dialog = findChild<CloudSyncDialog*>(
+        QStringLiteral("cloudSyncDialog"))) {
+    dialog->setGameActive(isGameLoaded() || isGameLoading());
+    dialog->setBusy(cloudSyncBusy_);
+  }
 }
 
 void MainWindow::updateAchievementControls()
@@ -2055,7 +2185,7 @@ void MainWindow::updateRecordingAction()
   const bool transitionBusy = recordingState_ == RecordingUiState::starting ||
     recordingState_ == RecordingUiState::stopping;
   const bool fileOperationReady = !gameLoading_ && !sessionResumeBusy_ &&
-    !stateOperationBusy_ && !transitionBusy;
+    !stateOperationBusy_ && !transitionBusy && !cloudSyncBusy_;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(
     fileOperationReady);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(
@@ -3647,7 +3777,7 @@ void MainWindow::setRecentGames(std::vector<std::filesystem::path> paths)
     });
   }
   hasRecentGames_ = !paths.empty();
-  menu->setEnabled(hasRecentGames_ && !gameLoading_);
+  menu->setEnabled(hasRecentGames_ && !gameLoading_ && !cloudSyncBusy_);
   updateRecordingAction();
 }
 
@@ -3663,7 +3793,7 @@ bool MainWindow::requestGameLoad(
   const std::filesystem::path& path,
   std::optional<std::filesystem::path> patchPath)
 {
-  if (gameLoading_ || sessionResumeBusy_) {
+  if (gameLoading_ || sessionResumeBusy_ || cloudSyncBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
     return false;
   }
@@ -3749,7 +3879,7 @@ bool MainWindow::submitGameLoadTarget(GameLaunchTarget target)
     presentGameLoadError(path, "The game launch target is incomplete.");
     return false;
   }
-  if (gameLoading_ || sessionResumeBusy_) {
+  if (gameLoading_ || sessionResumeBusy_ || cloudSyncBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
     return false;
   }
@@ -3870,6 +4000,7 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
         QStringLiteral("debugToolsWindow"))) {
     debugger->setGameLoaded(false);
   }
+  updateCloudDialogState();
 }
 
 void MainWindow::setGameLoaded(const std::filesystem::path& path)
@@ -3934,6 +4065,7 @@ void MainWindow::setGameLoaded(const GameLaunchTarget& target)
     debugger->setGameLoaded(true);
     debugger->setPaused(emulationPaused_);
   }
+  updateCloudDialogState();
 }
 
 void MainWindow::setGameRuntimeIdentity(std::string system, std::string region)
@@ -3960,7 +4092,7 @@ void MainWindow::updatePhysicalMediaAction()
     action->setEnabled(physicalMediaSupported_ &&
       static_cast<bool>(physicalMediaActions_.discover) &&
       static_cast<bool>(physicalMediaActions_.importDisc) &&
-      !gameLoading_ && !sessionResumeBusy_);
+      !gameLoading_ && !sessionResumeBusy_ && !cloudSyncBusy_);
   }
 }
 
@@ -4049,6 +4181,7 @@ void MainWindow::setNoGameLoaded()
         QStringLiteral("debugToolsWindow"))) {
     debugger->setGameLoaded(false);
   }
+  updateCloudDialogState();
 }
 
 void MainWindow::chooseDisc()
@@ -4221,7 +4354,7 @@ void MainWindow::dragEnterEvent(QDragEnterEvent* event)
       hasSupportedGamePatchExtension(pathFromQString(urls[1].toLocalFile()))) ||
      (hasSupportedGameExtension(pathFromQString(urls[1].toLocalFile())) &&
       hasSupportedGamePatchExtension(pathFromQString(urls[0].toLocalFile()))));
-  if (!gameLoading_ && (validSingle || validPair)) {
+  if (!gameLoading_ && !cloudSyncBusy_ && (validSingle || validPair)) {
     event->acceptProposedAction();
   }
 }

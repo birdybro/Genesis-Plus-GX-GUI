@@ -47,6 +47,7 @@ foreach(document IN ITEMS
     BIOS.md
     BUILDING.md
     CHEATS.md
+    CLOUD_SYNC.md
     DEBUG_TOOLS.md
     DEVELOPMENT.md
     FINAL_TEST_REPORT.md

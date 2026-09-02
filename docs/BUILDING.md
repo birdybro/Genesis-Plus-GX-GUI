@@ -41,7 +41,8 @@ cannot link a MinGW Qt package, and an arm64 application cannot link x86-64 SDL.
 The CHD, zlib, zstd, LZMA, FLAC, Tremor, and minimp3 decoder sources needed by the core
 are bundled. With shader support enabled, CMake downloads the checksum-pinned
 librashader 0.12.0 source archive and Cargo builds its OpenGL C API runtime. With
-achievement support enabled, CMake downloads checksum-pinned rcheevos 12.4.0 and
+achievement support enabled, CMake downloads checksum-pinned rcheevos 12.4.0. When
+achievements or cloud synchronization is enabled, CMake downloads checksum-pinned
 QtKeychain 0.17.0 sources. CMake never downloads ROM/BIOS material, credentials,
 achievement data, or an external shader pack.
 
@@ -124,6 +125,7 @@ Useful cache options are:
 | `GENPLUSGX_ENABLE_TREMOR` | `ON` | Build integer Ogg/Vorbis CD-audio decoding |
 | `GENPLUSGX_ENABLE_LIBRETRO_SHADERS` | `ON` | Fetch/build the pinned librashader OpenGL runtime and ship Slang preset support; requires Rust 1.88+ |
 | `GENPLUSGX_ENABLE_ACHIEVEMENTS` | `ON` | Fetch/build pinned rcheevos and QtKeychain integration; Linux requires `libsecret-1` headers |
+| `GENPLUSGX_ENABLE_CLOUD_SYNC` | `ON` | Build opt-in HTTPS WebDAV save/state synchronization and QtKeychain credentials; Linux requires `libsecret-1` headers |
 | `GENPLUSGX_WINDOWS_REDIST` | empty | Official `vc_redist.x64.exe` included in Windows packages |
 | `GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS` | `OFF` | Register user-owned BIOS fixture tests |
 

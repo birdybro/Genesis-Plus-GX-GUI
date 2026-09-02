@@ -5,6 +5,23 @@ qt_add_executable(genplusgx_main_window_test
 qt_add_executable(genplusgx_achievements_dialog_test
   achievements_dialog_test.cpp
 )
+
+qt_add_executable(genplusgx_cloud_sync_dialog_test
+  cloud_sync_dialog_test.cpp
+)
+set_target_properties(genplusgx_cloud_sync_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_cloud_sync_dialog_test
+  PRIVATE genplusgx::ui genplusgx_project_warnings Qt6::Test Qt6::Widgets
+)
+add_test(NAME gui.cloud_sync COMMAND genplusgx_cloud_sync_dialog_test)
+set_tests_properties(
+  gui.cloud_sync
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;unit;integration;cloud;security;persistence;accessibility"
+    TIMEOUT 30
+)
 set_target_properties(genplusgx_achievements_dialog_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_achievements_dialog_test

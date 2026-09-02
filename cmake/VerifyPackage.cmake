@@ -169,5 +169,8 @@ require_file(
 require_file(
   "${documentation_directory}/ACHIEVEMENTS.md"
   "RetroAchievements guide")
+require_file(
+  "${documentation_directory}/CLOUD_SYNC.md"
+  "cloud synchronization guide")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

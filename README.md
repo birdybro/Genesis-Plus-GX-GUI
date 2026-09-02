@@ -68,6 +68,9 @@ rewritten.
 - Opt-in RetroAchievements through the official rcheevos client, with recognized-game
   progress, rich presence, leaderboards, secure native token storage, offline fallback,
   and owner-thread Hardcore enforcement
+- Disabled-by-default HTTPS WebDAV synchronization for save RAM and wrapped states,
+  with native secure credential storage, conditional manifests, non-destructive deletion
+  healing, and collision-safe conflict copies
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
 - Native Windows, Linux, and macOS optical-drive import for original mixed-mode Sega
   CD/Mega CD media, with responsive progress/cancellation and atomic transient cleanup
@@ -184,6 +187,13 @@ Open Physical Sega CD Disc…**; it is read without modification into a validate
 BIN/CUE cache snapshot before emulation starts. See [BIOS.md](docs/BIOS.md) and the
 [physical-media guide](docs/PHYSICAL_MEDIA.md).
 
+To synchronize progress between machines, close the game and open **Tools → Cloud
+Synchronization…**. The feature sends only selected save/state files to a user-provided
+HTTPS WebDAV account and preserves divergent remote data as a local conflict copy. It
+never uploads games, BIOS files, settings, logs, or credentials. Read the privacy,
+provider-quota, and recovery details in [CLOUD_SYNC.md](docs/CLOUD_SYNC.md) before
+enabling it.
+
 The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
 cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),
 [the game library](docs/GAME_LIBRARY.md), [cheats](docs/CHEATS.md), and
@@ -205,6 +215,7 @@ saves/        Cartridge SRAM and Sega CD BRAM/RAM-cartridge data
 states/       Per-game save-state slots
 screenshots/  Native PNG captures, unless overridden
 recordings/   Default lossless A/V capture destination
+cloud/        Preserved cloud-conflict copies
 library/      SQLite game-library index and local metadata
 logs/         Rotating JSON Lines frontend logs
 ```
@@ -279,6 +290,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Run-ahead](docs/RUN_AHEAD.md)
 - [Netplay](docs/NETPLAY.md)
 - [RetroAchievements](docs/ACHIEVEMENTS.md)
+- [Cloud synchronization](docs/CLOUD_SYNC.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

@@ -167,6 +167,11 @@ struct DiagnosticsSnapshot final {
   std::uint64_t completedAchievementRequests{0U};
   std::uint64_t failedAchievementRequests{0U};
   std::string lastAchievementNetworkError;
+  std::string cloudSyncState;
+  bool cloudSyncSaves{false};
+  bool cloudSyncStates{false};
+  bool cloudSyncOnStartup{false};
+  bool cloudSyncOnGameClose{false};
   bool recordingActive{false};
   std::size_t recordingQueuedFrames{0};
   std::size_t recordingQueueCapacity{0};

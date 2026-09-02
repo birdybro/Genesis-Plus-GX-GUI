@@ -14,6 +14,12 @@ platform documentation.
 
 ### Added
 
+- Disabled-by-default HTTPS WebDAV synchronization for cartridge SRAM, Sega CD BRAM,
+  RAM-cartridge data, and wrapped state slots, with native secure password storage,
+  bounded TLS transfers, content-addressed integrity, ETag-conditional manifests,
+  deletion healing, collision-safe conflict copies, automatic safe points, diagnostics,
+  and real loopback TLS/WebDAV plus two-client and GUI regressions.
+
 - Disabled-by-default RetroAchievements integration through the official rcheevos
   `rc_client`, including supported-system hashing, achievements, measured progress,
   leaderboards, rich presence, bounded HTTPS transport, native secure token storage,

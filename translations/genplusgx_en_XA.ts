@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+417" />
+            <location filename="../desktop/app/main.cpp" line="+420" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+422" />
+            <location line="+448" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -273,7 +273,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+93" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+94" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -646,7 +646,7 @@ Arguments:
             <translation>⟦Ŀöçҡëð~~⟧</translation>
         </message>
         <message>
-            <location line="+66" />
+            <location line="+69" />
             <source>Signing in…</source>
             <translation>⟦Šïɠńïńɠ ïń…~~~⟧</translation>
         </message>
@@ -1437,6 +1437,200 @@ Arguments:
             <location line="+19" />
             <source>Added a disabled RAM cheat. Explicitly enable it and choose Apply to patch memory.</source>
             <translation>⟦Åððëð å ðïšåƀŀëð ŔÅḾ çħëåŧ. Ëẋƥŀïçïŧŀÿ ëńåƀŀë ïŧ åńð çħööšë Åƥƥŀÿ ŧö ƥåŧçħ ḿëḿöŕÿ.~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::CloudSyncDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/cloud_sync_dialog.cpp" line="+26" />
+            <source>Unchanged</source>
+            <translation>⟦Üńçħåńɠëð~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Uploaded</source>
+            <translation>⟦Üƥŀöåðëð~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Downloaded</source>
+            <translation>⟦Ðöŵńŀöåðëð~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Conflict copy</source>
+            <translation>⟦Çöńƒŀïçŧ çöƥÿ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Unknown</source>
+            <translation>⟦Üńҡńöŵń~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Cloud Synchronization</source>
+            <translation>⟦Çŀöüð Šÿńçħŕöńïžåŧïöń~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Synchronizes only save RAM and wrapped save states with your HTTPS WebDAV account. ROMs, BIOS files, settings, logs, and credentials are never uploaded. Conflicting remote data is preserved as a local copy.</source>
+            <translation>⟦Šÿńçħŕöńïžëš öńŀÿ šåṽë ŔÅḾ åńð ŵŕåƥƥëð šåṽë šŧåŧëš ŵïŧħ ÿöüŕ ĦŦŦƤŠ ŴëƀÐÅṼ åççöüńŧ. ŔÖḾš, ƁÏÖŠ ƒïŀëš, šëŧŧïńɠš, ŀöɠš, åńð çŕëðëńŧïåŀš åŕë ńëṽëŕ üƥŀöåðëð. Çöńƒŀïçŧïńɠ ŕëḿöŧë ðåŧå ïš ƥŕëšëŕṽëð åš å ŀöçåŀ çöƥÿ.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>WebDAV account</source>
+            <translation>⟦ŴëƀÐÅṼ åççöüńŧ~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Enable cloud synchronization</source>
+            <translation>⟦Ëńåƀŀë çŀöüð šÿńçħŕöńïžåŧïöń~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+7" />
+            <source>https://cloud.example.com/remote.php/dav/files/account</source>
+            <translation>⟦ħŧŧƥš://çŀöüð.ëẋåḿƥŀë.çöḿ/ŕëḿöŧë.ƥħƥ/ðåṽ/ƒïŀëš/åççöüńŧ~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>HTTPS WebDAV collection URL</source>
+            <translation>⟦ĦŦŦƤŠ ŴëƀÐÅṼ çöŀŀëçŧïöń ÜŔĿ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Server URL:</source>
+            <translation>⟦Šëŕṽëŕ ÜŔĿ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>WebDAV username</source>
+            <translation>⟦ŴëƀÐÅṼ üšëŕńåḿë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Username:</source>
+            <translation>⟦Üšëŕńåḿë:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>WebDAV password or application password</source>
+            <translation>⟦ŴëƀÐÅṼ ƥåššŵöŕð öŕ åƥƥŀïçåŧïöń ƥåššŵöŕð~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Password:</source>
+            <translation>⟦Ƥåššŵöŕð:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Remote synchronization directory</source>
+            <translation>⟦Ŕëḿöŧë šÿńçħŕöńïžåŧïöń ðïŕëçŧöŕÿ~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Remote folder:</source>
+            <translation>⟦Ŕëḿöŧë ƒöŀðëŕ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Content and automation</source>
+            <translation>⟦Çöńŧëńŧ åńð åüŧöḿåŧïöń~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Save RAM (cartridge SRAM and Sega CD BRAM)</source>
+            <translation>⟦Šåṽë ŔÅḾ (çåŕŧŕïðɠë ŠŔÅḾ åńð Šëɠå ÇÐ ƁŔÅḾ)~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Save states</source>
+            <translation>⟦Šåṽë šŧåŧëš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Synchronize after application startup</source>
+            <translation>⟦Šÿńçħŕöńïžë åƒŧëŕ åƥƥŀïçåŧïöń šŧåŕŧüƥ~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Synchronize after a game closes</source>
+            <translation>⟦Šÿńçħŕöńïžë åƒŧëŕ å ɠåḿë çŀöšëš~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <location line="+131" />
+            <source>Cloud synchronization is disabled.</source>
+            <translation>⟦Çŀöüð šÿńçħŕöńïžåŧïöń ïš ðïšåƀŀëð.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-129" />
+            <source>Cloud synchronization status</source>
+            <translation>⟦Çŀöüð šÿńçħŕöńïžåŧïöń šŧåŧüš~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+7" />
+            <source>File</source>
+            <translation>⟦Ƒïŀë~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Action</source>
+            <translation>⟦Åçŧïöń~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Details</source>
+            <translation>⟦Ðëŧåïŀš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Apply</source>
+            <translation>⟦Åƥƥŀÿ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Remember Password</source>
+            <translation>⟦Ŕëḿëḿƀëŕ Ƥåššŵöŕð~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Forget Password</source>
+            <translation>⟦Ƒöŕɠëŧ Ƥåššŵöŕð~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Sync Now</source>
+            <translation>⟦Šÿńç Ńöŵ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+66" />
+            <source>Synchronizing…</source>
+            <translation>⟦Šÿńçħŕöńïžïńɠ…~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+36" />
+            <source>Settings saved. Synchronization has not started.</source>
+            <translation>⟦Šëŧŧïńɠš šåṽëð. Šÿńçħŕöńïžåŧïöń ħåš ńöŧ šŧåŕŧëð.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+18" />
+            <source>Saving the password in the operating-system credential store…</source>
+            <translation>⟦Šåṽïńɠ ŧħë ƥåššŵöŕð ïń ŧħë öƥëŕåŧïńɠ~~~~~~~~-system çŕëðëńŧïåŀ šŧöŕë…~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Removing the saved password…</source>
+            <translation>⟦Ŕëḿöṽïńɠ ŧħë šåṽëð ƥåššŵöŕð…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+23" />
+            <source>Complete: %1 uploaded, %2 downloaded, %3 conflict copies, %4 unchanged.</source>
+            <translation>⟦Çöḿƥŀëŧë: ~~%1 üƥŀöåðëð, ~~%2 ðöŵńŀöåðëð, ~~~%3 çöńƒŀïçŧ çöƥïëš, ~~~~%4 üńçħåńɠëð.~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+48" />
+            <source>Close the active game before synchronizing.</source>
+            <translation>⟦Çŀöšë ŧħë åçŧïṽë ɠåḿë ƀëƒöŕë šÿńçħŕöńïžïńɠ.~~~~~~~~~~⟧</translation>
         </message>
     </context>
     <context>
@@ -2905,12 +3099,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+2909" />
+            <location line="+3051" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2905" />
+            <location line="-3047" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -2991,12 +3185,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+1838" />
+            <location line="+1980" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-1837" />
+            <location line="-1979" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -3017,12 +3211,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+1216" />
+            <location line="+1358" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-1216" />
+            <location line="-1358" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3218,12 +3412,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3730" />
+            <location line="+3875" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3725" />
+            <location line="-3870" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3335,12 +3529,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2595" />
+            <location line="+2737" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2564" />
+            <location line="-2706" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3526,6 +3720,16 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë ŔëŧŕöÅçħïëṽëḿëńŧš šüƥƥöŕŧ.~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
+            <location line="+3" />
+            <source>Cloud &amp;Synchronization…</source>
+            <translation>⟦Çŀöüð &amp;Šÿńçħŕöńïžåŧïöń…~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>This build does not include cloud synchronization support.</source>
+            <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë çŀöüð šÿńçħŕöńïžåŧïöń šüƥƥöŕŧ.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
             <location line="+2" />
             <source>&amp;Netplay…</source>
             <translation>⟦&amp;Ńëŧƥŀåÿ…~~⟧</translation>
@@ -3607,35 +3811,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+3118" />
+            <location line="+3254" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-3117" />
-            <location line="+2073" />
+            <location line="-3253" />
+            <location line="+2207" />
             <location line="+866" />
-            <location line="+179" />
+            <location line="+181" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3117" />
-            <location line="+2073" />
+            <location line="-3253" />
+            <location line="+2207" />
             <location line="+866" />
-            <location line="+179" />
+            <location line="+181" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3117" />
-            <location line="+2940" />
-            <location line="+178" />
+            <location line="-3253" />
+            <location line="+3074" />
+            <location line="+180" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-3116" />
+            <location line="-3252" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3645,17 +3849,17 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Šŀöŧ 0~⟧</translation>
         </message>
         <message>
-            <location line="+48" />
+            <location line="+51" />
             <source>Authenticated netplay session connected.</source>
             <translation>⟦Åüŧħëńŧïçåŧëð ńëŧƥŀåÿ šëššïöń çöńńëçŧëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+165" />
+            <location line="+175" />
             <source>Achievement unlocked: %1</source>
             <translation>⟦Åçħïëṽëḿëńŧ üńŀöçҡëð: ~~~~~%1⟧</translation>
         </message>
         <message>
-            <location line="+3" />
+            <location line="+4" />
             <source>All achievements completed!</source>
             <translation>⟦Åŀŀ åçħïëṽëḿëńŧš çöḿƥŀëŧëð!~~~~~~⟧</translation>
         </message>
@@ -3690,12 +3894,22 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš öƥëŕåŧïöń ƒåïŀëð~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+98" />
+            <location line="+81" />
+            <source>Cloud sync complete: %1 uploaded, %2 downloaded, %3 conflicts</source>
+            <translation>⟦Çŀöüð šÿńç çöḿƥŀëŧë: ~~~~~%1 üƥŀöåðëð, ~~%2 ðöŵńŀöåðëð, ~~~%3 çöńƒŀïçŧš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+14" />
+            <source>Cloud synchronization failed</source>
+            <translation>⟦Çŀöüð šÿńçħŕöńïžåŧïöń ƒåïŀëð~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+122" />
             <source>The emulation command could not be queued.</source>
             <translation>⟦Ŧħë ëḿüŀåŧïöń çöḿḿåńð çöüŀð ńöŧ ƀë ǫüëüëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+173" />
+            <location line="+174" />
             <source>&amp;Resume</source>
             <translation>⟦&amp;Ŕëšüḿë~~⟧</translation>
         </message>
@@ -3834,23 +4048,23 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <location line="+3" />
             <location line="+47" />
             <location line="+1739" />
-            <location line="+518" />
+            <location line="+521" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2293" />
+            <location line="-2296" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2296" />
+            <location line="+2299" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2244" />
+            <location line="-2247" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
@@ -4070,12 +4284,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+964" />
+            <location line="+966" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="-922" />
+            <location line="-924" />
             <source>Replacement disc inserted.</source>
             <translation>⟦Ŕëƥŀåçëḿëńŧ ðïšç ïńšëŕŧëð.~~~~~~⟧</translation>
         </message>
@@ -4257,17 +4471,17 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+7" />
-            <location line="+178" />
+            <location line="+180" />
             <source>Speed %1%</source>
             <translation>⟦Šƥëëð ~~%1%⟧</translation>
         </message>
         <message>
-            <location line="-177" />
+            <location line="-179" />
             <source>Loading game…</source>
             <translation>⟦Ŀöåðïńɠ ɠåḿë…~~~⟧</translation>
         </message>
         <message>
-            <location line="+54" />
+            <location line="+55" />
             <source>%1 — %2</source>
             <translation>⟦%1 — %2⟧</translation>
         </message>
@@ -4282,7 +4496,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="+21" />
+            <location line="+22" />
             <source>System: %1</source>
             <translation>⟦Šÿšŧëḿ: ~~%1⟧</translation>
         </message>
@@ -4292,7 +4506,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦%1 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="+158" />
+            <location line="+159" />
             <source>Disc %1 of %2</source>
             <translation>⟦Ðïšç ~%1 öƒ ~%2⟧</translation>
         </message>

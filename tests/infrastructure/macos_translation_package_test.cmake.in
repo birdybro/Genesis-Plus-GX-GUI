@@ -16,6 +16,7 @@ foreach(runtime IN ITEMS
     Contents/Resources/documentation/PHYSICAL_MEDIA.md
     Contents/Resources/documentation/NETPLAY.md
     Contents/Resources/documentation/ACHIEVEMENTS.md
+    Contents/Resources/documentation/CLOUD_SYNC.md
     Contents/Resources/licenses/librashader-MPL-2.0.md
     Contents/Resources/licenses/rcheevos-MIT.txt
     Contents/Resources/licenses/QtKeychain-BSD-3-Clause.txt)

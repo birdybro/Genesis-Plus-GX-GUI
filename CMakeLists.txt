@@ -42,6 +42,11 @@ option(
   "Enable opt-in RetroAchievements support through rcheevos"
   ON
 )
+option(
+  GENPLUSGX_ENABLE_CLOUD_SYNC
+  "Enable opt-in HTTPS WebDAV save and state synchronization"
+  ON
+)
 set(
   GENPLUSGX_WINDOWS_REDIST
   ""
@@ -81,6 +86,8 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
 endif()
 if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
   include(Rcheevos)
+endif()
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS OR GENPLUSGX_ENABLE_CLOUD_SYNC)
   include(QtKeychain)
 endif()
 
@@ -130,6 +137,7 @@ message(STATUS "Qt: ${Qt6_VERSION}")
 message(STATUS "SDL3: ${SDL3_VERSION}")
 message(STATUS "Netplay: authenticated direct TCP peer sessions")
 message(STATUS "RetroAchievements: ${GENPLUSGX_ENABLE_ACHIEVEMENTS}")
+message(STATUS "Cloud synchronization: ${GENPLUSGX_ENABLE_CLOUD_SYNC}")
 message(STATUS "Libretro shaders: ${GENPLUSGX_ENABLE_LIBRETRO_SHADERS}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
@@ -141,6 +149,7 @@ add_subdirectory(desktop/netplay)
 add_subdirectory(desktop/achievements)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
+add_subdirectory(desktop/cloud)
 add_subdirectory(desktop/diagnostics)
 add_subdirectory(desktop/cheats)
 add_subdirectory(desktop/screenshots)

@@ -50,6 +50,7 @@ foreach(document IN ITEMS
     USER_GUIDE.md
     BUILDING.md
     BIOS.md
+    CLOUD_SYNC.md
     INPUT_CONFIGURATION.md
     LIBRETRO_SHADERS.md
     RUN_AHEAD.md

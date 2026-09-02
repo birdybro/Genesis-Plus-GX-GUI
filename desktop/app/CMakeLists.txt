@@ -25,6 +25,7 @@ target_link_libraries(
   PRIVATE
     GenesisPlusGX::AppSupport
     GenesisPlusGX::Capture
+    GenesisPlusGX::Cloud
     GenesisPlusGX::Screenshots
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
@@ -168,9 +169,19 @@ if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
     DESTINATION "${genplusgx_achievement_license_destination}"
     RENAME "rcheevos-MIT.txt"
   )
+endif()
+
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS OR GENPLUSGX_ENABLE_CLOUD_SYNC)
+  if(APPLE)
+    set(genplusgx_qtkeychain_license_destination
+      "genesis-plus-gx-gui.app/Contents/Resources/licenses")
+  else()
+    set(genplusgx_qtkeychain_license_destination
+      "${CMAKE_INSTALL_DATADIR}/doc/Genesis-Plus-GX-GUI")
+  endif()
   install(
     FILES "${GENPLUSGX_QTKEYCHAIN_LICENSE}"
-    DESTINATION "${genplusgx_achievement_license_destination}"
+    DESTINATION "${genplusgx_qtkeychain_license_destination}"
     RENAME "QtKeychain-BSD-3-Clause.txt"
   )
 endif()

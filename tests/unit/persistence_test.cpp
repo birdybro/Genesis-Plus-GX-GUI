@@ -56,6 +56,7 @@ int main()
           std::filesystem::is_directory(store.paths().statesDirectory()) &&
           std::filesystem::is_directory(store.paths().screenshotsDirectory()) &&
           std::filesystem::is_directory(store.paths().recordingsDirectory()) &&
+          std::filesystem::is_directory(store.paths().cloudDirectory()) &&
           std::filesystem::is_directory(store.paths().libraryDirectory()) &&
           std::filesystem::is_directory(store.paths().logsDirectory()) &&
           std::filesystem::is_directory(store.paths().cacheDirectory()),
@@ -95,6 +96,7 @@ int main()
       !check(portablePaths.initialize() &&
           std::filesystem::is_directory(portablePaths.configDirectory()) &&
           std::filesystem::is_directory(portablePaths.savesDirectory()) &&
+          std::filesystem::is_directory(portablePaths.cloudDirectory()) &&
           std::filesystem::is_directory(portablePaths.cacheDirectory()),
         "The executable-relative portable hierarchy could not initialize") ||
       !check(genplusgx::applicationDataModeName(

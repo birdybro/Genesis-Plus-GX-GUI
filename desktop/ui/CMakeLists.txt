@@ -7,6 +7,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/bios_settings_dialog.h
   include/genplusgx/ui/binding_capture_button.h
   include/genplusgx/ui/cheat_manager_dialog.h
+  include/genplusgx/ui/cloud_sync_dialog.h
   include/genplusgx/ui/dialog_service.h
   include/genplusgx/ui/diagnostics_dialog.h
   include/genplusgx/ui/debug_tools_window.h
@@ -36,6 +37,7 @@ add_library(genplusgx_ui STATIC
   src/bios_settings_dialog.cpp
   src/binding_capture_button.cpp
   src/cheat_manager_dialog.cpp
+  src/cloud_sync_dialog.cpp
   src/dialog_service.cpp
   src/diagnostics_dialog.cpp
   src/debug_tools_window.cpp
@@ -74,6 +76,7 @@ target_link_libraries(
     Qt6::Widgets
     GenesisPlusGX::Achievements
     GenesisPlusGX::Cheats
+    GenesisPlusGX::Cloud
     GenesisPlusGX::Diagnostics
     GenesisPlusGX::GameFiles
     GenesisPlusGX::Input

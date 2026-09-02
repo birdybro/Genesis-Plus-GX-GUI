@@ -164,7 +164,8 @@ PersistenceStatus ApplicationPaths::initialize() const
 
   const std::array directories{
     root_, configDirectory(), savesDirectory(), statesDirectory(), screenshotsDirectory(),
-    recordingsDirectory(), libraryDirectory(), logsDirectory(), cacheDirectory()};
+    recordingsDirectory(), cloudDirectory(), libraryDirectory(), logsDirectory(),
+    cacheDirectory()};
   for (const auto& directory : directories) {
     std::error_code error;
     if (!createDirectory(directory, error)) {
@@ -214,6 +215,11 @@ std::filesystem::path ApplicationPaths::screenshotsDirectory() const
 std::filesystem::path ApplicationPaths::recordingsDirectory() const
 {
   return root_ / "recordings";
+}
+
+std::filesystem::path ApplicationPaths::cloudDirectory() const
+{
+  return root_ / "cloud";
 }
 
 std::filesystem::path ApplicationPaths::libraryDirectory() const

@@ -142,6 +142,11 @@ int main()
   snapshot.completedAchievementRequests = 8U;
   snapshot.failedAchievementRequests = 2U;
   snapshot.lastAchievementNetworkError = "token=must-not-appear";
+  snapshot.cloudSyncState = "Synchronizing automatically";
+  snapshot.cloudSyncSaves = true;
+  snapshot.cloudSyncStates = true;
+  snapshot.cloudSyncOnStartup = true;
+  snapshot.cloudSyncOnGameClose = true;
   snapshot.recordingActive = true;
   snapshot.recordingQueuedFrames = 2U;
   snapshot.recordingQueueCapacity = 8U;
@@ -188,6 +193,9 @@ int main()
                report.find("RetroAchievements: Authenticated; recognized game active (Hardcore active)") != std::string::npos &&
                report.find("RetroAchievements bridge: 1 requests / 2 responses / 32 capacity") != std::string::npos &&
                report.find("RetroAchievements HTTPS: 1 active, 8 completed, 2 failed") != std::string::npos &&
+               report.find("Cloud synchronization: Synchronizing automatically") != std::string::npos &&
+               report.find("Cloud content: saves enabled, states enabled") != std::string::npos &&
+               report.find("Cloud automatic sync: startup enabled, game close enabled") != std::string::npos &&
                report.find("Lossless recording: Active") != std::string::npos &&
                report.find("Recording queue: 2 / 8") != std::string::npos &&
                report.find("Recording frames: 144 written, 1 dropped") != std::string::npos &&

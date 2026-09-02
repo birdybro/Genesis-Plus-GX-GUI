@@ -70,6 +70,47 @@ Sega CD, Master System, Game Gear, or SG-1000 memory regions without exporting c
 pointers. Active Hardcore restrictions are checked at the worker command boundary, so
 programmatic commands cannot bypass disabled GUI actions.
 
+### Cloud synchronization data flow
+
+```text
+Cloud dialog / native credential store
+              | validated settings + transient password
+              v
+bounded SyncService queue (one active + one waiting)
+              |
+              v
+worker-owned Qt HTTPS/WebDAV client
+              | MKCOL / PROPFIND / GET / conditional PUT
+              v
+immutable SHA-256 objects + ETag-guarded remote manifest
+              |
+              v
+validated hash/size -> atomic local file or cloud/conflicts copy
+```
+
+The cloud worker owns its `QNetworkAccessManager` and never enters the emulation core.
+The GUI can submit only while no game is loading or active; automatic after-close work
+begins only after the core has flushed SRAM/BRAM and released the session. Shutdown
+cancels and joins this worker before stopping the emulation worker. All commands,
+terminal events, manifests, selected file sets, individual responses, and represented
+bytes have fixed limits.
+
+Only exact save-RAM and wrapped-state filename grammars below application-owned
+`saves/` and `states/` roots are accepted. Symlinks and every other data category are
+excluded. Each client stores an endpoint/username/remote-directory-specific baseline.
+One-sided changes copy toward the unchanged side; deletions heal from the surviving
+copy. Two-sided changes preserve local authority and atomically materialize the remote
+object under `cloud/conflicts/`. Remote content is verified against the manifest before
+write, while manifest replacement requires its prior ETag so concurrent clients cannot
+silently overwrite each other's index.
+
+TLS certificate validation is mandatory, redirects are not followed, and Basic
+credentials are sent only to a prevalidated HTTPS endpoint. QtKeychain holds remembered
+passwords with insecure fallback disabled; JSON settings and diagnostics intentionally
+contain no password. The provider sees unencrypted save/state contents after TLS
+termination because this feature does not implement client-side encryption. Immutable
+superseded objects are retained rather than risk racy generic-WebDAV garbage collection.
+
 ```text
              +-------------------+
              | Qt 6 Widgets GUI  |
@@ -1317,21 +1358,23 @@ Shutdown is an explicit, idempotent workflow:
 
 1. stop the GUI event pump, disconnect window/input producers and renderer sinks, and
    disable new commands;
-2. wake the emulation worker, stop frame execution, atomically flush available
+2. cooperatively cancel and join cloud synchronization so no HTTPS worker retains
+   application-data paths or transient credentials;
+3. wake the emulation worker, stop frame execution, atomically flush available
    SRAM/BRAM on the core-owning thread, shut down the core, and join the worker even
    when a save failed;
-3. cancel and join physical-media discovery/import, drain terminal events, and remove
+4. cancel and join physical-media discovery/import, drain terminal events, and remove
    any completed or active transient disc snapshots after the core has released them;
-4. stop and close the SDL3 audio stream/device;
-5. stop controller input and close its SDL handles on the GUI/owner thread;
-6. request cooperative cancellation of any in-flight backup, state, metadata, or
+5. stop and close the SDL3 audio stream/device;
+6. stop controller input and close its SDL handles on the GUI/owner thread;
+7. request cooperative cancellation of any in-flight backup, state, metadata, or
    library identity hash, then stop and join the state, metadata, screenshot, and
    library-scanner workers, clearing any pending UI operation rather than leaving it
    busy;
-7. release the bounded display frame exchange after its producer has joined;
-8. aggregate every cleanup failure without replacing a prior nonzero application exit,
+8. release the bounded display frame exchange after its producer has joined;
+9. aggregate every cleanup failure without replacing a prior nonzero application exit,
    emit the final structured log, and shut down logging;
-9. return the aggregate process status while Qt destroys the window and graphics
+10. return the aggregate process status while Qt destroys the window and graphics
    resources.
 
 Each stage has tests for no-game, running, paused, audio-disabled, dirty-save, and

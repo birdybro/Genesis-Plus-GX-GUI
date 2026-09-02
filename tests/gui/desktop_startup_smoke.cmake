@@ -51,6 +51,9 @@ if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
   file(WRITE
     "${GENPLUSGX_SMOKE_ROOT}/config/run-ahead-settings.json"
     "{ this is intentionally invalid startup-test JSON")
+  file(WRITE
+    "${GENPLUSGX_SMOKE_ROOT}/config/cloud-sync.json"
+    "{ this is intentionally invalid startup-test JSON")
 endif()
 
 set(smoke_command
@@ -91,7 +94,7 @@ if(NOT "${smoke_result}" STREQUAL "0")
 endif()
 
 foreach(required_directory IN ITEMS
-    config saves states screenshots recordings library logs cache)
+    config saves states screenshots recordings cloud library logs cache)
   if(NOT IS_DIRECTORY "${GENPLUSGX_SMOKE_ROOT}/${required_directory}")
     message(FATAL_ERROR
       "Desktop startup did not create ${required_directory} in its isolated root")
@@ -131,6 +134,7 @@ if(GENPLUSGX_SMOKE_INJECT_CORRUPT_SETTINGS)
       "audio settings file"
       "speed settings file"
       "run-ahead settings file"
+      "cloud settings file"
       "Startup issues presented:")
     string(FIND
       "${frontend_log_text}" "${required_error_message}" error_message_position)

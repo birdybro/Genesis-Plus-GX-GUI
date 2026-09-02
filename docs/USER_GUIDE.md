@@ -316,6 +316,26 @@ debugger access are unavailable. Fast-forward remains permitted. See the complet
 [RetroAchievements guide](ACHIEVEMENTS.md) for privacy, recognition, state-format, and
 troubleshooting details.
 
+## Cloud synchronization
+
+Close the current game, then open **Tools → Cloud Synchronization…** to configure an
+HTTPS WebDAV account and select save RAM, save states, or both. The feature is disabled
+by default. Use **Remember Password** for native OS credential storage with no plaintext
+fallback, or enter a one-time password before **Synchronize Now**. The password is
+cleared from the editor immediately after submission.
+
+Only application-owned SRAM/BRAM and wrapped state slots can be selected. ROMs, discs,
+BIOS files, cheats, settings, logs, screenshots, recordings, and library data are never
+uploaded. If local and remote progress both change, the local version stays in place and
+the remote version becomes an atomic, collision-safe file below `cloud/conflicts/`.
+Deletion on one side restores the surviving copy instead of propagating data loss.
+
+Optional startup and after-game-close synchronization runs only when no core session is
+active. An immediate startup game defers startup synchronization until that game closes.
+Automatic operation needs a remembered password; any credential/network error leaves
+emulation and local persistence available. See [Cloud Synchronization](CLOUD_SYNC.md)
+for privacy, fixed limits, WebDAV semantics, recovery, and provider-quota behavior.
+
 ## Run-ahead latency reduction
 
 For cartridge games, choose **Emulation → Run-Ahead** to display a future frame while

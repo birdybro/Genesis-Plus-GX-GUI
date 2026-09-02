@@ -62,6 +62,9 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.completedAchievementRequests = 8U;
     snapshot.failedAchievementRequests = 2U;
     snapshot.lastAchievementNetworkError = "password=never-copy-this";
+    snapshot.cloudSyncState = "Enabled; idle";
+    snapshot.cloudSyncSaves = true;
+    snapshot.cloudSyncStates = true;
     snapshot.normalSpeedPercent = 125U;
     snapshot.slowMotionSpeedPercent = 50U;
     snapshot.fastForwardSpeedPercent = 800U;
@@ -119,6 +122,10 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     QStringLiteral("RetroAchievements bridge: 1 requests / 2 responses / 32 capacity")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("RetroAchievements HTTPS: 0 active, 8 completed, 2 failed")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Cloud synchronization: Enabled; idle")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Cloud content: saves enabled, states enabled")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(

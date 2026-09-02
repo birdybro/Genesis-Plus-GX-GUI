@@ -1263,6 +1263,9 @@ worker, rollback, video, audio, and input route in separate processes.
 - [x] Disabled-by-default RetroAchievements through the official rcheevos client, with
   bounded provider transport, secure native token storage, achievements, leaderboards,
   rich presence, owner-thread evaluation, and enforceable recognition-gated Hardcore.
+- [x] Disabled-by-default HTTPS WebDAV synchronization for exact save-RAM and wrapped-
+  state paths, with native secure credential storage, bounded transfers, conditional
+  manifests, non-destructive deletion healing, and atomic local conflict copies.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, native Windows/Linux/macOS original-disc import with bounded
   progress/cancellation, and missing-firmware errors without bundled firmware.
@@ -1334,6 +1337,38 @@ all six TGZ/ZIP/DMG SHA-256 files verify; native package verifiers passed; execu
 documentation, rcheevos, and QtKeychain license payloads are present; and no game, BIOS,
 firmware, or save image was packaged.
 
+## Milestone 96 local validation
+
+The cloud implementation is locally release-gated. The default graph contains 124
+tests: 11 infrastructure, 20 core, 11 integration, 48 unit, and 34 GUI/process tests.
+Overlapping behavioral labels report 79 unit, 29 core, 56 integration, and 34 GUI
+tests. The new tests exercise the production TLS/WebDAV transport as well as the
+planner, persistence, bounded worker, credential/UI seams, and cross-operation guards.
+
+| Configuration | CTest | Result |
+| --- | ---: | --- |
+| GCC Debug, warnings as errors | 124/124 | Passed |
+| GCC Release, warnings as errors | 124/124 | Passed |
+| ASan + UBSan | 124/124 | Passed; no finding |
+| Clang Release, warnings as errors | 124/124 | Passed |
+| CHD disabled | 124/124 | Passed |
+| Cloud synchronization disabled | 124/124 | Passed |
+| Cloud and RetroAchievements disabled | 122/122 | Passed; no QtKeychain dependency |
+| Libretro shaders disabled | 122/122 | Passed |
+| Inherited Unix libretro | Build/link/clean | Passed; x86-64 ELF, warning-clean |
+
+The Release install passes the production package verifier, installed version and
+offscreen event-loop smokes, ELF dependency inspection, CPack creation, SHA-256
+verification, and unpacked archive re-verification. Its 102 archive entries include
+`CLOUD_SYNC.md` and the QtKeychain notice and exclude test TLS material and user/game
+data. Pinned `actionlint` 1.7.7 reports no workflow finding. Native XCB installed-package
+startup and the Windows/macOS package layouts remain mandatory hosted gates because
+this local host image has no `xvfb-run` or foreign platform runtime.
+
+Exact hosted commit/run evidence and the complete successful-log/artifact audit remain
+pending until this implementation commit is pushed. The milestone is not marked
+complete until those results are green and inspected.
+
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
@@ -1392,12 +1427,17 @@ directories.
   for the exact game revision, and an available native credential service for session
   retention. CI uses a deterministic official-client protocol fixture and never stores
   or transmits a real account credential.
+- Cloud synchronization requires a user-provided HTTPS WebDAV account. TLS protects
+  transfer, but save/state contents are not client-side encrypted, so the provider can
+  inspect them. Generic WebDAV has no portable transactional object garbage collection;
+  immutable historical revisions are retained until the user deliberately resets the
+  complete remote directory and matching local baseline, so provider quota can grow.
 - ZIP support is intentionally limited to stored/deflated cartridge members; archived
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Cloud sync, online scraping/downloading, a network-accessible external
-  debugger server, TAS tooling, and streaming remain intentionally outside scope.
+  formats. Online scraping/downloading, a network-accessible external debugger server,
+  TAS tooling, and streaming remain intentionally outside scope.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.

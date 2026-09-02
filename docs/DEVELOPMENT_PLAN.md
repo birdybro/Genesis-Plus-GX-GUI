@@ -106,8 +106,8 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
 | 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
 | 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
-| 95 Achievements | IN PROGRESS | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
-| 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
+| 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
+| 96 Cloud synchronization | IN PROGRESS | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
 | 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
 | 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
@@ -3779,6 +3779,68 @@ normal video; schema-1 settings migrate safely; global and sparse per-game selec
 persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
 software/no-feature builds remain usable; required runtimes/resources/licenses ship on
 all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 96 detail
+
+**Status:** IN PROGRESS — implementation and all local gates pass; exact hosted
+cross-platform confirmation, complete-log inspection, and downloaded-package audit
+begin after the implementation commit is pushed.
+
+**Goal:** Add disabled-by-default, conflict-safe synchronization of application-owned
+save RAM and wrapped save states through a user-provided HTTPS WebDAV account without
+allowing network work to race the authoritative emulation or persistence owner.
+
+**Files changed:**
+
+- Root/dependency/build/package CMake and package verification
+- `desktop/cloud/` settings, secure credentials, manifests, WebDAV transport, planner,
+  bounded worker, and conflict recovery
+- Application paths/composition, privacy-safe diagnostics, MainWindow gating, and the
+  accessible Cloud Synchronization dialog
+- Cloud unit, real TLS/WebDAV integration, GUI, process, persistence, diagnostics,
+  package-fixture, and localization tests
+- README, changelog, architecture/build/user/testing/matrix/audit/fixture/legal, cloud,
+  plan, and final-report documentation
+
+**Tests added:** `unit.cloud_sync` covers disabled defaults, secret-free atomic settings,
+strict account/path/hash grammars, bounded and fuzzed manifests, the complete
+three-way planner matrix, two-client upload/download/conflict/deletion recovery,
+conditional-write loss, exact local-file selection, queue saturation, cancellation,
+and worker join. `integration.cloud_webdav` uses a real local TLS server and the
+production Qt network transport to prove custom test-CA trust, normal untrusted-CA
+rejection, Basic authentication over HTTPS, collection creation/existence checks,
+GET, create-only and ETag-matched PUT, precondition failures, response limits, invalid
+paths, and authentication errors. `gui.cloud_sync` drives validation, password
+clearing, settings/credential/sync callbacks, result/conflict presentation,
+accessibility, feature-off behavior, and both game-to-sync and sync-to-load race guards.
+Existing process and package tests cover corrupt settings, startup, documentation,
+diagnostics redaction, installed payloads, and platform fixtures.
+
+**Local gate evidence:** GCC warning-as-error Debug and optimized Release each pass
+124/124 tests. ASan/UBSan passes 124/124 with no finding; Clang 22 Release and the
+CHD-disabled graph independently pass 124/124. Cloud-disabled passes 124/124, the
+cloud-and-achievements-disabled graph passes all 122 applicable tests without
+QtKeychain, and shader-disabled passes all 122 applicable tests. The strict inherited
+Unix libretro target builds, links as x86-64 ELF, and cleans warning-free. Pinned
+`actionlint` 1.7.7 reports no workflow finding. A fresh Release stage passes structural
+and ELF-dependency verification, installed `--version` and offscreen event-loop smokes,
+and CPack emits a checksum-verified 0.1.1 x86-64 TGZ with 102 archive entries. The
+unpacked package re-verifies, contains the cloud guide and QtKeychain license, and
+contains no test certificate/key, game, firmware, save RAM, or state fixture. This host
+does not provide `xvfb-run`; the required native XCB installed-package smoke remains in
+the hosted Linux Release gate.
+
+**Acceptance criteria:** Only exact per-game save/state paths are selected; TLS and
+conditional manifest writes prevent silent transport/lost-update failure; local data
+is never overwritten on a conflict; remote conflict copies are atomically recoverable;
+deletions heal rather than propagate; credentials use the native secure store or a
+one-time field and never settings/logs/diagnostics; all payloads, manifests, queues, and
+shutdown waits are bounded; sync and active game ownership cannot overlap; official
+packages and feature-off builds remain complete; all applicable local and exact hosted
+gates pass; and the Genesis Plus GX core remains unchanged.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

@@ -465,6 +465,16 @@ std::string formatDiagnostics(
          << " completed, " << snapshot.failedAchievementRequests << " failed\n"
          << "RetroAchievements last network error: "
          << safeLine(snapshot.lastAchievementNetworkError, detectedHome) << '\n'
+         << "Cloud synchronization: "
+         << safeLine(snapshot.cloudSyncState, detectedHome) << '\n'
+         << "Cloud content: saves "
+         << (snapshot.cloudSyncSaves ? "enabled" : "disabled")
+         << ", states "
+         << (snapshot.cloudSyncStates ? "enabled" : "disabled") << '\n'
+         << "Cloud automatic sync: startup "
+         << (snapshot.cloudSyncOnStartup ? "enabled" : "disabled")
+         << ", game close "
+         << (snapshot.cloudSyncOnGameClose ? "enabled" : "disabled") << '\n'
          << "Lossless recording: "
          << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
          << "Recording queue: " << snapshot.recordingQueuedFrames << " / "

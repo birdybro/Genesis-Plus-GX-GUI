@@ -17,6 +17,7 @@ set(required_documents
   docs/ACHIEVEMENTS.md
   docs/ARCHITECTURE.md
   docs/BUILDING.md
+  docs/CLOUD_SYNC.md
   docs/DEVELOPMENT.md
   docs/DEBUG_TOOLS.md
   docs/TESTING.md
@@ -114,6 +115,7 @@ foreach(menu_text IN ITEMS
     "Input → Controller Configuration"
     "Tools → Cheats"
     "Tools → RetroAchievements"
+    "Tools → Cloud Synchronization"
     "Tools → Game Information"
     "Tools → BIOS Settings"
     "Tools → Log and Diagnostics"

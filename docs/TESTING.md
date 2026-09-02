@@ -62,6 +62,25 @@ Run the focused set with:
 ctest --preset debug -L achievements --output-on-failure
 ```
 
+## Cloud synchronization tests
+
+`unit.cloud_sync` covers disabled defaults, credential-free atomic settings, strict
+HTTPS/account validation, account-key separation, recognized-file scanning, traversal
+and symlink exclusion, manifest bounds/fuzzing, the complete two-client action matrix,
+non-destructive deletion healing, atomic conflict copies, conditional-manifest failure,
+queue saturation, active cancellation, and joined shutdown. `integration.cloud_webdav`
+uses a dedicated loopback-only test certificate to make real Qt TLS/WebDAV requests and
+verify certificate rejection, Basic authorization, MKCOL/PROPFIND, GET, create-only PUT,
+ETag/If-Match PUT, authentication failure, and response-byte limits. `gui.cloud_sync`
+drives validation, password clearing, password-store callbacks, results, accessibility,
+and game-session gating. No test uses an account or Internet connection.
+
+Run the focused set with:
+
+```bash
+ctest --preset debug -L cloud --output-on-failure
+```
+
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
 `rewind`, `run-ahead`, `localization`, `packaging`, `release`, and `documentation`:

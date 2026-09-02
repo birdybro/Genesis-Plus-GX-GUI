@@ -5,6 +5,8 @@
 #include "genplusgx/achievements/achievement_types.h"
 #include "genplusgx/game_file.h"
 #include "genplusgx/cheats/cheat_manager.h"
+#include "genplusgx/cloud/cloud_settings.h"
+#include "genplusgx/cloud/cloud_types.h"
 #include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/input/input_profile.h"
 #include "genplusgx/library/game_metadata.h"
@@ -136,6 +138,12 @@ public:
   using AchievementLoginSink =
     std::function<void(std::string, std::string)>;
   using AchievementLogoutSink = std::function<void()>;
+  using CloudSettingsSink = std::function<PersistenceStatus(
+    const cloud::Settings&)>;
+  using CloudPasswordSink = std::function<void(
+    std::string, std::string, std::string)>;
+  using CloudAccountSink = std::function<void(std::string, std::string)>;
+  using CloudSyncSink = std::function<void(std::string)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -174,6 +182,16 @@ public:
   void presentAchievementEvent(const achievements::Event& event);
   void showAchievementError(const std::string& detail);
   void showAchievements();
+  void setCloudSettings(cloud::Settings settings);
+  void setCloudSettingsSink(CloudSettingsSink sink);
+  void setCloudPasswordSink(CloudPasswordSink sink);
+  void setCloudForgetSink(CloudAccountSink sink);
+  void setCloudSyncSink(CloudSyncSink sink);
+  void setCloudSyncBusy(bool busy);
+  void showCloudSyncResult(const cloud::SyncResult& result);
+  void showCloudSyncStatus(const std::string& detail);
+  void showCloudSyncError(const std::string& detail);
+  void showCloudSync();
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
@@ -376,6 +394,7 @@ private:
   void updatePhysicalMediaAction();
   void updateNetplayControls();
   void updateAchievementControls();
+  void updateCloudDialogState();
   void chooseGame();
   void chooseGameWithPatch();
   void closeGame();
@@ -473,8 +492,14 @@ private:
   AchievementSettingsSink achievementSettingsSink_;
   AchievementLoginSink achievementLoginSink_;
   AchievementLogoutSink achievementLogoutSink_;
+  CloudSettingsSink cloudSettingsSink_;
+  CloudPasswordSink cloudPasswordSink_;
+  CloudAccountSink cloudForgetSink_;
+  CloudSyncSink cloudSyncSink_;
   achievements::Settings achievementSettings_;
   achievements::Snapshot achievementSnapshot_;
+  cloud::Settings cloudSettings_;
+  bool cloudSyncBusy_{false};
   netplay::NetplaySessionState netplayState_{
     netplay::NetplaySessionState::disconnected};
   cheats::CheatConfiguration cheatConfiguration_;

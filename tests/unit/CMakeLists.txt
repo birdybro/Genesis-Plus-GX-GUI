@@ -1,5 +1,32 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_cloud_sync_test cloud_sync_test.cpp)
+target_link_libraries(
+  genplusgx_cloud_sync_test
+  PRIVATE GenesisPlusGX::Cloud genplusgx_project_warnings Qt6::Core
+)
+add_test(NAME unit.cloud_sync COMMAND genplusgx_cloud_sync_test)
+set_tests_properties(
+  unit.cloud_sync
+  PROPERTIES LABELS "unit;integration;cloud;network;security;persistence;filesystem;fuzz;bounded"
+    TIMEOUT 30
+)
+
+qt_add_executable(genplusgx_cloud_webdav_test cloud_webdav_test.cpp)
+set_target_properties(genplusgx_cloud_webdav_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_cloud_webdav_test
+  PRIVATE GenesisPlusGX::Cloud genplusgx_project_warnings Qt6::Network Qt6::Test
+)
+add_test(NAME integration.cloud_webdav COMMAND genplusgx_cloud_webdav_test)
+set_tests_properties(
+  integration.cloud_webdav
+  PROPERTIES
+    ENVIRONMENT "GENPLUSGX_TEST_FIXTURES=${PROJECT_SOURCE_DIR}/tests/fixtures"
+    LABELS "integration;cloud;network;tls;security;bounded;fixture"
+    TIMEOUT 30
+)
+
 if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
   add_executable(genplusgx_achievements_test achievements_test.cpp)
   target_link_libraries(

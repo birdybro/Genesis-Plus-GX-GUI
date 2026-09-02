@@ -10,6 +10,9 @@
 #include "genplusgx/backup_store.h"
 #include "genplusgx/bounded_queue.h"
 #include "genplusgx/cheats/cheat_manager.h"
+#include "genplusgx/cloud/cloud_credentials.h"
+#include "genplusgx/cloud/cloud_settings.h"
+#include "genplusgx/cloud/cloud_sync.h"
 #include "genplusgx/capture/recording_service.h"
 #include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/emulation_worker.h"
@@ -467,6 +470,16 @@ int main(int argc, char* argv[])
       recordStartupIssue("RetroAchievements settings migration", migrated.message);
     }
   }
+  genplusgx::cloud::SettingsStore cloudSettingsStore{
+    applicationPaths.configDirectory() / "cloud-sync.json"};
+  auto loadedCloudSettings = cloudSettingsStore.load();
+  if (!loadedCloudSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedCloudSettings.status.message);
+    recordStartupIssue(
+      "Cloud synchronization settings", loadedCloudSettings.status.message);
+  }
+  auto cloudSettings = loadedCloudSettings.settings;
   const auto translationApplied = translationManager.apply(
     appearanceSettings.language);
   if (!translationApplied) {
@@ -798,6 +811,20 @@ int main(int argc, char* argv[])
       screenshotServiceStarted.message);
     recordStartupIssue("Screenshot service", screenshotServiceStarted.message);
   }
+  genplusgx::cloud::SyncService cloudSyncService;
+#if defined(GENPLUSGX_HAVE_CLOUD_SYNC)
+  const auto cloudSyncServiceStarted = cloudSyncService.start();
+#else
+  const auto cloudSyncServiceStarted = genplusgx::cloud::Status{
+    genplusgx::cloud::Error::notRunning,
+    "This build does not include cloud synchronization support."};
+#endif
+  if (!cloudSyncServiceStarted && cloudSettings.enabled) {
+    qWarning().noquote() << QString::fromStdString(
+      cloudSyncServiceStarted.message);
+    recordStartupIssue(
+      "Cloud synchronization service", cloudSyncServiceStarted.message);
+  }
   auto recordingService =
     std::make_shared<genplusgx::capture::RecordingService>();
   const auto recordingServiceStarted = recordingService->start();
@@ -815,6 +842,7 @@ int main(int argc, char* argv[])
     achievementBridge,
     std::string{GENPLUSGX_APP_NAME} + "/" + GENPLUSGX_VERSION};
   genplusgx::achievements::CredentialStore achievementCredentials;
+  genplusgx::cloud::CredentialStore cloudCredentials;
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -832,6 +860,7 @@ int main(int argc, char* argv[])
     static_cast<void>(physicalMediaService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(screenshotService.stop());
+    static_cast<void>(cloudSyncService.stop());
     static_cast<void>(recordingService->stop());
     static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
@@ -984,6 +1013,153 @@ int main(int argc, char* argv[])
       !achievementSettings.username.empty()) {
     restoreAchievementSession(achievementSettings.username);
   }
+  window.setCloudSettings(cloudSettings);
+  std::uint64_t cloudOperationId = 875'000U;
+  std::optional<std::uint64_t> pendingCloudOperation;
+  bool cloudOperationAutomatic = false;
+  bool cloudCredentialReadPending = false;
+  bool startupCloudSyncDeferred = false;
+  const auto submitCloudSync =
+    [&applicationPaths, &cloudOperationAutomatic, &cloudSettings,
+     &cloudSyncService, &pendingCloudOperation, &cloudOperationId,
+     &window](std::string password, bool automatic) {
+      if (pendingCloudOperation) {
+        std::fill(password.begin(), password.end(), '\0');
+        if (!automatic) {
+          window.showCloudSyncStatus(
+            "Another cloud synchronization is already in progress.");
+        }
+        return;
+      }
+      if (window.isGameLoaded() || window.isGameLoading()) {
+        std::fill(password.begin(), password.end(), '\0');
+        window.setCloudSyncBusy(false);
+        if (!automatic) {
+          window.showCloudSyncError(
+            "Close the active game before synchronizing saves and states.");
+        }
+        return;
+      }
+      const auto operationId = ++cloudOperationId;
+      const auto submitted = cloudSyncService.request(operationId,
+        applicationPaths, cloudSettings, std::move(password));
+      if (!submitted) {
+        window.setCloudSyncBusy(false);
+        if (automatic) {
+          qWarning().noquote() << "Automatic cloud synchronization was not started:"
+                               << QString::fromStdString(submitted.message);
+          window.showCloudSyncStatus(
+            "Automatic cloud synchronization was not started: " +
+            submitted.message);
+        } else {
+          window.showCloudSyncError(submitted.message);
+        }
+        return;
+      }
+      pendingCloudOperation = operationId;
+      cloudOperationAutomatic = automatic;
+      window.setCloudSyncBusy(true);
+      qInfo() << (automatic ? "Automatic" : "Manual")
+              << "cloud synchronization started.";
+    };
+  const auto requestCloudSync =
+    [&cloudCredentialReadPending, &cloudCredentials, &cloudOperationAutomatic,
+     &cloudSettings, &pendingCloudOperation, &submitCloudSync,
+     &window](std::string password, bool automatic) {
+      if (cloudCredentialReadPending || pendingCloudOperation) {
+        std::fill(password.begin(), password.end(), '\0');
+        if (!automatic) {
+          window.showCloudSyncStatus(
+            "Another cloud synchronization is already in progress.");
+        }
+        return;
+      }
+      if (!cloudSettings.enabled) {
+        std::fill(password.begin(), password.end(), '\0');
+        if (!automatic) {
+          window.showCloudSyncError("Cloud synchronization is disabled.");
+        }
+        return;
+      }
+      if (!password.empty()) {
+        submitCloudSync(std::move(password), automatic);
+        return;
+      }
+      const auto endpoint = cloudSettings.endpoint;
+      const auto username = cloudSettings.username;
+      cloudCredentialReadPending = true;
+      cloudOperationAutomatic = automatic;
+      window.setCloudSyncBusy(true);
+      cloudCredentials.readPassword(endpoint, username,
+        [&cloudCredentialReadPending, &cloudSettings, &submitCloudSync,
+         &window, automatic, endpoint,
+         username](genplusgx::cloud::CredentialResult result) mutable {
+          cloudCredentialReadPending = false;
+          if (!cloudSettings.enabled || cloudSettings.endpoint != endpoint ||
+              cloudSettings.username != username) {
+            std::fill(result.password.begin(), result.password.end(), '\0');
+            window.setCloudSyncBusy(false);
+            return;
+          }
+          if (!result.succeeded || !result.found) {
+            window.setCloudSyncBusy(false);
+            const auto detail = !result.succeeded
+              ? result.detail
+              : std::string{
+                  "No WebDAV password is saved. Enter one or use Remember Password."};
+            if (automatic) {
+              qWarning().noquote()
+                << "Automatic cloud synchronization could not read credentials:"
+                << QString::fromStdString(detail);
+              window.showCloudSyncStatus(
+                "Automatic cloud synchronization needs a saved WebDAV password.");
+            } else {
+              window.showCloudSyncError(detail);
+            }
+            return;
+          }
+          submitCloudSync(std::move(result.password), automatic);
+        });
+    };
+  window.setCloudSettingsSink(
+    [&cloudSettings, &cloudSettingsStore, &window](
+      const genplusgx::cloud::Settings& settings) {
+      const auto saved = cloudSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      cloudSettings = settings;
+      window.setCloudSettings(settings);
+      return genplusgx::PersistenceStatus{};
+    });
+  window.setCloudPasswordSink(
+    [&cloudCredentials, &window](std::string endpoint, std::string username,
+      std::string password) {
+      cloudCredentials.writePassword(endpoint, username, std::move(password),
+        [&window](genplusgx::cloud::CredentialResult result) {
+          if (!result.succeeded) {
+            window.showCloudSyncError(result.detail);
+          } else {
+            window.showCloudSyncStatus(
+              "WebDAV password saved in the operating-system credential store.");
+          }
+        });
+    });
+  window.setCloudForgetSink(
+    [&cloudCredentials, &window](std::string endpoint, std::string username) {
+      cloudCredentials.deletePassword(endpoint, username,
+        [&window](genplusgx::cloud::CredentialResult result) {
+          if (!result.succeeded) {
+            window.showCloudSyncError(result.detail);
+          } else {
+            window.showCloudSyncStatus("Saved WebDAV password removed.");
+          }
+        });
+    });
+  window.setCloudSyncSink(
+    [&requestCloudSync](std::string password) {
+      requestCloudSync(std::move(password), false);
+    });
   std::set<std::int64_t> libraryScansInFlight;
   std::uint64_t libraryScanOperationId = 5'000'000U;
   genplusgx::BoundedQueue<
@@ -2111,6 +2287,8 @@ int main(int argc, char* argv[])
      &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
      &achievementBridge, &achievementNetwork,
+     &cloudCredentialReadPending, &cloudOperationAutomatic, &cloudSettings,
+     &pendingCloudOperation,
      &netplayBridge, &netplaySession, &recordingService, &rewindSettings,
      &runAheadSettings, &speedSettings,
      &translationManager, &window, &worker] {
@@ -2276,6 +2454,16 @@ int main(int argc, char* argv[])
         achievementNetworkMetrics.failedRequests;
       snapshot.lastAchievementNetworkError =
         achievementNetworkMetrics.lastError;
+      snapshot.cloudSyncState = !cloudSettings.enabled
+        ? "Disabled"
+        : (pendingCloudOperation || cloudCredentialReadPending)
+          ? (cloudOperationAutomatic ? "Synchronizing automatically"
+                                     : "Synchronizing manually")
+          : "Enabled; idle";
+      snapshot.cloudSyncSaves = cloudSettings.syncSaves;
+      snapshot.cloudSyncStates = cloudSettings.syncStates;
+      snapshot.cloudSyncOnStartup = cloudSettings.syncOnStartup;
+      snapshot.cloudSyncOnGameClose = cloudSettings.syncOnGameClose;
       const auto recordingMetrics = recordingService->metrics();
       snapshot.recordingActive = recordingMetrics.active;
       snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
@@ -2769,7 +2957,9 @@ int main(int argc, char* argv[])
      &automatedReadyQuitScheduled,
      &automaticResumePatchPath, &automaticResumePath,
      &applyEffectiveSettings, &audioControlFailureReported, &audioOutput,
-     &controllerInput,
+     &controllerInput, &cloudOperationAutomatic, &cloudSettings,
+     &cloudSyncService, &pendingCloudOperation, &requestCloudSync,
+     &startupCloudSyncDeferred,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
      &loggedPresentationCoalesces, &loggedVideoProducerDrops,
      &loggedVideoSkippedFrames,
@@ -2798,6 +2988,57 @@ int main(int argc, char* argv[])
      &releasePhysicalTarget, &reportRuntimeFailure, &runtimeFailureReported,
      &worker, &window, &achievementCredentials, &achievementNetwork,
      automatedQuitMilliseconds, automatedQuitWhenGameReady] {
+    while (auto event = cloudSyncService.pollEvent()) {
+      if (event->type == genplusgx::cloud::EventType::serviceStarted) {
+        qInfo() << "Cloud synchronization service started.";
+        continue;
+      }
+      if (event->type == genplusgx::cloud::EventType::serviceStopped) {
+        if (cloudSettings.enabled && !event->result.status) {
+          qWarning().noquote() << "Cloud synchronization service stopped:"
+                               << QString::fromStdString(
+                                    event->result.status.message);
+          window.showCloudSyncError(event->result.status.message);
+        }
+        continue;
+      }
+      if (!pendingCloudOperation ||
+          event->operationId != *pendingCloudOperation) {
+        continue;
+      }
+      pendingCloudOperation.reset();
+      window.setCloudSyncBusy(false);
+      if (event->type == genplusgx::cloud::EventType::syncCompleted &&
+          event->result.status) {
+        qInfo().noquote()
+          << "Cloud synchronization complete: uploaded"
+          << event->result.summary.uploaded << "downloaded"
+          << event->result.summary.downloaded << "conflicts"
+          << event->result.summary.conflicts;
+        if (cloudOperationAutomatic) {
+          window.showCloudSyncStatus(
+            "Automatic cloud synchronization completed: " +
+            std::to_string(event->result.summary.uploaded) + " uploaded, " +
+            std::to_string(event->result.summary.downloaded) + " downloaded, " +
+            std::to_string(event->result.summary.conflicts) + " conflicts.");
+        } else {
+          window.showCloudSyncResult(event->result);
+        }
+      } else {
+        const auto detail = event->result.status.message.empty()
+          ? std::string{"Cloud synchronization failed without diagnostic detail."}
+          : event->result.status.message;
+        qWarning().noquote() << "Cloud synchronization failed:"
+                             << QString::fromStdString(detail);
+        if (cloudOperationAutomatic) {
+          window.showCloudSyncStatus(
+            "Automatic cloud synchronization failed: " + detail);
+        } else {
+          window.showCloudSyncError(detail);
+        }
+      }
+      cloudOperationAutomatic = false;
+    }
     achievementNetwork.pump();
     static_cast<void>(controllerInput.pollEvents());
     while (auto outgoing = netplayBridge->pollOutgoing()) {
@@ -3481,6 +3722,11 @@ int main(int argc, char* argv[])
               << QString::fromStdString(released.message);
           }
           closingGameTarget = {};
+          if (cloudSettings.enabled &&
+              (cloudSettings.syncOnGameClose || startupCloudSyncDeferred)) {
+            startupCloudSyncDeferred = false;
+            requestCloudSync({}, true);
+          }
         } else {
           window.setGameLoaded(closingGameTarget);
           window.setSegaCdSession(
@@ -4156,6 +4402,15 @@ int main(int argc, char* argv[])
         window.setSessionSettings(sessionSettings);
       });
   }
+  if (cloudSettings.enabled && cloudSettings.syncOnStartup) {
+    if (!startupGame) {
+      QTimer::singleShot(0, &window,
+        [&requestCloudSync] { requestCloudSync({}, true); });
+    } else {
+      startupCloudSyncDeferred = true;
+      qInfo() << "Startup cloud synchronization deferred until the active game closes.";
+    }
+  }
   if (automatedQuitMilliseconds && !automatedQuitWhenGameReady) {
     qInfo().noquote() << "Automated startup smoke test entered the event loop.";
     QTimer::singleShot(
@@ -4331,6 +4586,10 @@ int main(int argc, char* argv[])
   window.setAchievementSettingsSink({});
   window.setAchievementLoginSink({});
   window.setAchievementLogoutSink({});
+  window.setCloudSettingsSink({});
+  window.setCloudPasswordSink({});
+  window.setCloudForgetSink({});
+  window.setCloudSyncSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});
@@ -4345,6 +4604,8 @@ int main(int argc, char* argv[])
                          << QString::fromStdString(status.message);
     shutdownReport.addFailure(service, status.message);
   };
+  const auto cloudSyncServiceStopped = cloudSyncService.stop();
+  recordCleanup("Cloud synchronization service", cloudSyncServiceStopped);
   const auto workerStopped = worker.stop();
   recordCleanup("Emulation worker", workerStopped);
   const auto physicalMediaServiceStopped = physicalMediaService.stop();
