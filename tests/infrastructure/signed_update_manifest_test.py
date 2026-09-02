@@ -78,6 +78,12 @@ def main() -> int:
         if openssl is None:
             print("OpenSSL CLI unavailable; canonical generation passed and C++ Ed25519 tests cover verification")
             return 0
+        pkeyutl_help = subprocess.run(
+            [openssl, "pkeyutl", "-help"], text=True, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, check=False)
+        if "-rawin" not in pkeyutl_help.stdout:
+            print("OpenSSL CLI lacks Ed25519 raw-input support; canonical generation passed and C++ Ed25519 tests cover verification")
+            return 0
         # RFC 8032 section 7.1 vector 1. The deterministic private seed is public
         # test material, is created only in this temporary directory, and is not
         # the project's production release key.

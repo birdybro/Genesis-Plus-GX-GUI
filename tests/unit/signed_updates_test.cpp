@@ -137,6 +137,33 @@ std::vector<std::uint8_t> canonicalBytes(const QJsonObject& object)
   return {bytes.begin(), bytes.end()};
 }
 
+std::vector<std::uint8_t> manifestForCurrentPlatform(
+  const std::string& version = "9.8.7")
+{
+  const auto platform = currentPlatform();
+  const auto architecture = currentArchitecture();
+  const auto format = platform == "macos" ? "dmg" :
+    (platform == "windows" ? "zip" : "tar.gz");
+  const auto name = "Genesis-Plus-GX-GUI-" + version + '-' + platform + '-' +
+    architecture + '.' + format;
+  const auto baseline = manifest(version);
+  const QByteArray baselineData{reinterpret_cast<const char*>(baseline.data()),
+    static_cast<qsizetype>(baseline.size())};
+  auto root = QJsonDocument::fromJson(baselineData).object();
+  auto assets = root[QStringLiteral("assets")].toArray();
+  auto asset = assets.at(0).toObject();
+  asset[QStringLiteral("platform")] = QString::fromStdString(platform);
+  asset[QStringLiteral("architecture")] = QString::fromStdString(architecture);
+  asset[QStringLiteral("format")] = QString::fromStdString(format);
+  asset[QStringLiteral("fileName")] = QString::fromStdString(name);
+  asset[QStringLiteral("url")] = QString::fromStdString(
+    "https://updates.example.test/project/releases/download/v" + version +
+      "/" + name);
+  assets[0] = asset;
+  root[QStringLiteral("assets")] = assets;
+  return canonicalBytes(root);
+}
+
 std::vector<std::uint8_t> sign(std::span<const std::uint8_t> bytes,
   const KeyPair& key)
 {
@@ -343,7 +370,7 @@ bool clientTests()
 {
   const auto key = testKey();
   const auto trust = testTrust(key);
-  const auto bytes = manifest();
+  const auto bytes = manifestForCurrentPlatform();
   FakeTransport transport;
   transport.responses.emplace(trust.manifestUrl,
     HttpResult{.status = {}, .statusCode = 200, .data = bytes});
@@ -353,9 +380,7 @@ bool clientTests()
   auto result = checkForUpdate({}, "1.2.3", trust, transport);
   ok &= check(result.status.ok() && result.updateAvailable,
     "new signed update should be available");
-  if (currentPlatform() == "linux" && currentArchitecture() == "x86_64") {
-    ok &= check(result.asset.has_value(), "current platform asset not selected");
-  }
+  ok &= check(result.asset.has_value(), "current platform asset not selected");
   result = checkForUpdate({.automaticChecks = false, .lastCheckUtc = {},
       .highestSeenVersion = "10.0.0"}, "1.2.3", trust, transport);
   ok &= check(result.status.error == Error::rollbackDetected,
@@ -367,7 +392,7 @@ bool serviceTests()
 {
   const auto key = testKey();
   const auto trust = testTrust(key);
-  const auto bytes = manifest();
+  const auto bytes = manifestForCurrentPlatform();
   auto factory = [trust, bytes, key](Cancellation) {
     auto transport = std::make_unique<FakeTransport>();
     transport->responses.emplace(trust.manifestUrl,

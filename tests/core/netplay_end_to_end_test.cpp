@@ -178,6 +178,7 @@ int runPeer(bool hosting, std::uint16_t port)
 
   std::optional<NetplayInputFrame> delayedFrame;
   bool delayedFrameSent = hosting;
+  QElapsedTimer delayedFrameTimer;
   QElapsedTimer runtime;
   runtime.start();
   bool runtimeValid = false;
@@ -185,8 +186,17 @@ int runPeer(bool hosting, std::uint16_t port)
     QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
     observeWorker(worker, observation);
     while (auto frame = bridge->pollOutgoing()) {
-      if (!hosting && !delayedFrame && frame->frameNumber == 2U) {
+      // Exercise a real rollback only after both paced peers are exchanging
+      // steady-state frames. Delaying frame 2 tied this test to process startup
+      // speed and could exceed the rollback window under Intel emulation on an
+      // Apple Silicon CI host.
+      if (!hosting && !delayedFrame &&
+          observation.latestRemoteFrame >= 30U &&
+          frame->frameNumber >= 30U) {
         delayedFrame = *frame;
+        delayedFrame->state.buttons = static_cast<InputButtonSet>(
+          delayedFrame->state.buttons ^ buttonMask(InputButton::c));
+        delayedFrameTimer.start();
         continue;
       }
       if (const auto sent = session.sendInput(*frame); !sent) {
@@ -195,7 +205,7 @@ int runPeer(bool hosting, std::uint16_t port)
       }
     }
     if (!hosting && delayedFrame && !delayedFrameSent &&
-        observation.latestRemoteFrame >= delayedFrame->frameNumber + 3U) {
+        delayedFrameTimer.elapsed() >= 80) {
       if (const auto sent = session.sendInput(*delayedFrame); !sent) {
         sessionFailure = sent.message;
       } else {

@@ -58,13 +58,16 @@ def main() -> int:
         fail(f"signature base64 is invalid: {error}")
     if len(signature) != 64:
         fail("Ed25519 signature must contain exactly 64 bytes")
-    with tempfile.NamedTemporaryFile() as signature_file:
-        signature_file.write(signature)
-        signature_file.flush()
+    # NamedTemporaryFile cannot be reopened by OpenSSL while it remains open on
+    # Windows. A private temporary directory gives every platform the same
+    # close-before-read lifetime and removes the decoded signature afterward.
+    with tempfile.TemporaryDirectory(prefix="genplusgx-update-signature-") as temporary:
+        signature_path = Path(temporary) / "signature.raw"
+        signature_path.write_bytes(signature)
         verified = subprocess.run([
             "openssl", "pkeyutl", "-verify", "-rawin", "-pubin",
             "-inkey", str(arguments.public_key), "-in", str(arguments.manifest),
-            "-sigfile", signature_file.name,
+            "-sigfile", str(signature_path),
         ], check=False, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
     if verified.returncode != 0:
         fail("manifest Ed25519 signature verification failed: " + verified.stdout.strip())
