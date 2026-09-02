@@ -55,8 +55,10 @@ verification through 2026-09-02 (America/Denver).
   `696be36a5ca9e0896f44719eec4729f6aced98c8`
 - Exact physical-media portability and warning-clean hosted baseline:
   `1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`
-- Exact netplay implementation: the current commit containing this report; the initial
-  implementation SHA will be recorded after the non-circular milestone commit exists
+- Exact netplay implementation baseline:
+  `9e98c3377bee0e668abd81d4357b7a8cdab7b4ea`
+- Exact netplay cross-platform corrective and hosted baseline:
+  `5c4ee3fdb57e0da4bfdf3237a07c64ccf7b1f9c4`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -1158,9 +1160,7 @@ shader-disabled graph passes all 116 applicable tests. The strict Unix libretro 
 builds, links as x86-64 ELF, and cleans without a warning. A fresh Linux Release stage
 passes the production package verifier, installed CLI and complete portable event-loop
 smoke, dependency inspection, TGZ/checksum generation, and confirms that Qt Network and
-the netplay guide ship. Hosted cross-platform evidence is intentionally pending until
-the corrective exact-commit matrix passes and its complete logs and packages are
-inspected.
+the netplay guide ship.
 
 Initial exact hosted run
 [`33604070435`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33604070435)
@@ -1182,8 +1182,30 @@ linker warning, sanitizer signature, workflow warning, timeout, runtime error, o
 packaging failure. The Windows Debug and Release jobs each capability-skip only the
 documented real-OpenGL test because their software context is below OpenGL 3.3; the
 fallback path is covered and Linux plus both macOS architectures execute the real
-render test. Replacement exact-commit hosted evidence and package inspection remain
-pending.
+render test.
+
+Corrective exact-SHA run
+[`33606663974`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33606663974)
+at `5c4ee3fdb57e0da4bfdf3237a07c64ccf7b1f9c4` passes all ten jobs: Windows
+Debug/Release; Linux Debug/Release/ASan+UBSan/legacy; macOS arm64 Debug/Release; and
+macOS x86_64 Debug/Release. Each of the eight CMake configurations passes all 118
+registered tests, including the independent-process netplay regression. Windows
+capability-skips only the documented real-OpenGL test with its below-3.3 software
+context; the fallback is tested, while Linux and both macOS architectures execute the
+render case. Inspection of all 15,874 hosted log lines (2,128,716 bytes) finds no
+actionable compiler, linker, CMake, sanitizer, test, runtime, workflow, or packaging
+diagnostic.
+
+All four artifacts and six distributable payloads were downloaded: Linux x86-64 TGZ
+41,333,453 bytes, Windows x86-64 ZIP 52,884,899 bytes, macOS arm64 ZIP/DMG
+33,713,028/33,638,432 bytes, and macOS x86_64 ZIP/DMG
+34,554,086/34,473,068 bytes. All six SHA-256 manifests, archive and DMG integrity/safe
+paths, symlink containment, four production package layouts, application/runtime
+architectures, platform netplay dependencies, and prohibited payload scans pass. The
+Linux package's 23 ELF dependency graphs resolve; its downloaded binary passes CLI and
+isolated portable event-loop startup/shutdown, while the hosted package also passes the
+native Xvfb smoke. Qt Network, SDL, and `NETPLAY.md` ship in every layout. Each DMG app
+binary is byte-identical to its matching ZIP app binary.
 
 The final adversarial pass additionally verifies disconnect-before-checkpoint shutdown,
 post-session state capture, runtime bridge-overflow reporting, password clearing,

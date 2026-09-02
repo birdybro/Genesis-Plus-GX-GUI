@@ -105,7 +105,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
 | 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
-| 94 Netplay | IN PROGRESS — local gates green; hosted evidence pending | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
+| 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
 | 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
 | 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
@@ -3785,9 +3785,8 @@ cannot contain its own SHA)
 
 ## Milestone 94 detail
 
-**Status:** IN PROGRESS — implementation and every corrected local gate are complete;
-replacement exact hosted matrix, complete-log inspection, and downloaded-package audit
-are pending.
+**Status:** COMPLETE — implementation, corrected local gates, exact hosted matrix,
+complete-log inspection, and downloaded-package audit all pass.
 
 **Goal:** Add deterministic direct peer play without moving networking into the core or
 weakening local emulation safety.
@@ -3858,8 +3857,29 @@ All 15,975 lines (2,142,331 bytes) from that first hosted run were inspected. No
 authored compiler/linker warning, sanitizer finding, test failure, workflow warning, or
 package error appears. The known Windows real-OpenGL capability skip remains documented
 and covered by its unsupported-context fallback; Linux and both macOS architectures
-execute that render test. Exact replacement Windows/Linux/macOS confirmation is the
-remaining completion gate.
+execute that render test.
+
+Corrective exact-SHA run
+[`33606663974`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33606663974)
+at `5c4ee3fdb57e0da4bfdf3237a07c64ccf7b1f9c4` passes all ten jobs: Windows
+Debug/Release; Linux Debug/Release/ASan+UBSan/legacy; macOS arm64 Debug/Release; and
+macOS x86_64 Debug/Release. Every CMake job registers and passes 118/118 tests. Windows
+retains only the documented real-OpenGL capability skip under its below-3.3 software
+context; all other hosts execute that test. The complete 15,874-line, 2,128,716-byte
+log set contains no actionable compiler, linker, CMake, sanitizer, runtime, test,
+workflow, or package diagnostic.
+
+All four uploaded artifacts were downloaded. Their six package payloads are Linux TGZ
+41,333,453 bytes, Windows ZIP 52,884,899 bytes, macOS arm64 ZIP/DMG
+33,713,028/33,638,432 bytes, and macOS x86_64 ZIP/DMG
+34,554,086/34,473,068 bytes. Every published SHA-256 manifest, archive/DMG integrity
+and safe-path check, symlink-containment check, prohibited game/firmware/save/secret
+payload scan, production package verifier, architecture inspection, and runtime
+dependency closure passes. The Linux package's 23 ELF dependency graphs resolve, its
+downloaded executable completes version and isolated portable event-loop smoke, and
+hosted Linux also passes the native Xvfb package smoke. Qt Network, SDL, and the netplay
+guide are present in every platform layout. Each DMG application binary is byte-for-byte
+identical to its corresponding ZIP application binary.
 
 **Acceptance criteria:** Networking is explicitly opt-in; the session code is never
 persisted or logged; peers authenticate mutually and every gameplay packet has integrity
@@ -3868,8 +3888,8 @@ late input performs bounded owner-thread rollback without corrective A/V publica
 determinism-changing UI and worker commands are locked; diagnostics expose safe bounded
 metrics; all local and hosted platform suites/packages pass.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Commit SHA:** `5c4ee3fdb57e0da4bfdf3237a07c64ccf7b1f9c4` (corrective
+cross-platform implementation; this evidence-only closure commit necessarily follows it)
 
 ## Milestone 86 detail
 
