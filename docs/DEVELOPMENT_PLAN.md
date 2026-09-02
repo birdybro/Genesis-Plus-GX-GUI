@@ -105,7 +105,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
 | 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
-| 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
+| 94 Netplay | IN PROGRESS — local gates green; hosted evidence pending | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
 | 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
 | 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
@@ -3779,6 +3779,72 @@ normal video; schema-1 settings migrate safely; global and sparse per-game selec
 persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
 software/no-feature builds remain usable; required runtimes/resources/licenses ship on
 all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 94 detail
+
+**Status:** IN PROGRESS — implementation and every local gate are complete; exact hosted
+matrix, complete-log inspection, and downloaded-package audit are pending.
+
+**Goal:** Add deterministic direct peer play without moving networking into the core or
+weakening local emulation safety.
+
+**Files changed:**
+
+- `desktop/netplay/` authenticated protocol, bounded input timeline/bridge, and Qt TCP
+  session service
+- `desktop/core/include/genplusgx/emulation_worker.h` and
+  `desktop/core/src/emulation_worker.cpp`
+- `desktop/ui/include/genplusgx/ui/netplay_dialog.h`,
+  `desktop/ui/src/netplay_dialog.cpp`, and MainWindow integration
+- `desktop/app/main.cpp` and target/deployment CMake files
+- netplay unit, security/fuzz, core integration, localhost transport, and GUI tests
+- Linux, Windows, and macOS package closure checks for Qt Network and the installed guide
+- README, changelog, notices, architecture, user, build, testing, matrix, netplay, and
+  final-report documentation
+
+**Tests added:** `unit.netplay_timeline`, `unit.netplay_protocol`,
+`integration.netplay_transport`, `integration.netplay_worker`,
+`integration.netplay_end_to_end`, and `gui.netplay`.
+They cover HMAC challenge/response, wrong-code/game/build/settings rejection, tamper and
+replay rejection, fragmented/multiple/oversized frames, a 1,024-payload bounded fuzz
+corpus, real localhost sockets, player ownership, input delay, prediction correction,
+exact core rollback/re-simulation, 64 MiB history and queue bounds, mutation lockout,
+invalid transactional startup, secret clearing, two independent core processes
+exchanging traffic in both directions, accessible stable widget IDs, runtime queue
+overflow teardown, post-session checkpoint capture, disconnect, and clean worker
+shutdown.
+
+**Gate evidence:** The focused six-test netplay set passes locally under Debug, and the
+two-process end-to-end case passes ten consecutive repetitions. Warning-as-error Debug,
+optimized Release, ASan/UBSan with leak detection, CHD-disabled, and fresh Clang graphs
+each pass 118/118; the shader-disabled graph passes all 116 applicable tests. The strict
+legacy Unix libretro target builds, links as x86-64 ELF, and cleans warning-free. A fresh
+Release installation passes the production Linux package verifier, installed version
+and complete portable event-loop smoke, dependency inspection, TGZ generation, and
+SHA-256 verification; the archive contains Qt Network and `NETPLAY.md`.
+
+The adversarial pass fixed rollback input-sequence monotonicity, delayed-frame retention
+accounting, clean local-input restoration, GUI action restoration/post-connect refresh
+races, Qt socket queue bounds, simultaneous peer teardown, and an Apple-Clang unused
+capture. Netplay startup is now one transactional owner-thread reset/configure/start
+operation; an invalid configuration cannot mutate the core. Runtime bridge/history
+failure pauses the worker and flags the active session for peer teardown. Netplay is
+disconnected before automatic shutdown checkpointing, debug breakpoints are cleared,
+and Sega CD sessions reject open trays, playlists, or an arbitrary swapped disc whose
+content is not the launch identity. The supplied NAS ROM directory is not mounted on
+this host, so no external commercial-ROM netplay smoke was attempted; generated CC0
+Genesis processes exercise the same production socket/worker/core path. Exact hosted
+Windows/Linux/macOS confirmation is the remaining completion gate.
+
+**Acceptance criteria:** Networking is explicitly opt-in; the session code is never
+persisted or logged; peers authenticate mutually and every gameplay packet has integrity
+and replay protection; identity mismatch and malformed/unbounded traffic fail closed;
+late input performs bounded owner-thread rollback without corrective A/V publication;
+determinism-changing UI and worker commands are locked; diagnostics expose safe bounded
+metrics; all local and hosted platform suites/packages pass.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

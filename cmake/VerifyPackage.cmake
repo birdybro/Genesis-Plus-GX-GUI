@@ -29,6 +29,7 @@ if(VERIFY_PLATFORM STREQUAL "windows")
     "${package_root}/bin/genesis-plus-gx-gui.exe"
     "Windows application executable")
   require_match("*Qt6Core.dll" "deployed Qt Core runtime")
+  require_match("*Qt6Network.dll" "deployed Qt Network runtime")
   require_match("*SDL3*.dll" "deployed SDL3 runtime")
   require_match("*qwindows.dll" "deployed Qt Windows platform plugin")
   require_match("*librashader.dll" "deployed libretro shader runtime")
@@ -50,6 +51,9 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
   require_file(
     "${bundle}/Contents/Frameworks/QtCore.framework/Versions/A/QtCore"
     "deployed Qt Core framework")
+  require_file(
+    "${bundle}/Contents/Frameworks/QtNetwork.framework/Versions/A/QtNetwork"
+    "deployed Qt Network framework")
   require_match("*SDL3*.dylib" "deployed SDL3 runtime")
   require_match("*libqcocoa.dylib" "deployed Qt Cocoa platform plugin")
   require_match("*librashader.dylib" "deployed libretro shader runtime")
@@ -68,6 +72,7 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
     "${package_root}/bin/qt.conf"
     "Linux relocatable Qt configuration")
   require_match("*libQt6Core.so*" "deployed Qt Core runtime")
+  require_match("*libQt6Network.so*" "deployed Qt Network runtime")
   require_match("*libQt6XcbQpa.so*" "deployed Qt XCB platform runtime")
   require_match("*libSDL3.so*" "deployed SDL3 runtime")
   require_match("*librashader.so" "deployed libretro shader runtime")
@@ -144,5 +149,8 @@ endif()
 require_file(
   "${documentation_directory}/PHYSICAL_MEDIA.md"
   "physical optical media guide")
+require_file(
+  "${documentation_directory}/NETPLAY.md"
+  "netplay guide")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

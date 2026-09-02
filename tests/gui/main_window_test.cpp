@@ -1650,6 +1650,10 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
       requests.emplace_back(operation, path, ejected);
     });
   window.setSegaCdSession(true, "USA", disc.path(), false, true);
+  QVERIFY(window.isSegaCdSession());
+  QVERIFY(window.isDiscPresent());
+  QVERIFY(!window.isDiscEjected());
+  QCOMPARE(window.currentDiscPath(), disc.path());
   QVERIFY(change->isEnabled() && eject->isEnabled());
   QVERIFY(!previous->isEnabled() && !next->isEnabled());
   QVERIFY(change->toolTip().contains(
@@ -1674,6 +1678,7 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
     genplusgx::ui::DiscUiOperation::setEjected);
   QVERIFY(std::get<2>(requests.back()));
   window.setSegaCdSession(true, "USA", disc.path(), true, true);
+  QVERIFY(window.isDiscEjected());
   QVERIFY(eject->isChecked());
   QVERIFY(eject->text().contains(QStringLiteral("Close Disc")));
   window.showDiscOperationSuccess(genplusgx::ui::DiscUiOperation::setEjected);
@@ -1693,6 +1698,10 @@ void MainWindowTest::segaCdDiscActionsAreTypedAndRecoverable()
   QVERIFY(dialogs->errors.front().contains(QStringLiteral("Unable to Change Disc")));
 
   window.setSegaCdSession(false, "stale", disc.path(), true, true);
+  QVERIFY(!window.isSegaCdSession());
+  QVERIFY(!window.isDiscPresent());
+  QVERIFY(!window.isDiscEjected());
+  QVERIFY(window.currentDiscPath().empty());
   QVERIFY(!change->isEnabled() && !eject->isEnabled());
   QVERIFY(!eject->isChecked());
   QCOMPARE(window.findChild<QLabel*>(QStringLiteral("systemStatusLabel"))->text(),

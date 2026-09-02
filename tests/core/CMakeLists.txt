@@ -75,6 +75,50 @@ target_link_libraries(
     genplusgx_project_warnings
     genplusgx_test_utilities
 )
+
+add_executable(genplusgx_netplay_worker_test netplay_worker_test.cpp)
+target_link_libraries(
+  genplusgx_netplay_worker_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::NetplayCore
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+)
+add_test(NAME integration.netplay_worker COMMAND genplusgx_netplay_worker_test)
+set_tests_properties(
+  integration.netplay_worker
+  PROPERTIES
+    LABELS "core;integration;netplay;rollback;input;audio;video;bounded;fixture;concurrency"
+    TIMEOUT 30
+)
+
+qt_add_executable(
+  genplusgx_netplay_end_to_end_test
+  netplay_end_to_end_test.cpp
+)
+set_target_properties(
+  genplusgx_netplay_end_to_end_test PROPERTIES AUTOMOC ON
+)
+target_link_libraries(
+  genplusgx_netplay_end_to_end_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Netplay
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+)
+add_test(
+  NAME integration.netplay_end_to_end
+  COMMAND genplusgx_netplay_end_to_end_test
+)
+set_tests_properties(
+  integration.netplay_end_to_end
+  PROPERTIES
+    LABELS "core;integration;netplay;network;loopback;rollback;input;audio;video;bounded;fixture;concurrency;lifecycle"
+    TIMEOUT 30
+)
 add_test(NAME integration.run_ahead COMMAND genplusgx_run_ahead_worker_test)
 set_tests_properties(
   integration.run_ahead

@@ -10,7 +10,7 @@ regenerate those legacy builds.
 - Ninja
 - Git (for embedded commit diagnostics; source archives fall back to `unknown`)
 - A C++20 compiler: GCC/Clang, Visual Studio 2022, or current Apple Clang
-- Qt 6.8 or newer with Core, Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools
+- Qt 6.8 or newer with Core, Gui, Widgets, Network, OpenGLWidgets, Sql, Test, and LinguistTools
 - SDL 3.2 or newer with its CMake config package
 - Rust and Cargo 1.88 or newer for the default Libretro shader runtime
 - Platform OpenGL/window-system development files on Linux

@@ -16,6 +16,31 @@ milestone.
 
 ## Component overview
 
+### Netplay data flow
+
+```text
+Qt GUI / Netplay dialog
+        │ explicit host/join; no stored secret
+        ▼
+Authenticated QTcpSocket service ── HMAC/sequence/size validation
+        │ remote frame commands             ▲ local frame packets
+        ▼                                   │
+bounded worker command queue       bounded NetplayBridge (256)
+        │                                   ▲
+        ▼                                   │
+emulation-thread input timeline / rollback history (≤12 frames, ≤64 MiB)
+        │ exact raw + transient restore
+        ▼
+Genesis Plus GX core
+```
+
+Sockets and cryptography remain on the Qt thread. The core is never called from a
+network callback. Remote input enters the existing bounded worker command queue; local
+frame-stamped input exits through a dedicated bounded bridge so coalesced presentation
+events cannot drop protocol data. Prediction correction restores `CoreRollbackState`
+and re-simulates without publishing corrective audio/video/capture output. All core
+access remains owned by the emulation thread.
+
 ```text
              +-------------------+
              | Qt 6 Widgets GUI  |

@@ -6,6 +6,7 @@ file(REMOVE_RECURSE "${fixture_directory}")
 foreach(runtime IN ITEMS
     Contents/MacOS/genesis-plus-gx-gui
     Contents/Frameworks/QtCore.framework/Versions/A/QtCore
+    Contents/Frameworks/QtNetwork.framework/Versions/A/QtNetwork
     Contents/Frameworks/libSDL3.dylib
     Contents/Frameworks/librashader.dylib
     Contents/PlugIns/platforms/libqcocoa.dylib
@@ -13,6 +14,7 @@ foreach(runtime IN ITEMS
     Contents/Resources/shaders/genplusgx-crt.slang
     Contents/Resources/translations/genplusgx_en_XA.qm
     Contents/Resources/documentation/PHYSICAL_MEDIA.md
+    Contents/Resources/documentation/NETPLAY.md
     Contents/Resources/licenses/librashader-MPL-2.0.md)
   get_filename_component(parent "${bundle}/${runtime}" DIRECTORY)
   file(MAKE_DIRECTORY "${parent}")

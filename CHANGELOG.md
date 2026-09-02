@@ -14,6 +14,12 @@ platform documentation.
 
 ### Added
 
+- Authenticated direct TCP netplay for one peer, with game/build/settings/BIOS/cheat
+  compatibility checks, HMAC-SHA-256 challenge/response and per-packet integrity,
+  replay rejection, 0–8 frame input delay, bounded 1–12-frame rollback on the
+  emulation thread, deterministic-operation lockouts, diagnostics, and protocol,
+  loopback transport, core integration, fuzz, and GUI regressions.
+
 - Native Windows, Linux, and macOS optical-drive support for original mixed-mode Sega
   CD/Mega CD media, using a cancellable bounded worker, raw data/CDDA reads, validated
   atomic BIN/CUE snapshots, transient lifecycle cleanup, and generated legal core/GUI

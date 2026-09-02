@@ -19,6 +19,7 @@
 #include "genplusgx/settings/video_settings.h"
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/netplay_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
@@ -127,6 +128,7 @@ public:
   using DiagnosticsSnapshotProvider =
     std::function<diagnostics::DiagnosticsSnapshot()>;
   using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
+  using NetplayRequestSink = NetplayDialog::RequestSink;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -151,6 +153,12 @@ public:
   void showDiagnostics();
   void setDebugRequestSink(DebugRequestSink sink);
   void showDebugTools();
+  void setNetplayRequestSink(NetplayRequestSink sink);
+  void setNetplaySessionState(
+    netplay::NetplaySessionState state,
+    const std::string& detail = {});
+  void showNetplay();
+  void showNetplayError(const std::string& detail);
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
@@ -325,6 +333,10 @@ public:
   [[nodiscard]] const std::filesystem::path& loadedGamePath() const noexcept;
   [[nodiscard]] const std::filesystem::path& loadedRuntimePath() const noexcept;
   [[nodiscard]] const GameLaunchTarget& loadedGameTarget() const noexcept;
+  [[nodiscard]] bool isSegaCdSession() const noexcept;
+  [[nodiscard]] bool isDiscEjected() const noexcept;
+  [[nodiscard]] bool isDiscPresent() const noexcept;
+  [[nodiscard]] const std::filesystem::path& currentDiscPath() const noexcept;
   [[nodiscard]] bool captureControllerButton(SDL_GamepadButton button);
   [[nodiscard]] bool presentLatestFrame();
   [[nodiscard]] video::DisplayWidget* displayWidget() const noexcept;
@@ -347,6 +359,7 @@ private:
   void setGameActionsEnabled(bool enabled);
   [[nodiscard]] bool submitGameLoadTarget(GameLaunchTarget target);
   void updatePhysicalMediaAction();
+  void updateNetplayControls();
   void chooseGame();
   void chooseGameWithPatch();
   void closeGame();
@@ -440,6 +453,9 @@ private:
   SpeedSettingsSink speedSettingsSink_;
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   DebugRequestSink debugRequestSink_;
+  NetplayRequestSink netplayRequestSink_;
+  netplay::NetplaySessionState netplayState_{
+    netplay::NetplaySessionState::disconnected};
   cheats::CheatConfiguration cheatConfiguration_;
   cheats::CheatSystem cheatSystem_{cheats::CheatSystem::genesis};
   settings::PerGameSettings perGameSettings_;

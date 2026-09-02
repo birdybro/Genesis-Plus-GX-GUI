@@ -18,6 +18,8 @@
 #include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/library/game_metadata_service.h"
 #include "genplusgx/localization/localization.h"
+#include "genplusgx/netplay/netplay_bridge.h"
+#include "genplusgx/netplay/netplay_session.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/platform/physical_media.h"
@@ -41,6 +43,8 @@
 
 #include <QApplication>
 #include <QCoreApplication>
+#include <QCryptographicHash>
+#include <QDataStream>
 #include <QDebug>
 #include <QLocale>
 #include <QMessageBox>
@@ -243,6 +247,62 @@ std::string presentationBufferingDescription(
     result += "; renderer initialization pending";
   }
   return result;
+}
+
+std::string netplaySettingsFingerprint(
+  const genplusgx::settings::EffectiveGameSettings& settings,
+  const genplusgx::input::InputConfiguration& inputConfiguration,
+  const genplusgx::platform::BiosSnapshot& bios,
+  const genplusgx::cheats::CheatConfiguration& cheats)
+{
+  QByteArray canonical;
+  QDataStream stream{&canonical, QIODevice::WriteOnly};
+  stream.setVersion(QDataStream::Qt_6_8);
+  stream.setByteOrder(QDataStream::BigEndian);
+  const auto& video = settings.video.core;
+  const auto& audio = settings.audio.core;
+  const auto& system = settings.system;
+  stream << static_cast<quint8>(video.overscan)
+         << static_cast<quint8>(video.ntscFilter)
+         << static_cast<quint8>(video.interlacedRender)
+         << video.gameGearExtendedScreen
+         << static_cast<quint8>(audio.output)
+         << static_cast<quint8>(audio.filter)
+         << static_cast<quint8>(audio.ym2612Core)
+         << static_cast<quint8>(audio.ym2413Mode)
+         << static_cast<quint8>(audio.ym2413Core)
+         << audio.psgLevelPercent << audio.fmLevelPercent
+         << audio.cddaLevelPercent << audio.pcmLevelPercent
+         << audio.lowPassPercent << audio.equalizerLowPercent
+         << audio.equalizerMidPercent << audio.equalizerHighPercent
+         << audio.highQualityFm << audio.highQualityPsg
+         << static_cast<quint8>(system.hardware)
+         << static_cast<quint8>(system.region)
+         << static_cast<quint8>(system.videoStandard)
+         << static_cast<quint8>(system.masterClock)
+         << system.emulateIllegalAccessLockups << system.enableAddressErrors;
+
+  const auto profile = std::ranges::find_if(inputConfiguration.profiles,
+    [&settings](const auto& candidate) {
+      return candidate.name == settings.inputProfile;
+    });
+  if (profile != inputConfiguration.profiles.end()) {
+    const auto coreInput = genplusgx::input::coreInputSettings(*profile);
+    for (const auto device : coreInput.devices) {
+      stream << static_cast<quint8>(device);
+    }
+  }
+  for (const auto& validation : bios.validation) {
+    stream << QString::fromStdString(
+      validation.valid() ? validation.sha256 : std::string{});
+  }
+  for (const auto& cheat : cheats.entries) {
+    if (cheat.enabled) {
+      stream << QString::fromStdString(cheat.code);
+    }
+  }
+  return QCryptographicHash::hash(canonical, QCryptographicHash::Sha256)
+    .toHex().toStdString();
 }
 
 } // namespace
@@ -719,6 +779,8 @@ int main(int argc, char* argv[])
     recordStartupIssue("Lossless recording service",
       recordingServiceStarted.message);
   }
+  auto netplayBridge =
+    std::make_shared<genplusgx::netplay::NetplayBridge>();
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -726,7 +788,8 @@ int main(int argc, char* argv[])
     videoFrames,
     audioOutput.ringBuffer(),
     backupStore,
-    recordingServiceStarted ? recordingService : nullptr};
+    recordingServiceStarted ? recordingService : nullptr,
+    netplayBridge};
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
@@ -774,6 +837,7 @@ int main(int argc, char* argv[])
   }
 
   genplusgx::ui::MainWindow window;
+  genplusgx::netplay::NetplaySession netplaySession{&window};
   window.setArchiveCacheDirectory(
     applicationPaths.cacheDirectory() / "archives");
   window.setPatchCacheDirectory(
@@ -1757,6 +1821,147 @@ int main(int argc, char* argv[])
   std::optional<genplusgx::GameIdentity> activeCheatIdentity;
   std::optional<genplusgx::cheats::CheatSystem> activeCheatSystem;
   genplusgx::cheats::CheatConfiguration activeCheatConfiguration;
+  std::uint64_t netplayOperationId = 4'400'000U;
+  bool netplayRuntimeActive = false;
+  QObject::connect(
+    &netplaySession,
+    &genplusgx::netplay::NetplaySession::stateChanged,
+    &window,
+    [&window](genplusgx::netplay::NetplaySessionState state) {
+      window.setNetplaySessionState(state);
+    });
+  QObject::connect(
+    &netplaySession,
+    &genplusgx::netplay::NetplaySession::peerConnected,
+    &window,
+    [&netplayOperationId, &netplayRuntimeActive, &netplaySession,
+     &reportRuntimeFailure, &worker]
+    (genplusgx::netplay::NetplayConfiguration configuration) {
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::startNetplaySession(
+          ++netplayOperationId, configuration));
+      if (!submitted) {
+        reportRuntimeFailure(
+          "The authenticated netplay session could not start emulation: " +
+          submitted.message);
+        netplaySession.disconnectFromPeer(
+          "The emulation worker rejected netplay startup.");
+        return;
+      }
+      netplayRuntimeActive = true;
+      qInfo().noquote()
+        << "Authenticated netplay peer connected; local player"
+        << static_cast<qulonglong>(configuration.localPlayer + 1U)
+        << "delay" << configuration.inputDelayFrames
+        << "rollback" << configuration.rollbackFrames;
+    });
+  QObject::connect(
+    &netplaySession,
+    &genplusgx::netplay::NetplaySession::inputReceived,
+    &window,
+    [&netplayOperationId, &netplayRuntimeActive, &netplaySession, &worker]
+    (genplusgx::netplay::NetplayInputFrame frame) {
+      if (!netplayRuntimeActive) {
+        netplaySession.disconnectFromPeer(
+          "Peer input arrived before the emulation session was ready.");
+        return;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::remoteNetplayFrame(
+          ++netplayOperationId, frame));
+      if (!submitted) {
+        netplaySession.disconnectFromPeer(
+          "The bounded emulation command queue rejected peer input.");
+      }
+    });
+  QObject::connect(
+    &netplaySession,
+    &genplusgx::netplay::NetplaySession::peerDisconnected,
+    &window,
+    [&netplayOperationId, &netplayRuntimeActive, &worker](const QString& detail) {
+      if (netplayRuntimeActive) {
+        const auto stopped = worker.submit(genplusgx::EmulationCommand::simple(
+          genplusgx::EmulationCommandType::stopNetplay, ++netplayOperationId));
+        if (!stopped) {
+          qWarning().noquote() << "Netplay runtime stop failed:"
+                               << QString::fromStdString(stopped.message);
+        }
+        netplayRuntimeActive = false;
+      }
+      qInfo().noquote() << detail;
+    });
+  QObject::connect(
+    &netplaySession,
+    &genplusgx::netplay::NetplaySession::sessionError,
+    &window,
+    [&window](genplusgx::netplay::NetplaySessionError, const QString& detail) {
+      qWarning().noquote() << "Netplay session error:" << detail;
+      window.showNetplayError(detail.toStdString());
+    });
+  window.setNetplayRequestSink(
+    [&activeCheatConfiguration, &activeEffectiveSettings,
+     &activePerGameIdentity, &biosManager, &inputConfiguration,
+     &netplaySession, &window](genplusgx::ui::NetplayUiRequest request) {
+      if (request.operation == genplusgx::ui::NetplayUiOperation::disconnect) {
+        netplaySession.disconnectFromPeer("Disconnected locally.");
+        return genplusgx::PersistenceStatus{};
+      }
+      if (!window.isGameLoaded() || !activePerGameIdentity) {
+        return workerPersistenceFailure(
+          "Load a game with a valid SHA-256 identity before starting netplay.");
+      }
+      if (window.isSegaCdSession()) {
+        if (!window.isDiscPresent() || window.isDiscEjected()) {
+          return workerPersistenceFailure(
+            "Insert and close a validated Sega CD disc before starting netplay.");
+        }
+        if (window.loadedGameTarget().isPlaylist()) {
+          return workerPersistenceFailure(
+            "For deterministic netplay, load the current CUE or CHD directly "
+            "instead of starting from an M3U playlist.");
+        }
+        std::error_code equivalentError;
+        const bool originalDisc = std::filesystem::equivalent(
+          window.currentDiscPath(), window.loadedRuntimePath(), equivalentError);
+        if (equivalentError || !originalDisc) {
+          return workerPersistenceFailure(
+            "Reload the originally validated Sega CD image before starting netplay.");
+        }
+      }
+      const genplusgx::netplay::NetplaySessionDescriptor descriptor{
+        .gameSha256 = activePerGameIdentity->sha256,
+        .settingsSha256 = netplaySettingsFingerprint(
+          activeEffectiveSettings,
+          inputConfiguration,
+          biosManager.snapshot(),
+          activeCheatConfiguration),
+        .coreVersion = GENPLUSGX_GIT_COMMIT,
+      };
+      const auto status = request.operation == genplusgx::ui::NetplayUiOperation::host
+        ? netplaySession.host(
+            descriptor,
+            std::move(request.sessionCode),
+            request.port,
+            request.inputDelayFrames,
+            request.rollbackFrames)
+        : netplaySession.join(
+            QString::fromStdString(request.host),
+            descriptor,
+            std::move(request.sessionCode),
+            request.port,
+            request.inputDelayFrames,
+            request.rollbackFrames);
+      if (!status) {
+        return workerPersistenceFailure(status.message);
+      }
+      if (request.operation == genplusgx::ui::NetplayUiOperation::host) {
+        qInfo().noquote() << "Netplay host listening on port"
+                          << netplaySession.listeningPort();
+      } else {
+        qInfo() << "Netplay guest connection started.";
+      }
+      return genplusgx::PersistenceStatus{};
+    });
   std::uint64_t screenshotOperationId = 4'500'000U;
   std::uint64_t recordingOperationId = 4'600'000U;
   std::uint64_t debugOperationId = 4'750'000U;
@@ -1770,7 +1975,8 @@ int main(int argc, char* argv[])
     [&applicationPaths, &audioOutput, &biosManager, &controllerInput,
      &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
-     &recordingService, &rewindSettings, &runAheadSettings, &speedSettings,
+     &netplayBridge, &netplaySession, &recordingService, &rewindSettings,
+     &runAheadSettings, &speedSettings,
      &translationManager, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.applicationDataMode = std::string{
@@ -1874,6 +2080,40 @@ int main(int argc, char* argv[])
       snapshot.runAheadStateBytes = workerMetrics.runAheadStateBytes;
       snapshot.runAheadStateCapacityBytes =
         workerMetrics.runAheadStateCapacityBytes;
+      const auto netplayMetrics = netplaySession.metrics();
+      switch (netplayMetrics.state) {
+        case genplusgx::netplay::NetplaySessionState::disconnected:
+          snapshot.netplayState = "Disconnected";
+          break;
+        case genplusgx::netplay::NetplaySessionState::listening:
+          snapshot.netplayState = "Listening";
+          break;
+        case genplusgx::netplay::NetplaySessionState::connecting:
+          snapshot.netplayState = "Connecting";
+          break;
+        case genplusgx::netplay::NetplaySessionState::authenticating:
+          snapshot.netplayState = "Authenticating";
+          break;
+        case genplusgx::netplay::NetplaySessionState::connected:
+          snapshot.netplayState = "Authenticated peer connected";
+          break;
+      }
+      snapshot.netplaySentPackets = netplayMetrics.sentPackets;
+      snapshot.netplayReceivedPackets = netplayMetrics.receivedPackets;
+      snapshot.netplaySentBytes = netplayMetrics.sentBytes;
+      snapshot.netplayReceivedBytes = netplayMetrics.receivedBytes;
+      snapshot.netplayAuthenticationFailures =
+        netplayMetrics.authenticationFailures;
+      snapshot.netplayProtocolFailures = netplayMetrics.protocolFailures;
+      const auto netplayBridgeMetrics = netplayBridge->metrics();
+      snapshot.netplayQueuedFrames = netplayBridgeMetrics.outgoingDepth;
+      snapshot.netplayQueueCapacity = netplayBridgeMetrics.outgoingCapacity;
+      snapshot.netplayPredictedFrames = workerMetrics.netplayPredictedFrames;
+      snapshot.netplayRollbackRequests =
+        workerMetrics.netplayRollbackRequests;
+      snapshot.netplayRollbacks = workerMetrics.netplayRollbacks;
+      snapshot.netplayHistoryFrames = workerMetrics.netplayHistoryFrames;
+      snapshot.netplayHistoryBytes = workerMetrics.netplayHistoryBytes;
       const auto recordingMetrics = recordingService->metrics();
       snapshot.recordingActive = recordingMetrics.active;
       snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
@@ -2036,9 +2276,15 @@ int main(int argc, char* argv[])
      &applyEffectiveSettings, &automaticResumePatchPath, &automaticResumePath,
      &globalGameSettings,
      &lifecycleOperationId, &loadMetadataOperationId, &metadataService,
+     &netplaySession,
      &pendingAutomaticResume, &pendingLoad, &releasePhysicalTarget,
      &window, &worker](
       const genplusgx::GameLaunchTarget& target) {
+      if (netplaySession.state() !=
+          genplusgx::netplay::NetplaySessionState::disconnected) {
+        netplaySession.disconnectFromPeer(
+          "Netplay ended because another game was selected.");
+      }
       if (pendingAutomaticResume) {
         pendingAutomaticResume.reset();
         automaticResumePath.reset();
@@ -2103,7 +2349,13 @@ int main(int argc, char* argv[])
       }
     });
   window.setGameCloseSink(
-    [&closingGameTarget, &lifecycleOperationId, &pendingUnload, &window, &worker] {
+    [&closingGameTarget, &lifecycleOperationId, &netplaySession,
+     &pendingUnload, &window, &worker] {
+      if (netplaySession.state() !=
+          genplusgx::netplay::NetplaySessionState::disconnected) {
+        netplaySession.disconnectFromPeer(
+          "Netplay ended because the game was closed.");
+      }
       closingGameTarget = window.loadedGameTarget();
       const auto operationId = ++lifecycleOperationId;
       pendingUnload = operationId;
@@ -2369,6 +2621,7 @@ int main(int argc, char* argv[])
      &lifecycleOperationId,
      &metadataService, &pendingDisc, &physicalMediaCache,
      &physicalMediaService, &pendingPhysicalMediaOperation,
+     &netplayBridge, &netplayRuntimeActive, &netplaySession,
      &pendingAutomaticResume, &pendingLoad, &pendingMetadata, &pendingState,
      &pendingUnload,
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
@@ -2384,6 +2637,20 @@ int main(int argc, char* argv[])
      &worker, &window,
      automatedQuitMilliseconds, automatedQuitWhenGameReady] {
     static_cast<void>(controllerInput.pollEvents());
+    while (auto outgoing = netplayBridge->pollOutgoing()) {
+      if (!netplayRuntimeActive ||
+          netplaySession.state() !=
+            genplusgx::netplay::NetplaySessionState::connected) {
+        netplaySession.disconnectFromPeer(
+          "The netplay transport was unavailable for an emulated input frame.");
+        break;
+      }
+      const auto sent = netplaySession.sendInput(*outgoing);
+      if (!sent) {
+        netplaySession.disconnectFromPeer(sent.message);
+        break;
+      }
+    }
     while (auto event = physicalMediaService.pollEvent()) {
       using EventType = genplusgx::platform::PhysicalMediaEventType;
       if (event->type == EventType::serviceStarted) {
@@ -2571,6 +2838,27 @@ int main(int argc, char* argv[])
         qWarning().noquote() << QString::fromStdString(detail);
         window.showEmulationRuntimeError(
           detail + " Normal authoritative emulation remains active.");
+      }
+      if (event->type == genplusgx::EmulationEventType::netplayRollback) {
+        qInfo().noquote() << "Netplay rollback corrected from frame"
+                          << static_cast<qulonglong>(event->netplayRollbackFrame)
+                          << "to" << static_cast<qulonglong>(event->frameNumber);
+      }
+      if ((event->netplayActive ||
+           event->command == genplusgx::EmulationCommandType::startNetplay ||
+           event->command ==
+             genplusgx::EmulationCommandType::remoteNetplayInput) &&
+          !event->succeeded()) {
+        if (event->command ==
+              genplusgx::EmulationCommandType::startNetplay &&
+            !event->netplayActive) {
+          netplayRuntimeActive = false;
+        }
+        const auto detail = event->message.empty()
+          ? std::string{"The emulation worker rejected netplay state."}
+          : event->message;
+        qWarning().noquote() << QString::fromStdString(detail);
+        netplaySession.disconnectFromPeer(detail);
       }
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
         static_cast<void>(window.presentLatestFrame());
@@ -3677,6 +3965,7 @@ int main(int argc, char* argv[])
       *automatedQuitMilliseconds, &application, &QCoreApplication::quit);
   }
   const int result = application.exec();
+  netplaySession.disconnectFromPeer("Application shutdown.");
   eventPump.stop();
   genplusgx::app::ShutdownReport shutdownReport{result};
   if (result == 0 && sessionSettings.resumeOnLaunch &&
@@ -3839,6 +4128,7 @@ int main(int argc, char* argv[])
   window.setRunAheadSettingsSink({});
   window.setDiagnosticsSnapshotProvider({});
   window.setDebugRequestSink({});
+  window.setNetplayRequestSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});

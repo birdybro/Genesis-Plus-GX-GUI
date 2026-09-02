@@ -4,9 +4,9 @@ This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
-synchronization, local bezel/overlay, cheat import/search, portable-mode, and
-localization, advanced-debugger, and physical-optical-media verification through 2026-09-02
-(America/Denver).
+synchronization, local bezel/overlay, cheat import/search, portable-mode,
+localization, advanced-debugger, physical-optical-media, and authenticated-netplay
+verification through 2026-09-02 (America/Denver).
 
 ## Candidate identity
 
@@ -55,6 +55,8 @@ localization, advanced-debugger, and physical-optical-media verification through
   `696be36a5ca9e0896f44719eec4729f6aced98c8`
 - Exact physical-media portability and warning-clean hosted baseline:
   `1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`
+- Exact netplay implementation: the current commit containing this report; the initial
+  implementation SHA will be recorded after the non-circular milestone commit exists
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -463,12 +465,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 112/112 | Passed |
-| Release | Optimized native x86-64 | 112/112 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 112/112 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 110/110 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 112/112 | Passed |
-| Clang 22 | Warning-gated Debug | 112/112 | Passed; frontend warning-clean |
+| Debug | C++20, Qt Widgets/OpenGL/Network, SDL3, SQLite, libchdr, librashader | 118/118 | Passed |
+| Release | Optimized native x86-64 | 118/118 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 118/118 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 116/116 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 118/118 | Passed |
+| Clang 22 | Warning-gated Debug | 118/118 | Passed; frontend warning-clean |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -481,23 +483,24 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 112 distinct tests:
+The default shader-enabled build registers 118 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 11 |
 | Core | 20 |
-| Integration | 6 |
-| Unit | 44 |
-| GUI/smoke | 31 |
-| **Total** | **112** |
+| Integration | 9 |
+| Unit | 46 |
+| GUI/smoke | 32 |
+| **Total** | **118** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 71 `unit`, 26 `core`, 46 `integration`, and 31 `gui`. Focused
+layers. Label counts are 75 `unit`, 28 `core`, 50 `integration`, and 32 `gui`. Focused
 coverage also includes persistence (33), fixtures (33), concurrency (20), settings
 (21), input (10), video (13), audio (9), timing (7), presentation (1), rewind (4),
 run-ahead (3), state (9), release (5), fuzz/property (5), shader (2), recording (2),
-packaging (5), portable mode (2), localization (6), and physical media (3).
+packaging (5), portable mode (2), localization (6), physical media (3), netplay (6),
+network (2), rollback (3), and security (9).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -1123,6 +1126,49 @@ four package layouts, application/runtime architectures, DMG contents, the artwo
 guide, 22 Linux ELF dependency graphs, downloaded Linux CLI/offscreen/real-XCB OpenGL
 startup and clean shutdown, and prohibited-payload scans pass.
 
+## Local authenticated-netplay verification
+
+Milestone 94 adds explicitly initiated direct TCP play for one peer without moving
+networking into the inherited core. A private 6–128-byte session code drives mutual
+HMAC-SHA-256 challenge/response with fresh 256-bit nonces; a derived session key
+authenticates every monotonically sequenced input packet. Game content, Git build,
+deterministic settings, validated BIOS hashes, enabled cheats, delay, rollback window,
+and player roles must match. The session code is cleared after authentication and is
+never persisted, logged, or copied into diagnostics. Traffic is authenticated but not
+encrypted, which is disclosed in both the UI and guide.
+
+The owner thread performs one atomic hard-reset/configure/start command and retains
+exact bounded rollback states before authoritative frames. Differing late input restores
+and re-simulates without publishing corrective audio, video, or recording output.
+History is capped at 12 frames and 64 MiB; protocol frames, receive/write storage,
+timeline state, bridge queues, and handshake time are independently bounded. Invalid
+startup leaves the loaded core paused and unmodified. Queue/history/runtime failure
+pauses emulation and explicitly tears down the peer rather than continuing divergent
+play. Debug breakpoints and incompatible run modes are cleared, and deterministic
+operations remain locked in both GUI and worker command paths until disconnect.
+
+The six focused tests cover bounded timeline behavior, protocol mutation/fuzz input,
+real localhost authentication and rejection, rollback worker lifecycle, two independent
+core processes exchanging delayed traffic in both directions, and semantic Qt controls.
+The independent-process workflow also passes ten consecutive repetitions. Final-source
+warning-as-error Debug, optimized Release, CHD-disabled, and Clang graphs each pass
+118/118; ASan/UBSan passes 118/118 with leak detection and no finding; the
+shader-disabled graph passes all 116 applicable tests. The strict Unix libretro target
+builds, links as x86-64 ELF, and cleans without a warning. A fresh Linux Release stage
+passes the production package verifier, installed CLI and complete portable event-loop
+smoke, dependency inspection, TGZ/checksum generation, and confirms that Qt Network and
+the netplay guide ship. Hosted cross-platform evidence is intentionally pending until
+this implementation commit is pushed.
+
+The final adversarial pass additionally verifies disconnect-before-checkpoint shutdown,
+post-session state capture, runtime bridge-overflow reporting, password clearing,
+packet replay/tamper rejection, Sega CD tray and source-identity restrictions, bounded
+diagnostics, and no peer address/secret disclosure. It found and fixed one unused
+lambda capture under Clang before commit. The previously supplied NAS ROM directory is
+not mounted on this host, so no proprietary-ROM netplay smoke was attempted; generated
+CC0 Genesis programs exercise the production application, Qt TCP session, bridge,
+worker, rollback, video, audio, and input route in separate processes.
+
 ## Final feature checklist
 
 - [x] SG-1000, Mark III, Master System, Game Gear, Genesis/Mega Drive, and Sega CD/Mega
@@ -1163,6 +1209,10 @@ startup and clean shutdown, and prohibited-payload scans pass.
 - [x] Optional bounded one-through-four-frame cartridge run-ahead with exact transient
   rollback, authoritative audio/input/state, pad/multitap support, fail-closed
   determinism verification, mode suspension, settings, status, and diagnostics.
+- [x] Opt-in authenticated two-peer direct TCP netplay with content/build/settings
+  compatibility checks, host Player 1/guest Player 2 ownership, configurable input
+  delay and bounded owner-thread rollback, replay/tamper rejection, deterministic
+  lockouts, safe diagnostics, and clean disconnect/shutdown.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, native Windows/Linux/macOS original-disc import with bounded
   progress/cancellation, and missing-firmware errors without bundled firmware.
@@ -1232,11 +1282,15 @@ directories.
   notarization, and any Windows installer signing require project-owned credentials.
 - Linux ships a relocatable TGZ rather than an AppImage and intentionally relies on the
   CI distribution's base graphics, window-system, C/C++ runtime, and libc libraries.
+- Direct authenticated two-peer TCP netplay is implemented, but relay matchmaking,
+  automatic NAT traversal, spectators, encrypted traffic, host migration, synchronized
+  pause, and mid-session state transfer are not. Users needing traffic privacy should
+  use a trusted network or encrypted peer VPN.
 - ZIP support is intentionally limited to stored/deflated cartridge members; archived
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Netplay, achievements, cloud sync, online scraping/downloading, a network-accessible external
+  formats. Achievements, cloud sync, online scraping/downloading, a network-accessible external
   debugger server, TAS tooling, and streaming remain intentionally outside
   scope.
 

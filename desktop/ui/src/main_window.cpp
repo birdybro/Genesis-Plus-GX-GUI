@@ -752,6 +752,9 @@ void MainWindow::buildMenus()
   });
 
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
+  auto* netplay = addAction(*tools, tr("&Netplay…"), "netplayAction");
+  connect(netplay, &QAction::triggered, this, &MainWindow::showNetplay);
+  tools->addSeparator();
   auto* cheats = addAction(*tools, tr("&Cheats…"), "cheatsAction");
   connect(cheats, &QAction::triggered, this, &MainWindow::showCheats);
   auto* perGameSettings = addAction(
@@ -919,6 +922,130 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateCheatAction();
   updatePerGameSettingsAction();
   updateEmulationControls();
+  updateNetplayControls();
+}
+
+void MainWindow::setNetplayRequestSink(NetplayRequestSink sink)
+{
+  netplayRequestSink_ = std::move(sink);
+  if (auto* dialog = findChild<NetplayDialog*>(
+        QStringLiteral("netplayDialog"))) {
+    dialog->setRequestSink(netplayRequestSink_);
+  }
+  updateNetplayControls();
+}
+
+void MainWindow::setNetplaySessionState(
+  netplay::NetplaySessionState state,
+  const std::string& detail)
+{
+  netplayState_ = state;
+  if (auto* dialog = findChild<NetplayDialog*>(
+        QStringLiteral("netplayDialog"))) {
+    dialog->setGameReady(isGameLoaded());
+    dialog->setSessionState(state, detail);
+  }
+  setGameActionsEnabled(isGameLoaded() && !sessionResumeBusy_);
+  if (state == netplay::NetplaySessionState::connected) {
+    statusBar()->showMessage(tr("Authenticated netplay session connected."), 5'000);
+  }
+}
+
+void MainWindow::showNetplay()
+{
+  if (auto* existing = findChild<NetplayDialog*>(
+        QStringLiteral("netplayDialog"))) {
+    existing->setGameReady(isGameLoaded());
+    existing->setSessionState(netplayState_);
+    existing->show();
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new NetplayDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setRequestSink(netplayRequestSink_);
+  dialog->setGameReady(isGameLoaded());
+  dialog->setSessionState(netplayState_);
+  dialog->show();
+}
+
+void MainWindow::showNetplayError(const std::string& detail)
+{
+  showNetplay();
+  if (auto* dialog = findChild<NetplayDialog*>(
+        QStringLiteral("netplayDialog"))) {
+    dialog->showError(detail);
+  }
+  statusBar()->showMessage(QString::fromStdString(detail), 8'000);
+}
+
+void MainWindow::updateNetplayControls()
+{
+  const bool sessionActive =
+    netplayState_ != netplay::NetplaySessionState::disconnected;
+  if (auto* action = findChild<QAction*>(QStringLiteral("netplayAction"))) {
+    action->setEnabled(isGameLoaded() || sessionActive);
+  }
+  static constexpr const char* lockedActions[]{
+    "pauseAction", "resetAction", "softResetAction", "fastForwardAction",
+    "slowMotionAction", "rewindAction", "frameAdvanceAction",
+    "saveStateAction", "loadStateAction", "deleteStateAction",
+    "stateManagerAction", "previousStateSlotAction", "nextStateSlotAction",
+    "importStateAction", "exportStateAction", "runAheadAction",
+    "cheatsAction", "perGameSettingsAction", "controllerConfigurationAction",
+    "playerAssignmentsAction", "settingsAction", "systemSettingsAction",
+    "biosSettingsAction", "videoSettingsAction", "audioSettingsAction",
+    "changeDiscAction", "ejectDiscAction", "previousDiscAction",
+    "nextDiscAction", "runAheadSettingsAction", "rewindSettingsAction",
+    "speedSettingsAction", "overscanDisabledAction", "overscanVerticalAction",
+    "overscanHorizontalAction", "overscanFullAction", "ntscDisabledAction",
+    "ntscMonochromeAction", "ntscCompositeAction", "ntscSVideoAction",
+    "ntscRgbAction", "singleFieldRenderAction", "doubleFieldRenderAction",
+    "gameGearExtendedScreenAction", "debugToolsAction"};
+  if (sessionActive) {
+    for (const auto* name : lockedActions) {
+      if (auto* action = findChild<QAction*>(QString::fromLatin1(name))) {
+        action->setEnabled(false);
+      }
+    }
+  } else {
+    static constexpr const char* settingsActions[]{
+      "controllerConfigurationAction", "playerAssignmentsAction",
+      "settingsAction", "systemSettingsAction", "biosSettingsAction",
+      "videoSettingsAction", "audioSettingsAction", "runAheadSettingsAction",
+      "rewindSettingsAction", "speedSettingsAction"};
+    for (const auto* name : settingsActions) {
+      if (auto* action = findChild<QAction*>(QString::fromLatin1(name))) {
+        action->setEnabled(true);
+      }
+    }
+    static constexpr const char* coreVideoActions[]{
+      "overscanDisabledAction", "overscanVerticalAction",
+      "overscanHorizontalAction", "overscanFullAction", "ntscDisabledAction",
+      "ntscMonochromeAction", "ntscCompositeAction", "ntscSVideoAction",
+      "ntscRgbAction", "singleFieldRenderAction", "doubleFieldRenderAction",
+      "gameGearExtendedScreenAction"};
+    for (const auto* name : coreVideoActions) {
+      if (auto* action = findChild<QAction*>(QString::fromLatin1(name))) {
+        action->setEnabled(true);
+      }
+    }
+    if (auto* debugAction = findChild<QAction*>(
+          QStringLiteral("debugToolsAction"))) {
+      debugAction->setEnabled(appearanceSettings_.developerToolsEnabled);
+    }
+  }
+  if (auto* speedGroup = findChild<QActionGroup*>(
+        QStringLiteral("emulationSpeedActionGroup"))) {
+    for (auto* action : speedGroup->actions()) {
+      action->setEnabled(!sessionActive);
+    }
+  }
+  if (auto* dialog = findChild<NetplayDialog*>(
+        QStringLiteral("netplayDialog"))) {
+    dialog->setGameReady(isGameLoaded());
+  }
 }
 
 void MainWindow::setEmulationControlSink(EmulationControlSink sink)
@@ -959,6 +1086,7 @@ void MainWindow::setEmulationControlState(
     rewindToggled_ = rewindActive_;
   }
   updateEmulationControls();
+  updateNetplayControls();
   if (auto* debugger = findChild<DebugToolsWindow*>(
         QStringLiteral("debugToolsWindow"))) {
     debugger->setPaused(emulationPaused_);
@@ -1112,6 +1240,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
   if ((fastPress || slowPress || rewindPress) &&
       (!belongsToWindow || (active != nullptr && active != this) ||
        !isGameLoaded() || gameLoading_ || emulationPaused_ ||
+       netplayState_ != netplay::NetplaySessionState::disconnected ||
        (rewindPress && !rewindAvailable_))) {
     return QMainWindow::eventFilter(watched, event);
   }
@@ -1132,7 +1261,8 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
 void MainWindow::updateEmulationControls()
 {
   const bool available = isGameLoaded() && !gameLoading_ && !sessionResumeBusy_ &&
-                         static_cast<bool>(emulationControlSink_);
+    static_cast<bool>(emulationControlSink_) &&
+    netplayState_ == netplay::NetplaySessionState::disconnected;
   auto* pause = findChild<QAction*>(QStringLiteral("pauseAction"));
   auto* reset = findChild<QAction*>(QStringLiteral("resetAction"));
   auto* softReset = findChild<QAction*>(QStringLiteral("softResetAction"));
@@ -1257,6 +1387,7 @@ void MainWindow::updateCheatAction()
 {
   if (auto* action = findChild<QAction*>(QStringLiteral("cheatsAction"))) {
     action->setEnabled(
+      netplayState_ == netplay::NetplaySessionState::disconnected &&
       isGameLoaded() && !sessionResumeBusy_ && cheatSessionReady_);
   }
 }
@@ -1348,6 +1479,7 @@ void MainWindow::updatePerGameSettingsAction()
   if (auto* action = findChild<QAction*>(
         QStringLiteral("perGameSettingsAction"))) {
     action->setEnabled(
+      netplayState_ == netplay::NetplaySessionState::disconnected &&
       isGameLoaded() && !sessionResumeBusy_ && perGameSettingsSessionReady_);
   }
 }
@@ -2092,7 +2224,8 @@ void MainWindow::updateRunAheadAction()
     .arg(runAheadSettings_.frames)
     .arg(runAheadSettings_.frames == 1U ? QString{} : tr("s")));
   action->setEnabled(isGameLoaded() && !gameLoading_ && runAheadSupported_ &&
-    static_cast<bool>(runAheadSettingsSink_));
+    static_cast<bool>(runAheadSettingsSink_) &&
+    netplayState_ == netplay::NetplaySessionState::disconnected);
   if (isGameLoaded() && !runAheadSupported_) {
     action->setToolTip(tr("Run-ahead is unavailable for the current system or controller configuration."));
   } else if (runAheadActive_) {
@@ -2584,6 +2717,7 @@ void MainWindow::setAppearanceSettings(settings::AppearanceSettings value)
         QStringLiteral("appearanceSettingsDialog"))) {
     dialog->setSettings(appearanceSettings_);
   }
+  updateNetplayControls();
   refreshSettingsDialog();
 }
 
@@ -2701,6 +2835,26 @@ void MainWindow::setDiscOperationBusy(bool busy)
 {
   discOperationBusy_ = busy && segaCdSession_;
   updateDiscActions();
+}
+
+bool MainWindow::isSegaCdSession() const noexcept
+{
+  return segaCdSession_;
+}
+
+bool MainWindow::isDiscEjected() const noexcept
+{
+  return discEjected_;
+}
+
+bool MainWindow::isDiscPresent() const noexcept
+{
+  return discPresent_;
+}
+
+const std::filesystem::path& MainWindow::currentDiscPath() const noexcept
+{
+  return currentDiscPath_;
 }
 
 void MainWindow::showDiscOperationSuccess(DiscUiOperation operation)
@@ -3800,7 +3954,8 @@ void MainWindow::updateDiscActions()
     return;
   }
   const bool available = isGameLoaded() && !sessionResumeBusy_ &&
-    segaCdSession_ && !discOperationBusy_;
+    segaCdSession_ && !discOperationBusy_ &&
+    netplayState_ == netplay::NetplaySessionState::disconnected;
   change->setEnabled(available);
   eject->setEnabled(available);
   const bool playlistAvailable = available && playlistDiscIndex_.has_value();
@@ -4037,7 +4192,8 @@ void MainWindow::requestStateOperation(
 void MainWindow::updateStateActions()
 {
   const bool ready = isGameLoaded() && !sessionResumeBusy_ &&
-    stateSessionReady_ && !stateOperationBusy_;
+    stateSessionReady_ && !stateOperationBusy_ &&
+    netplayState_ == netplay::NetplaySessionState::disconnected;
   const auto selectedState = stateSlotViews_[selectedStateSlot_].state;
   findChild<QAction*>(QStringLiteral("saveStateAction"))->setEnabled(ready);
   findChild<QAction*>(QStringLiteral("loadStateAction"))->setEnabled(

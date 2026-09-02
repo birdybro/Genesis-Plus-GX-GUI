@@ -67,6 +67,11 @@ authoritative continuation with owner-thread speculation, including input, raw s
 native video, stereo audio, recording cadence, maximum-depth stress, and allocation
 bounds. Its Sega CD exclusion case uses only the generated firmware/disc fixtures
 documented below.
+`integration.netplay_worker` uses the program's controller polling while it forces a
+late authoritative input through exact rollback. `integration.netplay_end_to_end`
+launches two copies of its test executable; each copy independently generates this ROM
+in a temporary directory, owns one core/worker, and exchanges only input packets over
+localhost. No ROM bytes cross the socket or survive either process.
 
 ## Generated 8-bit Z80 RAM marker ROMs
 

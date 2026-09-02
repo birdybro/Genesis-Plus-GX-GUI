@@ -16,6 +16,31 @@ cmake --build --preset release
 ctest --preset release
 ```
 
+## Netplay tests
+
+`unit.netplay_timeline` covers input delay, player ownership, prediction correction,
+duplicate/old/future rejection, history pruning, and bridge overflow. The bounded fuzz
+corpus and tamper/replay cases live in `unit.netplay_protocol`.
+`integration.netplay_transport` creates two real localhost TCP sockets and verifies
+mutual authentication, role assignment, authenticated input exchange, wrong-code and
+wrong-game rejection, and disconnect. `integration.netplay_worker` executes the legal
+synthetic Genesis ROM through atomic reset/start, invalid transactional startup,
+prediction, late-input rollback, audio suppression, bounded state history, mutation
+lockout, runtime bridge-overflow teardown, post-session checkpoint capture, and clean
+stop.
+`integration.netplay_end_to_end` launches two child processes so each owns an
+independent Genesis Plus GX core, then exercises the complete authenticated socket,
+bridge, worker, delayed-input rollback, bounded-metric, disconnect, and shutdown path
+in both directions. `gui.netplay` drives the
+password field, host/join request, validation, stable object names, deterministic
+lockouts, post-connect model refreshes, and disconnect under Qt offscreen.
+
+Run the focused set with:
+
+```bash
+ctest --preset debug -R netplay --output-on-failure
+```
+
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
 `rewind`, `run-ahead`, `localization`, `packaging`, `release`, and `documentation`:

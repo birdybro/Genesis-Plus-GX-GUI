@@ -434,6 +434,22 @@ std::string formatDiagnostics(
          << snapshot.runAheadDeterminismFailures << '\n'
          << "Run-ahead state bytes: " << snapshot.runAheadStateBytes << " / "
          << snapshot.runAheadStateCapacityBytes << '\n'
+         << "Netplay: " << safeLine(snapshot.netplayState, detectedHome) << '\n'
+         << "Netplay packets: " << snapshot.netplaySentPackets << " sent / "
+         << snapshot.netplayReceivedPackets << " received\n"
+         << "Netplay bytes: " << snapshot.netplaySentBytes << " sent / "
+         << snapshot.netplayReceivedBytes << " received\n"
+         << "Netplay authentication failures: "
+         << snapshot.netplayAuthenticationFailures << '\n'
+         << "Netplay protocol failures: " << snapshot.netplayProtocolFailures
+         << '\n'
+         << "Netplay output queue: " << snapshot.netplayQueuedFrames << " / "
+         << snapshot.netplayQueueCapacity << '\n'
+         << "Netplay prediction/rollback: " << snapshot.netplayPredictedFrames
+         << " predicted, " << snapshot.netplayRollbackRequests
+         << " requested, " << snapshot.netplayRollbacks << " performed\n"
+         << "Netplay rollback history: " << snapshot.netplayHistoryFrames
+         << " frames, " << snapshot.netplayHistoryBytes << " bytes\n"
          << "Lossless recording: "
          << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
          << "Recording queue: " << snapshot.recordingQueuedFrames << " / "

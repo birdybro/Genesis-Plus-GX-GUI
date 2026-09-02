@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+354" />
+            <location filename="../desktop/app/main.cpp" line="+414" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+387" />
+            <location line="+390" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -2737,12 +2737,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+2604" />
+            <location line="+2706" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2600" />
+            <location line="-2702" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -2823,12 +2823,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+1556" />
+            <location line="+1658" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-1555" />
+            <location line="-1657" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -2849,12 +2849,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+939" />
+            <location line="+1041" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-939" />
+            <location line="-1041" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3050,12 +3050,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3424" />
+            <location line="+3526" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3419" />
+            <location line="-3521" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3167,12 +3167,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2290" />
+            <location line="+2392" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2259" />
+            <location line="-2361" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3349,6 +3349,11 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
+            <source>&amp;Netplay…</source>
+            <translation>⟦&amp;Ńëŧƥŀåÿ…~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
             <source>&amp;Cheats…</source>
             <translation>⟦&amp;Çħëåŧš…~~⟧</translation>
         </message>
@@ -3424,35 +3429,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+2825" />
+            <location line="+2924" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-2824" />
-            <location line="+1800" />
+            <location line="-2923" />
+            <location line="+1899" />
             <location line="+846" />
             <location line="+179" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2824" />
-            <location line="+1800" />
+            <location line="-2923" />
+            <location line="+1899" />
             <location line="+846" />
             <location line="+179" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2824" />
-            <location line="+2647" />
+            <location line="-2923" />
+            <location line="+2746" />
             <location line="+178" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-2823" />
+            <location line="-2922" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3462,7 +3467,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Šŀöŧ 0~⟧</translation>
         </message>
         <message>
-            <location line="+76" />
+            <location line="+48" />
+            <source>Authenticated netplay session connected.</source>
+            <translation>⟦Åüŧħëńŧïçåŧëð ńëŧƥŀåÿ šëššïöń çöńńëçŧëð.~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+127" />
             <source>The emulation command could not be queued.</source>
             <translation>⟦Ŧħë ëḿüŀåŧïöń çöḿḿåńð çöüŀð ńöŧ ƀë ǫüëüëð.~~~~~~~~~⟧</translation>
         </message>
@@ -4175,6 +4185,133 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <location line="+1" />
             <source>Slot %1</source>
             <translation>⟦Šŀöŧ ~%1⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::NetplayDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/netplay_dialog.cpp" line="+19" />
+            <source>Netplay</source>
+            <translation>⟦Ńëŧƥŀåÿ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Play the currently loaded game with one authenticated peer. Both sides must use the same game, core build, deterministic settings, delay, and rollback window. Starting a session resets the game.</source>
+            <translation>⟦Ƥŀåÿ ŧħë çüŕŕëńŧŀÿ ŀöåðëð ɠåḿë ŵïŧħ öńë åüŧħëńŧïçåŧëð ƥëëŕ. Ɓöŧħ šïðëš ḿüšŧ üšë ŧħë šåḿë ɠåḿë, çöŕë ƀüïŀð, ðëŧëŕḿïńïšŧïç šëŧŧïńɠš, ðëŀåÿ, åńð ŕöŀŀƀåçҡ ŵïńðöŵ. Šŧåŕŧïńɠ å šëššïöń ŕëšëŧš ŧħë ɠåḿë.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Host (Player 1)</source>
+            <translation>⟦Ħöšŧ (Ƥŀåÿëŕ 1)~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Join (Player 2)</source>
+            <translation>⟦Ĵöïń (Ƥŀåÿëŕ 2)~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Mode:</source>
+            <translation>⟦Ḿöðë:~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Netplay host name or address</source>
+            <translation>⟦Ńëŧƥŀåÿ ħöšŧ ńåḿë öŕ åððŕëšš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Host:</source>
+            <translation>⟦Ħöšŧ:~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>Port:</source>
+            <translation>⟦Ƥöŕŧ:~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>At least 6 characters; share out of band</source>
+            <translation>⟦Åŧ ŀëåšŧ 6 çħåŕåçŧëŕš; šħåŕë öüŧ öƒ ƀåńð~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Private netplay session code</source>
+            <translation>⟦Ƥŕïṽåŧë ńëŧƥŀåÿ šëššïöń çöðë~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Session code:</source>
+            <translation>⟦Šëššïöń çöðë:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <location line="+7" />
+            <source> frames</source>
+            <translation>⟦ ƒŕåḿëš~~⟧</translation>
+        </message>
+        <message>
+            <location line="-6" />
+            <source>Input delay:</source>
+            <translation>⟦Ïńƥüŧ ðëŀåÿ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+7" />
+            <source>Rollback window:</source>
+            <translation>⟦Ŕöŀŀƀåçҡ ŵïńðöŵ:~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>The session code authenticates and integrity-protects peer traffic, but does not encrypt gameplay. The code is never saved or written to logs.</source>
+            <translation>⟦Ŧħë šëššïöń çöðë åüŧħëńŧïçåŧëš åńð ïńŧëɠŕïŧÿ~~~~~~~~~~-protects ƥëëŕ ŧŕåƒƒïç, ƀüŧ ðöëš ńöŧ ëńçŕÿƥŧ ɠåḿëƥŀåÿ. Ŧħë çöðë ïš ńëṽëŕ šåṽëð öŕ ŵŕïŧŧëń ŧö ŀöɠš.~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+7" />
+            <location line="+47" />
+            <location line="+6" />
+            <source>Disconnected</source>
+            <translation>⟦Ðïšçöńńëçŧëð~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-51" />
+            <source>Netplay connection status</source>
+            <translation>⟦Ńëŧƥŀåÿ çöńńëçŧïöń šŧåŧüš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <location line="+60" />
+            <source>Host Session</source>
+            <translation>⟦Ħöšŧ Šëššïöń~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-58" />
+            <source>Disconnect</source>
+            <translation>⟦Ðïšçöńńëçŧ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+34" />
+            <source>Listening for one peer…</source>
+            <translation>⟦Ŀïšŧëńïńɠ ƒöŕ öńë ƥëëŕ…~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Connecting…</source>
+            <translation>⟦Çöńńëçŧïńɠ…~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Authenticating peer…</source>
+            <translation>⟦Åüŧħëńŧïçåŧïńɠ ƥëëŕ…~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Connected — netplay active</source>
+            <translation>⟦Çöńńëçŧëð — ńëŧƥŀåÿ åçŧïṽë~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+21" />
+            <source>Join Session</source>
+            <translation>⟦Ĵöïń Šëššïöń~~~⟧</translation>
         </message>
     </context>
     <context>

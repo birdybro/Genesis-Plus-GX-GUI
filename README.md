@@ -62,6 +62,9 @@ rewritten.
   WAV audio, explicit drop metrics, and atomic session finalization
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
+- Opt-in authenticated direct TCP netplay for one peer, with content/build/settings
+  compatibility checks, configurable input delay, bounded owner-thread rollback,
+  replay/tamper rejection, and deterministic operation lockouts
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
 - Native Windows, Linux, and macOS optical-drive import for original mixed-mode Sega
   CD/Mega CD media, with responsive progress/cancellation and atomic transient cleanup
@@ -217,7 +220,7 @@ for platform launch examples and relocation rules.
 ## Building from source
 
 The desktop build requires CMake 3.25+, Ninja, a C++20 compiler, Qt 6.8+ with Core,
-Gui, Widgets, OpenGLWidgets, Sql, Test, and LinguistTools modules, SDL 3.2+, and
+Gui, Widgets, Network, OpenGLWidgets, Sql, Test, and LinguistTools modules, SDL 3.2+, and
 Rust/Cargo 1.88+ for the default Libretro shader runtime. Once CMake can locate the Qt
 and SDL config packages:
 
@@ -271,6 +274,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Display synchronization](docs/DISPLAY_SYNCHRONIZATION.md)
 - [Lossless recording](docs/RECORDING.md)
 - [Run-ahead](docs/RUN_AHEAD.md)
+- [Netplay](docs/NETPLAY.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

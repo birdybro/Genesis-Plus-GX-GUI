@@ -28,6 +28,7 @@ target_link_libraries(
     GenesisPlusGX::Screenshots
     genplusgx::ui
     GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Netplay
     genplusgx_project_options
     genplusgx_project_warnings
     Qt6::Widgets
@@ -202,6 +203,7 @@ if(UNIX AND NOT APPLE)
     Qt6::Core
     Qt6::DBus
     Qt6::Gui
+    Qt6::Network
     Qt6::OpenGL
     Qt6::OpenGLWidgets
     Qt6::Sql

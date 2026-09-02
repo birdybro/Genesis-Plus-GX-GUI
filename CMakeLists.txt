@@ -64,7 +64,7 @@ set(GENPLUSGX_MINIMUM_QT_VERSION 6.8)
 
 find_package(
   Qt6 ${GENPLUSGX_MINIMUM_QT_VERSION} REQUIRED
-  COMPONENTS Core Gui Widgets LinguistTools OpenGLWidgets Sql Test
+  COMPONENTS Core Gui Widgets LinguistTools Network OpenGLWidgets Sql Test
 )
 if(UNIX AND NOT APPLE)
   find_package(Qt6 ${GENPLUSGX_MINIMUM_QT_VERSION} REQUIRED COMPONENTS DBus)
@@ -119,6 +119,7 @@ target_link_libraries(genplusgx_frontend_types INTERFACE genplusgx_project_optio
 message(STATUS "Genesis Plus GX GUI ${GENPLUSGX_VERSION} (${GENPLUSGX_GIT_COMMIT})")
 message(STATUS "Qt: ${Qt6_VERSION}")
 message(STATUS "SDL3: ${SDL3_VERSION}")
+message(STATUS "Netplay: authenticated direct TCP peer sessions")
 message(STATUS "Libretro shaders: ${GENPLUSGX_ENABLE_LIBRETRO_SHADERS}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
@@ -126,6 +127,7 @@ message(STATUS "Tests: ${BUILD_TESTING}")
 add_subdirectory(desktop/video)
 add_subdirectory(desktop/audio)
 add_subdirectory(desktop/timing)
+add_subdirectory(desktop/netplay)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
 add_subdirectory(desktop/diagnostics)

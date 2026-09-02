@@ -1,5 +1,39 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_netplay_timeline_test netplay_timeline_test.cpp)
+target_link_libraries(
+  genplusgx_netplay_timeline_test
+  PRIVATE GenesisPlusGX::NetplayCore genplusgx_project_warnings
+)
+add_test(NAME unit.netplay_timeline COMMAND genplusgx_netplay_timeline_test)
+set_tests_properties(
+  unit.netplay_timeline
+  PROPERTIES LABELS "unit;netplay;input;rollback;bounded" TIMEOUT 30
+)
+
+add_executable(genplusgx_netplay_protocol_test netplay_protocol_test.cpp)
+target_link_libraries(
+  genplusgx_netplay_protocol_test
+  PRIVATE GenesisPlusGX::Netplay genplusgx_project_warnings Qt6::Core
+)
+
+qt_add_executable(genplusgx_netplay_session_test netplay_session_test.cpp)
+set_target_properties(genplusgx_netplay_session_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_netplay_session_test
+  PRIVATE GenesisPlusGX::Netplay genplusgx_project_warnings Qt6::Test
+)
+add_test(NAME integration.netplay_transport COMMAND genplusgx_netplay_session_test)
+set_tests_properties(
+  integration.netplay_transport
+  PROPERTIES LABELS "unit;integration;netplay;network;security;loopback" TIMEOUT 30
+)
+add_test(NAME unit.netplay_protocol COMMAND genplusgx_netplay_protocol_test)
+set_tests_properties(
+  unit.netplay_protocol
+  PROPERTIES LABELS "unit;netplay;protocol;security;fuzz;bounded" TIMEOUT 30
+)
+
 add_executable(genplusgx_localization_test localization_test.cpp)
 target_link_libraries(
   genplusgx_localization_test

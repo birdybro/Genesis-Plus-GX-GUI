@@ -286,6 +286,21 @@ number. If that exact name already exists, the application adds a numeric suffix
 never overwrites it. PNG data is first completed in a temporary file in the destination
 directory, so an interrupted encode cannot leave a partially named capture.
 
+## Netplay
+
+Load the same game and application build on both computers, then open **Tools →
+Netplay…**. The host selects **Host (Player 1)**; the guest selects **Join (Player 2)**
+and enters the host address. Use the same TCP port, private session code, input delay,
+and rollback window on both sides. A successful authenticated connection resets both
+games and begins play. The session code is not saved or logged.
+
+Netplay rejects mismatched game content, core builds, deterministic settings, enabled
+cheats, input devices, or validated BIOS checksums. State-changing controls are locked
+during a connection. Closing or replacing the game disconnects first. Direct Internet
+play may require manual TCP port forwarding or a peer VPN; the application performs no
+automatic router configuration. See [Netplay](NETPLAY.md) for security, rollback,
+diagnostics, and current limitations.
+
 ## Run-ahead latency reduction
 
 For cartridge games, choose **Emulation → Run-Ahead** to display a future frame while

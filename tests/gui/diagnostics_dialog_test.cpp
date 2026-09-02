@@ -44,6 +44,16 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.runAheadRollbacks = 42U;
     snapshot.runAheadStateBytes = 192U * 1024U;
     snapshot.runAheadStateCapacityBytes = 256U * 1024U;
+    snapshot.netplayState = "Authenticated peer connected";
+    snapshot.netplaySentPackets = 180U;
+    snapshot.netplayReceivedPackets = 179U;
+    snapshot.netplayQueuedFrames = 2U;
+    snapshot.netplayQueueCapacity = 256U;
+    snapshot.netplayPredictedFrames = 12U;
+    snapshot.netplayRollbackRequests = 2U;
+    snapshot.netplayRollbacks = 2U;
+    snapshot.netplayHistoryFrames = 9U;
+    snapshot.netplayHistoryBytes = 196'608U;
     snapshot.normalSpeedPercent = 125U;
     snapshot.slowMotionSpeedPercent = 50U;
     snapshot.fastForwardSpeedPercent = 800U;
@@ -87,6 +97,14 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     QStringLiteral("Run-ahead speculative frames: 84")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Run-ahead state bytes: 196608 / 262144")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Netplay: Authenticated peer connected")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Netplay packets: 180 sent / 179 received")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Netplay output queue: 2 / 256")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Netplay prediction/rollback: 12 predicted, 2 requested, 2 performed")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(

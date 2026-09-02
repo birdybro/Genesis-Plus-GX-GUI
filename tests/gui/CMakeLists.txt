@@ -2,6 +2,21 @@ qt_add_executable(genplusgx_main_window_test
   main_window_test.cpp
 )
 
+qt_add_executable(genplusgx_netplay_dialog_test netplay_dialog_test.cpp)
+set_target_properties(genplusgx_netplay_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_netplay_dialog_test
+  PRIVATE genplusgx::ui genplusgx_project_warnings Qt6::Test Qt6::Widgets
+)
+add_test(NAME gui.netplay COMMAND genplusgx_netplay_dialog_test)
+set_tests_properties(
+  gui.netplay
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;unit;integration;netplay;security;accessibility"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_localization_gui_test localization_test.cpp)
 set_target_properties(genplusgx_localization_gui_test PROPERTIES AUTOMOC ON)
 target_link_libraries(

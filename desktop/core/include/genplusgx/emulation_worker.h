@@ -3,6 +3,8 @@
 #include "genplusgx/core_adapter.h"
 #include "genplusgx/emulation_capture_sink.h"
 #include "genplusgx/input_snapshot.h"
+#include "genplusgx/netplay/netplay_bridge.h"
+#include "genplusgx/netplay/netplay_timeline.h"
 #include "genplusgx/run_ahead_configuration.h"
 #include "genplusgx/rewind_configuration.h"
 #include "genplusgx/audio_ring_buffer.h"
@@ -60,6 +62,9 @@ enum class EmulationCommandType {
   captureState,
   restoreState,
   debugRequest,
+  startNetplay,
+  remoteNetplayInput,
+  stopNetplay,
 };
 
 struct EmulationCommand final {
@@ -79,6 +84,8 @@ struct EmulationCommand final {
   std::vector<std::uint8_t> rawState;
   std::vector<CoreCheatPatch> coreCheats;
   CoreDebugRequest coreDebugRequest;
+  netplay::NetplayConfiguration netplayConfiguration;
+  netplay::NetplayInputFrame netplayInput;
 
   [[nodiscard]] static EmulationCommand simple(
     EmulationCommandType type,
@@ -137,6 +144,12 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand debug(
     std::uint64_t operationId,
     CoreDebugRequest request);
+  [[nodiscard]] static EmulationCommand startNetplaySession(
+    std::uint64_t operationId,
+    netplay::NetplayConfiguration configuration);
+  [[nodiscard]] static EmulationCommand remoteNetplayFrame(
+    std::uint64_t operationId,
+    netplay::NetplayInputFrame frame);
 };
 
 enum class EmulationWorkerError {
@@ -167,6 +180,9 @@ enum class EmulationEventType {
   debugResponse,
   debugBreakpointHit,
   runAheadDisabled,
+  netplayStarted,
+  netplayStopped,
+  netplayRollback,
   workerStopped,
 };
 
@@ -192,6 +208,8 @@ struct EmulationEvent final {
   bool runAheadActive{false};
   bool runAheadVerified{false};
   std::uint32_t runAheadFrames{1U};
+  bool netplayActive{false};
+  std::uint64_t netplayRollbackFrame{0U};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
   CoreDiscInfo disc;
@@ -244,6 +262,12 @@ struct EmulationWorkerMetrics final {
   std::uint64_t runAheadDeterminismFailures{0U};
   std::size_t runAheadStateBytes{0U};
   std::size_t runAheadStateCapacityBytes{0U};
+  bool netplayActive{false};
+  std::uint64_t netplayPredictedFrames{0U};
+  std::uint64_t netplayRollbackRequests{0U};
+  std::uint64_t netplayRollbacks{0U};
+  std::size_t netplayHistoryFrames{0U};
+  std::size_t netplayHistoryBytes{0U};
 };
 
 class EmulationWorker final {
@@ -255,7 +279,8 @@ public:
     std::shared_ptr<VideoFrameExchange> videoFrames = {},
     std::shared_ptr<StereoAudioRingBuffer> audioFrames = {},
     std::shared_ptr<BackupMemoryPersistence> backupPersistence = {},
-    std::shared_ptr<EmulationCaptureSink> captureSink = {});
+    std::shared_ptr<EmulationCaptureSink> captureSink = {},
+    std::shared_ptr<netplay::NetplayBridge> netplayBridge = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;

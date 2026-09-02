@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <atomic>
 #include <condition_variable>
+#include <deque>
 #include <mutex>
 #include <system_error>
 #include <utility>
@@ -18,6 +19,7 @@ namespace {
 using Clock = std::chrono::steady_clock;
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 constexpr std::size_t defaultAudioRingFrames = 12'000U;
+constexpr std::size_t maximumNetplayHistoryBytes = 64U * 1024U * 1024U;
 constexpr std::array backupMemoryKinds{
   BackupMemoryKind::cartridgeSram,
   BackupMemoryKind::scdInternalBram,
@@ -227,6 +229,24 @@ EmulationCommand EmulationCommand::debug(
   return command;
 }
 
+EmulationCommand EmulationCommand::startNetplaySession(
+  std::uint64_t operationId,
+  netplay::NetplayConfiguration configuration)
+{
+  auto command = simple(EmulationCommandType::startNetplay, operationId);
+  command.netplayConfiguration = configuration;
+  return command;
+}
+
+EmulationCommand EmulationCommand::remoteNetplayFrame(
+  std::uint64_t operationId,
+  netplay::NetplayInputFrame frame)
+{
+  auto command = simple(EmulationCommandType::remoteNetplayInput, operationId);
+  command.netplayInput = frame;
+  return command;
+}
+
 class EmulationWorker::Private final {
 public:
   Private(
@@ -237,7 +257,8 @@ public:
     std::shared_ptr<VideoFrameExchange> videoFrames,
     std::shared_ptr<StereoAudioRingBuffer> audioFrames,
     std::shared_ptr<BackupMemoryPersistence> backupPersistence,
-    std::shared_ptr<EmulationCaptureSink> captureSink)
+    std::shared_ptr<EmulationCaptureSink> captureSink,
+    std::shared_ptr<netplay::NetplayBridge> netplayBridge)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
@@ -248,7 +269,9 @@ public:
                                : std::make_shared<StereoAudioRingBuffer>(
                                    defaultAudioRingFrames)),
       backupPersistence_(std::move(backupPersistence)),
-      captureSink_(std::move(captureSink))
+      captureSink_(std::move(captureSink)),
+      netplayBridge_(netplayBridge ? std::move(netplayBridge)
+                                  : std::make_shared<netplay::NetplayBridge>())
   {
   }
 
@@ -271,6 +294,7 @@ public:
     rewinding_ = false;
     rewindBuffer_.clear();
     resetRunAheadSession(false);
+    resetNetplaySession(false);
     latestInput_ = {};
     hasLatestInput_ = false;
     frameBreakpoints_.clear();
@@ -504,6 +528,12 @@ public:
       .runAheadDeterminismFailures = runAheadDeterminismFailuresMetrics_,
       .runAheadStateBytes = runAheadStateBytesMetrics_,
       .runAheadStateCapacityBytes = runAheadStateCapacityBytesMetrics_,
+      .netplayActive = netplayActiveMetrics_,
+      .netplayPredictedFrames = netplayTimelineMetrics_.predictedFrames,
+      .netplayRollbackRequests = netplayTimelineMetrics_.rollbackRequests,
+      .netplayRollbacks = netplayRollbacksMetrics_,
+      .netplayHistoryFrames = netplayHistoryFramesMetrics_,
+      .netplayHistoryBytes = netplayHistoryBytesMetrics_,
     };
   }
 
@@ -686,6 +716,7 @@ private:
   void finishThread(CoreAdapter& adapter)
   {
     pacer_.pause();
+    resetNetplaySession(true);
     updateMetrics(adapter);
     const auto persisted = saveBackupMemory(adapter);
     const auto shutdown = adapter.shutdown();
@@ -720,7 +751,18 @@ private:
     CoreDebugResponse debugResponse;
     const auto current = owner_.state_.load(std::memory_order_acquire);
 
-    switch (command.type) {
+    const bool blockedByNetplay = netplayTimeline_.active() &&
+      command.type != EmulationCommandType::inputSnapshot &&
+      command.type != EmulationCommandType::remoteNetplayInput &&
+      command.type != EmulationCommandType::stopNetplay &&
+      command.type != EmulationCommandType::resume &&
+      command.type != EmulationCommandType::start;
+    if (blockedByNetplay) {
+      coreResult = {
+        CoreError::invalidStatePayload,
+        "That operation is unavailable during an active netplay session.",
+      };
+    } else switch (command.type) {
       case EmulationCommandType::loadGame: {
         frameBreakpoints_.clear();
         frameBreakpointClientToken_ = 0U;
@@ -734,6 +776,7 @@ private:
           break;
         }
         resetRunAheadSession(true);
+        resetNetplaySession(true);
         latestInput_ = {};
         hasLatestInput_ = false;
         discardLatestFrame();
@@ -783,6 +826,7 @@ private:
         if (coreResult) {
           endBackupGame();
           resetRunAheadSession(true);
+          resetNetplaySession(true);
           runAheadSupported_ = false;
           latestInput_ = {};
           hasLatestInput_ = false;
@@ -1100,6 +1144,86 @@ private:
         }
         break;
       }
+      case EmulationCommandType::startNetplay:
+        validTransition =
+          (current == EmulationWorkerState::paused ||
+           current == EmulationWorkerState::running) &&
+          adapter.state() == CoreLifecycleState::loaded;
+        if (validTransition && !command.netplayConfiguration.valid()) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            "The netplay player assignment, delay, or rollback window is invalid.",
+          };
+        } else if (validTransition) {
+          pacer_.pause();
+          discardLatestFrame();
+          rewindBuffer_.clear();
+          rewinding_ = false;
+          fastForward_ = false;
+          slowMotion_ = false;
+          resetRunAheadSession(true);
+          audioFrames_->clear();
+          coreResult = adapter.reset();
+          if (coreResult) {
+            coreResult = configurePacing(adapter, false);
+          }
+          if (coreResult) {
+            const auto configured = netplayTimeline_.configure(
+              command.netplayConfiguration, adapter.frameCount());
+            if (!configured) {
+              coreResult = {
+                CoreError::invalidStatePayload,
+                configured.message,
+              };
+            }
+          }
+          if (!coreResult) {
+            owner_.state_.store(
+              EmulationWorkerState::paused, std::memory_order_release);
+          } else {
+            netplayHistory_.clear();
+            netplayHistoryBytes_ = 0U;
+            netplayInputSequence_ = std::max(
+              adapter.appliedInputSequence(), latestInput_.sequence);
+            netplayBridge_->clear();
+            frameBreakpoints_.clear();
+            frameBreakpointClientToken_ = 0U;
+            lastBreakpointHit_.reset();
+            owner_.state_.store(
+              EmulationWorkerState::running, std::memory_order_release);
+            pacer_.resume(Clock::now());
+            eventType = EmulationEventType::netplayStarted;
+          }
+        }
+        break;
+      case EmulationCommandType::remoteNetplayInput: {
+        validTransition = netplayTimeline_.active() &&
+          (current == EmulationWorkerState::paused ||
+           current == EmulationWorkerState::running);
+        if (validTransition) {
+          const auto submitted = netplayTimeline_.submitRemote(
+            command.netplayInput, adapter.frameCount());
+          if (!submitted) {
+            coreResult = {
+              CoreError::invalidStatePayload,
+              submitted.message,
+            };
+          }
+        }
+        break;
+      }
+      case EmulationCommandType::stopNetplay:
+        validTransition = netplayTimeline_.active();
+        if (validTransition) {
+          resetNetplaySession(true);
+          if (hasLatestInput_) {
+            auto restoredInput = latestInput_;
+            restoredInput.sequence = ++netplayInputSequence_;
+            coreResult = adapter.setInputSnapshot(restoredInput);
+          }
+          eventType = EmulationEventType::netplayStopped;
+        }
+        break;
     }
 
     updateMetrics(adapter);
@@ -1164,6 +1288,7 @@ private:
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     populateRunAheadEvent(event, adapter);
     event.rawState = std::move(capturedState);
+    event.netplayActive = netplayTimeline_.active();
     event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
       static_cast<void>(adapter.discInfo(event.disc));
@@ -1186,13 +1311,14 @@ private:
       event.message = result.message;
       event.frameNumber = adapter.frameCount();
       event.hardware = adapter.hardware();
+      event.netplayActive = netplayTimeline_.active();
       publishOperation(std::move(event));
       return;
     }
 
     pacer_.frameExecuted(Clock::now());
     auto frameState = EmulationWorkerState::running;
-    if (!rewinding_) {
+    if (!rewinding_ && !netplayTimeline_.active()) {
       if (const auto breakpoint = matchingFrameBreakpoint(adapter)) {
         frameState = EmulationWorkerState::paused;
         owner_.state_.store(frameState, std::memory_order_release);
@@ -1301,6 +1427,9 @@ private:
 
   CoreResult executeOneFrame(CoreAdapter& adapter)
   {
+    if (netplayTimeline_.active()) {
+      return executeNetplayFrame(adapter);
+    }
     if (rewinding_) {
       const auto currentFrame = adapter.frameCount();
       const auto latestUsableState = currentFrame > 0U
@@ -1342,6 +1471,136 @@ private:
         "The bounded rewind history rejected a core snapshot.",
       };
     }
+    return {};
+  }
+
+  struct NetplayHistoryEntry final {
+    std::uint64_t frameNumber{0U};
+    CoreRollbackState state;
+  };
+
+  [[nodiscard]] static std::size_t netplayStateBytes(
+    const CoreRollbackState& state) noexcept
+  {
+    return state.rawState.size() + state.transientSystemState.size();
+  }
+
+  CoreResult captureNetplayHistory(
+    CoreAdapter& adapter,
+    std::uint64_t frameNumber)
+  {
+    CoreRollbackState state;
+    const auto maximumEntries = static_cast<std::size_t>(
+      netplayTimeline_.configuration().rollbackFrames) + 1U;
+    if (netplayHistory_.size() >= maximumEntries) {
+      netplayHistoryBytes_ -= netplayStateBytes(netplayHistory_.front().state);
+      state = std::move(netplayHistory_.front().state);
+      netplayHistory_.pop_front();
+    }
+    if (const auto saved = adapter.saveRollbackState(state); !saved) {
+      return saved;
+    }
+    const auto bytes = netplayStateBytes(state);
+    if (bytes > maximumNetplayHistoryBytes ||
+        netplayHistoryBytes_ > maximumNetplayHistoryBytes - bytes) {
+      return {
+        CoreError::stateSaveFailed,
+        "The bounded netplay rollback history reached its 64 MiB limit.",
+      };
+    }
+    netplayHistoryBytes_ += bytes;
+    netplayHistory_.push_back({frameNumber, std::move(state)});
+    return {};
+  }
+
+  CoreResult performNetplayRollback(CoreAdapter& adapter)
+  {
+    const auto requested = netplayTimeline_.takeRollbackRequest();
+    if (!requested || *requested >= adapter.frameCount()) {
+      return {};
+    }
+    const auto targetFrame = adapter.frameCount();
+    const auto found = std::ranges::find_if(
+      netplayHistory_, [requested](const auto& entry) {
+        return entry.frameNumber == *requested;
+      });
+    if (found == netplayHistory_.end()) {
+      return {
+        CoreError::stateLoadFailed,
+        "A late peer input arrived after its rollback snapshot was discarded.",
+      };
+    }
+    if (const auto restored = adapter.restoreRollbackState(found->state);
+        !restored) {
+      return restored;
+    }
+    for (auto erase = found; erase != netplayHistory_.end(); ++erase) {
+      netplayHistoryBytes_ -= netplayStateBytes(erase->state);
+    }
+    netplayHistory_.erase(found, netplayHistory_.end());
+    netplayTimeline_.discardFrom(*requested);
+    audioFrames_->clear();
+
+    while (adapter.frameCount() < targetFrame) {
+      const auto frameNumber = adapter.frameCount();
+      if (const auto captured = captureNetplayHistory(adapter, frameNumber);
+          !captured) {
+        return captured;
+      }
+      auto replay = netplayTimeline_.replayInput(frameNumber);
+      replay.sequence = ++netplayInputSequence_;
+      if (const auto applied = adapter.setInputSnapshot(replay); !applied) {
+        return applied;
+      }
+      if (const auto executed = adapter.runFrame(false); !executed) {
+        return executed;
+      }
+      CoreAudioBatchInfo discardedAudio;
+      if (const auto drained = transferCoreAudio(
+            adapter, false, discardedAudio); !drained) {
+        return drained;
+      }
+    }
+    ++netplayRollbacks_;
+    auto event = eventFor(
+      EmulationEventType::netplayRollback,
+      owner_.state_.load(std::memory_order_acquire));
+    event.frameNumber = adapter.frameCount();
+    event.hardware = adapter.hardware();
+    event.netplayActive = true;
+    event.netplayRollbackFrame = *requested;
+    publishOperation(std::move(event));
+    return {};
+  }
+
+  CoreResult executeNetplayFrame(CoreAdapter& adapter)
+  {
+    if (const auto rolledBack = performNetplayRollback(adapter); !rolledBack) {
+      return rolledBack;
+    }
+    const auto frameNumber = adapter.frameCount();
+    if (const auto captured = captureNetplayHistory(adapter, frameNumber);
+        !captured) {
+      return captured;
+    }
+    auto prepared = netplayTimeline_.prepareFrame(
+      frameNumber, hasLatestInput_ ? latestInput_ : InputSnapshot{});
+    if (const auto queued = netplayBridge_->submitOutgoing(prepared.outgoing);
+        !queued) {
+      return {
+        CoreError::invalidStatePayload,
+        queued.message,
+      };
+    }
+    prepared.combined.sequence = ++netplayInputSequence_;
+    if (const auto applied = adapter.setInputSnapshot(prepared.combined);
+        !applied) {
+      return applied;
+    }
+    if (const auto executed = executeCoreFrame(adapter, true); !executed) {
+      return executed;
+    }
+    netplayTimeline_.prune(adapter.frameCount());
     return {};
   }
 
@@ -1654,6 +1913,22 @@ private:
       runAheadRollbackState_.rawState.capacity() +
       runAheadRollbackState_.transientSystemState.capacity() +
       runAheadFirstFrameState_.capacity() + runAheadCanonicalState_.capacity();
+    netplayTimelineMetrics_ = netplayTimeline_.metrics();
+    netplayActiveMetrics_ = netplayTimeline_.active();
+    netplayRollbacksMetrics_ = netplayRollbacks_;
+    netplayHistoryFramesMetrics_ = netplayHistory_.size();
+    netplayHistoryBytesMetrics_ = netplayHistoryBytes_;
+  }
+
+  void resetNetplaySession(bool preserveCounters) noexcept
+  {
+    netplayTimeline_.reset();
+    netplayHistory_.clear();
+    netplayHistoryBytes_ = 0U;
+    netplayBridge_->clear();
+    if (!preserveCounters) {
+      netplayRollbacks_ = 0U;
+    }
   }
 
   void resetRunAheadSession(bool preserveCounters) noexcept
@@ -1732,10 +2007,16 @@ private:
   std::shared_ptr<StereoAudioRingBuffer> audioFrames_;
   std::shared_ptr<BackupMemoryPersistence> backupPersistence_;
   std::shared_ptr<EmulationCaptureSink> captureSink_;
+  std::shared_ptr<netplay::NetplayBridge> netplayBridge_;
   bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
   std::array<std::uint16_t, maximumCoreSurfacePixels> runAheadVideoScratch_{};
   CoreRollbackState runAheadRollbackState_;
+  netplay::NetplayTimeline netplayTimeline_;
+  std::deque<NetplayHistoryEntry> netplayHistory_;
+  std::size_t netplayHistoryBytes_{0U};
+  std::uint64_t netplayRollbacks_{0U};
+  std::uint64_t netplayInputSequence_{0U};
   std::vector<std::uint8_t> runAheadFirstFrameState_;
   std::vector<std::uint8_t> runAheadCanonicalState_;
   InputSnapshot latestInput_;
@@ -1763,6 +2044,11 @@ private:
   std::uint64_t runAheadDeterminismFailuresMetrics_{0U};
   std::size_t runAheadStateBytesMetrics_{0U};
   std::size_t runAheadStateCapacityBytesMetrics_{0U};
+  netplay::NetplayTimelineMetrics netplayTimelineMetrics_;
+  bool netplayActiveMetrics_{false};
+  std::uint64_t netplayRollbacksMetrics_{0U};
+  std::size_t netplayHistoryFramesMetrics_{0U};
+  std::size_t netplayHistoryBytesMetrics_{0U};
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
@@ -1786,7 +2072,8 @@ EmulationWorker::EmulationWorker(
   std::shared_ptr<VideoFrameExchange> videoFrames,
   std::shared_ptr<StereoAudioRingBuffer> audioFrames,
   std::shared_ptr<BackupMemoryPersistence> backupPersistence,
-  std::shared_ptr<EmulationCaptureSink> captureSink)
+  std::shared_ptr<EmulationCaptureSink> captureSink,
+  std::shared_ptr<netplay::NetplayBridge> netplayBridge)
   : private_(std::make_unique<Private>(
       *this,
       commandCapacity,
@@ -1795,7 +2082,8 @@ EmulationWorker::EmulationWorker(
       std::move(videoFrames),
       std::move(audioFrames),
       std::move(backupPersistence),
-      std::move(captureSink)))
+      std::move(captureSink),
+      std::move(netplayBridge)))
 {
 }
 
