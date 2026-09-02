@@ -1260,6 +1260,9 @@ worker, rollback, video, audio, and input route in separate processes.
   compatibility checks, host Player 1/guest Player 2 ownership, configurable input
   delay and bounded owner-thread rollback, replay/tamper rejection, deterministic
   lockouts, safe diagnostics, and clean disconnect/shutdown.
+- [x] Disabled-by-default RetroAchievements through the official rcheevos client, with
+  bounded provider transport, secure native token storage, achievements, leaderboards,
+  rich presence, owner-thread evaluation, and enforceable recognition-gated Hardcore.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
   disc change/eject, native Windows/Linux/macOS original-disc import with bounded
   progress/cancellation, and missing-firmware errors without bundled firmware.
@@ -1279,10 +1282,10 @@ worker, rollback, video, audio, and input route in separate processes.
   guarded release workflows; complete user, developer, architecture, testing, and legal
   documentation.
 
-## Milestone 95 local candidate validation
+## Milestone 95 validation
 
-The disabled-by-default RetroAchievements integration is locally release-gated and is
-awaiting the exact pushed-commit hosted matrix before the milestone is marked complete.
+The disabled-by-default RetroAchievements integration is locally and remotely
+release-gated.
 It uses checksum-pinned rcheevos 12.4.0 through `rc_client`, a bounded HTTPS bridge, and
 QtKeychain with plaintext fallback disabled. Achievement evaluation and all emulated
 memory reads remain on the authoritative emulation owner thread. The Genesis Plus GX
@@ -1311,10 +1314,25 @@ A fresh Linux Release stage passed the production package verifier, installed `-
 and offscreen event-loop smoke, runtime dependency inspection, TGZ generation, checksum
 verification, and archive inspection. The archive contains `ACHIEVEMENTS.md`, the
 rcheevos MIT license, and the QtKeychain BSD-3-Clause license. `xvfb-run` is unavailable
-in this local host image, so the native XCB package smoke is deferred to the required
-hosted Linux Release job. The user-supplied NAS ROM directory is also not mounted; no
-optional proprietary-ROM run was substituted. Legal generated fixtures execute the same
-production adapter, worker, state, and GUI paths.
+in this local host image, so the native XCB package smoke was deferred to the required
+hosted Linux Release job, where it passed. The user-supplied NAS ROM directory is also
+not mounted; no optional proprietary-ROM run was substituted. Legal generated fixtures
+execute the same production adapter, worker, state, and GUI paths.
+
+Exact hosted run
+[`33623279437`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33623279437)
+at `95695f20f8de4e627bc3823ad1ceaef29a5db380` passes all ten CI jobs. Windows
+Debug/Release, Linux Debug/Release/ASan+UBSan, macOS arm64 Debug/Release, and macOS
+x86_64 Debug/Release each register and pass 121/121 tests; the strict Linux legacy job
+also passes. The only skips are the two established Windows hosted-software-renderer
+OpenGL 3.3 cases, while Linux and both macOS architectures execute the real shader test.
+
+The complete combined log contains 16,798 lines and 2,265,117 bytes. It contains no
+authored warning, workflow annotation, sanitizer finding, failed test, package error, or
+nonzero process result. Four artifact bundles were downloaded and independently checked:
+all six TGZ/ZIP/DMG SHA-256 files verify; native package verifiers passed; executable,
+documentation, rcheevos, and QtKeychain license payloads are present; and no game, BIOS,
+firmware, or save image was packaged.
 
 ## Adversarial review
 
@@ -1370,6 +1388,10 @@ directories.
   automatic NAT traversal, spectators, encrypted traffic, host migration, synchronized
   pause, and mid-session state transfer are not. Users needing traffic privacy should
   use a trusted network or encrypted peer VPN.
+- RetroAchievements requires a user-provided account, network access, provider support
+  for the exact game revision, and an available native credential service for session
+  retention. CI uses a deterministic official-client protocol fixture and never stores
+  or transmits a real account credential.
 - ZIP support is intentionally limited to stored/deflated cartridge members; archived
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can

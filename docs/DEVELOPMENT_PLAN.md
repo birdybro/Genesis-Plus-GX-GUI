@@ -3785,8 +3785,8 @@ cannot contain its own SHA)
 
 ## Milestone 95 detail
 
-**Status:** LOCAL GATES COMPLETE — exact pushed-commit hosted matrix and artifact audit
-pending before the milestone is closed.
+**Status:** COMPLETE — implementation, local matrices, exact hosted matrix, complete-log
+inspection, and downloaded-package audit all pass.
 
 **Goal:** Add disabled-by-default RetroAchievements support through its official client
 without allowing networking, UI timing, or Hardcore policy to weaken the authoritative
@@ -3824,7 +3824,27 @@ achievement guide and both dependency licenses. The supplied NAS ROM directory i
 mounted on this host, so no optional proprietary-ROM smoke was attempted; generated
 CC0 fixtures traverse the production core/worker/GUI path. Exact hosted Windows, Linux,
 Apple Silicon, and Intel validation plus complete-log and downloaded-artifact inspection
-begin only after this candidate commit is pushed.
+are recorded below for the pushed candidate.
+
+Exact-SHA hosted run
+[`33623279437`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33623279437)
+at `95695f20f8de4e627bc3823ad1ceaef29a5db380` passes all ten jobs: Windows
+Debug/Release; Linux Debug/Release/ASan+UBSan/legacy; macOS arm64 Debug/Release; and
+macOS x86_64 Debug/Release. Each of the nine CMake jobs registers and passes 121/121
+tests. Windows skips only the documented real-OpenGL shader-render case because its
+hosted software context is below OpenGL 3.3; Linux and both macOS architectures execute
+that test.
+
+All 16,798 combined log lines (2,265,117 bytes) were scanned. There is no authored
+compiler/linker warning, workflow annotation, sanitizer finding, test failure, or
+nonzero process result. The remaining diagnostic-like text is limited to successful
+negative release tests, expected CMake platform probes, Git's hosted-runner initialization
+hint, and the two documented Windows OpenGL skips. All four Release package jobs pass
+their native layout/version/event-loop verifier. The four downloaded artifact bundles
+contain six platform archives and checksum files; every SHA-256 verifies, each archive
+contains its executable/app plus `ACHIEVEMENTS.md` and both new dependency licenses,
+and a prohibited-payload scan finds no game, firmware, or save image. Milestone 95 is
+complete.
 
 **Acceptance criteria:** The emulator remains fully functional offline; the password is
 never persisted and the returned token uses only a secure platform store; provider
