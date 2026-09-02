@@ -50,7 +50,6 @@ target_link_libraries(
   genplusgx_physical_media_gui_test
   PRIVATE
     genplusgx::ui
-    GenesisPlusGX::Platform
     genplusgx_project_warnings
     genplusgx_test_utilities
     Qt6::Test

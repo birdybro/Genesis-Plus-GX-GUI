@@ -421,8 +421,13 @@ pass after correction. Corrective hosted run
 passes all ten jobs. Its complete 15,517-line log contains no compiler, test, sanitizer,
 or runtime failure, but the required audit found Apple linker warnings for repeated
 static archives. Capability-aware CMake link de-duplication is now enabled on CMake
-3.29 and newer, with the CMake 3.25 fallback retained. A warning-clean hosted rerun and
-artifact audit remain required before Milestone 93 closes.
+3.29 and newer, with the CMake 3.25 fallback retained. Verification run
+[`33589911472`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33589911472)
+passes all ten jobs and removes all but eight warning lines: the app and physical-media
+GUI test each still linked the platform archive both directly and through the UI's
+public interface in all four macOS configurations. Those two redundant direct edges
+are now removed. A warning-clean hosted rerun and artifact audit remain required before
+Milestone 93 closes.
 
 ## Build configurations tested
 

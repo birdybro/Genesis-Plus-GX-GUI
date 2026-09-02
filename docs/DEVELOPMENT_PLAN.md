@@ -4396,9 +4396,14 @@ pass again after those corrections. Corrective hosted run
 passes all ten jobs, but the required complete-log audit found Apple's linker still
 reporting harmless duplicate static archives inherited from CMake's legacy link-line
 policy. The project now opts into CMake's capability-aware archive de-duplication when
-available (and preserves the documented CMake 3.25 fallback). A warning-clean hosted
-rerun, complete log review, and artifact audit are still required before the milestone
-can be marked complete.
+available (and preserves the documented CMake 3.25 fallback). Verification run
+[`33589911472`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33589911472)
+passes all ten jobs and removes every repeated persistence/game-file archive. Its
+15,430-line audit narrows the remaining warning to two targets that each named the
+platform archive directly and also consumed it through the UI's required public API;
+those redundant direct edges are now removed. A warning-clean hosted rerun, complete
+log review, and artifact audit are still required before the milestone can be marked
+complete.
 
 **Acceptance criteria:** Native code opens optical devices read-only; GUI/core threads
 never own those handles; sector, disc, queue, path, and cache sizes are bounded; imports
