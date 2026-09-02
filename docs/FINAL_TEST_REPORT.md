@@ -5,7 +5,7 @@ Linux startup correction, tagged-release audits, and the post-release Libretro s
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
 synchronization, local bezel/overlay, cheat import/search, portable-mode, and
-localization verification and the in-progress advanced-debugger verification through 2026-09-01
+localization and advanced-debugger verification through 2026-09-02
 (America/Denver).
 
 ## Candidate identity
@@ -49,6 +49,8 @@ localization verification and the in-progress advanced-debugger verification thr
   `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
 - Exact localization implementation and hosted evidence baseline:
   `58e624e573e9d7e9d8768edb04e4f77617f07602`
+- Exact advanced-debugger implementation and hosted evidence baseline:
+  `cfa611a2ebbcba76862f7a80255ee1b75e31f453`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -342,7 +344,7 @@ the declared Qt 6.8 minimum and adds a compatibility regression. The complete
 7,671-line, 1,002,995-byte failed-run log contains that one repeated root cause and no
 second project issue.
 
-## Advanced debugger verification (in progress)
+## Advanced debugger verification
 
 Milestone 92 adds owner-thread paused single-instruction execution for the real 68000
 and Z80 engines, an opt-in 4,096-entry circular execution trace with explicit loss
@@ -363,11 +365,25 @@ applicable tests. The fresh Clang log contains no warning diagnostic after makin
 pre-existing inherited Tremor/libchdr exceptions host-independent and target-local.
 The strict legacy libretro target builds, links, and cleans warning-free. A fresh Linux
 stage and TGZ pass the production package verifier, checksum, dependency, offscreen,
-real XCB event-loop, extracted-layout, and prohibited-payload checks. Exact pushed
-GitHub Actions, complete log inspection, and downloaded-artifact audit are still
-pending, so this section does not yet claim Milestone 92 completion. The user-supplied
-Phantasy Star IV NAS path was not mounted during this gate; the optional real-ROM runner
-was therefore unavailable and no copyrighted substitute was fetched.
+real XCB event-loop, extracted-layout, and prohibited-payload checks.
+
+Exact implementation run
+[`33579204982`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33579204982)
+passes all ten jobs. All nine native jobs register 109 tests. Linux Debug, Release, and
+ASan/UBSan plus macOS arm64/x86_64 Debug/Release pass all 109; Windows Debug/Release
+pass 108 plus the established OpenGL 3.3 software-runner capability skip. The four
+debugger-focused tests pass on every native configuration. The complete logs total
+15,222 lines and 1,582,568 bytes and contain no authored warning, test failure,
+sanitizer/runtime finding, timeout, or unexplained skip.
+
+The four downloaded artifact families contain six checksum-valid packages: Linux
+x86-64 TGZ, Windows x86-64 ZIP, and macOS arm64/x86_64 ZIP and DMG pairs. Archive
+integrity, all four extracted production layouts, the four declared executable
+architectures, all 22 Linux ELF dependencies, downloaded Linux offscreen and real XCB
+portable startup/shutdown, the shipped pseudo catalog/debugger guide, and the
+prohibited-payload scan pass. The user-supplied Phantasy Star IV NAS path was not
+mounted during this gate; the optional real-ROM runner was therefore unavailable and
+no copyrighted substitute was fetched. Milestone 92 is complete.
 
 ## Build configurations tested
 

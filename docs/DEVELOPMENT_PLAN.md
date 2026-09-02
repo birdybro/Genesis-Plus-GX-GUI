@@ -103,7 +103,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
-| 92 Advanced debugger | IN PROGRESS | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
+| 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
@@ -4274,7 +4274,7 @@ canonical macOS package correction and exact hosted baseline
 
 ## Milestone 92 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Extend the hidden debugger with real paused CPU instruction stepping,
 bounded opt-in execution tracing, local symbols, and a safe file-only external-analysis
@@ -4309,12 +4309,29 @@ Linux stage passes the production self-contained-package verifier, offscreen and
 XCB event-loop startup/shutdown, TGZ creation, checksum verification, extracted-layout
 verification, dependency resolution, and the prohibited-ROM/firmware/save scan. The
 required Xvfb package smoke remains assigned to hosted Ubuntu because this local host
-does not provide `xvfb-run`. The previously supplied Phantasy Star IV NAS directory was
-not mounted for this gate, so the optional copyrighted-ROM acceptance runner could not
-be repeated; all required hook, option, and lifecycle coverage uses the generated legal
-fixtures. Exact pushed hosted gates and their complete log/artifact audit remain pending;
-this milestone cannot be marked complete or permit Milestone 93 to begin until those
-results pass.
+does not provide `xvfb-run`. Exact implementation run
+[`33579204982`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33579204982)
+passes all ten jobs at `cfa611a2ebbcba76862f7a80255ee1b75e31f453`. Every one of
+the nine native configurations registers 109 tests: Linux and both macOS architectures
+pass all 109 in Debug/Release plus Linux ASan/UBSan; Windows Debug/Release each pass 108
+and report only the established capability skip for a hosted software context that
+cannot create OpenGL 3.3. All four debugger-focused tests pass in every native job.
+
+The complete ten-job logs comprise 15,222 lines and 1,582,568 bytes. Inspection found
+no authored compiler warning, test failure, sanitizer/runtime finding, timeout, or
+unexplained skip; Windows pthread probes and optional Vulkan-header discovery are
+normal CMake/Qt capability checks. Four downloaded artifact families contain six
+checksum-verified distributions (Linux TGZ, Windows ZIP, and arm64/x86_64 macOS ZIP
+plus DMG). Every archive and all four extracted layouts pass the production package
+verifier. Their main binaries are respectively ELF x86-64, PE32+ x86-64, Mach-O arm64,
+and Mach-O x86_64; all 22 packaged Linux ELF objects resolve without a missing
+dependency. The downloaded Linux build passes `--version` plus complete offscreen and
+real XCB portable event-loop startup/shutdown. Every layout contains the pseudo catalog
+and updated debugger guide, and the scan outside documentation/licenses finds no ROM,
+firmware, save, state, secret, or pre-created portable-data payload. The previously
+supplied Phantasy Star IV NAS directory was not mounted for this gate, so the optional
+copyrighted-ROM acceptance runner could not be repeated; all required hook, option,
+and lifecycle coverage uses the generated legal fixtures.
 
 **Acceptance criteria:** Only the selected CPU executes during a paused instruction
 step; running mutation is rejected by the worker; trace storage and UI history cannot
@@ -4323,7 +4340,7 @@ hook; malformed symbol files preserve the prior table; external integration is a
 atomic read-only JSON file rather than a listening service; hidden-default behavior and
 all prior emulator workflows remain unchanged.
 
-**Commit SHA:** pending
+**Commit SHA:** implementation `cfa611a2ebbcba76862f7a80255ee1b75e31f453`
 
 ## Milestone 83 detail
 
