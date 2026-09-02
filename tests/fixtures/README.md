@@ -277,6 +277,22 @@ snapshot/search model, creates typed Action Replay/Fusion RAM codes, applies the
 through the real core boundary, and verifies the values are restored. No imported list
 or generated artifact is committed.
 
+## Generated input-movie and stream fixtures
+
+`unit.input_movie` constructs a short `GPGXMOV1` movie in memory from invented SHA-256
+identifiers, a 2 KiB byte ramp as a stand-in raw state, and original controller patterns.
+It writes only Qt-temporary files for deterministic round trips and 64 fixed corruption
+mutations. `integration.input_movie` records and replays the project-authored Genesis
+RAM-marker ROM through the real emulation worker, so its raw initial state and input
+timeline exist only in memory and are deleted with the generated ROM.
+
+`unit.streaming_service` uses a 2×2 RGB565 red/green/blue/white pattern and four invented
+stereo samples. `integration.streaming` uses the same CC0 Genesis RAM-marker program as
+the core suite and receives its real native frame/audio batch through a loopback TCP
+socket. No network request leaves localhost, and no stream packet, movie, ROM, audio,
+or image output is committed. All newly generated fixture data is original project test
+material dedicated to CC0-1.0.
+
 ## Generated ZIP and M3U container fixtures
 
 `unit.game_file`, `integration.archive_playlist`, `gui.game_loading`, and

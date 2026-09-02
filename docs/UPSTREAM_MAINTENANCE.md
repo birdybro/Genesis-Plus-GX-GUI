@@ -80,6 +80,10 @@ Inspect these boundaries before trusting a successful compile:
 9. Libretro shader support is entirely downstream of the copied framebuffer. Updating
    librashader or its C ABI belongs in `cmake/Librashader.cmake` and `desktop/video`;
    it must not be mixed into the inherited libretro frontend or emulator core.
+10. Input movies preserve the opaque raw state payload but own identity, framing, and
+    input timelines under `desktop/movies`; local streaming consumes only the existing
+    frontend capture copy under `desktop/capture`. After a state/input/frame ABI change,
+    rerun both integration workflows without moving either facility into `core/`.
 
 Do not paper over an adapter failure by weakening a deterministic expected result.
 Determine whether upstream intentionally corrected behavior, a frontend assumption is

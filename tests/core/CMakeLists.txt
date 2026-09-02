@@ -469,6 +469,25 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+add_executable(genplusgx_input_movie_workflow_test input_movie_workflow_test.cpp)
+target_link_libraries(genplusgx_input_movie_workflow_test PRIVATE
+  GenesisPlusGX::CoreAdapter GenesisPlusGX::Movies
+  genplusgx_test_utilities genplusgx_project_warnings)
+add_test(NAME integration.input_movie COMMAND genplusgx_input_movie_workflow_test)
+set_tests_properties(integration.input_movie PROPERTIES
+  LABELS "core;integration;movies;tas;input;state;determinism;fixture;concurrency;lifecycle"
+  TIMEOUT 30)
+
+add_executable(genplusgx_streaming_workflow_test streaming_workflow_test.cpp)
+target_link_libraries(genplusgx_streaming_workflow_test PRIVATE
+  GenesisPlusGX::Capture GenesisPlusGX::CoreAdapter
+  genplusgx_test_utilities genplusgx_project_warnings
+  Qt6::Core Qt6::Network)
+add_test(NAME integration.streaming COMMAND genplusgx_streaming_workflow_test)
+set_tests_properties(integration.streaming PROPERTIES
+  LABELS "core;integration;streaming;network;loopback;video;audio;fixture;concurrency;lifecycle;bounded"
+  TIMEOUT 30)
+
 add_executable(genplusgx_timing_pacing_test timing_pacing_test.cpp)
 target_link_libraries(
   genplusgx_timing_pacing_test

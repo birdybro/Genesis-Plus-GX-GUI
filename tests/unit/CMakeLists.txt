@@ -673,6 +673,23 @@ target_link_libraries(
     Qt6::Gui
     Threads::Threads
 )
+
+add_executable(genplusgx_input_movie_test input_movie_test.cpp)
+target_link_libraries(genplusgx_input_movie_test PRIVATE
+  GenesisPlusGX::Movies genplusgx_project_warnings Qt6::Core)
+add_test(NAME unit.input_movie COMMAND genplusgx_input_movie_test)
+set_tests_properties(unit.input_movie PROPERTIES
+  LABELS "unit;movies;tas;input;state;filesystem;security;fuzz;bounded"
+  TIMEOUT 30)
+
+add_executable(genplusgx_streaming_service_test streaming_service_test.cpp)
+target_link_libraries(genplusgx_streaming_service_test PRIVATE
+  GenesisPlusGX::Capture genplusgx_project_warnings
+  Qt6::Core Qt6::Network Threads::Threads)
+add_test(NAME unit.streaming_service COMMAND genplusgx_streaming_service_test)
+set_tests_properties(unit.streaming_service PROPERTIES
+  LABELS "unit;integration;streaming;network;loopback;video;audio;concurrency;bounded"
+  TIMEOUT 30)
 add_test(NAME unit.recording_service COMMAND genplusgx_recording_service_test)
 set_tests_properties(
   unit.recording_service

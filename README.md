@@ -60,6 +60,10 @@ rewritten.
   manager, validated import/export, and strict game/hardware identity checks
 - Bounded lossless A/V recording with native sequential PNG frame dumps, stereo PCM
   WAV audio, explicit drop metrics, and atomic session finalization
+- Deterministic identity-checked input movies with exact frame-boundary recording,
+  playback, rerecord accounting, and an accessible eight-port TAS timeline editor
+- Loopback-only bounded native RGB565/S16 A/V streaming with multi-client limits,
+  slow-client eviction, drop/queue instrumentation, and a documented wire protocol
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
 - Opt-in authenticated direct TCP netplay for one peer, with content/build/settings
@@ -307,6 +311,8 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Local bezels and overlays](docs/ARTWORK_OVERLAYS.md)
 - [Display synchronization](docs/DISPLAY_SYNCHRONIZATION.md)
 - [Lossless recording](docs/RECORDING.md)
+- [Input movies and TAS editing](docs/INPUT_MOVIES.md)
+- [Local A/V streaming protocol](docs/STREAMING.md)
 - [Run-ahead](docs/RUN_AHEAD.md)
 - [Netplay](docs/NETPLAY.md)
 - [RetroAchievements](docs/ACHIEVEMENTS.md)

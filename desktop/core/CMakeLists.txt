@@ -351,6 +351,7 @@ target_link_libraries(
     GenesisPlusGX::Core
     GenesisPlusGX::FrontendTypes
     GenesisPlusGX::NetplayCore
+    GenesisPlusGX::Movies
     GenesisPlusGX::Timing
     GenesisPlusGX::VideoExchange
   PRIVATE

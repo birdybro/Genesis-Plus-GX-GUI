@@ -11,7 +11,9 @@ core/                 Authoritative Genesis Plus GX emulator sources
 desktop/core/         C host bridge, C++ adapter, worker, commands/events
 desktop/video/        Bounded frame exchange, geometry, display widget
 desktop/audio/        Bounded SDL3 audio output and metrics
+desktop/capture/      Bounded lossless recording and loopback A/V fan-out
 desktop/input/        Neutral mappings, profiles, SDL controller service
+desktop/movies/       Versioned deterministic input movies and TAS mutations
 desktop/persistence/  Platform roots, save RAM, state wrappers, recents
 desktop/settings/     Versioned global and sparse per-game settings
 desktop/localization/ Qt catalog selection, discovery, fallback, and status
@@ -35,6 +37,8 @@ newest state. Worker events are delivered back to Qt through queued signals.
 
 Video uses three preallocated exchange slots. Audio uses a bounded single-producer/
 single-consumer ring. Input is an immutable snapshot consumed at a frame boundary.
+Input-movie selection remains on the emulation owner thread; capture sinks receive only
+copied native output through fixed queues and never call back into the core.
 Never call core lifecycle/frame/state functions from a widget callback, retain raw frame
 pointers across an exchange, block the SDL callback, or create an unbounded per-frame
 event queue.

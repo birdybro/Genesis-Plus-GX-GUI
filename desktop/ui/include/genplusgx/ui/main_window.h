@@ -12,6 +12,7 @@
 #include "genplusgx/library/game_metadata.h"
 #include "genplusgx/library/game_library_database.h"
 #include "genplusgx/library/game_library_scanner.h"
+#include "genplusgx/movies/input_movie.h"
 #include "genplusgx/library/online_metadata_settings.h"
 #include "genplusgx/updates/update_settings.h"
 #include "genplusgx/updates/update_types.h"
@@ -27,6 +28,7 @@
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/netplay_dialog.h"
+#include "genplusgx/ui/streaming_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
@@ -74,6 +76,26 @@ enum class RecordingUiState {
   stopping,
 };
 
+enum class MovieUiOperation {
+  startRecording,
+  stopRecording,
+  startPlayback,
+  stopPlayback,
+};
+
+enum class MovieUiState {
+  unavailable,
+  idle,
+  recording,
+  playback,
+};
+
+struct MovieUiRequest final {
+  MovieUiOperation operation{MovieUiOperation::startRecording};
+  std::filesystem::path path;
+  movies::InputMovie movie;
+};
+
 enum class EmulationUiOperation {
   pause,
   resume,
@@ -119,6 +141,8 @@ public:
     const settings::ScreenshotSettings&)>;
   using RecordingSink = std::function<bool(
     bool start, const std::filesystem::path& directory)>;
+  using MovieSink = std::function<PersistenceStatus(MovieUiRequest)>;
+  using StreamingSink = StreamingDialog::RequestSink;
   using CheatConfigurationSink = std::function<PersistenceStatus(
     const cheats::CheatConfiguration&)>;
   using PerGameSettingsSink = std::function<PersistenceStatus(
@@ -340,6 +364,14 @@ public:
     std::uint64_t writtenFrames = 0U,
     std::uint64_t droppedFrames = 0U);
   void showRecordingError(const std::string& detail);
+  void setMovieSink(MovieSink sink);
+  void setMovieState(MovieUiState state, std::filesystem::path path = {},
+    std::uint64_t frame = 0U, std::uint64_t totalFrames = 0U);
+  void showMovieError(const std::string& detail);
+  void setStreamingSink(StreamingSink sink);
+  void setStreamingMetrics(capture::StreamingMetrics metrics);
+  void showStreaming();
+  void showStreamingError(const std::string& detail);
   void setScreenshotSettings(
     settings::ScreenshotSettings settings,
     std::filesystem::path defaultDirectory);
@@ -458,6 +490,10 @@ private:
   void updateScreenshotAction();
   void requestRecordingToggle(bool enabled);
   void updateRecordingAction();
+  void requestMovieRecording();
+  void requestMoviePlayback();
+  void showMovieEditor();
+  void updateMovieActions();
   void updateCheatAction();
   void updatePerGameSettingsAction();
   void presentGameLoadError(
@@ -507,6 +543,8 @@ private:
   ScreenshotSink screenshotSink_;
   ScreenshotSettingsSink screenshotSettingsSink_;
   RecordingSink recordingSink_;
+  MovieSink movieSink_;
+  StreamingSink streamingSink_;
   CheatConfigurationSink cheatConfigurationSink_;
   PerGameSettingsSink perGameSettingsSink_;
   AppearanceSettingsSink appearanceSettingsSink_;
@@ -550,6 +588,7 @@ private:
   ApplicationPaths applicationPaths_;
   std::filesystem::path defaultScreenshotDirectory_;
   std::filesystem::path recordingPath_;
+  std::filesystem::path moviePath_;
   std::vector<library::LibraryDirectory> gameLibraryDirectories_;
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
@@ -591,6 +630,8 @@ private:
   bool gameLibraryAvailable_{true};
   bool screenshotBusy_{false};
   RecordingUiState recordingState_{RecordingUiState::unavailable};
+  MovieUiState movieState_{MovieUiState::unavailable};
+  bool movieOperationPending_{false};
   bool cheatSessionReady_{false};
   bool perGameSettingsSessionReady_{false};
   bool applicationPathsAvailable_{false};

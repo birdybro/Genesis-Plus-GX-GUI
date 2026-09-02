@@ -16,6 +16,30 @@ cmake --build --preset release
 ctest --preset release
 ```
 
+## Input-movie and local-stream tests
+
+Run the focused deterministic tooling graph with:
+
+```bash
+ctest --preset debug -R '^(unit.input_movie|unit.streaming_service|integration.input_movie|integration.streaming|gui.movie_streaming)$' --output-on-failure
+```
+
+`unit.input_movie` verifies deterministic byte-identical encoding, run-length
+compression, atomic round trips, game/settings/core compatibility, every TAS mutation,
+UTF-8 and size bounds, truncation, trailing data, digest corruption, and a fixed 64-case
+mutation corpus. `integration.input_movie` records exact frame-boundary input through
+the real worker and generated CC0 ROM, rejects state-changing operations, replays from
+the raw initial state, compares final raw core state, stops on the exact frame, and
+verifies monotonic live-input recovery.
+
+`unit.streaming_service` exercises configuration, fixed queue capacity, capture fan-out,
+real TCP greeting/packet delivery, port collision, client limits, and clean stop.
+`integration.streaming` sends real generated-ROM video/audio from the emulation worker
+through the production capture path to a real loopback socket and validates the complete
+bounded packet. `gui.movie_streaming` drives the TAS editor, transition lockouts,
+streaming configuration/metrics, stable object names, and accessible controls with no
+human dialogs.
+
 ## Netplay tests
 
 `unit.netplay_timeline` covers input delay, player ownership, prediction correction,

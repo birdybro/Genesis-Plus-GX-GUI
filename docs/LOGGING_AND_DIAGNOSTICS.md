@@ -31,6 +31,9 @@ Open **Tools → Log and Diagnostics…**. The snapshot includes:
 - audio occupancy/capacity plus underrun/overrun counters;
 - lossless-recording activity, bounded queue occupancy, written/dropped frames, and
   output bytes;
+- input-movie record/playback state, current/total frame, and rerecord count;
+- loopback-stream state/port, client and fixed-queue occupancy, broadcast/drop/slow-
+  client counters, and bytes sent;
 - run-ahead preference/support/active/verified state, configured depth, speculative
   frame/rollback/failure counters, and current/capacity rollback bytes;
 - controller count and loaded game title, system, and region;

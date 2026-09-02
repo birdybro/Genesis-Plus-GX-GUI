@@ -21,6 +21,11 @@ using Clock = std::chrono::steady_clock;
 constexpr std::size_t maximumAudioFramesPerBatch = 4'096U;
 constexpr std::size_t defaultAudioRingFrames = 12'000U;
 constexpr std::size_t maximumNetplayHistoryBytes = 64U * 1024U * 1024U;
+enum class MovieMode : std::uint8_t {
+  idle,
+  recording,
+  playback,
+};
 constexpr std::array backupMemoryKinds{
   BackupMemoryKind::cartridgeSram,
   BackupMemoryKind::scdInternalBram,
@@ -284,6 +289,30 @@ EmulationCommand EmulationCommand::achievementTokenLogin(
   return command;
 }
 
+EmulationCommand EmulationCommand::startMovieRecordingSession(
+  std::uint64_t operationId,
+  movies::MovieDescriptor descriptor,
+  movies::MovieMetadata metadata)
+{
+  auto command = simple(
+    EmulationCommandType::startMovieRecording, operationId);
+  command.movieDescriptor = std::move(descriptor);
+  command.movieMetadata = std::move(metadata);
+  return command;
+}
+
+EmulationCommand EmulationCommand::startMoviePlaybackSession(
+  std::uint64_t operationId,
+  movies::InputMovie movie,
+  movies::MovieDescriptor expected)
+{
+  auto command = simple(
+    EmulationCommandType::startMoviePlayback, operationId);
+  command.movie = std::move(movie);
+  command.movieDescriptor = std::move(expected);
+  return command;
+}
+
 class EmulationWorker::Private final {
 public:
   Private(
@@ -335,6 +364,12 @@ public:
     rewindBuffer_.clear();
     resetRunAheadSession(false);
     resetNetplaySession(false);
+    movieMode_ = MovieMode::idle;
+    activeMovie_ = {};
+    movieCursor_ = 0U;
+    pendingMovieInput_.reset();
+    pendingMovieFrameEvent_.reset();
+    movieInputSequence_ = 0U;
     latestInput_ = {};
     hasLatestInput_ = false;
     frameBreakpoints_.clear();
@@ -583,6 +618,11 @@ public:
       .achievementResponseQueueDepth = achievementBridgeMetrics_.responseDepth,
       .rejectedAchievementRequests = achievementBridgeMetrics_.rejectedRequests,
       .rejectedAchievementResponses = achievementBridgeMetrics_.rejectedResponses,
+      .movieRecording = movieRecordingMetrics_,
+      .moviePlayback = moviePlaybackMetrics_,
+      .movieFrame = movieFrameMetrics_,
+      .movieFrameCount = movieFrameCountMetrics_,
+      .movieRerecordCount = movieRerecordCountMetrics_,
     };
   }
 
@@ -829,6 +869,7 @@ private:
     std::vector<std::uint8_t> capturedState;
     std::vector<std::uint8_t> capturedAchievementProgress;
     CoreDebugResponse debugResponse;
+    movies::InputMovie completedMovie;
     const auto current = owner_.state_.load(std::memory_order_acquire);
 
     const bool blockedByNetplay = netplayTimeline_.active() &&
@@ -853,6 +894,19 @@ private:
           command.speedConfiguration.normalPercent < 100U) ||
        (command.type == EmulationCommandType::cheats &&
           !command.coreCheats.empty()));
+    const bool movieActive = movieMode_ != MovieMode::idle;
+    const bool movieCommandAllowed =
+      command.type == EmulationCommandType::inputSnapshot ||
+      command.type == EmulationCommandType::pause ||
+      command.type == EmulationCommandType::resume ||
+      command.type == EmulationCommandType::start ||
+      command.type == EmulationCommandType::frameAdvance ||
+      command.type == EmulationCommandType::captureState ||
+      command.type == EmulationCommandType::setFastForward ||
+      command.type == EmulationCommandType::setSlowMotion ||
+      command.type == EmulationCommandType::speedSettings ||
+      command.type == EmulationCommandType::stopMovieRecording ||
+      command.type == EmulationCommandType::stopMoviePlayback;
     if (blockedByNetplay) {
       coreResult = {
         CoreError::invalidStatePayload,
@@ -862,6 +916,11 @@ private:
       coreResult = {
         CoreError::invalidStatePayload,
         "That operation is unavailable while RetroAchievements Hardcore Mode is active.",
+      };
+    } else if (movieActive && !movieCommandAllowed) {
+      coreResult = {
+        CoreError::invalidStatePayload,
+        "That operation is unavailable while an input movie is active.",
       };
     } else switch (command.type) {
       case EmulationCommandType::loadGame: {
@@ -1150,10 +1209,15 @@ private:
         audioFrames_->clear();
         break;
       case EmulationCommandType::inputSnapshot:
-        coreResult = adapter.setInputSnapshot(command.input);
-        if (coreResult) {
-          latestInput_ = command.input;
-          hasLatestInput_ = true;
+        if (command.input.sequence < movieInputSequence_) {
+          command.input.sequence = ++movieInputSequence_;
+        } else {
+          movieInputSequence_ = command.input.sequence;
+        }
+        latestInput_ = command.input;
+        hasLatestInput_ = true;
+        if (movieMode_ != MovieMode::playback) {
+          coreResult = adapter.setInputSnapshot(command.input);
         }
         break;
       case EmulationCommandType::inputSettings:
@@ -1407,6 +1471,101 @@ private:
         }
         achievementHardcoreEnforced_ = false;
         break;
+      case EmulationCommandType::startMovieRecording:
+        validTransition = movieMode_ == MovieMode::idle &&
+          (current == EmulationWorkerState::paused ||
+           current == EmulationWorkerState::running) &&
+          command.movieDescriptor.valid() && !hardcore;
+        if (validTransition) {
+          std::vector<std::uint8_t> initialState;
+          coreResult = adapter.saveRawState(initialState);
+          if (coreResult) {
+            activeMovie_ = {
+              .descriptor = std::move(command.movieDescriptor),
+              .metadata = std::move(command.movieMetadata),
+              .startFrame = adapter.frameCount(),
+              .initialState = std::move(initialState),
+              .frames = {},
+            };
+            movieMode_ = MovieMode::recording;
+            movieCursor_ = 0U;
+            pendingMovieInput_.reset();
+            movieInputSequence_ = std::max(
+              adapter.appliedInputSequence(), latestInput_.sequence);
+            rewinding_ = false;
+            audioFrames_->clear();
+            eventType = EmulationEventType::movieRecordingStarted;
+          }
+        }
+        break;
+      case EmulationCommandType::stopMovieRecording:
+        validTransition = movieMode_ == MovieMode::recording;
+        if (validTransition && activeMovie_.frames.empty()) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            "Run or advance at least one frame before saving the input movie.",
+          };
+        } else if (validTransition) {
+          completedMovie = std::move(activeMovie_);
+          activeMovie_ = {};
+          movieMode_ = MovieMode::idle;
+          movieCursor_ = 0U;
+          pendingMovieInput_.reset();
+          eventType = EmulationEventType::movieRecordingFinished;
+        }
+        break;
+      case EmulationCommandType::startMoviePlayback: {
+        validTransition = movieMode_ == MovieMode::idle &&
+          (current == EmulationWorkerState::paused ||
+           current == EmulationWorkerState::running) && !hardcore;
+        if (!validTransition) {
+          break;
+        }
+        const auto compatibility = movies::compatibleMovie(
+          command.movie, command.movieDescriptor);
+        if (!compatibility) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            compatibility.message,
+          };
+          break;
+        }
+        discardLatestFrame();
+        rewindBuffer_.clear();
+        rewinding_ = false;
+        resetRunAheadSession(true);
+        audioFrames_->clear();
+        coreResult = adapter.loadRawState(
+          command.movie.initialState, command.movie.startFrame);
+        if (coreResult) {
+          activeMovie_ = std::move(command.movie);
+          movieMode_ = MovieMode::playback;
+          movieCursor_ = 0U;
+          pendingMovieInput_.reset();
+          movieInputSequence_ = std::max(
+            adapter.appliedInputSequence(), latestInput_.sequence);
+          owner_.state_.store(
+            EmulationWorkerState::running, std::memory_order_release);
+          pacer_.resume(Clock::now());
+          eventType = EmulationEventType::moviePlaybackStarted;
+        }
+        break;
+      }
+      case EmulationCommandType::stopMoviePlayback:
+        validTransition = movieMode_ == MovieMode::playback;
+        if (validTransition) {
+          movieMode_ = MovieMode::idle;
+          activeMovie_ = {};
+          movieCursor_ = 0U;
+          pendingMovieInput_.reset();
+          if (hasLatestInput_) {
+            auto restored = latestInput_;
+            restored.sequence = ++movieInputSequence_;
+            coreResult = adapter.setInputSnapshot(restored);
+          }
+          eventType = EmulationEventType::moviePlaybackFinished;
+        }
+        break;
     }
 
     updateMetrics(adapter);
@@ -1473,6 +1632,9 @@ private:
     event.rawState = std::move(capturedState);
     event.achievementProgress = std::move(capturedAchievementProgress);
     event.netplayActive = netplayTimeline_.active();
+    event.movieFrame = movieCursor_;
+    event.movieFrameCount = activeMovie_.frames.size();
+    event.movie = std::move(completedMovie);
     event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
       static_cast<void>(adapter.discInfo(event.disc));
@@ -1602,7 +1764,7 @@ private:
     serviceAchievements(adapter, true);
 
     pacer_.frameExecuted(Clock::now());
-    auto frameState = EmulationWorkerState::running;
+    auto frameState = owner_.state_.load(std::memory_order_acquire);
     if (!rewinding_ && !netplayTimeline_.active()) {
       if (const auto breakpoint = matchingFrameBreakpoint(adapter)) {
         frameState = EmulationWorkerState::paused;
@@ -1630,6 +1792,12 @@ private:
     }
     updateMetrics(adapter);
 
+    if (pendingMovieFrameEvent_) {
+      auto event = std::move(*pendingMovieFrameEvent_);
+      pendingMovieFrameEvent_.reset();
+      publishOperation(std::move(event));
+    }
+
     std::scoped_lock lock{mutex_};
     if (latestFrame_) {
       ++replacedFrameEvents_;
@@ -1645,6 +1813,8 @@ private:
     event.speedPercent = pacer_.speedPercent();
     event.rewinding = rewinding_;
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
+    event.movieFrame = movieCursor_;
+    event.movieFrameCount = activeMovie_.frames.size();
     populateRunAheadEvent(event, adapter);
     latestFrame_ = std::move(event);
     eventReady_.notify_all();
@@ -1712,8 +1882,12 @@ private:
 
   CoreResult executeOneFrame(CoreAdapter& adapter)
   {
+    if (const auto prepared = prepareMovieFrame(adapter); !prepared) {
+      return prepared;
+    }
     if (netplayTimeline_.active()) {
-      return executeNetplayFrame(adapter);
+      const auto result = executeNetplayFrame(adapter);
+      return result ? commitMovieFrame(adapter) : result;
     }
     if (rewinding_) {
       const auto currentFrame = adapter.frameCount();
@@ -1728,7 +1902,8 @@ private:
             snapshot->rawState, snapshot->frameNumber); !restored) {
         return restored;
       }
-      return executeCoreFrame(adapter, false);
+      const auto result = executeCoreFrame(adapter, false);
+      return result ? commitMovieFrame(adapter) : result;
     }
 
     if (runAheadActive(adapter)) {
@@ -1744,7 +1919,7 @@ private:
     }
 
     if (!rewindBuffer_.shouldCapture(adapter.frameCount())) {
-      return {};
+      return commitMovieFrame(adapter);
     }
     std::vector<std::uint8_t> state;
     if (const auto captured = adapter.saveRawState(state); !captured) {
@@ -1756,6 +1931,82 @@ private:
         "The bounded rewind history rejected a core snapshot.",
       };
     }
+    return commitMovieFrame(adapter);
+  }
+
+  CoreResult prepareMovieFrame(CoreAdapter& adapter)
+  {
+    pendingMovieInput_.reset();
+    if (movieMode_ == MovieMode::idle) {
+      return {};
+    }
+    if (movieMode_ == MovieMode::recording) {
+      if (activeMovie_.frames.size() >= movies::maximumMovieFrames) {
+        return {
+          CoreError::invalidStatePayload,
+          "The input movie reached its fixed one-million-frame limit.",
+        };
+      }
+      auto input = hasLatestInput_ ? latestInput_ : InputSnapshot{};
+      input.sequence = 0U;
+      pendingMovieInput_ = input;
+      return {};
+    }
+    if (movieCursor_ >= activeMovie_.frames.size()) {
+      return {
+        CoreError::invalidStatePayload,
+        "The input movie playback cursor exceeded its bounded timeline.",
+      };
+    }
+    auto input = activeMovie_.frames[movieCursor_];
+    input.sequence = ++movieInputSequence_;
+    return adapter.setInputSnapshot(input);
+  }
+
+  CoreResult commitMovieFrame(CoreAdapter& adapter)
+  {
+    if (movieMode_ == MovieMode::recording) {
+      if (!pendingMovieInput_) {
+        return {
+          CoreError::invalidStatePayload,
+          "The input movie recorder lost its frame-boundary snapshot.",
+        };
+      }
+      activeMovie_.frames.push_back(*pendingMovieInput_);
+      pendingMovieInput_.reset();
+      movieCursor_ = activeMovie_.frames.size();
+      return {};
+    }
+    if (movieMode_ != MovieMode::playback) {
+      return {};
+    }
+    ++movieCursor_;
+    if (movieCursor_ < activeMovie_.frames.size()) {
+      return {};
+    }
+
+    const auto totalFrames = activeMovie_.frames.size();
+    movieMode_ = MovieMode::idle;
+    activeMovie_ = {};
+    pendingMovieInput_.reset();
+    if (hasLatestInput_) {
+      auto restored = latestInput_;
+      restored.sequence = ++movieInputSequence_;
+      if (const auto applied = adapter.setInputSnapshot(restored); !applied) {
+        return applied;
+      }
+    }
+    owner_.state_.store(
+      EmulationWorkerState::paused, std::memory_order_release);
+    pacer_.pause();
+    audioFrames_->clear();
+    auto event = eventFor(
+      EmulationEventType::moviePlaybackFinished, EmulationWorkerState::paused);
+    event.frameNumber = adapter.frameCount();
+    event.hardware = adapter.hardware();
+    event.movieFrame = totalFrames;
+    event.movieFrameCount = totalFrames;
+    pendingMovieFrameEvent_ = std::move(event);
     return {};
   }
 
@@ -2214,6 +2465,11 @@ private:
     achievementsHardcoreMetrics_ =
       achievements_ && achievements_->hardcoreActive();
     achievementBridgeMetrics_ = achievementBridge_->metrics();
+    movieRecordingMetrics_ = movieMode_ == MovieMode::recording;
+    moviePlaybackMetrics_ = movieMode_ == MovieMode::playback;
+    movieFrameMetrics_ = movieCursor_;
+    movieFrameCountMetrics_ = activeMovie_.frames.size();
+    movieRerecordCountMetrics_ = activeMovie_.metadata.rerecordCount;
   }
 
   void resetNetplaySession(bool preserveCounters) noexcept
@@ -2318,6 +2574,12 @@ private:
   std::size_t netplayHistoryBytes_{0U};
   std::uint64_t netplayRollbacks_{0U};
   std::uint64_t netplayInputSequence_{0U};
+  MovieMode movieMode_{MovieMode::idle};
+  movies::InputMovie activeMovie_;
+  std::size_t movieCursor_{0U};
+  std::optional<InputSnapshot> pendingMovieInput_;
+  std::optional<EmulationEvent> pendingMovieFrameEvent_;
+  std::uint64_t movieInputSequence_{0U};
   std::vector<std::uint8_t> runAheadFirstFrameState_;
   std::vector<std::uint8_t> runAheadCanonicalState_;
   InputSnapshot latestInput_;
@@ -2355,6 +2617,11 @@ private:
   bool achievementsAuthenticatedMetrics_{false};
   bool achievementsGameLoadedMetrics_{false};
   bool achievementsHardcoreMetrics_{false};
+  bool movieRecordingMetrics_{false};
+  bool moviePlaybackMetrics_{false};
+  std::uint64_t movieFrameMetrics_{0U};
+  std::uint64_t movieFrameCountMetrics_{0U};
+  std::uint64_t movieRerecordCountMetrics_{0U};
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};

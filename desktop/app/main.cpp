@@ -14,6 +14,8 @@
 #include "genplusgx/cloud/cloud_settings.h"
 #include "genplusgx/cloud/cloud_sync.h"
 #include "genplusgx/capture/recording_service.h"
+#include "genplusgx/capture/capture_fanout.h"
+#include "genplusgx/capture/streaming_service.h"
 #include "genplusgx/diagnostics/diagnostics.h"
 #include "genplusgx/emulation_worker.h"
 #include "genplusgx/input/controller_input.h"
@@ -868,6 +870,8 @@ int main(int argc, char* argv[])
   }
   auto recordingService =
     std::make_shared<genplusgx::capture::RecordingService>();
+  auto streamingService =
+    std::make_shared<genplusgx::capture::StreamingService>();
   const auto recordingServiceStarted = recordingService->start();
   if (!recordingServiceStarted) {
     qWarning().noquote() << QString::fromStdString(
@@ -875,6 +879,9 @@ int main(int argc, char* argv[])
     recordStartupIssue("Lossless recording service",
       recordingServiceStarted.message);
   }
+  auto captureFanout = std::make_shared<genplusgx::capture::CaptureFanout>(
+    std::vector<std::shared_ptr<genplusgx::EmulationCaptureSink>>{
+      recordingService, streamingService});
   auto netplayBridge =
     std::make_shared<genplusgx::netplay::NetplayBridge>();
   auto achievementBridge =
@@ -891,7 +898,7 @@ int main(int argc, char* argv[])
     videoFrames,
     audioOutput.ringBuffer(),
     backupStore,
-    recordingServiceStarted ? recordingService : nullptr,
+    captureFanout,
     netplayBridge,
     achievementBridge};
   const auto workerStarted = worker.start();
@@ -907,6 +914,7 @@ int main(int argc, char* argv[])
     static_cast<void>(screenshotService.stop());
     static_cast<void>(cloudSyncService.stop());
     static_cast<void>(recordingService->stop());
+    static_cast<void>(streamingService->stop());
     static_cast<void>(gameLibraryScanner.stop());
     static_cast<void>(audioOutput.shutdown());
     QMessageBox::critical(
@@ -2498,6 +2506,9 @@ int main(int argc, char* argv[])
     });
   std::uint64_t screenshotOperationId = 4'500'000U;
   std::uint64_t recordingOperationId = 4'600'000U;
+  std::uint64_t movieOperationId = 4'650'000U;
+  std::optional<std::uint64_t> pendingMovieOperation;
+  std::filesystem::path activeMoviePath;
   std::uint64_t debugOperationId = 4'750'000U;
   window.setDebugRequestSink(
     [&debugOperationId, &worker](genplusgx::CoreDebugRequest request) {
@@ -2517,7 +2528,7 @@ int main(int argc, char* argv[])
 #if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
      &pendingUpdateDownload, &pendingUpdateOperation,
 #endif
-     &translationManager, &window, &worker] {
+     &streamingService, &translationManager, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.applicationDataMode = std::string{
         genplusgx::applicationDataModeName(applicationPaths.mode())};
@@ -2711,6 +2722,23 @@ int main(int argc, char* argv[])
       snapshot.recordingWrittenFrames = recordingMetrics.writtenFrames;
       snapshot.recordingDroppedFrames = recordingMetrics.droppedFrames;
       snapshot.recordingOutputBytes = recordingMetrics.outputBytes;
+      snapshot.inputMovieState = workerMetrics.movieRecording
+        ? "Recording"
+        : workerMetrics.moviePlayback ? "Playback" : "Idle";
+      snapshot.inputMovieFrame = workerMetrics.movieFrame;
+      snapshot.inputMovieFrameCount = workerMetrics.movieFrameCount;
+      snapshot.inputMovieRerecordCount = workerMetrics.movieRerecordCount;
+      const auto streamingMetrics = streamingService->metrics();
+      snapshot.streamingActive = streamingMetrics.active;
+      snapshot.streamingPort = streamingMetrics.port;
+      snapshot.streamingClients = streamingMetrics.connectedClients;
+      snapshot.streamingQueuedFrames = streamingMetrics.queueDepth;
+      snapshot.streamingQueueCapacity = streamingMetrics.queueCapacity;
+      snapshot.streamingBroadcastFrames = streamingMetrics.broadcastFrames;
+      snapshot.streamingDroppedFrames = streamingMetrics.droppedFrames;
+      snapshot.streamingSlowClientDisconnects =
+        streamingMetrics.disconnectedSlowClients;
+      snapshot.streamingBytesSent = streamingMetrics.bytesSent;
       snapshot.loggerActive = frontendLogger.installed();
       snapshot.logger = frontendLogger.metrics();
       const auto& bios = biosManager.snapshot();
@@ -2789,6 +2817,67 @@ int main(int argc, char* argv[])
         return true;
       });
   }
+  window.setMovieSink(
+    [&activeCheatConfiguration, &activeEffectiveSettings,
+     &activePerGameIdentity, &activeMoviePath, &biosManager,
+     &inputConfiguration, &movieOperationId, &pendingMovieOperation, &worker]
+    (genplusgx::ui::MovieUiRequest request) {
+      if (!activePerGameIdentity) {
+        return workerPersistenceFailure(
+          "Load a game with a valid SHA-256 identity before using input movies.");
+      }
+      if (pendingMovieOperation) {
+        return workerPersistenceFailure(
+          "Wait for the current input movie operation to finish.");
+      }
+      const genplusgx::movies::MovieDescriptor descriptor{
+        .gameSha256 = activePerGameIdentity->sha256,
+        .settingsSha256 = netplaySettingsFingerprint(
+          activeEffectiveSettings, inputConfiguration, biosManager.snapshot(),
+          activeCheatConfiguration),
+        .coreVersion = GENPLUSGX_GIT_COMMIT,
+      };
+      genplusgx::EmulationCommand command;
+      switch (request.operation) {
+        case genplusgx::ui::MovieUiOperation::startRecording:
+          if (request.path.empty() || !request.path.is_absolute()) {
+            return workerPersistenceFailure(
+              "Choose an absolute input movie destination.");
+          }
+          activeMoviePath = request.path;
+          command = genplusgx::EmulationCommand::startMovieRecordingSession(
+            ++movieOperationId, descriptor);
+          break;
+        case genplusgx::ui::MovieUiOperation::stopRecording:
+          command = genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::stopMovieRecording,
+            ++movieOperationId);
+          break;
+        case genplusgx::ui::MovieUiOperation::startPlayback:
+          activeMoviePath = request.path;
+          command = genplusgx::EmulationCommand::startMoviePlaybackSession(
+            ++movieOperationId, std::move(request.movie), descriptor);
+          break;
+        case genplusgx::ui::MovieUiOperation::stopPlayback:
+          command = genplusgx::EmulationCommand::simple(
+            genplusgx::EmulationCommandType::stopMoviePlayback,
+            ++movieOperationId);
+          break;
+      }
+      const auto operationId = command.operationId;
+      const auto submitted = worker.submit(std::move(command));
+      if (submitted) {
+        pendingMovieOperation = operationId;
+      }
+      return submitted ? genplusgx::PersistenceStatus{}
+        : workerPersistenceFailure(submitted.message);
+    });
+  window.setStreamingSink(
+    [&streamingService](bool start,
+      genplusgx::capture::StreamingConfiguration configuration) {
+      return start ? streamingService->start(configuration)
+                   : streamingService->stop();
+    });
   window.setPerGameSettingsSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &applyEffectiveSettings, &globalGameSettings, &perGameSettingsStore,
@@ -3225,9 +3314,11 @@ int main(int argc, char* argv[])
      &pendingAutomaticResume, &pendingLoad, &pendingMetadata, &pendingState,
      &pendingUnload,
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
+     &activeMoviePath, &pendingMovieOperation,
      &cheatMetadataOperationId, &cheatOperationId, &cheatStore,
      &pendingCheatMetadata, &pendingCheatOperation, &perGameSettingsStore,
      &pendingScreenshot, &recordingService, &screenshotService,
+     &streamingService,
      &closingGameTarget, &recentGames, &recentGamesStore, &recordLibraryLaunch,
      &refreshGameLibrary, &refreshRecentGamesMenu, &stateActivationOperation,
      &sessionSettings, &sessionSettingsStore, &startLoadedGame,
@@ -3683,7 +3774,73 @@ int main(int argc, char* argv[])
         qWarning().noquote() << QString::fromStdString(detail);
         netplaySession.disconnectFromPeer(detail);
       }
+      const bool movieCommand = event->command &&
+        (*event->command ==
+           genplusgx::EmulationCommandType::startMovieRecording ||
+         *event->command ==
+           genplusgx::EmulationCommandType::stopMovieRecording ||
+         *event->command ==
+           genplusgx::EmulationCommandType::startMoviePlayback ||
+         *event->command ==
+           genplusgx::EmulationCommandType::stopMoviePlayback);
+      if (movieCommand && pendingMovieOperation &&
+          event->operationId == *pendingMovieOperation) {
+        pendingMovieOperation.reset();
+      }
+      if (event->type ==
+          genplusgx::EmulationEventType::movieRecordingStarted) {
+        qInfo().noquote() << "Deterministic input movie recording started:"
+                          << genplusgx::ui::pathToQString(activeMoviePath);
+        window.setMovieState(genplusgx::ui::MovieUiState::recording,
+          activeMoviePath, event->movieFrame, event->movieFrameCount);
+      } else if (event->type ==
+                 genplusgx::EmulationEventType::movieRecordingFinished) {
+        const auto totalFrames = event->movie.frames.size();
+        const auto saved = genplusgx::movies::saveMovie(
+          activeMoviePath, event->movie);
+        if (saved) {
+          qInfo().noquote() << "Deterministic input movie saved:"
+                            << genplusgx::ui::pathToQString(activeMoviePath)
+                            << "frames"
+                            << static_cast<qulonglong>(totalFrames);
+          window.setMovieState(genplusgx::ui::MovieUiState::idle,
+            activeMoviePath, totalFrames, totalFrames);
+        } else {
+          qWarning().noquote() << "Input movie save failed:"
+                               << QString::fromStdString(saved.message);
+          window.setMovieState(
+            genplusgx::ui::MovieUiState::idle, {}, 0U, 0U);
+          window.showMovieError(saved.message);
+        }
+      } else if (event->type ==
+                 genplusgx::EmulationEventType::moviePlaybackStarted) {
+        qInfo().noquote() << "Deterministic input movie playback started:"
+                          << genplusgx::ui::pathToQString(activeMoviePath);
+        window.setMovieState(genplusgx::ui::MovieUiState::playback,
+          activeMoviePath, event->movieFrame, event->movieFrameCount);
+      } else if (event->type ==
+                 genplusgx::EmulationEventType::moviePlaybackFinished) {
+        qInfo().noquote() << "Deterministic input movie playback finished:"
+                          << genplusgx::ui::pathToQString(activeMoviePath);
+        window.setMovieState(genplusgx::ui::MovieUiState::idle,
+          activeMoviePath, event->movieFrame, event->movieFrameCount);
+      } else if (movieCommand && !event->succeeded()) {
+        const auto detail = event->message.empty()
+          ? std::string{"The emulation worker rejected the input movie operation."}
+          : event->message;
+        qWarning().noquote() << "Input movie operation failed:"
+                             << QString::fromStdString(detail);
+        window.showMovieError(detail);
+      }
       if (event->type == genplusgx::EmulationEventType::frameCompleted) {
+        const auto metrics = worker.metrics();
+        if (metrics.movieRecording) {
+          window.setMovieState(genplusgx::ui::MovieUiState::recording,
+            activeMoviePath, metrics.movieFrame, metrics.movieFrameCount);
+        } else if (metrics.moviePlayback) {
+          window.setMovieState(genplusgx::ui::MovieUiState::playback,
+            activeMoviePath, metrics.movieFrame, metrics.movieFrameCount);
+        }
         static_cast<void>(window.presentLatestFrame());
         continue;
       }
@@ -4166,7 +4323,15 @@ int main(int argc, char* argv[])
            *event->command == genplusgx::EmulationCommandType::cheats ||
            *event->command == genplusgx::EmulationCommandType::captureState ||
            *event->command == genplusgx::EmulationCommandType::restoreState ||
-           *event->command == genplusgx::EmulationCommandType::debugRequest);
+           *event->command == genplusgx::EmulationCommandType::debugRequest ||
+           *event->command ==
+             genplusgx::EmulationCommandType::startMovieRecording ||
+           *event->command ==
+             genplusgx::EmulationCommandType::stopMovieRecording ||
+           *event->command ==
+             genplusgx::EmulationCommandType::startMoviePlayback ||
+           *event->command ==
+             genplusgx::EmulationCommandType::stopMoviePlayback);
         if (!hasWorkflowSpecificError) {
           reportRuntimeFailure(
             event->message.empty()
@@ -4483,6 +4648,35 @@ int main(int argc, char* argv[])
           break;
       }
     }
+    while (auto event = streamingService->pollEvent()) {
+      using EventType = genplusgx::capture::StreamingEventType;
+      window.setStreamingMetrics(event->metrics);
+      switch (event->type) {
+        case EventType::started:
+          qInfo().noquote() << "Loopback A/V stream listening on 127.0.0.1:"
+                            << event->metrics.port;
+          break;
+        case EventType::clientConnected:
+          qInfo().noquote() << "Loopback A/V stream client connected; clients:"
+                            << event->metrics.connectedClients;
+          break;
+        case EventType::clientDisconnected:
+          qInfo().noquote()
+            << "Loopback A/V stream client disconnected; clients:"
+            << event->metrics.connectedClients;
+          break;
+        case EventType::failed:
+          qWarning().noquote() << "Loopback A/V stream failed:"
+                               << QString::fromStdString(event->status.message);
+          static_cast<void>(streamingService->stop());
+          window.showStreamingError(event->status.message);
+          break;
+        case EventType::stopped:
+          qInfo() << "Loopback A/V stream stopped.";
+          break;
+      }
+    }
+    window.setStreamingMetrics(streamingService->metrics());
     while (auto event = metadataService.pollEvent()) {
       if (event->type ==
           genplusgx::library::GameMetadataEventType::serviceStarted) {
@@ -4833,6 +5027,68 @@ int main(int argc, char* argv[])
   netplaySession.disconnectFromPeer("Application shutdown.");
   eventPump.stop();
   genplusgx::app::ShutdownReport shutdownReport{result};
+  const auto waitForMovieOperation = [&worker](std::uint64_t operationId) {
+    const auto deadline = std::chrono::steady_clock::now() +
+      std::chrono::seconds{3};
+    while (std::chrono::steady_clock::now() < deadline) {
+      auto event = worker.waitForEvent(std::chrono::milliseconds{100});
+      if (event && event->operationId == operationId) {
+        return event;
+      }
+    }
+    return std::optional<genplusgx::EmulationEvent>{};
+  };
+  if (pendingMovieOperation) {
+    auto completed = waitForMovieOperation(*pendingMovieOperation);
+    pendingMovieOperation.reset();
+    if (!completed || !completed->succeeded()) {
+      shutdownReport.addFailure("Input movie",
+        completed
+          ? completed->message
+          : "The emulation worker did not finish the pending input movie "
+            "operation during shutdown.");
+    } else if (completed->type ==
+               genplusgx::EmulationEventType::movieRecordingFinished) {
+      const auto saved = genplusgx::movies::saveMovie(
+        activeMoviePath, completed->movie);
+      if (!saved) {
+        shutdownReport.addFailure("Input movie", saved.message);
+      } else {
+        qInfo().noquote() << "Pending input movie finalized during shutdown:"
+                          << genplusgx::ui::pathToQString(activeMoviePath);
+      }
+    }
+  }
+  const auto movieMetricsAtShutdown = worker.metrics();
+  if (movieMetricsAtShutdown.movieRecording ||
+      movieMetricsAtShutdown.moviePlayback) {
+    const auto operationId = ++movieOperationId;
+    const auto type = movieMetricsAtShutdown.movieRecording
+      ? genplusgx::EmulationCommandType::stopMovieRecording
+      : genplusgx::EmulationCommandType::stopMoviePlayback;
+    const auto submitted = worker.submit(
+      genplusgx::EmulationCommand::simple(type, operationId));
+    auto completed = submitted
+      ? waitForMovieOperation(operationId)
+      : std::optional<genplusgx::EmulationEvent>{};
+    if (!submitted || !completed || !completed->succeeded()) {
+      shutdownReport.addFailure("Input movie",
+        !submitted
+          ? submitted.message
+          : completed
+            ? completed->message
+            : "The emulation worker did not finalize the active input movie.");
+    } else if (movieMetricsAtShutdown.movieRecording) {
+      const auto saved = genplusgx::movies::saveMovie(
+        activeMoviePath, completed->movie);
+      if (!saved) {
+        shutdownReport.addFailure("Input movie", saved.message);
+      } else {
+        qInfo().noquote() << "Input movie finalized during shutdown:"
+                          << genplusgx::ui::pathToQString(activeMoviePath);
+      }
+    }
+  }
   if (result == 0 && sessionSettings.resumeOnLaunch &&
       window.isGameLoaded() && pendingAutomaticResume) {
     shutdownReport.addFailure(
@@ -4987,6 +5243,8 @@ int main(int argc, char* argv[])
   window.setGameLibraryActions({});
   window.setScreenshotSink({});
   window.setRecordingSink({});
+  window.setMovieSink({});
+  window.setStreamingSink({});
   window.setScreenshotSettingsSink({});
   window.setCheatConfigurationSink({});
   window.setPerGameSettingsSink({});
@@ -5055,6 +5313,8 @@ int main(int argc, char* argv[])
   }
   const auto recordingServiceStopped = recordingService->stop();
   recordCleanup("Lossless recording service", recordingServiceStopped);
+  const auto streamingServiceStopped = streamingService->stop();
+  recordCleanup("Loopback A/V streaming service", streamingServiceStopped);
   const auto audioOutputStopped = audioOutput.shutdown();
   recordCleanup("Audio output", audioOutputStopped);
   const auto controllerInputStopped = controllerInput.shutdown();

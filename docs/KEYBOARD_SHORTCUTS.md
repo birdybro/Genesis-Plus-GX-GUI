@@ -58,6 +58,8 @@ shortcuts.
 | Next playlist disc | Ctrl+Shift+PageDown |
 | Screenshot | F12 |
 | Start/stop lossless A/V recording | Ctrl+Shift+F12 |
+| Start/stop deterministic input-movie recording | Ctrl+Alt+R |
+| Start/stop deterministic input-movie playback | Ctrl+Alt+P |
 | Mute | M |
 | Volume up / down | + / - |
 | Preferences | Platform standard shortcut |

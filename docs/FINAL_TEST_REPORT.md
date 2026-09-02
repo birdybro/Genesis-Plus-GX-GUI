@@ -7,7 +7,8 @@ cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
 synchronization, local bezel/overlay, cheat import/search, portable-mode,
 localization, advanced-debugger, physical-optical-media, authenticated-netplay,
 RetroAchievements, and conflict-safe cloud-synchronization verification through
-2026-09-02 (America/Denver).
+2026-09-02 (America/Denver), followed by deterministic input movies, accessible TAS
+editing, and bounded loopback A/V streaming.
 
 ## Candidate identity
 
@@ -1254,6 +1255,12 @@ worker, rollback, video, audio, and input route in separate processes.
 - [x] Bounded lossless native-frame recording with stereo PCM audio, deterministic
   PNG/JSON frame dumps, collision-safe output directories, drop instrumentation,
   lifecycle-safe draining, and a configurable hotkey.
+- [x] Deterministic identity-checked input-movie recording/playback with an unchanged
+  raw core-state payload, exact eight-port frame input, monotonic live-input recovery,
+  atomic checksummed RLE files, rerecord accounting, and an accessible TAS editor.
+- [x] Loopback-only native RGB565/S16 A/V streaming through a fixed capture fan-out,
+  bounded frame queue, one-to-four clients, slow-client eviction, diagnostics, and a
+  documented real-TCP protocol.
 - [x] Opt-in automatic clean-shutdown session checkpoint, identity-checked restore,
   command-line precedence, explicit-close clearing, and safe normal-launch fallback.
 - [x] Bounded owner-thread rewind with configurable cadence/memory, hold/toggle UI,
@@ -1555,6 +1562,64 @@ and its one-line 89-byte Ed25519 signature using the committed public key, key I
 secret is masked in the log and absent from packages; workflow-dispatch correctly skips
 the tag-only publication step. Milestone 98 is complete.
 
+## Milestone 99 deterministic movies, TAS, and local streaming
+
+The default graph now contains 136 registrations: 12 infrastructure, 20 core,
+15 integration, 52 unit, and 37 GUI/process tests. Five new registrations cover the
+movie format and editor, exact core-owner-thread recording/playback, the streaming
+service, and a real generated-ROM-to-`QTcpSocket` packet path. Their overlapping labels
+contribute three movie, three TAS, and three streaming executions.
+
+| Configuration | CTest | Result |
+| --- | ---: | --- |
+| GCC Debug, warnings as errors | 136/136 | Passed |
+| GCC Release, warnings as errors | 136/136 | Passed |
+| ASan + UBSan | 136/136 | Passed; no finding |
+| Clang 22 Release, warnings as errors | 136/136 | Passed |
+| CHD disabled | 136/136 | Passed |
+| Cloud synchronization and RetroAchievements disabled | 134/134 | Passed |
+| Signed updates disabled | 134/134 | Passed |
+| Libretro shaders disabled | 134/134 | Passed |
+| Inherited Unix libretro | Build/link/clean | Passed |
+
+The exact generated-ROM movie workflow additionally passes 100 consecutive Debug
+executions. An earlier loaded parallel run exposed and then drove correction of a real
+event-order race: natural playback completion could be observed immediately before the
+public metrics snapshot changed to idle. Completion is now deferred until after metrics
+publication, preserving one observable transition invariant under load.
+
+Movie files preserve the raw core state payload and a complete eight-port input
+snapshot per emulated frame, while a versioned frontend envelope binds the game SHA-256,
+deterministic settings SHA-256, exact core build, start frame, author/notes, and
+rerecord count. Serialization is deterministic RLE with an end-to-end SHA-256 and
+atomic replacement. Reads are limited to 96 MiB, initial states to 32 MiB, timelines
+to one million frames, and metadata to documented UTF-8 byte limits. Playback restores
+the initial state on the emulation owner thread, substitutes input only at frame
+boundaries, pauses immediately after the last frame, and restores the newest live
+input with a monotonic sequence. State-changing operations, netplay, and Hardcore
+conflicts fail visibly.
+
+The TAS dialog edits complete frame snapshots, inserts/duplicates/deletes/truncates
+frames, reports rerecords, and exposes stable accessible controls. The local stream
+binds only `127.0.0.1`, accepts one through four clients, uses a four-slot preallocated
+frame queue, limits audio batches and per-client pending bytes, drops producer frames
+instead of stalling the core, and evicts slow consumers. Its documented `GPGX-AV/1`
+protocol carries framed little-endian RGB565 video and stereo signed-16 audio without
+claiming remote relay, compression, or Internet broadcasting.
+
+A fresh staged Release tree and extracted TGZ pass the production Linux package
+verifier and installed offscreen version/startup smokes. The
+41,312,336-byte `Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` matches its SHA-256
+sidecar and contains Qt Network, `INPUT_MOVIES.md`, and `STREAMING.md`. The workstation
+does not currently provide `xvfb-run`, so the native XCB package smoke is delegated to
+the required hosted Linux job. The supplied NAS ROM mount is empty; generated CC0
+Genesis fixtures execute through the production worker/video/audio/input/capture paths,
+and no proprietary ROM-derived material enters the tree or package.
+
+Exact hosted CI, complete successful-log inspection, and cross-platform package audit
+will be recorded here after the implementation commit is pushed. Milestone 99 remains
+open until that exact run passes.
+
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
@@ -1623,8 +1688,10 @@ directories.
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Website scraping and unlicensed asset downloading, a network-accessible
-  external debugger server, TAS tooling, and streaming remain intentionally outside scope.
+  formats. Website scraping, unlicensed asset downloading, and a network-accessible
+  external debugger server remain intentionally outside scope. Local input-movie/TAS
+  tooling and loopback-only A/V output are implemented; no remote broadcast relay,
+  codec, or hosted streaming service is implied.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.

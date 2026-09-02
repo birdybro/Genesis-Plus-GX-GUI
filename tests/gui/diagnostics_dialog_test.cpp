@@ -74,6 +74,17 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.fastForwardSpeedPercent = 800U;
     snapshot.activeSpeedPercent = 50U;
     snapshot.slowMotion = true;
+    snapshot.inputMovieState = "Recording";
+    snapshot.inputMovieFrame = 42U;
+    snapshot.inputMovieFrameCount = 42U;
+    snapshot.inputMovieRerecordCount = 2U;
+    snapshot.streamingActive = true;
+    snapshot.streamingPort = 55'456U;
+    snapshot.streamingClients = 1U;
+    snapshot.streamingQueuedFrames = 2U;
+    snapshot.streamingQueueCapacity = 4U;
+    snapshot.streamingBroadcastFrames = 40U;
+    snapshot.streamingDroppedFrames = 2U;
     snapshot.loggerActive = true;
     snapshot.logger.writtenMessages = 42U;
     snapshot.bios.push_back({
@@ -138,6 +149,14 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Active speed: 50% (slow motion)")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Input movie: Recording")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Input movie position: 42 / 42")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Loopback A/V streaming: Active")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Streaming queue: 2 / 4")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("do-not-copy")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("never-copy-this")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("/users/private")));

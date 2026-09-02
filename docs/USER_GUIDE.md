@@ -383,6 +383,31 @@ the file's normal emulated-time cadence, pause adds nothing, and rewind records 
 silence. See [RECORDING.md](RECORDING.md) for the format, hard limits, recovery behavior,
 and post-processing guidance.
 
+## Input movies and TAS editing
+
+With a game loaded, choose **Tools → TAS and Input Movies → Start Input Movie
+Recording…** (`Ctrl+Alt+R`). The worker captures the current raw core state and then the
+complete input consumed at each authoritative frame. Choose the same action to finish
+an atomic `.gpgx-movie` file. **Play Input Movie…** (`Ctrl+Alt+P`) restores that initial
+state and pauses exactly after the final recorded frame; live input resumes afterward.
+
+Playback requires the exact same game SHA-256, deterministic settings/BIOS/cheats, and
+core Git build. A mismatch is rejected instead of risking silent desynchronization.
+Netplay, Hardcore Mode, resets, state loads, disc changes, and setting mutations cannot
+interfere with an active movie. Stop it before changing games. Use **Edit Input Movie…**
+to edit all eight controller ports frame by frame, insert/duplicate/delete input, branch
+the timeline, and maintain the author, notes, and rerecord count. See
+[INPUT_MOVIES.md](INPUT_MOVIES.md) for the deterministic and bounded file contract.
+
+## Local A/V streaming output
+
+Choose **Tools → Local A/V Streaming Output…** to expose native unscaled RGB565 video
+and the corresponding stereo S16 audio to one to four compatible local clients. The
+service binds only `127.0.0.1`, uses a four-frame bounded queue, removes clients whose
+pending output exceeds 8 MiB, and reports drops rather than delaying the emulator. It
+does not open a LAN/Internet listener or encode a broadcast format. The exact
+`GPGX-AV/1` framing and client safety requirements are in [STREAMING.md](STREAMING.md).
+
 ## Cheats
 
 With a game loaded, choose **Tools → Cheats…** to manage its local cheat list. Add a

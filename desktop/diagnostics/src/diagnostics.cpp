@@ -492,6 +492,22 @@ std::string formatDiagnostics(
          << "Recording frames: " << snapshot.recordingWrittenFrames
          << " written, " << snapshot.recordingDroppedFrames << " dropped\n"
          << "Recording output bytes: " << snapshot.recordingOutputBytes << '\n'
+         << "Input movie: "
+         << safeLine(snapshot.inputMovieState, detectedHome) << '\n'
+         << "Input movie position: " << snapshot.inputMovieFrame << " / "
+         << snapshot.inputMovieFrameCount << '\n'
+         << "Input movie rerecords: " << snapshot.inputMovieRerecordCount << '\n'
+         << "Loopback A/V streaming: "
+         << (snapshot.streamingActive ? "Active" : "Inactive") << '\n'
+         << "Streaming endpoint: 127.0.0.1:" << snapshot.streamingPort << '\n'
+         << "Streaming clients: " << snapshot.streamingClients << '\n'
+         << "Streaming queue: " << snapshot.streamingQueuedFrames << " / "
+         << snapshot.streamingQueueCapacity << '\n'
+         << "Streaming frames: " << snapshot.streamingBroadcastFrames
+         << " broadcast, " << snapshot.streamingDroppedFrames << " dropped\n"
+         << "Streaming slow-client disconnects: "
+         << snapshot.streamingSlowClientDisconnects << '\n'
+         << "Streaming bytes sent: " << snapshot.streamingBytesSent << '\n'
          << "Structured logging: " << (snapshot.loggerActive ? "Active" : "Unavailable")
          << '\n'
          << "Log messages written: " << snapshot.logger.writtenMessages << '\n'

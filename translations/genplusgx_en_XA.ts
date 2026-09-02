@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+425" />
+            <location filename="../desktop/app/main.cpp" line="+427" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+488" />
+            <location line="+494" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -161,7 +161,12 @@ Arguments:
             <translation>⟦Çħëåŧ ŀïšŧš (~~~*.cht *.txt);;ŔëŧŕöÅŕçħ çħëåŧ ŀïšŧš (~~~~~*.cht);;Ƥŀåïń~~-text çħëåŧ ŀïšŧš (~~~*.txt);;Åŀŀ ƒïŀëš (*)~~⟧</translation>
         </message>
         <message>
-            <location line="+89" />
+            <location line="+7" />
+            <source>Genesis Plus GX input movies (*.gpgx-movie);;All files (*)</source>
+            <translation>⟦Ɠëńëšïš Ƥŀüš ƓẊ ïńƥüŧ ḿöṽïëš (~~~~~~*.gpgx-movie);;Åŀŀ ƒïŀëš (*)~~⟧</translation>
+        </message>
+        <message>
+            <location line="+99" />
             <source>Open Game</source>
             <translation>⟦Öƥëń Ɠåḿë~~⟧</translation>
         </message>
@@ -231,6 +236,16 @@ Arguments:
             <translation>⟦Çħööšë Ŕëçöŕðïńɠ Ðïŕëçŧöŕÿ~~~~~~⟧</translation>
         </message>
         <message>
+            <location line="+13" />
+            <source>Open Input Movie</source>
+            <translation>⟦Öƥëń Ïńƥüŧ Ḿöṽïë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+12" />
+            <source>Save Input Movie</source>
+            <translation>⟦Šåṽë Ïńƥüŧ Ḿöṽïë~~~~⟧</translation>
+        </message>
+        <message>
             <location filename="../desktop/ui/src/game_information_dialog.cpp" line="+45" />
             <source>Header: 0x%1</source>
             <translation>⟦Ħëåðëŕ: 0ẋ~~%1⟧</translation>
@@ -273,7 +288,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+97" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+98" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -2901,6 +2916,8 @@ Video → Shaders enables the built-in adjustable CRT effect or loads a user-pro
 
 Emulation → Emulation Speed provides normal-speed presets and an editor for exact normal, slow-motion, and fast-forward percentages. Host audio plays only at 100% speed so alternate pacing cannot create buffer drift.
 
+Tools → TAS and Input Movies records deterministic frame-boundary input or edits a saved timeline. Tools → Local A/V Streaming Output exposes the documented native frame/audio protocol to loopback clients only.
+
 Save data is loaded and written automatically in the platform application data directory. No ROMs or proprietary Sega firmware are included. The complete guide is installed as docs/USER_GUIDE.md with source builds.</source>
             <translation>⟦Ɠëŧŧïńɠ šŧåŕŧëð
 
@@ -2912,10 +2929,12 @@ Save data is loaded and written automatically in the platform application data d
 
 Ëḿüŀåŧïöń → Ëḿüŀåŧïöń Šƥëëð ƥŕöṽïðëš ńöŕḿåŀ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-speed ƥŕëšëŧš åńð åń ëðïŧöŕ ƒöŕ ëẋåçŧ ńöŕḿåŀ, šŀöŵ~~~~~~~~~-motion, åńð ƒåšŧ~~-forward ƥëŕçëńŧåɠëš. Ħöšŧ åüðïö ƥŀåÿš öńŀÿ åŧ 100% šƥëëð šö åŀŧëŕńåŧë ƥåçïńɠ çåńńöŧ çŕëåŧë ƀüƒƒëŕ ðŕïƒŧ.
 
-Šåṽë ðåŧå ïš ŀöåðëð åńð ŵŕïŧŧëń åüŧöḿåŧïçåŀŀÿ ïń ŧħë ƥŀåŧƒöŕḿ åƥƥŀïçåŧïöń ðåŧå ðïŕëçŧöŕÿ. Ńö ŔÖḾš öŕ ƥŕöƥŕïëŧåŕÿ Šëɠå ƒïŕḿŵåŕë åŕë ïńçŀüðëð. Ŧħë çöḿƥŀëŧë ɠüïðë ïš ïńšŧåŀŀëð åš ðöçš/~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~USER_GUIDE.md ŵïŧħ šöüŕçë ƀüïŀðš.~~~~⟧</translation>
+Ŧööŀš → ŦÅŠ åńð Ïńƥüŧ Ḿöṽïëš ŕëçöŕðš ðëŧëŕḿïńïšŧïç ƒŕåḿë~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-boundary ïńƥüŧ öŕ ëðïŧš å šåṽëð ŧïḿëŀïńë. Ŧööŀš → Ŀöçåŀ Å/Ṽ Šŧŕëåḿïńɠ Öüŧƥüŧ ëẋƥöšëš ŧħë ðöçüḿëńŧëð ńåŧïṽë ƒŕåḿë/åüðïö ƥŕöŧöçöŀ ŧö ŀööƥƀåçҡ çŀïëńŧš öńŀÿ.
+
+Šåṽë ðåŧå ïš ŀöåðëð åńð ŵŕïŧŧëń åüŧöḿåŧïçåŀŀÿ ïń ŧħë ƥŀåŧƒöŕḿ åƥƥŀïçåŧïöń ðåŧå ðïŕëçŧöŕÿ. Ńö ŔÖḾš öŕ ƥŕöƥŕïëŧåŕÿ Šëɠå ƒïŕḿŵåŕë åŕë ïńçŀüðëð. Ŧħë çöḿƥŀëŧë ɠüïðë ïš ïńšŧåŀŀëð åš ðöçš/~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~USER_GUIDE.md ŵïŧħ šöüŕçë ƀüïŀðš.~~~~⟧</translation>
         </message>
         <message>
-            <location line="+28" />
+            <location line="+32" />
             <source>Open game                 Ctrl+O
 Close game                Ctrl+W
 Game library              Ctrl+L
@@ -2934,6 +2953,8 @@ Select state slot         Ctrl+0 … Ctrl+9
 Previous / next slot      Ctrl+[ / Ctrl+]
 Delete selected state     Ctrl+Delete
 Screenshot                F12
+Input-movie recording     Ctrl+Alt+R
+Input-movie playback      Ctrl+Alt+P
 Fullscreen                Alt+Return
 Mute                      M
 Volume up / down          + / -
@@ -2959,16 +2980,18 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
 Ƥŕëṽïöüš / ńëẋŧ šŀöŧ      Çŧŕŀ+[ / Çŧŕŀ+]
 Ðëŀëŧë šëŀëçŧëð šŧåŧë     Çŧŕŀ+Ðëŀëŧë
 Šçŕëëńšħöŧ                Ƒ12
+Ïńƥüŧ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-movie ŕëçöŕðïńɠ     Çŧŕŀ+Åŀŧ+Ŕ
+Ïńƥüŧ~~~~~~-movie ƥŀåÿƀåçҡ      Çŧŕŀ+Åŀŧ+Ƥ
 Ƒüŀŀšçŕëëń                Åŀŧ+Ŕëŧüŕń
 Ḿüŧë                      Ḿ
 Ṽöŀüḿë üƥ / ðöŵń          + / -
 Ƥŕëƒëŕëńçëš               Ƥŀåŧƒöŕḿ šŧåńðåŕð šħöŕŧçüŧ
 Ǫüïŧ                      Ƥŀåŧƒöŕḿ šŧåńðåŕð šħöŕŧçüŧ
 
-Çħåńɠë ëḿüŀåŧöŕ ħöŧҡëÿš üńðëŕ Ïńƥüŧ → Çöńŧŕöŀŀëŕ Çöńƒïɠüŕåŧïöń → Ħöŧҡëÿš.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+Çħåńɠë ëḿüŀåŧöŕ ħöŧҡëÿš üńðëŕ Ïńƥüŧ → Çöńŧŕöŀŀëŕ Çöńƒïɠüŕåŧïöń → Ħöŧҡëÿš.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+36" />
+            <location line="+38" />
             <source>Keyboard Shortcuts</source>
             <translation>⟦Ҡëÿƀöåŕð Šħöŕŧçüŧš~~~~~⟧</translation>
         </message>
@@ -3147,6 +3170,149 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
     </context>
     <context>
+        <name>genplusgx::ui::InputMovieEditorDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/input_movie_editor_dialog.cpp" line="+143" />
+            <source>TAS Input Movie Editor</source>
+            <translation>⟦ŦÅŠ Ïńƥüŧ Ḿöṽïë Ëðïŧöŕ~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <location line="+176" />
+            <source>Game %1…  •  Start frame %2  •  %3 input frames  •  %4 rerecords</source>
+            <translation>⟦Ɠåḿë ~%1…  •  Šŧåŕŧ ƒŕåḿë ~~~%2  •  %3 ïńƥüŧ ƒŕåḿëš  •  ~~~%4 ŕëŕëçöŕðš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-166" />
+            <source>Input movie timeline</source>
+            <translation>⟦Ïńƥüŧ ḿöṽïë ŧïḿëŀïńë~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Frame-by-frame input for all eight emulated controller ports.</source>
+            <translation>⟦Ƒŕåḿë~~-by-frame ïńƥüŧ ƒöŕ åŀŀ ëïɠħŧ ëḿüŀåŧëð çöńŧŕöŀŀëŕ ƥöŕŧš.~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Frame input</source>
+            <translation>⟦Ƒŕåḿë ïńƥüŧ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Frame number</source>
+            <translation>⟦Ƒŕåḿë ńüḿƀëŕ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Emulated controller port</source>
+            <translation>⟦Ëḿüŀåŧëð çöńŧŕöŀŀëŕ ƥöŕŧ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Player %1</source>
+            <translation>⟦Ƥŀåÿëŕ ~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Connected</source>
+            <translation>⟦Çöńńëçŧëð~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Whether this controller is connected on the selected frame.</source>
+            <translation>⟦Ŵħëŧħëŕ ŧħïš çöńŧŕöŀŀëŕ ïš çöńńëçŧëð öń ŧħë šëŀëçŧëð ƒŕåḿë.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Frame:</source>
+            <translation>⟦Ƒŕåḿë:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Controller:</source>
+            <translation>⟦Çöńŧŕöŀŀëŕ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+14" />
+            <source>Analog X value</source>
+            <translation>⟦Åńåŀöɠ Ẋ ṽåŀüë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Analog Y value</source>
+            <translation>⟦Åńåŀöɠ Ÿ ṽåŀüë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Analog X:</source>
+            <translation>⟦Åńåŀöɠ Ẋ:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Analog Y:</source>
+            <translation>⟦Åńåŀöɠ Ÿ:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Apply frame</source>
+            <translation>⟦Åƥƥŀÿ ƒŕåḿë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Insert neutral before</source>
+            <translation>⟦Ïńšëŕŧ ńëüŧŕåŀ ƀëƒöŕë~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Duplicate frame</source>
+            <translation>⟦Ðüƥŀïçåŧë ƒŕåḿë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Delete frame</source>
+            <translation>⟦Ðëŀëŧë ƒŕåḿë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Truncate after frame</source>
+            <translation>⟦Ŧŕüńçåŧë åƒŧëŕ ƒŕåḿë~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>Movie metadata</source>
+            <translation>⟦Ḿöṽïë ḿëŧåðåŧå~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Movie author</source>
+            <translation>⟦Ḿöṽïë åüŧħöŕ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Movie notes</source>
+            <translation>⟦Ḿöṽïë ńöŧëš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Author:</source>
+            <translation>⟦Åüŧħöŕ:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Notes:</source>
+            <translation>⟦Ńöŧëš:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+98" />
+            <location line="+14" />
+            <location line="+13" />
+            <location line="+12" />
+            <location line="+12" />
+            <source>TAS Edit Error</source>
+            <translation>⟦ŦÅŠ Ëðïŧ Ëŕŕöŕ~~~⟧</translation>
+        </message>
+    </context>
+    <context>
         <name>genplusgx::ui::MainWindow</name>
         <message>
             <location filename="../desktop/ui/src/main_window.cpp" line="+47" />
@@ -3155,12 +3321,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+3276" />
+            <location line="+3547" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-3272" />
+            <location line="-3543" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -3241,12 +3407,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+2199" />
+            <location line="+2220" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2198" />
+            <location line="-2219" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -3267,12 +3433,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+1539" />
+            <location line="+1560" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-1539" />
+            <location line="-1560" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3468,12 +3634,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+4102" />
+            <location line="+4385" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-4097" />
+            <location line="-4380" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3585,12 +3751,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2962" />
+            <location line="+3233" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2931" />
+            <location line="-3202" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3796,7 +3962,44 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦&amp;Ńëŧƥŀåÿ…~~⟧</translation>
         </message>
         <message>
+            <location line="+2" />
+            <source>&amp;TAS and Input Movies</source>
+            <translation>⟦&amp;ŦÅŠ åńð Ïńƥüŧ Ḿöṽïëš~~~~~⟧</translation>
+        </message>
+        <message>
             <location line="+3" />
+            <location line="+1837" />
+            <source>Start Input Movie &amp;Recording…</source>
+            <translation>⟦Šŧåŕŧ Ïńƥüŧ Ḿöṽïë &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-1836" />
+            <source>Ctrl+Alt+R</source>
+            <translation>Ctrl+Alt+R</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <location line="+1835" />
+            <source>&amp;Play Input Movie…</source>
+            <translation>⟦&amp;Ƥŀåÿ Ïńƥüŧ Ḿöṽïë…~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-1834" />
+            <source>Ctrl+Alt+P</source>
+            <translation>Ctrl+Alt+P</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>&amp;Edit Input Movie…</source>
+            <translation>⟦&amp;Ëðïŧ Ïńƥüŧ Ḿöṽïë…~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Local A/&amp;V Streaming Output…</source>
+            <translation>⟦Ŀöçåŀ Å/&amp;Ṽ Šŧŕëåḿïńɠ Öüŧƥüŧ…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
             <source>&amp;Cheats…</source>
             <translation>⟦&amp;Çħëåŧš…~~⟧</translation>
         </message>
@@ -3882,35 +4085,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+3470" />
+            <location line="+3733" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-3469" />
-            <location line="+2421" />
-            <location line="+868" />
+            <location line="-3732" />
+            <location line="+2672" />
+            <location line="+880" />
             <location line="+181" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3469" />
-            <location line="+2421" />
-            <location line="+868" />
+            <location line="-3732" />
+            <location line="+2672" />
+            <location line="+880" />
             <location line="+181" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3469" />
-            <location line="+3290" />
+            <location line="-3732" />
+            <location line="+3553" />
             <location line="+180" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-3468" />
+            <location line="-3731" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3920,7 +4123,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Šŀöŧ 0~⟧</translation>
         </message>
         <message>
-            <location line="+51" />
+            <location line="+52" />
             <source>Authenticated netplay session connected.</source>
             <translation>⟦Åüŧħëńŧïçåŧëð ńëŧƥŀåÿ šëššïöń çöńńëçŧëð.~~~~~~~~~⟧</translation>
         </message>
@@ -4158,29 +4361,69 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         <message>
             <location line="+3" />
             <location line="+47" />
-            <location line="+1747" />
-            <location line="+521" />
+            <location line="+2009" />
+            <location line="+533" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2304" />
+            <location line="-2578" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2307" />
+            <location line="+2581" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2255" />
+            <location line="-2529" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+51" />
+            <location line="+52" />
+            <source>Input movie complete: %1 (%2 frames)</source>
+            <translation>⟦Ïńƥüŧ ḿöṽïë çöḿƥŀëŧë: ~~~~~%1 (%2 ƒŕåḿëš)~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Input movie is idle</source>
+            <translation>⟦Ïńƥüŧ ḿöṽïë ïš ïðŀë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Recording deterministic input movie — frame %1</source>
+            <translation>⟦Ŕëçöŕðïńɠ ðëŧëŕḿïńïšŧïç ïńƥüŧ ḿöṽïë — ƒŕåḿë ~~~~~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Playing input movie — %1/%2</source>
+            <translation>⟦Ƥŀåÿïńɠ ïńƥüŧ ḿöṽïë — ~~~~~%1/%2⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Input Movie Error</source>
+            <translation>⟦Ïńƥüŧ Ḿöṽïë Ëŕŕöŕ~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+117" />
+            <source>Edited input movie saved: %1</source>
+            <translation>⟦Ëðïŧëð ïńƥüŧ ḿöṽïë šåṽëð: ~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+12" />
+            <source>Stop Input Movie &amp;Recording</source>
+            <translation>⟦Šŧöƥ Ïńƥüŧ Ḿöṽïë &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Stop Input Movie &amp;Playback</source>
+            <translation>⟦Šŧöƥ Ïńƥüŧ Ḿöṽïë &amp;Ƥŀåÿƀåçҡ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+95" />
             <source>Input configuration could not be saved.</source>
             <translation>⟦Ïńƥüŧ çöńƒïɠüŕåŧïöń çöüŀð ńöŧ ƀë šåṽëð.~~~~~~~~~⟧</translation>
         </message>
@@ -4395,12 +4638,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+968" />
+            <location line="+980" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="-926" />
+            <location line="-938" />
             <source>Replacement disc inserted.</source>
             <translation>⟦Ŕëƥŀåçëḿëńŧ ðïšç ïńšëŕŧëð.~~~~~~⟧</translation>
         </message>
@@ -4566,7 +4809,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ŕëçëńŧ ɠåḿë ħïšŧöŕÿ çöüŀð ńöŧ ƀë üƥðåŧëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+142" />
+            <location line="+154" />
             <source>Restoring the previous session…</source>
             <translation>⟦Ŕëšŧöŕïńɠ ŧħë ƥŕëṽïöüš šëššïöń…~~~~~~~⟧</translation>
         </message>
@@ -4685,7 +4928,27 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Üńåƀŀë ŧö Öƥëń Ɠåḿë~~~~⟧</translation>
         </message>
         <message>
-            <location line="+111" />
+            <location line="+104" />
+            <source>Input Movie Busy</source>
+            <translation>⟦Ïńƥüŧ Ḿöṽïë Ɓüšÿ~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Wait for the current input movie operation to finish before closing the game.</source>
+            <translation>⟦Ŵåïŧ ƒöŕ ŧħë çüŕŕëńŧ ïńƥüŧ ḿöṽïë öƥëŕåŧïöń ŧö ƒïńïšħ ƀëƒöŕë çŀöšïńɠ ŧħë ɠåḿë.~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>Input Movie Active</source>
+            <translation>⟦Ïńƥüŧ Ḿöṽïë Åçŧïṽë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Stop the active input movie before closing the game.</source>
+            <translation>⟦Šŧöƥ ŧħë åçŧïṽë ïńƥüŧ ḿöṽïë ƀëƒöŕë çŀöšïńɠ ŧħë ɠåḿë.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
             <source>Recording could not be stopped</source>
             <translation>⟦Ŕëçöŕðïńɠ çöüŀð ńöŧ ƀë šŧöƥƥëð~~~~~~~⟧</translation>
         </message>
@@ -5873,6 +6136,94 @@ Load a game to configure per-game overrides. Diagnostics remain available.</sour
             <location line="+66" />
             <source>%1 KiB</source>
             <translation>⟦%1 ҠïƁ~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::StreamingDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/streaming_dialog.cpp" line="+19" />
+            <source>Local A/V Streaming Output</source>
+            <translation>⟦Ŀöçåŀ Å/Ṽ Šŧŕëåḿïńɠ Öüŧƥüŧ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Broadcast native RGB565 video and stereo S16 audio through the documented GPGX-AV/1 protocol. The server listens on 127.0.0.1 only for a compatible local capture or streaming client.</source>
+            <translation>⟦Ɓŕöåðçåšŧ ńåŧïṽë ŔƓƁ565 ṽïðëö åńð šŧëŕëö Š16 åüðïö ŧħŕöüɠħ ŧħë ðöçüḿëńŧëð ƓƤƓẊ~~~~~~~~~~~~~~~~-AV/1 ƥŕöŧöçöŀ. Ŧħë šëŕṽëŕ ŀïšŧëńš öń 127.0.0.1 öńŀÿ ƒöŕ å çöḿƥåŧïƀŀë ŀöçåŀ çåƥŧüŕë öŕ šŧŕëåḿïńɠ çŀïëńŧ.~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Loopback streaming port</source>
+            <translation>⟦Ŀööƥƀåçҡ šŧŕëåḿïńɠ ƥöŕŧ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Maximum streaming clients</source>
+            <translation>⟦Ḿåẋïḿüḿ šŧŕëåḿïńɠ çŀïëńŧš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Loopback port:</source>
+            <translation>⟦Ŀööƥƀåçҡ ƥöŕŧ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Maximum clients:</source>
+            <translation>⟦Ḿåẋïḿüḿ çŀïëńŧš:~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Streaming state</source>
+            <translation>⟦Šŧŕëåḿïńɠ šŧåŧë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Streaming metrics</source>
+            <translation>⟦Šŧŕëåḿïńɠ ḿëŧŕïçš~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Start or stop the loopback-only native audio and video stream.</source>
+            <translation>⟦Šŧåŕŧ öŕ šŧöƥ ŧħë ŀööƥƀåçҡ~~~~~~-only ńåŧïṽë åüðïö åńð ṽïðëö šŧŕëåḿ.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+31" />
+            <source>Local Streaming Error</source>
+            <translation>⟦Ŀöçåŀ Šŧŕëåḿïńɠ Ëŕŕöŕ~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+26" />
+            <source>Streaming on 127.0.0.1:%1</source>
+            <translation>⟦Šŧŕëåḿïńɠ öń 127.0.0.1:~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Streaming is stopped</source>
+            <translation>⟦Šŧŕëåḿïńɠ ïš šŧöƥƥëð~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Clients: %1  •  Queue: %2/%3  •  Sent: %4 frames / %5 bytes  •  Dropped: %6  •  Slow clients removed: %7</source>
+            <translation>⟦Çŀïëńŧš: ~~%1  •  Ǫüëüë: ~~%2/%3  •  Šëńŧ: ~%4 ƒŕåḿëš / ~~%5 ƀÿŧëš  •  Ðŕöƥƥëð: ~~~%6  •  Šŀöŵ çŀïëńŧš ŕëḿöṽëð: ~~~~~%7⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Stopping…</source>
+            <translation>⟦Šŧöƥƥïńɠ…~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Starting…</source>
+            <translation>⟦Šŧåŕŧïńɠ…~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Stop streaming</source>
+            <translation>⟦Šŧöƥ šŧŕëåḿïńɠ~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Start streaming</source>
+            <translation>⟦Šŧåŕŧ šŧŕëåḿïńɠ~~~~⟧</translation>
         </message>
     </context>
     <context>

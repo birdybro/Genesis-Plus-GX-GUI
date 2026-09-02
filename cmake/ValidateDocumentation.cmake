@@ -26,6 +26,7 @@ set(required_documents
   docs/USER_GUIDE.md
   docs/KEYBOARD_SHORTCUTS.md
   docs/INPUT_CONFIGURATION.md
+  docs/INPUT_MOVIES.md
   docs/LIBRETRO_SHADERS.md
   docs/LOCALIZATION.md
   docs/ARTWORK_OVERLAYS.md
@@ -35,6 +36,7 @@ set(required_documents
   docs/BIOS.md
   docs/GAME_LIBRARY.md
   docs/SAVE_STATES.md
+  docs/STREAMING.md
   docs/PACKAGING.md
   docs/PHYSICAL_MEDIA.md
   docs/PORTABLE_MODE.md
@@ -120,6 +122,8 @@ foreach(menu_text IN ITEMS
     "Tools → Cheats"
     "Tools → RetroAchievements"
     "Tools → Cloud Synchronization"
+    "Tools → TAS and Input Movies"
+    "Tools → Local A/V Streaming Output"
     "Tools → Game Information"
     "Tools → BIOS Settings"
     "Tools → Log and Diagnostics"

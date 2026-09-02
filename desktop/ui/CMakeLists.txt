@@ -15,6 +15,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/game_library_dialog.h
   include/genplusgx/ui/help_dialog.h
   include/genplusgx/ui/input_configuration_dialog.h
+  include/genplusgx/ui/input_movie_editor_dialog.h
   include/genplusgx/ui/main_window.h
   include/genplusgx/ui/netplay_dialog.h
   include/genplusgx/ui/online_metadata_dialog.h
@@ -28,6 +29,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/session_settings_dialog.h
   include/genplusgx/ui/speed_settings_dialog.h
   include/genplusgx/ui/state_manager_dialog.h
+  include/genplusgx/ui/streaming_dialog.h
   include/genplusgx/ui/system_settings_dialog.h
   include/genplusgx/ui/theme_controller.h
   include/genplusgx/ui/video_settings_dialog.h
@@ -47,6 +49,7 @@ add_library(genplusgx_ui STATIC
   src/game_library_dialog.cpp
   src/help_dialog.cpp
   src/input_configuration_dialog.cpp
+  src/input_movie_editor_dialog.cpp
   src/main_window.cpp
   src/netplay_dialog.cpp
   src/online_metadata_dialog.cpp
@@ -60,6 +63,7 @@ add_library(genplusgx_ui STATIC
   src/session_settings_dialog.cpp
   src/speed_settings_dialog.cpp
   src/state_manager_dialog.cpp
+  src/streaming_dialog.cpp
   src/system_settings_dialog.cpp
   src/theme_controller.cpp
   src/video_settings_dialog.cpp
@@ -81,12 +85,14 @@ target_link_libraries(
     GenesisPlusGX::Achievements
     GenesisPlusGX::Cheats
     GenesisPlusGX::Cloud
+    GenesisPlusGX::Capture
     GenesisPlusGX::Diagnostics
     GenesisPlusGX::GameFiles
     GenesisPlusGX::Input
     GenesisPlusGX::Library
     GenesisPlusGX::Localization
     GenesisPlusGX::NetplayCore
+    GenesisPlusGX::Movies
     GenesisPlusGX::Platform
     GenesisPlusGX::Settings
     GenesisPlusGX::Updates

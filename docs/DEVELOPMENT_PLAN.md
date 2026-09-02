@@ -110,7 +110,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
 | 98 Signed updates | COMPLETE | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | `c257953` |
-| 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
+| 99 TAS, movies, and streaming | IMPLEMENTED — HOSTED CI PENDING | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
 ## Execution policy
 
@@ -3779,6 +3779,82 @@ normal video; schema-1 settings migrate safely; global and sparse per-game selec
 persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
 software/no-feature builds remain usable; required runtimes/resources/licenses ship on
 all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 99 detail
+
+**Status:** IMPLEMENTED — all local compiler, test, sanitizer, compatibility,
+packaging, and adversarial gates pass; exact hosted CI and artifact inspection are
+pending the milestone commit.
+
+**Goal:** Add deterministic input-movie recording/playback, an accessible TAS timeline
+editor, and bounded loopback A/V streaming without moving core access off its owner
+thread or changing Genesis Plus GX algorithms.
+
+**Files changed:**
+
+- `desktop/movies/` for the versioned, checksummed, atomically written input-movie
+  model and bounded timeline editing operations
+- `desktop/core/` for exact frame-boundary recording/playback, state restoration,
+  conflict policy, metrics, and monotonic live-input recovery
+- `desktop/capture/` for capture fan-out and the bounded loopback streaming service
+- `desktop/ui/` and `desktop/app/main.cpp` for movie actions, TAS and streaming
+  dialogs, composition, status, logging, diagnostics, and ordered shutdown
+- unit, generated-core integration, real loopback TCP, semantic GUI, diagnostics,
+  localization, fixture-provenance, package, and documentation coverage
+- README, changelog, architecture, testing, user, logging, upstream-maintenance,
+  requirements-audit, and the dedicated `docs/INPUT_MOVIES.md` and
+  `docs/STREAMING.md` guides
+
+**Tests added:** `unit.input_movie` covers deterministic RLE serialization, identity
+compatibility, atomic round trips, timeline mutations, UTF-8 and size bounds, checksum
+corruption, unsupported versions, trailing bytes, canonical frame sequences, saturated
+rerecord accounting, and a bounded mutation corpus.
+`integration.input_movie` executes a generated CC0 Genesis program through the real
+core/worker path, records two distinct eight-port input frames, rejects state-changing
+operations and the wrong identity, restores the exact initial raw state, reproduces
+the final raw state, finishes on the exact frame, and proves a lower-sequence live
+input resumes afterward. `unit.streaming_service` exercises fan-out, real loopback
+greeting/frame transmission, client limits, queue saturation, port collision, metrics,
+and clean restart. `integration.streaming` carries actual generated-ROM RGB565 and
+stereo S16 output from the worker through the capture fan-out and a real `QTcpSocket`,
+then validates the entire framed packet. `gui.movie_streaming` drives all TAS mutations,
+Unicode metadata bounds, object names/accessibility, streaming transitions/metrics,
+movie command gating, replacement protection, pending states, and recoverable failures.
+It also proves that record/playback controls are disabled while netplay or Hardcore is
+active and restored afterward.
+
+**Local gate evidence:** Warning-as-error GCC Debug and optimized Release, and
+warning-as-error Clang 22 Release each pass 136/136 tests. Leak-detecting ASan+UBSan
+passes 136/136 with halt-on-error and no finding. CHD-disabled passes 136/136;
+Libretro-shader-disabled, cloud-plus-achievements-disabled, and signed-update-disabled
+graphs each pass every one of their 134 applicable tests. The default graph consists
+of 12 infrastructure, 20 core, 15 integration, 52 unit, and 37 GUI/process
+registrations. The strict inherited Unix libretro target builds, links, and cleans.
+The exact movie workflow also passes 100 consecutive Debug executions. That repetition
+gate was added after a loaded parallel run exposed an event-order race: natural
+playback completion was published before the public metrics snapshot became idle. The
+worker now updates metrics first and only then publishes the matching completion event,
+so an observer can never see a completed timeline paired with stale active metrics.
+
+A fresh Release install and the extracted CPack archive pass the production Linux
+layout verifier; installed offscreen version and portable pseudo-language event-loop
+smokes pass. The 41,312,336-byte
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` matches its generated SHA-256 sidecar
+and contains the two new manuals plus Qt Network. Native XCB smoke awaits hosted CI
+because this workstation image does not contain `xvfb-run`. No proprietary ROM was
+copied or generated; the previously supplied NAS mount is empty, so the required new
+workflows use documented generated CC0 programs through the same production paths.
+
+**Acceptance criteria:** Movie input is captured and replayed only at authoritative
+frame boundaries; initial state, game, deterministic settings, and exact core build are
+validated; untrusted files and all queues have fixed limits; TAS edits preserve
+rerecord accounting; live input recovers monotonically; the stream binds only to
+loopback, rejects excess/slow clients, and cannot block emulation; every action is
+accessible, diagnosable, and lifecycle-safe; and all local and hosted native gates pass
+without an authored warning or sanitizer finding.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

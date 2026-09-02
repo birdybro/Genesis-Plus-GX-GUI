@@ -14,6 +14,15 @@ platform documentation.
 
 ### Added
 
+- Deterministic input movies with raw initial-state preservation, exact eight-port
+  frame-boundary input, game/settings/core identity checks, atomic checksummed
+  run-length files, automatic clean-shutdown finalization, live-input recovery, and an
+  accessible rerecord-counted TAS timeline editor.
+
+- Loopback-only `GPGX-AV/1` native RGB565/stereo-S16 output with a bounded reusable
+  frame pipeline, one-to-four-client limits, slow-client eviction, runtime diagnostics,
+  a documented protocol, and real worker-to-TCP integration coverage.
+
 - Ed25519-authenticated application-update discovery with a pinned project key,
   disabled-by-default automatic checks, highest-seen-version rollback defense, strict
   HTTPS/release URL validation, exact native-package selection, bounded atomic

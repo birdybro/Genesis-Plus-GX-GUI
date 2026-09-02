@@ -17,6 +17,7 @@
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/input_movie_editor_dialog.h"
 #include "genplusgx/ui/online_metadata_dialog.h"
 #include "genplusgx/ui/update_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
@@ -780,6 +781,26 @@ void MainWindow::buildMenus()
     this, &MainWindow::showOnlineMetadataSettings);
   auto* netplay = addAction(*tools, tr("&Netplay…"), "netplayAction");
   connect(netplay, &QAction::triggered, this, &MainWindow::showNetplay);
+  auto* movies = tools->addMenu(tr("&TAS and Input Movies"));
+  movies->setObjectName(QStringLiteral("inputMoviesMenu"));
+  auto* recordMovie = addAction(*movies,
+    tr("Start Input Movie &Recording…"), "movieRecordAction",
+    QKeySequence{tr("Ctrl+Alt+R")});
+  connect(recordMovie, &QAction::triggered,
+    this, &MainWindow::requestMovieRecording);
+  auto* playMovie = addAction(*movies,
+    tr("&Play Input Movie…"), "moviePlaybackAction",
+    QKeySequence{tr("Ctrl+Alt+P")});
+  connect(playMovie, &QAction::triggered,
+    this, &MainWindow::requestMoviePlayback);
+  auto* editMovie = addAction(*movies,
+    tr("&Edit Input Movie…"), "movieEditorAction");
+  connect(editMovie, &QAction::triggered,
+    this, &MainWindow::showMovieEditor);
+  auto* streaming = addAction(*tools,
+    tr("Local A/&V Streaming Output…"), "streamingAction");
+  streaming->setEnabled(false);
+  connect(streaming, &QAction::triggered, this, &MainWindow::showStreaming);
   tools->addSeparator();
   auto* cheats = addAction(*tools, tr("&Cheats…"), "cheatsAction");
   connect(cheats, &QAction::triggered, this, &MainWindow::showCheats);
@@ -951,6 +972,7 @@ void MainWindow::setGameActionsEnabled(bool enabled)
   updateStateActions();
   updateScreenshotAction();
   updateRecordingAction();
+  updateMovieActions();
   updateRunAheadAction();
   updateCheatAction();
   updatePerGameSettingsAction();
@@ -1026,11 +1048,13 @@ void MainWindow::updateNetplayControls()
 {
   const bool sessionActive =
     netplayState_ != netplay::NetplaySessionState::disconnected;
+  const bool movieActive = movieState_ == MovieUiState::recording ||
+    movieState_ == MovieUiState::playback || movieOperationPending_;
   const bool achievementSession = achievementSnapshot_.gameLoaded ||
     achievementSnapshot_.state == achievements::ConnectionState::loadingGame ||
     achievementSnapshot_.hardcore;
   if (auto* action = findChild<QAction*>(QStringLiteral("netplayAction"))) {
-    action->setEnabled((isGameLoaded() && !achievementSession) ||
+    action->setEnabled((isGameLoaded() && !achievementSession && !movieActive) ||
       sessionActive);
   }
   static constexpr const char* lockedActions[]{
@@ -1048,7 +1072,8 @@ void MainWindow::updateNetplayControls()
     "overscanHorizontalAction", "overscanFullAction", "ntscDisabledAction",
     "ntscMonochromeAction", "ntscCompositeAction", "ntscSVideoAction",
     "ntscRgbAction", "singleFieldRenderAction", "doubleFieldRenderAction",
-    "gameGearExtendedScreenAction", "debugToolsAction"};
+    "gameGearExtendedScreenAction", "debugToolsAction",
+    "movieRecordAction", "moviePlaybackAction"};
   if (sessionActive) {
     for (const auto* name : lockedActions) {
       if (auto* action = findChild<QAction*>(QString::fromLatin1(name))) {
@@ -1520,6 +1545,7 @@ void MainWindow::updateAchievementControls()
   updateCheatAction();
   updateRunAheadAction();
   updateNetplayControls();
+  updateMovieActions();
 }
 
 void MainWindow::setEmulationControlSink(EmulationControlSink sink)
@@ -2414,6 +2440,262 @@ void MainWindow::updateRecordingAction()
     hasRecentGames_ && fileOperationReady);
   findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(
     isGameLoaded() && fileOperationReady);
+}
+
+void MainWindow::setMovieSink(MovieSink sink)
+{
+  movieSink_ = std::move(sink);
+  if (!movieSink_) {
+    movieState_ = MovieUiState::unavailable;
+    moviePath_.clear();
+  } else if (movieState_ == MovieUiState::unavailable) {
+    movieState_ = MovieUiState::idle;
+  }
+  movieOperationPending_ = false;
+  updateMovieActions();
+}
+
+void MainWindow::setMovieState(
+  MovieUiState state, std::filesystem::path path,
+  std::uint64_t frame, std::uint64_t totalFrames)
+{
+  const bool stateChanged = movieState_ != state;
+  movieState_ = state;
+  if (stateChanged) {
+    movieOperationPending_ = false;
+  }
+  if (!path.empty()) {
+    moviePath_ = std::move(path);
+  }
+  updateMovieActions();
+  switch (state) {
+    case MovieUiState::unavailable:
+    case MovieUiState::idle:
+      if (!moviePath_.empty() && totalFrames > 0U) {
+        statusBar()->showMessage(
+          tr("Input movie complete: %1 (%2 frames)")
+            .arg(pathToQString(moviePath_)).arg(totalFrames), 8'000);
+      } else if (state == MovieUiState::idle) {
+        statusBar()->showMessage(tr("Input movie is idle"), 3'000);
+      }
+      break;
+    case MovieUiState::recording:
+      statusBar()->showMessage(
+        tr("Recording deterministic input movie — frame %1").arg(frame));
+      break;
+    case MovieUiState::playback:
+      statusBar()->showMessage(
+        tr("Playing input movie — %1/%2").arg(frame).arg(totalFrames));
+      break;
+  }
+}
+
+void MainWindow::showMovieError(const std::string& detail)
+{
+  movieOperationPending_ = false;
+  updateMovieActions();
+  dialogService_->showError(
+    this, tr("Input Movie Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::requestMovieRecording()
+{
+  if (!movieSink_) {
+    return;
+  }
+  if (movieState_ == MovieUiState::recording) {
+    const auto status = movieSink_({
+      .operation = MovieUiOperation::stopRecording,
+      .path = moviePath_,
+      .movie = {},
+    });
+    if (!status) {
+      showMovieError(status.message);
+    } else {
+      movieOperationPending_ = true;
+      updateMovieActions();
+    }
+    return;
+  }
+  if (movieState_ != MovieUiState::idle || !isGameLoaded() ||
+      !applicationPathsAvailable_) {
+    return;
+  }
+  auto suggested = applicationPaths_.recordingsDirectory() /
+    (sanitizeFilename(pathToQString(loadedGamePath_.stem())
+       .toUtf8().toStdString(), 80U) + ".gpgx-movie");
+  const auto path = dialogService_->chooseMovieSave(this, suggested);
+  if (!path) {
+    return;
+  }
+  const auto status = movieSink_({
+    .operation = MovieUiOperation::startRecording,
+    .path = *path,
+    .movie = {},
+  });
+  if (!status) {
+    showMovieError(status.message);
+    return;
+  }
+  moviePath_ = *path;
+  movieOperationPending_ = true;
+  updateMovieActions();
+}
+
+void MainWindow::requestMoviePlayback()
+{
+  if (!movieSink_) {
+    return;
+  }
+  if (movieState_ == MovieUiState::playback) {
+    const auto status = movieSink_({
+      .operation = MovieUiOperation::stopPlayback,
+      .path = moviePath_,
+      .movie = {},
+    });
+    if (!status) {
+      showMovieError(status.message);
+    } else {
+      movieOperationPending_ = true;
+      updateMovieActions();
+    }
+    return;
+  }
+  if (movieState_ != MovieUiState::idle || !isGameLoaded() ||
+      !applicationPathsAvailable_) {
+    return;
+  }
+  const auto path = dialogService_->chooseMovieOpen(
+    this, applicationPaths_.recordingsDirectory());
+  if (!path) {
+    return;
+  }
+  auto loaded = movies::loadMovie(*path);
+  if (!loaded.status) {
+    showMovieError(loaded.status.message);
+    return;
+  }
+  const auto status = movieSink_({
+    .operation = MovieUiOperation::startPlayback,
+    .path = *path,
+    .movie = std::move(loaded.movie),
+  });
+  if (!status) {
+    showMovieError(status.message);
+    return;
+  }
+  moviePath_ = *path;
+  movieOperationPending_ = true;
+  updateMovieActions();
+}
+
+void MainWindow::showMovieEditor()
+{
+  const auto initial = applicationPathsAvailable_
+    ? applicationPaths_.recordingsDirectory() : std::filesystem::path{};
+  const auto path = dialogService_->chooseMovieOpen(this, initial);
+  if (!path) {
+    return;
+  }
+  auto loaded = movies::loadMovie(*path);
+  if (!loaded.status) {
+    showMovieError(loaded.status.message);
+    return;
+  }
+  InputMovieEditorDialog editor{std::move(loaded.movie), this};
+  if (editor.exec() != QDialog::Accepted) {
+    return;
+  }
+  const auto saved = movies::saveMovie(*path, editor.movie());
+  if (!saved) {
+    showMovieError(saved.message);
+    return;
+  }
+  statusBar()->showMessage(
+    tr("Edited input movie saved: %1").arg(pathToQString(*path)), 8'000);
+}
+
+void MainWindow::updateMovieActions()
+{
+  auto* record = findChild<QAction*>(QStringLiteral("movieRecordAction"));
+  auto* playback = findChild<QAction*>(QStringLiteral("moviePlaybackAction"));
+  auto* editor = findChild<QAction*>(QStringLiteral("movieEditorAction"));
+  if (record == nullptr || playback == nullptr || editor == nullptr) {
+    return;
+  }
+  record->setText(movieState_ == MovieUiState::recording
+    ? tr("Stop Input Movie &Recording")
+    : tr("Start Input Movie &Recording…"));
+  playback->setText(movieState_ == MovieUiState::playback
+    ? tr("Stop Input Movie &Playback")
+    : tr("&Play Input Movie…"));
+  const bool idleReady = movieState_ == MovieUiState::idle &&
+    isGameLoaded() && !gameLoading_ && !sessionResumeBusy_ &&
+    netplayState_ == netplay::NetplaySessionState::disconnected &&
+    !achievementSnapshot_.hardcore && applicationPathsAvailable_ &&
+    static_cast<bool>(movieSink_);
+  record->setEnabled(!movieOperationPending_ &&
+    (idleReady || movieState_ == MovieUiState::recording));
+  playback->setEnabled(!movieOperationPending_ &&
+    (idleReady || movieState_ == MovieUiState::playback));
+  editor->setEnabled(movieState_ == MovieUiState::idle &&
+    applicationPathsAvailable_ && !movieOperationPending_);
+  const bool movieActive = movieState_ == MovieUiState::recording ||
+    movieState_ == MovieUiState::playback || movieOperationPending_;
+  if (movieActive) {
+    findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
+    findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
+    findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
+    findChild<QAction*>(QStringLiteral("closeGameAction"))->setEnabled(false);
+    if (auto* netplay = findChild<QAction*>(QStringLiteral("netplayAction"))) {
+      netplay->setEnabled(false);
+    }
+  } else {
+    updateRecordingAction();
+    updateNetplayControls();
+  }
+}
+
+void MainWindow::setStreamingSink(StreamingSink sink)
+{
+  streamingSink_ = std::move(sink);
+  if (auto* dialog = findChild<StreamingDialog*>(
+        QStringLiteral("streamingDialog"))) {
+    dialog->setRequestSink(streamingSink_);
+  }
+  if (auto* action = findChild<QAction*>(QStringLiteral("streamingAction"))) {
+    action->setEnabled(static_cast<bool>(streamingSink_));
+  }
+}
+
+void MainWindow::setStreamingMetrics(capture::StreamingMetrics metrics)
+{
+  if (auto* dialog = findChild<StreamingDialog*>(
+        QStringLiteral("streamingDialog"))) {
+    dialog->setMetrics(metrics);
+  }
+}
+
+void MainWindow::showStreaming()
+{
+  auto* dialog = findChild<StreamingDialog*>(QStringLiteral("streamingDialog"));
+  if (dialog == nullptr) {
+    dialog = new StreamingDialog(this);
+    dialog->setAttribute(Qt::WA_DeleteOnClose);
+    dialog->setRequestSink(streamingSink_);
+  }
+  dialog->show();
+  dialog->raise();
+  dialog->activateWindow();
+}
+
+void MainWindow::showStreamingError(const std::string& detail)
+{
+  showStreaming();
+  if (auto* dialog = findChild<StreamingDialog*>(
+        QStringLiteral("streamingDialog"))) {
+    dialog->showFailure(detail);
+  }
 }
 
 void MainWindow::showAboutDialog()
@@ -4025,6 +4307,18 @@ bool MainWindow::requestGameLoad(
     presentGameLoadError(path, "Another game operation is still in progress.");
     return false;
   }
+  if (movieOperationPending_) {
+    presentGameLoadError(path,
+      "Wait for the current input movie operation to finish before changing "
+      "games.");
+    return false;
+  }
+  if (movieState_ == MovieUiState::recording ||
+      movieState_ == MovieUiState::playback) {
+    presentGameLoadError(path,
+      "Stop the active input movie before changing games.");
+    return false;
+  }
   if (recordingState_ == RecordingUiState::starting ||
       recordingState_ == RecordingUiState::stopping) {
     presentGameLoadError(path,
@@ -4109,6 +4403,18 @@ bool MainWindow::submitGameLoadTarget(GameLaunchTarget target)
   }
   if (gameLoading_ || sessionResumeBusy_ || cloudSyncBusy_) {
     presentGameLoadError(path, "Another game operation is still in progress.");
+    return false;
+  }
+  if (movieOperationPending_) {
+    presentGameLoadError(path,
+      "Wait for the current input movie operation to finish before changing "
+      "games.");
+    return false;
+  }
+  if (movieState_ == MovieUiState::recording ||
+      movieState_ == MovieUiState::playback) {
+    presentGameLoadError(path,
+      "Stop the active input movie before changing games.");
     return false;
   }
   if (recordingState_ == RecordingUiState::starting ||
@@ -4639,6 +4945,18 @@ void MainWindow::closeGame()
 {
   if (recordingState_ == RecordingUiState::starting ||
       recordingState_ == RecordingUiState::stopping) {
+    return;
+  }
+  if (movieOperationPending_) {
+    dialogService_->showError(this, tr("Input Movie Busy"),
+      tr("Wait for the current input movie operation to finish before closing "
+         "the game."));
+    return;
+  }
+  if (movieState_ == MovieUiState::recording ||
+      movieState_ == MovieUiState::playback) {
+    dialogService_->showError(this, tr("Input Movie Active"),
+      tr("Stop the active input movie before closing the game."));
     return;
   }
   if (gameCloseSink_ && isGameLoaded()) {

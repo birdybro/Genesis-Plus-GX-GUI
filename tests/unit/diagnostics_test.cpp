@@ -158,6 +158,19 @@ int main()
   snapshot.recordingWrittenFrames = 144U;
   snapshot.recordingDroppedFrames = 1U;
   snapshot.recordingOutputBytes = 4'096U;
+  snapshot.inputMovieState = "Playback";
+  snapshot.inputMovieFrame = 90U;
+  snapshot.inputMovieFrameCount = 144U;
+  snapshot.inputMovieRerecordCount = 3U;
+  snapshot.streamingActive = true;
+  snapshot.streamingPort = 55'456U;
+  snapshot.streamingClients = 2U;
+  snapshot.streamingQueuedFrames = 1U;
+  snapshot.streamingQueueCapacity = 4U;
+  snapshot.streamingBroadcastFrames = 120U;
+  snapshot.streamingDroppedFrames = 2U;
+  snapshot.streamingSlowClientDisconnects = 1U;
+  snapshot.streamingBytesSent = 65'536U;
   snapshot.normalSpeedPercent = 125U;
   snapshot.slowMotionSpeedPercent = 50U;
   snapshot.fastForwardSpeedPercent = 800U;
@@ -207,6 +220,15 @@ int main()
                report.find("Lossless recording: Active") != std::string::npos &&
                report.find("Recording queue: 2 / 8") != std::string::npos &&
                report.find("Recording frames: 144 written, 1 dropped") != std::string::npos &&
+               report.find("Input movie: Playback") != std::string::npos &&
+               report.find("Input movie position: 90 / 144") != std::string::npos &&
+               report.find("Input movie rerecords: 3") != std::string::npos &&
+               report.find("Loopback A/V streaming: Active") != std::string::npos &&
+               report.find("Streaming endpoint: 127.0.0.1:55456") != std::string::npos &&
+               report.find("Streaming clients: 2") != std::string::npos &&
+               report.find("Streaming queue: 1 / 4") != std::string::npos &&
+               report.find("Streaming frames: 120 broadcast, 2 dropped") != std::string::npos &&
+               report.find("Streaming slow-client disconnects: 1") != std::string::npos &&
                report.find("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%") != std::string::npos &&
                report.find("Active speed: 50% (slow motion)") != std::string::npos &&
                report.find("/users/alex") == std::string::npos &&

@@ -153,6 +153,53 @@ is refreshed, and transport failures may use a previously validated stale record
 shutdown, the metadata service is cancelled and joined before application resources are
 destroyed; it never outlives the GUI-owned database or calls core teardown.
 
+### Input-movie data flow
+
+```text
+GUI input sources -> coalesced latest snapshot -------------------+
+                                                                 |
+movie command -> emulation owner thread -> raw initial state      |
+                                  |                               |
+                                  +-> authoritative frame boundary+
+                                         | record/playback
+                                         v
+                             bounded InputMovie timeline
+                                         |
+                              atomic checksummed envelope
+```
+
+The emulation worker alone captures/restores the raw core state and selects the input
+consumed by a frame. Recording copies the latest neutral frontend snapshot immediately
+before each authoritative frame. Playback substitutes the recorded snapshot, retains
+new live input without applying it, and restores that input with a worker-owned
+monotonic sequence after the final frame. The GUI never calls state or input core APIs.
+
+The movie descriptor binds the timeline to exact game content, a canonical digest of
+deterministic core/input/BIOS/cheat settings, and the core Git build. State-changing
+commands and netplay are rejected at the worker boundary while active. The format
+module owns bounded validation, run-length encoding, final SHA-256, and atomic I/O;
+the TAS dialog edits an owned copy without touching core state.
+
+### Capture and local-stream data flow
+
+```text
+authoritative native video + matching audio batch
+                       |
+                CaptureFanout
+                 /          \
+bounded lossless recorder   bounded four-slot stream queue
+                                      |
+                              dedicated TCP thread
+                                      |
+                        127.0.0.1 clients (maximum four)
+```
+
+`CaptureFanout` calls only active sinks and never changes core output. The stream sink
+copies into one preallocated slot on the emulation thread; a full queue counts a drop.
+Its worker reuses one encoded packet buffer, applies an 8 MiB per-client Qt write-backlog
+limit, and publishes bounded events/metrics. It binds `QHostAddress::LocalHost` only and
+sends no path, game, input, state, firmware, or credential metadata.
+
 ```text
              +-------------------+
              | Qt 6 Widgets GUI  |
@@ -208,6 +255,8 @@ desktop/persistence/     application paths, atomic files, RAM and states
 desktop/settings/        versioned global and per-game configuration
 desktop/localization/    catalog discovery, installation, and fallback policy
 desktop/achievements/    rcheevos runtime, bounded service bridge, secure credentials
+desktop/movies/          deterministic input-movie format and TAS mutation model
+desktop/capture/         bounded lossless recording, fan-out, and loopback stream
 desktop/library/         metadata and asynchronous SQLite index
 desktop/cheats/          validation, persistence, adapter application
 desktop/platform/        platform paths, diagnostics, deployment helpers
@@ -283,8 +332,8 @@ separate workers only through their service interfaces.
 Commands are a finite tagged set: load, unload, start, pause, resume, hard reset, soft
 reset, frame advance, fast-forward/slow-motion modes, speed configuration,
 save/load/delete state, input snapshot,
-settings and firmware snapshots, decoded cheat patch lists, disc change/eject, and
-shutdown. Commands with
+settings and firmware snapshots, decoded cheat patch lists, disc change/eject,
+input-movie record/playback, and shutdown. Commands with
 superseding semantics (input and live settings) are coalesced. A failed coalescing
 search does not move from the command that is subsequently queued. Lifecycle,
 persistence, and disc commands retain ordering. The queue has a fixed capacity and
@@ -1400,8 +1449,8 @@ cross-file transaction format in the settings center.
 
 Shutdown is an explicit, idempotent workflow:
 
-1. stop the GUI event pump, disconnect window/input producers and renderer sinks, and
-   disable new commands;
+1. stop the GUI event pump, synchronously finalize any active non-empty input movie,
+   disconnect window/input producers and renderer sinks, and disable new commands;
 2. cooperatively cancel and join cloud synchronization and signed-update HTTPS work so
    no network worker retains application-data paths or transient credentials;
 3. wake the emulation worker, stop frame execution, atomically flush available
@@ -1409,7 +1458,8 @@ Shutdown is an explicit, idempotent workflow:
    when a save failed;
 4. cancel and join physical-media discovery/import, drain terminal events, and remove
    any completed or active transient disc snapshots after the core has released them;
-5. stop and close the SDL3 audio stream/device;
+5. stop and join the lossless-recording and loopback-stream workers, then stop and close
+   the SDL3 audio stream/device;
 6. stop controller input and close its SDL handles on the GUI/owner thread;
 7. request cooperative cancellation of any in-flight backup, state, metadata, or
    library identity hash, then stop and join the state, metadata, screenshot, and

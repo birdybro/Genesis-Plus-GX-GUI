@@ -69,6 +69,11 @@ QString cheatFileDialogFilter()
     "Plain-text cheat lists (*.txt);;All files (*)");
 }
 
+QString movieFileDialogFilter()
+{
+  return QObject::tr("Genesis Plus GX input movies (*.gpgx-movie);;All files (*)");
+}
+
 std::optional<std::filesystem::path> DialogService::chooseDisc(
   QWidget* parent,
   const std::filesystem::path& initialDirectory)
@@ -135,6 +140,18 @@ std::optional<std::filesystem::path> DialogService::chooseStateExport(
 std::optional<std::filesystem::path> DialogService::chooseRecordingDirectory(
   QWidget*,
   const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseMovieOpen(
+  QWidget*, const std::filesystem::path&)
+{
+  return std::nullopt;
+}
+
+std::optional<std::filesystem::path> DialogService::chooseMovieSave(
+  QWidget*, const std::filesystem::path&)
 {
   return std::nullopt;
 }
@@ -305,6 +322,34 @@ std::optional<std::filesystem::path> QtDialogService::chooseRecordingDirectory(
   return selected.isEmpty()
     ? std::nullopt
     : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseMovieOpen(
+  QWidget* parent,
+  const std::filesystem::path& initialDirectory)
+{
+  const auto selected = QFileDialog::getOpenFileName(
+    parent, QObject::tr("Open Input Movie"), pathToQString(initialDirectory),
+    movieFileDialogFilter());
+  return selected.isEmpty()
+    ? std::nullopt
+    : std::optional<std::filesystem::path>{pathFromQString(selected)};
+}
+
+std::optional<std::filesystem::path> QtDialogService::chooseMovieSave(
+  QWidget* parent,
+  const std::filesystem::path& suggestedPath)
+{
+  auto selected = QFileDialog::getSaveFileName(
+    parent, QObject::tr("Save Input Movie"), pathToQString(suggestedPath),
+    movieFileDialogFilter());
+  if (selected.isEmpty()) {
+    return std::nullopt;
+  }
+  if (!selected.endsWith(QStringLiteral(".gpgx-movie"), Qt::CaseInsensitive)) {
+    selected += QStringLiteral(".gpgx-movie");
+  }
+  return pathFromQString(selected);
 }
 
 std::optional<std::string> QtDialogService::chooseArchiveEntry(

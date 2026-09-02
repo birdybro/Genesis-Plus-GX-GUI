@@ -8,6 +8,7 @@
 #include "genplusgx/input_snapshot.h"
 #include "genplusgx/netplay/netplay_bridge.h"
 #include "genplusgx/netplay/netplay_timeline.h"
+#include "genplusgx/movies/input_movie.h"
 #include "genplusgx/run_ahead_configuration.h"
 #include "genplusgx/rewind_configuration.h"
 #include "genplusgx/audio_ring_buffer.h"
@@ -72,6 +73,10 @@ enum class EmulationCommandType {
   achievementLoginPassword,
   achievementLoginToken,
   achievementLogout,
+  startMovieRecording,
+  stopMovieRecording,
+  startMoviePlayback,
+  stopMoviePlayback,
 };
 
 struct EmulationCommand final {
@@ -97,6 +102,9 @@ struct EmulationCommand final {
   std::string achievementUsername;
   std::string achievementSecret;
   std::vector<std::uint8_t> achievementProgress;
+  movies::MovieDescriptor movieDescriptor;
+  movies::MovieMetadata movieMetadata;
+  movies::InputMovie movie;
 
   [[nodiscard]] static EmulationCommand simple(
     EmulationCommandType type,
@@ -173,6 +181,14 @@ struct EmulationCommand final {
     std::uint64_t operationId,
     std::string username,
     std::string token);
+  [[nodiscard]] static EmulationCommand startMovieRecordingSession(
+    std::uint64_t operationId,
+    movies::MovieDescriptor descriptor,
+    movies::MovieMetadata metadata = {});
+  [[nodiscard]] static EmulationCommand startMoviePlaybackSession(
+    std::uint64_t operationId,
+    movies::InputMovie movie,
+    movies::MovieDescriptor expected);
 };
 
 enum class EmulationWorkerError {
@@ -207,6 +223,10 @@ enum class EmulationEventType {
   netplayStopped,
   netplayRollback,
   achievementEvent,
+  movieRecordingStarted,
+  movieRecordingFinished,
+  moviePlaybackStarted,
+  moviePlaybackFinished,
   workerStopped,
 };
 
@@ -234,12 +254,15 @@ struct EmulationEvent final {
   std::uint32_t runAheadFrames{1U};
   bool netplayActive{false};
   std::uint64_t netplayRollbackFrame{0U};
+  std::uint64_t movieFrame{0U};
+  std::uint64_t movieFrameCount{0U};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
   std::vector<std::uint8_t> achievementProgress;
   CoreDiscInfo disc;
   CoreDebugResponse debug;
   achievements::Event achievement;
+  movies::InputMovie movie;
 
   [[nodiscard]] bool succeeded() const noexcept
   {
@@ -302,6 +325,11 @@ struct EmulationWorkerMetrics final {
   std::size_t achievementResponseQueueDepth{0U};
   std::uint64_t rejectedAchievementRequests{0U};
   std::uint64_t rejectedAchievementResponses{0U};
+  bool movieRecording{false};
+  bool moviePlayback{false};
+  std::uint64_t movieFrame{0U};
+  std::uint64_t movieFrameCount{0U};
+  std::uint64_t movieRerecordCount{0U};
 };
 
 class EmulationWorker final {
