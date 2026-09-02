@@ -17,6 +17,7 @@
 #include "genplusgx/ui/game_library_dialog.h"
 #include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
+#include "genplusgx/ui/online_metadata_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
@@ -771,6 +772,10 @@ void MainWindow::buildMenus()
   cloudSync->setToolTip(
     tr("This build does not include cloud synchronization support."));
 #endif
+  auto* onlineMetadata = addAction(
+    *tools, tr("Online &Metadata and Artwork…"), "onlineMetadataAction");
+  connect(onlineMetadata, &QAction::triggered,
+    this, &MainWindow::showOnlineMetadataSettings);
   auto* netplay = addAction(*tools, tr("&Netplay…"), "netplayAction");
   connect(netplay, &QAction::triggered, this, &MainWindow::showNetplay);
   tools->addSeparator();
@@ -1305,6 +1310,57 @@ void MainWindow::showCloudSync()
   dialog->setBusy(cloudSyncBusy_);
   dialog->show();
 #endif
+}
+
+void MainWindow::setOnlineMetadataSettings(
+  library::OnlineMetadataSettings settings)
+{
+  onlineMetadataSettings_ = std::move(settings);
+  if (auto* dialog = findChild<OnlineMetadataDialog*>(
+        QStringLiteral("onlineMetadataDialog"))) {
+    dialog->setSettings(onlineMetadataSettings_);
+  }
+  if (auto* libraryDialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    libraryDialog->setOnlineMetadataEnabled(onlineMetadataSettings_.enabled);
+  }
+  refreshSettingsDialog();
+}
+
+void MainWindow::setOnlineMetadataSettingsSink(
+  OnlineMetadataSettingsSink sink)
+{
+  onlineMetadataSettingsSink_ = std::move(sink);
+  if (auto* dialog = findChild<OnlineMetadataDialog*>(
+        QStringLiteral("onlineMetadataDialog"))) {
+    dialog->setSettingsSink(onlineMetadataSettingsSink_);
+  }
+}
+
+void MainWindow::showOnlineMetadataSettings()
+{
+  if (auto* existing = findChild<OnlineMetadataDialog*>(
+        QStringLiteral("onlineMetadataDialog"))) {
+    existing->show();
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new OnlineMetadataDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettings(onlineMetadataSettings_);
+  dialog->setSettingsSink([this](const auto& settings) {
+    if (onlineMetadataSettingsSink_) {
+      const auto saved = onlineMetadataSettingsSink_(settings);
+      if (!saved) {
+        return saved;
+      }
+    }
+    setOnlineMetadataSettings(settings);
+    statusBar()->showMessage(tr("Online metadata settings saved."), 3'000);
+    return PersistenceStatus{};
+  });
+  dialog->show();
 }
 
 void MainWindow::updateCloudDialogState()
@@ -1886,6 +1942,7 @@ void MainWindow::showGameLibrary()
   dialog->setSnapshot(gameLibraryDirectories_, gameLibraryGames_);
   dialog->setServiceAvailable(
     gameLibraryAvailable_, gameLibraryUnavailableDetail_);
+  dialog->setOnlineMetadataEnabled(onlineMetadataSettings_.enabled);
   dialog->open();
 }
 
@@ -1941,6 +1998,43 @@ void MainWindow::showGameLibraryError(const std::string& detail)
   }
   dialogService_->showError(
     this, tr("Game Library Error"), QString::fromStdString(detail));
+}
+
+void MainWindow::showOnlineMetadataStarted(std::int64_t gameId)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showOnlineMetadataStarted(gameId);
+  }
+  statusBar()->showMessage(tr("Looking up licensed online metadata…"));
+}
+
+void MainWindow::showOnlineMetadataCompleted(
+  std::int64_t gameId,
+  bool fromCache,
+  bool staleCache)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showOnlineMetadataCompleted(gameId, fromCache, staleCache);
+  }
+  statusBar()->showMessage(staleCache
+    ? tr("Validated cached metadata restored; provider unavailable.")
+    : tr("Licensed online metadata updated."), 5'000);
+}
+
+void MainWindow::showOnlineMetadataFailed(
+  std::int64_t gameId,
+  const std::string& detail)
+{
+  if (auto* dialog = findChild<GameLibraryDialog*>(
+        QStringLiteral("gameLibraryDialog"))) {
+    dialog->showOnlineMetadataFailed(gameId, detail);
+  } else {
+    dialogService_->showError(this, tr("Online Metadata Failed"),
+      QString::fromStdString(detail));
+  }
+  statusBar()->showMessage(tr("Online metadata lookup failed."), 5'000);
 }
 
 void MainWindow::setScreenshotSink(ScreenshotSink sink)
@@ -2352,6 +2446,9 @@ void MainWindow::showSettings(SettingsPage page)
         break;
       case SettingsPageAction::runAhead:
         showRunAheadSettings();
+        break;
+      case SettingsPageAction::onlineMetadata:
+        showOnlineMetadataSettings();
         break;
     }
   });
@@ -3371,6 +3468,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .runAhead = runAheadSettings_,
     .session = sessionSettings_,
     .speed = speedSettings_,
+    .onlineMetadata = onlineMetadataSettings_,
     .paths = applicationPaths_,
     .connectedControllerCount = controllers_.size(),
     .pathsAvailable = applicationPathsAvailable_,

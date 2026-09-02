@@ -1408,6 +1408,50 @@ version 0.1.1. Each package contains `CLOUD_SYNC.md`, Qt Network, and the QtKeyc
 license. No ROM, BIOS, save RAM, state, private key, certificate, or test fixture is
 present. Milestone 96 is complete.
 
+## Milestone 97 online metadata and artwork validation
+
+The disabled-by-default online enrichment implementation is locally release-gated. The
+default graph contains 127 tests: 11 infrastructure, 20 core, 12 integration, 49 unit,
+and 35 GUI/process tests. Overlapping behavioral labels report 81 unit, 29 core, 59
+integration, and 35 GUI tests. New coverage exercises settings and license validation,
+both provider schemas, exact SHA-256 identity, canonical serialization, malformed input,
+licensed artwork selection and complete image decoding, bounded caching and worker
+lifecycle, real loopback TLS/redirect/response limits, SQLite migration and rescan
+invalidation, local-art priority, attribution, and accessible library/settings actions.
+
+| Configuration | CTest | Result |
+| --- | ---: | --- |
+| GCC Debug, warnings as errors | 127/127 | Passed |
+| GCC Release, warnings as errors | 127/127 | Passed |
+| ASan + UBSan | 127/127 | Passed; no finding |
+| Clang Release, warnings as errors | 127/127 | Passed |
+| CHD disabled | 127/127 | Passed |
+| Cloud synchronization disabled | 127/127 | Passed |
+| Cloud and RetroAchievements disabled | 125/125 | Passed; no QtKeychain dependency |
+| Libretro shaders disabled | 125/125 | Passed |
+| Inherited Unix libretro | Build/link/clean | Passed; x86-64 ELF, warning-clean |
+
+The Clang gate exposed and drove removal of one unused application-lambda capture. A
+manual adversarial pass then found two artwork-validation defects before publication:
+the Retronian license probe used a noncanonical CC0 URL, image validation stopped at
+decoder/header recognition, and WebP availability depended on an optional unshipped Qt
+module. The corrected implementation guarantees PNG/JPEG, accepts an explicitly
+attributed CC0 Retronian offer, verifies the detected byte format, and performs a
+complete bounded decode; the unit suite proves that a truncated PNG with a readable
+header and content that disagrees with its declared MIME type are rejected.
+
+A fresh Linux Release stage passes the production package verifier, installed help,
+version and offscreen portable pseudo-language event-loop smokes. CPack produces
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz`; its SHA-256 sidecar verifies and its
+103-entry extracted layout passes the verifier again. The package includes
+`ONLINE_METADATA.md` and Qt Network, and the payload scan finds no ROM, disc, firmware,
+save/state, private key, certificate, or cached online content. Pinned `actionlint`
+1.7.7 and the strict inherited libretro build pass. `xvfb-run` is unavailable in this
+local host image, so native XCB startup and Windows/macOS layouts remain mandatory
+hosted gates. Exact hosted CI, complete-log inspection, and downloaded cross-platform
+artifact audit will be recorded after the implementation commit; Milestone 97 remains
+in progress until those gates pass.
+
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
@@ -1439,10 +1483,11 @@ directories.
   pseudo-language is exposed explicitly as layout testing and is not represented as a
   translation for ordinary play.
 
-- No commercial ROM, proprietary Sega BIOS, or copyrighted box art is distributed or
-  fetched. Real Sega CD boot testing needs a user-supplied regional BIOS and is an
-  optional external-fixture suite; CI validates the frontend path with generated legal
-  firmware and disc fixtures.
+- No commercial ROM, proprietary Sega BIOS, or unlicensed box art is distributed or
+  fetched. Optional online enrichment accepts only explicitly attributed, allowlisted
+  Creative Commons metadata and artwork. Real Sega CD boot testing needs a user-supplied
+  regional BIOS and is an optional external-fixture suite; CI validates the frontend
+  path with generated legal firmware and disc fixtures.
 - The previously supplied external-ROM mount was unmounted/empty during the
   configurable-speed, soft-patch, enhanced save-state, recording, and artwork runs, so
   its speed workflows, temporary header-only IPS case, optional real-game state browser
@@ -1475,8 +1520,8 @@ directories.
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Online scraping/downloading, a network-accessible external debugger server,
-  TAS tooling, and streaming remain intentionally outside scope.
+  formats. Website scraping and unlicensed asset downloading, a network-accessible
+  external debugger server, TAS tooling, and streaming remain intentionally outside scope.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.

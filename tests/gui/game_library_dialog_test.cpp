@@ -85,6 +85,29 @@ genplusgx::library::LibraryGame game(
   return result;
 }
 
+genplusgx::library::OnlineMetadataRecord onlineRecord(const std::string& hash)
+{
+  return {
+    .lookupSha256 = hash,
+    .providerName = "Fixture Provider",
+    .providerHomepage = "https://provider.example.test",
+    .preferredTitle = "Enriched Beta CD",
+    .alternateTitle = "Beta Alternate",
+    .description = "Licensed fixture description.",
+    .releaseDate = "1994-01-02",
+    .developer = "Fixture Studio",
+    .publisher = "Fixture Publisher",
+    .genres = {"Role Playing"},
+    .attribution = {
+      .creator = "Fixture contributors",
+      .licenseSpdx = "CC-BY-4.0",
+      .licenseUrl = "https://creativecommons.org/licenses/by/4.0/",
+      .sourceUrl = "https://provider.example.test/games/fixture",
+    },
+    .artwork = std::nullopt,
+  };
+}
+
 class GameLibraryDialogTest final : public QObject {
   Q_OBJECT
 
@@ -108,12 +131,17 @@ void GameLibraryDialogTest::fullOfflineLibraryWorkflow()
   dialogs->artworkSelection = artwork;
   genplusgx::ui::MainWindow window;
   window.setDialogService(dialogs);
+  auto metadataSettings = genplusgx::library::defaultOnlineMetadataSettings();
+  metadataSettings.enabled = true;
+  window.setOnlineMetadataSettings(metadataSettings);
   std::vector<std::pair<std::filesystem::path, bool>> added;
   std::vector<std::int64_t> removed;
   std::vector<std::int64_t> scanned;
   std::vector<std::pair<std::int64_t, bool>> recursiveUpdates;
   std::vector<std::pair<std::int64_t, bool>> favoriteUpdates;
   std::vector<std::pair<std::int64_t, std::filesystem::path>> artworkUpdates;
+  std::vector<std::int64_t> metadataLookups;
+  std::vector<std::int64_t> metadataClears;
   std::vector<std::pair<std::int64_t, std::filesystem::path>> launches;
   window.setGameLibraryActions({
     .addDirectory = [&added](const auto& path, bool recursive) {
@@ -130,6 +158,12 @@ void GameLibraryDialogTest::fullOfflineLibraryWorkflow()
     .setArtwork = [&artworkUpdates](auto id, const auto& path) {
       artworkUpdates.emplace_back(id, path);
     },
+    .lookupOnlineMetadata = [&metadataLookups](auto id) {
+      metadataLookups.push_back(id);
+    },
+    .clearOnlineMetadata = [&metadataClears](auto id) {
+      metadataClears.push_back(id);
+    },
     .launchGame = [&launches](auto id, const auto& path) {
       launches.emplace_back(id, path);
     },
@@ -143,6 +177,7 @@ void GameLibraryDialogTest::fullOfflineLibraryWorkflow()
       genplusgx::library::GameSystem::segaCd, "Europe", true, 7,
       1'710'000'000'000, artwork),
   };
+  games[1].onlineMetadata = onlineRecord(games[1].metadata.sha256);
   window.setGameLibrarySnapshot(directories, games);
   window.show();
   window.findChild<QAction*>(QStringLiteral("gameLibraryAction"))->trigger();
@@ -187,6 +222,31 @@ void GameLibraryDialogTest::fullOfflineLibraryWorkflow()
     QStringLiteral("libraryArtworkLabel"));
   QVERIFY(artworkLabel != nullptr);
   QVERIFY(artworkLabel->text().isEmpty());
+  auto* metadataDetails = dialog->findChild<QLabel*>(
+    QStringLiteral("libraryOnlineMetadataDetailsLabel"));
+  auto* lookupMetadata = dialog->findChild<QPushButton*>(
+    QStringLiteral("libraryLookupMetadataButton"));
+  auto* clearMetadata = dialog->findChild<QPushButton*>(
+    QStringLiteral("libraryClearMetadataButton"));
+  QVERIFY(metadataDetails != nullptr);
+  QVERIFY(lookupMetadata != nullptr);
+  QVERIFY(clearMetadata != nullptr);
+  QVERIFY(metadataDetails->text().contains(QStringLiteral("Fixture Provider")));
+  QVERIFY(metadataDetails->text().contains(QStringLiteral("CC-BY-4.0")));
+  QVERIFY(lookupMetadata->isEnabled());
+  QVERIFY(clearMetadata->isEnabled());
+  QTest::mouseClick(lookupMetadata, Qt::LeftButton);
+  QCOMPARE(metadataLookups, std::vector<std::int64_t>{2});
+  dialog->showOnlineMetadataStarted(2);
+  QVERIFY(!lookupMetadata->isEnabled());
+  QVERIFY(dialog->findChild<QProgressBar*>(
+    QStringLiteral("libraryProgressBar"))->isVisible());
+  dialog->showOnlineMetadataCompleted(2, true, false);
+  QVERIFY(dialog->findChild<QLabel*>(QStringLiteral("libraryStatusLabel"))
+    ->text().contains(QStringLiteral("cache"), Qt::CaseInsensitive));
+  QVERIFY(lookupMetadata->isEnabled());
+  QTest::mouseClick(clearMetadata, Qt::LeftButton);
+  QCOMPARE(metadataClears, std::vector<std::int64_t>{2});
   QTest::mouseClick(dialog->findChild<QPushButton*>(
     QStringLiteral("libraryFavoriteButton")), Qt::LeftButton);
   QCOMPARE(favoriteUpdates.size(), std::size_t{1});
@@ -201,6 +261,14 @@ void GameLibraryDialogTest::fullOfflineLibraryWorkflow()
   QApplication::processEvents();
   QVERIFY(dialog->findChild<genplusgx::ui::GameInformationDialog*>(
     QStringLiteral("gameInformationDialog")) != nullptr);
+  auto* information = dialog->findChild<genplusgx::ui::GameInformationDialog*>(
+    QStringLiteral("gameInformationDialog"));
+  QCOMPARE(information->findChild<QLineEdit*>(
+    QStringLiteral("gameInfoOnlineTitleValue"))->text(),
+    QStringLiteral("Enriched Beta CD"));
+  QCOMPARE(information->findChild<QLineEdit*>(
+    QStringLiteral("gameInfoOnlineLicenseValue"))->text(),
+    QStringLiteral("CC-BY-4.0"));
   QTest::mouseClick(dialog->findChild<QPushButton*>(
     QStringLiteral("libraryChooseArtworkButton")), Qt::LeftButton);
   QCOMPARE(artworkUpdates.back(),
@@ -315,6 +383,8 @@ void GameLibraryDialogTest::databaseScannerWorkflow()
       QVERIFY(database.setArtworkPath(id, path));
       refresh();
     },
+    .lookupOnlineMetadata = [](auto) {},
+    .clearOnlineMetadata = [](auto) {},
     .launchGame = [&](auto id, const auto&) {
       QVERIFY(database.recordLaunch(id, 1'720'000'000'000));
       refresh();

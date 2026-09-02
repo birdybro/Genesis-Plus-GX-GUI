@@ -79,6 +79,9 @@ rewritten.
   checksum validation, patched-content save/state identity, and session resume
 - Recent games, searchable asynchronous SQLite library, favorites, play history, and
   user-provided local artwork
+- Disabled-by-default licensed online library enrichment with local SHA-256 matching,
+  explicit attribution, bounded caching, Retronian Genesis metadata, an open manifest
+  protocol for other systems, and strict rejection of unlicensed artwork
 - Header metadata and SHA-256 game information, Game Genie/PAR cheats, bounded
   RetroArch/plain-text cheat import, live RAM search, and sparse per-game overrides
 - System/light/dark themes, structured rotating logs, and copyable privacy-filtered
@@ -194,6 +197,14 @@ never uploads games, BIOS files, settings, logs, or credentials. Read the privac
 provider-quota, and recovery details in [CLOUD_SYNC.md](docs/CLOUD_SYNC.md) before
 enabling it.
 
+To enrich library titles and descriptive fields, open **Tools → Online Metadata and
+Artwork…** and explicitly enable a provider. Retronian Genesis hashes are matched from
+a downloaded index without uploading ROM data or the hash; its third-party thumbnail
+links are not downloaded because they do not declare an independent license. A custom
+Licensed Manifest provider can cover the other systems but must attach an approved
+license and attribution to every accepted record and image. See the [online metadata
+and artwork guide](docs/ONLINE_METADATA.md).
+
 The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
 cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),
 [the game library](docs/GAME_LIBRARY.md), [cheats](docs/CHEATS.md), and
@@ -291,6 +302,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Netplay](docs/NETPLAY.md)
 - [RetroAchievements](docs/ACHIEVEMENTS.md)
 - [Cloud synchronization](docs/CLOUD_SYNC.md)
+- [Online metadata and artwork](docs/ONLINE_METADATA.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

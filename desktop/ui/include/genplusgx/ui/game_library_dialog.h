@@ -33,6 +33,8 @@ struct GameLibraryActions final {
   std::function<void(std::int64_t)> scanDirectory;
   std::function<void(std::int64_t, bool)> setFavorite;
   std::function<void(std::int64_t, const std::filesystem::path&)> setArtwork;
+  std::function<void(std::int64_t)> lookupOnlineMetadata;
+  std::function<void(std::int64_t)> clearOnlineMetadata;
   std::function<void(std::int64_t, const std::filesystem::path&)> launchGame;
 };
 
@@ -50,6 +52,13 @@ public:
     std::vector<library::LibraryDirectory> directories,
     std::vector<library::LibraryGame> games);
   void setServiceAvailable(bool available, const std::string& detail = {});
+  void setOnlineMetadataEnabled(bool enabled);
+  void showOnlineMetadataStarted(std::int64_t gameId);
+  void showOnlineMetadataCompleted(
+    std::int64_t gameId,
+    bool fromCache,
+    bool staleCache);
+  void showOnlineMetadataFailed(std::int64_t gameId, const std::string& detail);
   void showScanStarted(
     std::int64_t directoryId,
     const std::filesystem::path& path);
@@ -77,6 +86,8 @@ private:
   void toggleFavorite();
   void chooseArtwork();
   void clearArtwork();
+  void lookupOnlineMetadata();
+  void clearOnlineMetadata();
   void launchSelected();
   void showSelectedInformation();
   [[nodiscard]] std::int64_t selectedDirectoryId() const;
@@ -105,10 +116,15 @@ private:
   QPushButton* informationButton_{nullptr};
   QPushButton* chooseArtworkButton_{nullptr};
   QPushButton* clearArtworkButton_{nullptr};
+  QPushButton* lookupMetadataButton_{nullptr};
+  QPushButton* clearMetadataButton_{nullptr};
   QLabel* artworkLabel_{nullptr};
+  QLabel* metadataDetailsLabel_{nullptr};
   QLabel* statusLabel_{nullptr};
   QProgressBar* progressBar_{nullptr};
   bool serviceAvailable_{true};
+  bool onlineMetadataEnabled_{false};
+  std::int64_t onlineMetadataGameId_{0};
 };
 
 } // namespace genplusgx::ui

@@ -2,6 +2,7 @@
 
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/input/input_profile.h"
+#include "genplusgx/library/online_metadata_settings.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/appearance_settings.h"
@@ -52,6 +53,7 @@ enum class SettingsPageAction {
   session,
   speed,
   runAhead,
+  onlineMetadata,
 };
 
 struct SettingsOverview final {
@@ -66,6 +68,7 @@ struct SettingsOverview final {
   RunAheadConfiguration runAhead;
   settings::SessionSettings session;
   EmulationSpeedConfiguration speed;
+  library::OnlineMetadataSettings onlineMetadata;
   ApplicationPaths paths;
   std::size_t connectedControllerCount{0U};
   bool pathsAvailable{false};

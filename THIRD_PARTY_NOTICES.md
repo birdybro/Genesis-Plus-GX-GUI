@@ -24,6 +24,19 @@ and the terms of the exact Qt/SDL packages they redistribute. Official packages 
 and SDL dynamically replaceable and include source-distribution references; a distributor
 is responsible for supplying all notices/source offers required by its chosen Qt edition.
 
+## Optional online data services
+
+| Service/data | Use | Distribution and license handling |
+| --- | --- | --- |
+| [Retronian GameDB](https://gamedb.retronian.com/) | Optional Genesis / Mega Drive library metadata matched by SHA-256 | Retronian publishes its game database under CC BY-SA 4.0. The application downloads data only after user opt-in and retains provider, creator, license, and source attribution. No Retronian database or artwork is bundled in release packages. |
+
+Retronian metadata can contain links to Libretro Thumbnails repositories. Those image
+records do not independently declare an asset license in the provider response, so the
+application rejects them. A custom Licensed Manifest provider is likewise accepted only
+when metadata and each downloaded image identify an approved Creative Commons or
+public-domain license and attribution. Provider data is cached for personal frontend
+use and is not incorporated into this repository or its packages.
+
 ## Bundled emulator dependencies
 
 | Component | Use | Bundled location/version | License |
@@ -56,4 +69,4 @@ that qualify under their own system distribution terms.
 The application icon and generated test programs/images are original project material.
 Generated binary fixtures are dedicated to CC0 1.0 as documented in
 [tests/fixtures/README.md](tests/fixtures/README.md). No commercial game, proprietary
-Sega BIOS, scraped artwork, or automatically downloaded copyrighted asset is distributed.
+Sega BIOS, scraped artwork, or automatically downloaded unlicensed asset is distributed.

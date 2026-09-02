@@ -108,7 +108,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
 | 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
-| 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
+| 97 Online metadata and art | IN PROGRESS | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
 | 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
@@ -3782,6 +3782,65 @@ all package layouts; and every applicable local gate passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
+
+## Milestone 97 detail
+
+**Status:** IN PROGRESS — implementation, every local configuration gate, sanitizer,
+package verification, and adversarial review pass. Commit/push, exact hosted CI,
+complete-log inspection, and artifact audit remain required before this milestone can
+become complete.
+
+**Goal:** Add explicit opt-in enrichment for the offline game library without sending
+game bytes or local paths, accepting unlicensed artwork, racing the emulation core, or
+making normal scanning and play depend on an Internet service.
+
+**Files changed:**
+
+- `desktop/library/` provider protocol, settings, HTTPS/cache client, bounded service,
+  and SQLite schema-2 enrichment fields
+- `desktop/ui/` online metadata settings, library workflow, attributed game information,
+  and stable test identifiers
+- `desktop/app/main.cpp` settings, request/event composition, automatic queue, logging,
+  and clean shutdown
+- unit, real loopback TLS, database migration, and GUI tests under `tests/`
+- root/user/architecture/testing/library/legal/package/milestone documentation
+
+**Tests added:** `unit.online_metadata`, `integration.online_metadata_https`, and
+`gui.online_metadata`; existing database, scanner, settings, game-library, information,
+documentation, and package tests are extended. The focused tests cover private defaults,
+approved-license parsing, exact hashes, locally matched Retronian data, generic manifests,
+licensed PNG validation, corrupt cache recovery, real Qt TLS and redirect behavior,
+worker lifecycle, schema migration, local-art priority, settings validation, attribution,
+and library progress/clear behavior.
+
+**Current evidence:** The 127-test default graph passes warning-as-error GCC Debug and
+Release, ASan+UBSan, and warning-as-error Clang Release. Fresh CHD-disabled and
+cloud-disabled graphs pass 127/127; cloud-plus-achievements-disabled and
+shader-disabled graphs pass their 125/125 applicable tests. The strict inherited Unix
+libretro build, pinned `actionlint` 1.7.7, Release install verifier, installed help,
+version and portable pseudo-language event-loop smoke, CPack TGZ/checksum, extracted
+103-entry archive verifier, and prohibited-payload scan all pass. Final review caught
+and fixed a Clang-only unused capture, an artwork-license probe that rejected valid
+Retronian offers, header-only image validation, and environment-dependent format
+claims; regression coverage now requires a properly attributed CC0 offer, rejects a
+truncated PNG even when Qt can read its header, and rejects bytes that disagree with a
+declared PNG/JPEG MIME type. The production endpoint returned a valid current Retronian
+`md` hash index and matching public game record during a manual availability/schema
+check on 2026-09-02.
+Required automated tests remain hermetic. The previous user-owned Phantasy Star IV path
+is not currently mounted (`/mnt/qnapraid` is empty), so no new external-ROM result is
+claimed; earlier completed core/presentation evidence remains unchanged and generated
+legal ROM workflows remain required here. Exact hosted evidence is pending the
+implementation commit.
+
+**Acceptance criteria:** The feature is disabled by default; no ROM bytes, path, or
+filename leaves the machine; provider and artwork records require exact identity,
+explicit approved license, and visible attribution; transfers, cache, image decode, and
+worker queues remain bounded; corrupt/stale/offline states fail safely; local artwork
+wins; normal emulation is independent; every local and hosted platform gate passes; and
+complete successful logs/packages contain no actionable issue or unintended data asset.
+
+**Commit SHA:** pending
 
 ## Milestone 96 detail
 

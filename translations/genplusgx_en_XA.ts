@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+420" />
+            <location filename="../desktop/app/main.cpp" line="+422" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+448" />
+            <location line="+467" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -231,7 +231,7 @@ Arguments:
             <translation>⟦Çħööšë Ŕëçöŕðïńɠ Ðïŕëçŧöŕÿ~~~~~~⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/game_information_dialog.cpp" line="+44" />
+            <location filename="../desktop/ui/src/game_information_dialog.cpp" line="+45" />
             <source>Header: 0x%1</source>
             <translation>⟦Ħëåðëŕ: 0ẋ~~%1⟧</translation>
         </message>
@@ -273,7 +273,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+94" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+95" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -2613,7 +2613,7 @@ Arguments:
         <name>genplusgx::ui::GameInformationDialog</name>
         <message>
             <location filename="../desktop/ui/src/game_information_dialog.cpp" line="+14" />
-            <location line="+88" />
+            <location line="+100" />
             <source>Game Information</source>
             <translation>⟦Ɠåḿë Ïńƒöŕḿåŧïöń~~~~⟧</translation>
         </message>
@@ -2738,25 +2738,25 @@ Arguments:
         </message>
         <message>
             <location line="+14" />
-            <location line="+331" />
-            <location line="+7" />
-            <source>No local artwork</source>
-            <translation>⟦Ńö ŀöçåŀ åŕŧŵöŕҡ~~~~⟧</translation>
+            <location line="+395" />
+            <location line="+19" />
+            <source>No artwork</source>
+            <translation>⟦Ńö åŕŧŵöŕҡ~~~⟧</translation>
         </message>
         <message>
-            <location line="-336" />
-            <source>Selected game local artwork</source>
-            <translation>⟦Šëŀëçŧëð ɠåḿë ŀöçåŀ åŕŧŵöŕҡ~~~~~~⟧</translation>
+            <location line="-412" />
+            <source>Selected game artwork</source>
+            <translation>⟦Šëŀëçŧëð ɠåḿë åŕŧŵöŕҡ~~~~~⟧</translation>
         </message>
         <message>
             <location line="+7" />
-            <location line="+320" />
-            <location line="+6" />
+            <location line="+384" />
+            <location line="+7" />
             <source>Add to Favorites</source>
             <translation>⟦Åðð ŧö Ƒåṽöŕïŧëš~~~~⟧</translation>
         </message>
         <message>
-            <location line="-324" />
+            <location line="-389" />
             <source>Launch</source>
             <translation>⟦Ŀåüńçħ~~⟧</translation>
         </message>
@@ -2776,12 +2776,34 @@ Arguments:
             <translation>⟦Çŀëåŕ Åŕŧŵöŕҡ~~~⟧</translation>
         </message>
         <message>
-            <location line="+21" />
+            <location line="+2" />
+            <source>Fetch Online Metadata…</source>
+            <translation>⟦Ƒëŧçħ Öńŀïńë Ḿëŧåðåŧå…~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Clear Online Metadata</source>
+            <translation>⟦Çŀëåŕ Öńŀïńë Ḿëŧåðåŧå~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <location line="+365" />
+            <location line="+14" />
+            <source>No online metadata</source>
+            <translation>⟦Ńö öńŀïńë ḿëŧåðåŧå~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="-375" />
+            <source>Selected game online metadata attribution</source>
+            <translation>⟦Šëŀëçŧëð ɠåḿë öńŀïńë ḿëŧåðåŧå åŧŧŕïƀüŧïöń~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+19" />
             <source>No indexed games</source>
             <translation>⟦Ńö ïńðëẋëð ɠåḿëš~~~~⟧</translation>
         </message>
         <message>
-            <location line="+87" />
+            <location line="+91" />
             <source>%1 indexed game(s) from %2 directorie(s)</source>
             <translation>⟦%1 ïńðëẋëð ɠåḿë(š) ƒŕöḿ ~~~~%2 ðïŕëçŧöŕïë(š)~~~⟧</translation>
         </message>
@@ -2796,7 +2818,27 @@ Arguments:
             <translation>⟦Ŧħë ɠåḿë~~-library šëŕṽïçë ïš üńåṽåïŀåƀŀë.~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+15" />
+            <location line="+16" />
+            <source>Looking up licensed online metadata…</source>
+            <translation>⟦Ŀööҡïńɠ üƥ ŀïçëńšëð öńŀïńë ḿëŧåðåŧå…~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+13" />
+            <source>Online provider unavailable; restored validated cached metadata.</source>
+            <translation>⟦Öńŀïńë ƥŕöṽïðëŕ üńåṽåïŀåƀŀë; ŕëšŧöŕëð ṽåŀïðåŧëð çåçħëð ḿëŧåðåŧå.~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Validated metadata loaded from the local cache.</source>
+            <translation>⟦Ṽåŀïðåŧëð ḿëŧåðåŧå ŀöåðëð ƒŕöḿ ŧħë ŀöçåŀ çåçħë.~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Licensed online metadata updated.</source>
+            <translation>⟦Ŀïçëńšëð öńŀïńë ḿëŧåðåŧå üƥðåŧëð.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+23" />
             <source>Scanning %1…</source>
             <translation>⟦Šçåńńïńɠ ~~%1…⟧</translation>
         </message>
@@ -2821,12 +2863,26 @@ Arguments:
             <translation>⟦Ɠåḿë Ŀïƀŕåŕÿ Ëŕŕöŕ~~~~⟧</translation>
         </message>
         <message>
-            <location line="+76" />
+            <location line="+72" />
+            <source>Enable online metadata in Tools → Online Metadata and Artwork.</source>
+            <translation>⟦Ëńåƀŀë öńŀïńë ḿëŧåðåŧå ïń Ŧööŀš → Öńŀïńë Ḿëŧåðåŧå åńð Åŕŧŵöŕҡ.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
             <source>Remove from Favorites</source>
             <translation>⟦Ŕëḿöṽë ƒŕöḿ Ƒåṽöŕïŧëš~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+15" />
+            <location line="+4" />
+            <source>%1
+%2 · %3
+Attribution: %4</source>
+            <translation>⟦%1
+%2 · %3
+Åŧŧŕïƀüŧïöń: ~~~%4⟧</translation>
+        </message>
+        <message>
+            <location line="+22" />
             <source>Artwork unavailable</source>
             <translation>⟦Åŕŧŵöŕҡ üńåṽåïŀåƀŀë~~~~~⟧</translation>
         </message>
@@ -3099,12 +3155,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+3051" />
+            <location line="+3149" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-3047" />
+            <location line="-3145" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -3185,12 +3241,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+1980" />
+            <location line="+2075" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-1979" />
+            <location line="-2074" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -3211,12 +3267,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+1358" />
+            <location line="+1415" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-1358" />
+            <location line="-1415" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3412,12 +3468,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3875" />
+            <location line="+3974" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3870" />
+            <location line="-3969" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3529,12 +3585,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2737" />
+            <location line="+2835" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2706" />
+            <location line="-2804" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3730,7 +3786,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë çŀöüð šÿńçħŕöńïžåŧïöń šüƥƥöŕŧ.~~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+2" />
+            <location line="+3" />
+            <source>Online &amp;Metadata and Artwork…</source>
+            <translation>⟦Öńŀïńë &amp;Ḿëŧåðåŧå åńð Åŕŧŵöŕҡ…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
             <source>&amp;Netplay…</source>
             <translation>⟦&amp;Ńëŧƥŀåÿ…~~⟧</translation>
         </message>
@@ -3811,35 +3872,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+3254" />
+            <location line="+3349" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-3253" />
-            <location line="+2207" />
-            <location line="+866" />
+            <location line="-3348" />
+            <location line="+2301" />
+            <location line="+867" />
             <location line="+181" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3253" />
-            <location line="+2207" />
-            <location line="+866" />
+            <location line="-3348" />
+            <location line="+2301" />
+            <location line="+867" />
             <location line="+181" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3253" />
-            <location line="+3074" />
+            <location line="-3348" />
+            <location line="+3169" />
             <location line="+180" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-3252" />
+            <location line="-3347" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3894,7 +3955,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš öƥëŕåŧïöń ƒåïŀëð~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+81" />
+            <location line="+83" />
             <source>Cloud sync complete: %1 uploaded, %2 downloaded, %3 conflicts</source>
             <translation>⟦Çŀöüð šÿńç çöḿƥŀëŧë: ~~~~~%1 üƥŀöåðëð, ~~%2 ðöŵńŀöåðëð, ~~~%3 çöńƒŀïçŧš~~~⟧</translation>
         </message>
@@ -3904,7 +3965,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Çŀöüð šÿńçħŕöńïžåŧïöń ƒåïŀëð~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+122" />
+            <location line="+82" />
+            <source>Online metadata settings saved.</source>
+            <translation>⟦Öńŀïńë ḿëŧåðåŧå šëŧŧïńɠš šåṽëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+91" />
             <source>The emulation command could not be queued.</source>
             <translation>⟦Ŧħë ëḿüŀåŧïöń çöḿḿåńð çöüŀð ńöŧ ƀë ǫüëüëð.~~~~~~~~~⟧</translation>
         </message>
@@ -3989,7 +4055,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ɠåḿë Ïńƒöŕḿåŧïöń Ƒåïŀëð~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+93" />
+            <location line="+94" />
             <source>Game Library Scan Failed</source>
             <translation>⟦Ɠåḿë Ŀïƀŕåŕÿ Šçåń Ƒåïŀëð~~~~~~⟧</translation>
         </message>
@@ -3997,6 +4063,31 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <location line="+11" />
             <source>Game Library Error</source>
             <translation>⟦Ɠåḿë Ŀïƀŕåŕÿ Ëŕŕöŕ~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>Looking up licensed online metadata…</source>
+            <translation>⟦Ŀööҡïńɠ üƥ ŀïçëńšëð öńŀïńë ḿëŧåðåŧå…~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+13" />
+            <source>Validated cached metadata restored; provider unavailable.</source>
+            <translation>⟦Ṽåŀïðåŧëð çåçħëð ḿëŧåðåŧå ŕëšŧöŕëð; ƥŕöṽïðëŕ üńåṽåïŀåƀŀë.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Licensed online metadata updated.</source>
+            <translation>⟦Ŀïçëńšëð öńŀïńë ḿëŧåðåŧå üƥðåŧëð.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Online Metadata Failed</source>
+            <translation>⟦Öńŀïńë Ḿëŧåðåŧå Ƒåïŀëð~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Online metadata lookup failed.</source>
+            <translation>⟦Öńŀïńë ḿëŧåðåŧå ŀööҡüƥ ƒåïŀëð.~~~~~~~⟧</translation>
         </message>
         <message>
             <location line="+14" />
@@ -4047,24 +4138,24 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         <message>
             <location line="+3" />
             <location line="+47" />
-            <location line="+1739" />
+            <location line="+1743" />
             <location line="+521" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2296" />
+            <location line="-2300" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2299" />
+            <location line="+2303" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2247" />
+            <location line="-2251" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
@@ -4104,7 +4195,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Åƥƥëåŕåńçë šëŧŧïńɠš åƥƥŀïëð.~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+125" />
+            <location line="+128" />
             <source>Rewind settings applied.</source>
             <translation>⟦Ŕëŵïńð šëŧŧïńɠš åƥƥŀïëð.~~~~~~⟧</translation>
         </message>
@@ -4284,12 +4375,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+966" />
+            <location line="+967" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="-924" />
+            <location line="-925" />
             <source>Replacement disc inserted.</source>
             <translation>⟦Ŕëƥŀåçëḿëńŧ ðïšç ïńšëŕŧëð.~~~~~~⟧</translation>
         </message>
@@ -4339,7 +4430,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ (ḿüŧëð)~~⟧</translation>
         </message>
         <message>
-            <location line="+112" />
+            <location line="+113" />
             <source>Physical Media Unavailable</source>
             <translation>⟦Ƥħÿšïçåŀ Ḿëðïå Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -4744,6 +4835,99 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <location line="+21" />
             <source>Join Session</source>
             <translation>⟦Ĵöïń Šëššïöń~~~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::OnlineMetadataDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/online_metadata_dialog.cpp" line="+21" />
+            <source>Online Metadata and Artwork</source>
+            <translation>⟦Öńŀïńë Ḿëŧåðåŧå åńð Åŕŧŵöŕҡ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Privacy and licensing</source>
+            <translation>⟦Ƥŕïṽåçÿ åńð ŀïçëńšïńɠ~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Provider</source>
+            <translation>⟦Ƥŕöṽïðëŕ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Enable online metadata lookup</source>
+            <translation>⟦Ëńåƀŀë öńŀïńë ḿëŧåðåŧå ŀööҡüƥ~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Automatically look up newly scanned games</source>
+            <translation>⟦Åüŧöḿåŧïçåŀŀÿ ŀööҡ üƥ ńëŵŀÿ šçåńńëð ɠåḿëš~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Download artwork only when an approved license is declared</source>
+            <translation>⟦Ðöŵńŀöåð åŕŧŵöŕҡ öńŀÿ ŵħëń åń åƥƥŕöṽëð ŀïçëńšë ïš ðëçŀåŕëð~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Retronian GameDB (Genesis metadata)</source>
+            <translation>⟦Ŕëŧŕöńïåń ƓåḿëÐƁ (Ɠëńëšïš ḿëŧåðåŧå)~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Licensed Manifest API v1</source>
+            <translation>⟦Ŀïçëńšëð Ḿåńïƒëšŧ ÅƤÏ ṽ1~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Metadata provider HTTPS endpoint</source>
+            <translation>⟦Ḿëŧåðåŧå ƥŕöṽïðëŕ ĦŦŦƤŠ ëńðƥöïńŧ~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Optional, for example us</source>
+            <translation>⟦Öƥŧïöńåŀ, ƒöŕ ëẋåḿƥŀë üš~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source> MiB</source>
+            <translation>⟦ ḾïƁ~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Service:</source>
+            <translation>⟦Šëŕṽïçë:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>HTTPS endpoint:</source>
+            <translation>⟦ĦŦŦƤŠ ëńðƥöïńŧ:~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Preferred language:</source>
+            <translation>⟦Ƥŕëƒëŕŕëð ŀåńɠüåɠë:~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Preferred region:</source>
+            <translation>⟦Ƥŕëƒëŕŕëð ŕëɠïöń:~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Cache limit:</source>
+            <translation>⟦Çåçħë ŀïḿïŧ:~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+90" />
+            <source>Disabled by default. Retronian lookup downloads a static Genesis hash index and sends no ROM bytes, file paths, or filenames. Matched metadata is &lt;a href="https://creativecommons.org/licenses/by-sa/4.0/"&gt;CC BY-SA 4.0&lt;/a&gt; and is attributed to Retronian GameDB contributors. Linked thumbnail images are rejected unless they independently declare an approved license.</source>
+            <translation>⟦Ðïšåƀŀëð ƀÿ ðëƒåüŀŧ. Ŕëŧŕöńïåń ŀööҡüƥ ðöŵńŀöåðš å šŧåŧïç Ɠëńëšïš ħåšħ ïńðëẋ åńð šëńðš ńö ŔÖḾ ƀÿŧëš, ƒïŀë ƥåŧħš, öŕ ƒïŀëńåḿëš. Ḿåŧçħëð ḿëŧåðåŧå ïš ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~&lt;a href="https://creativecommons.org/licenses/by-sa/4.0/"&gt;ÇÇ ƁŸ~-SA 4.0&lt;/a&gt; åńð ïš åŧŧŕïƀüŧëð ŧö Ŕëŧŕöńïåń ƓåḿëÐƁ çöńŧŕïƀüŧöŕš. Ŀïńҡëð ŧħüḿƀńåïŀ ïḿåɠëš åŕë ŕëĵëçŧëð üńŀëšš ŧħëÿ ïńðëƥëńðëńŧŀÿ ðëçŀåŕë åń åƥƥŕöṽëð ŀïçëńšë.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Disabled by default. The custom provider receives the selected game's system identifier and SHA-256 hash, never ROM bytes or local paths. Responses and artwork are accepted only with explicit attribution and an approved Creative Commons or public-domain license.</source>
+            <translation>⟦Ðïšåƀŀëð ƀÿ ðëƒåüŀŧ. Ŧħë çüšŧöḿ ƥŕöṽïðëŕ ŕëçëïṽëš ŧħë šëŀëçŧëð ɠåḿë'š šÿšŧëḿ ïðëńŧïƒïëŕ åńð ŠĦÅ-256 ħåšħ, ńëṽëŕ ŔÖḾ ƀÿŧëš öŕ ŀöçåŀ ƥåŧħš. Ŕëšƥöńšëš åńð åŕŧŵöŕҡ åŕë åççëƥŧëð öńŀÿ ŵïŧħ ëẋƥŀïçïŧ åŧŧŕïƀüŧïöń åńð åń åƥƥŕöṽëð Çŕëåŧïṽë Çöḿḿöńš öŕ ƥüƀŀïç~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-domain ŀïçëńšë.~~⟧</translation>
         </message>
     </context>
     <context>
@@ -5266,6 +5450,11 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
+            <source>Online Metadata and Artwork…</source>
+            <translation>⟦Öńŀïńë Ḿëŧåðåŧå åńð Åŕŧŵöŕҡ…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
             <source>Log and Diagnostics…</source>
             <translation>⟦Ŀöɠ åńð Ðïåɠńöšŧïçš…~~~~~⟧</translation>
         </message>
@@ -5285,21 +5474,23 @@ Resume last session: %4</source>
         <message>
             <location line="+6" />
             <location line="+1" />
+            <location line="+71" />
             <source>enabled</source>
             <translation>⟦ëńåƀŀëð~~⟧</translation>
         </message>
         <message>
-            <location line="-1" />
+            <location line="-72" />
             <source>hidden</source>
             <translation>⟦ħïððëń~~⟧</translation>
         </message>
         <message>
             <location line="+1" />
+            <location line="+71" />
             <source>disabled</source>
             <translation>⟦ðïšåƀŀëð~~⟧</translation>
         </message>
         <message>
-            <location line="+2" />
+            <location line="-69" />
             <source>Aspect: %1
 Scaling: %2
 Texture filter: %3
@@ -5421,14 +5612,21 @@ Logs: %9</source>
             <translation>⟦Ŕüń~-ahead: ðïšåƀŀëð~~⟧</translation>
         </message>
         <message>
-            <location line="+2" />
+            <location line="+1" />
+            <source>Online metadata: %1 (%2)</source>
+            <translation>⟦Öńŀïńë ḿëŧåðåŧå: ~~~~%1 (%2)⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
             <source>%1
 %2
 %3
+%4
 Per-game overrides are available. Diagnostics omit personal secrets.</source>
             <translation>⟦%1
 %2
 %3
+%4
 Ƥëŕ~-game öṽëŕŕïðëš åŕë åṽåïŀåƀŀë. Ðïåɠńöšŧïçš öḿïŧ ƥëŕšöńåŀ šëçŕëŧš.~~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
@@ -5436,10 +5634,12 @@ Per-game overrides are available. Diagnostics omit personal secrets.</source>
             <source>%1
 %2
 %3
+%4
 Load a game to configure per-game overrides. Diagnostics remain available.</source>
             <translation>⟦%1
 %2
 %3
+%4
 Ŀöåð å ɠåḿë ŧö çöńƒïɠüŕë ƥëŕ~~~~~~-game öṽëŕŕïðëš. Ðïåɠńöšŧïçš ŕëḿåïń åṽåïŀåƀŀë.~~~~~~~~~⟧</translation>
         </message>
     </context>

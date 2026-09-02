@@ -4,19 +4,19 @@ No commercial ROM, proprietary BIOS, copyrighted game asset, or automatically fe
 binary is used by the test suite. Binary fixtures are generated into temporary
 directories at test runtime and removed by RAII cleanup.
 
-## Local TLS/WebDAV certificate fixture
+## Local TLS/WebDAV and metadata certificate fixture
 
 | Field | Value |
 | --- | --- |
 | Stored filenames | `cloud-test-ca.der`, `cloud-test-server.der`, `cloud-test-server-key.der` |
 | Generator | `generate_cloud_tls_fixtures.sh`, using OpenSSL 3 on 2026-09-02 |
-| Purpose | Exercise the production Qt HTTPS/WebDAV client against a real loopback TLS server, including trusted and deliberately untrusted certificate paths |
+| Purpose | Exercise the production Qt HTTPS/WebDAV and online-metadata clients against real loopback TLS servers, including trusted and deliberately untrusted certificate paths, manual redirects, and transfer bounds |
 | Scope | Server certificate SAN is limited to `localhost` and `127.0.0.1`; the CA is never installed into a host trust store |
 | Validity | CA: 2026-09-02 through 2036-08-30; TLS leaf: 2026-09-02 through 2028-12-04 (824 days, within Apple's 825-day TLS-server limit) |
 | Provenance | Original project-only fixture dedicated to CC0-1.0; the private key is deliberately public test data and is not an account, production certificate, credential, or secret |
 | Expected behavior | `integration.cloud_webdav` trusts the CA only through its constructor seam; a production client without that injected CA rejects the same server |
 
-The key exists solely so all hosted platforms can run a deterministic local TLS server
+The key exists solely so all hosted platforms can run deterministic local TLS servers
 without external tools, accounts, or Internet access. It is stored as binary DER rather
 than secret-looking PEM text and is never installed or packaged. The CA uses critical
 `CA:TRUE` and certificate-signing constraints; the leaf uses critical `CA:FALSE` and

@@ -1,9 +1,10 @@
 # Game Library
 
-The local game library is an offline SQLite index stored at
+The local game library is an offline-first SQLite index stored at
 `library/game-library.sqlite3` beneath the platform application-data root. It contains
-paths and metadata only. It does not copy ROMs, contact a metadata service, download
-artwork, or initialize Genesis Plus GX while scanning.
+paths and metadata only. It does not copy ROMs or initialize Genesis Plus GX while
+scanning. Scanning itself never contacts a service; optional online enrichment is a
+separate, disabled-by-default action described in [ONLINE_METADATA.md](ONLINE_METADATA.md).
 
 Open **File → Game Library…** (`Ctrl+L`) to manage and launch the offline collection.
 The window is modeless, so it may remain open while a game runs. Its controls have
@@ -29,9 +30,18 @@ last-played time.
 **Add to Favorites** and **Remove from Favorites** persist across rescans. **Game
 Information…** opens the already-indexed read-only metadata without rerunning the core.
 **Choose Artwork…** associates a local PNG, JPEG, WebP, or BMP path and displays a
-bounded preview; **Clear Artwork** removes the association. Artwork is never copied,
-uploaded, fetched, or scraped. A moved/deleted image is shown as unavailable without
-affecting the game row.
+bounded preview; **Clear Artwork** removes the association. User-selected artwork is
+never copied or uploaded, and an offline scan never fetches or scrapes it. A
+moved/deleted image is shown as unavailable without affecting the game row.
+
+When online metadata is explicitly enabled, **Look Up Metadata** submits the selected
+row to a bounded background lookup. A successful exact-hash result changes the displayed
+library title and makes attributed release/developer/publisher/genre/description fields
+available in **Game Information…**. **Clear Online Metadata** removes that record and
+detaches only application-managed cached artwork. User-selected artwork always takes
+priority, is never overwritten by enrichment, and survives a metadata clear. Automatic
+lookup after scans is a second opt-in setting and observes the same privacy and license
+validation.
 
 ## Directory model
 
@@ -59,8 +69,10 @@ offline source row; it does not duplicate ZIP members into separate database row
 The versioned schema stores each selected path, titles, detected system and region,
 format, product and peripheral fields, file/declared sizes, checksums, mapper/media,
 Sega CD track details, SHA-256, and last-modified time. It also reserves durable fields
-for favorite, last-played, play-count, and user-provided artwork state. Rescanning a
-path updates file-owned metadata while preserving those user-owned fields.
+for favorite, last-played, play-count, user-provided artwork, validated online metadata,
+and managed-artwork ownership state. Rescanning a path updates file-owned metadata while
+preserving those user-owned/enrichment fields. Schema version 2 migrates existing
+version-1 libraries transactionally by adding empty enrichment columns.
 
 Every complete directory scan is a transaction. Rows not observed in that generation
 are removed only when enumeration and metadata batching finish successfully. A stop,

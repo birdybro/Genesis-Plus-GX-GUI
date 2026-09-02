@@ -1,8 +1,11 @@
 #pragma once
 
 #include "genplusgx/library/game_metadata.h"
+#include "genplusgx/library/online_metadata.h"
 
 #include <QDialog>
+
+#include <optional>
 
 namespace genplusgx::ui {
 
@@ -15,6 +18,8 @@ public:
     QWidget* parent = nullptr);
 
   void setMetadata(const library::GameMetadata& metadata);
+  void setOnlineMetadata(
+    const std::optional<library::OnlineMetadataRecord>& metadata);
 };
 
 } // namespace genplusgx::ui

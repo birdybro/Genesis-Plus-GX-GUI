@@ -221,8 +221,13 @@ sort any table column. The table includes last-played and play-count state. Laun
 double-clicking a row or pressing **Launch**; the count changes only after a successful
 core load. Favorites and local artwork paths survive rescans. **Game Information…**
 shows the indexed header and hash, while **Choose Artwork…** displays a bounded local
-preview. The application never contacts an artwork or metadata service. See
-[GAME_LIBRARY.md](GAME_LIBRARY.md) for storage, recovery, and scan safety details.
+preview. Offline scanning never contacts a service. Optional enrichment is separately
+disabled by default under **Tools → Online Metadata and Artwork…**; a manual lookup or
+explicitly enabled automatic lookup can add attributed descriptive metadata and
+license-validated artwork without uploading ROM bytes or local paths. See
+[GAME_LIBRARY.md](GAME_LIBRARY.md) for storage/recovery and
+[ONLINE_METADATA.md](ONLINE_METADATA.md) for privacy, provider, cache, and licensing
+details.
 
 ## Save states
 

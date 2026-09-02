@@ -172,5 +172,8 @@ require_file(
 require_file(
   "${documentation_directory}/CLOUD_SYNC.md"
   "cloud synchronization guide")
+require_file(
+  "${documentation_directory}/ONLINE_METADATA.md"
+  "online metadata and artwork guide")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

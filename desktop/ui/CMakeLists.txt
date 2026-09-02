@@ -17,6 +17,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/input_configuration_dialog.h
   include/genplusgx/ui/main_window.h
   include/genplusgx/ui/netplay_dialog.h
+  include/genplusgx/ui/online_metadata_dialog.h
   include/genplusgx/ui/per_game_settings_dialog.h
   include/genplusgx/ui/physical_media_dialog.h
   include/genplusgx/ui/rewind_settings_dialog.h
@@ -47,6 +48,7 @@ add_library(genplusgx_ui STATIC
   src/input_configuration_dialog.cpp
   src/main_window.cpp
   src/netplay_dialog.cpp
+  src/online_metadata_dialog.cpp
   src/per_game_settings_dialog.cpp
   src/physical_media_dialog.cpp
   src/rewind_settings_dialog.cpp

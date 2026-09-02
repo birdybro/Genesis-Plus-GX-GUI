@@ -18,6 +18,7 @@ set(required_documents
   docs/ARCHITECTURE.md
   docs/BUILDING.md
   docs/CLOUD_SYNC.md
+  docs/ONLINE_METADATA.md
   docs/DEVELOPMENT.md
   docs/DEBUG_TOOLS.md
   docs/TESTING.md
@@ -93,6 +94,7 @@ foreach(component IN ITEMS
     "librashader"
     "rcheevos"
     "QtKeychain"
+    "Retronian GameDB"
     "libchdr"
     "zlib"
     "zstd"

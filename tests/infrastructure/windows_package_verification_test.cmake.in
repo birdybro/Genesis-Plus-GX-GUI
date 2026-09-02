@@ -21,6 +21,7 @@ foreach(runtime IN ITEMS
     share/doc/Genesis-Plus-GX-GUI/NETPLAY.md
     share/doc/Genesis-Plus-GX-GUI/ACHIEVEMENTS.md
     share/doc/Genesis-Plus-GX-GUI/CLOUD_SYNC.md
+    share/doc/Genesis-Plus-GX-GUI/ONLINE_METADATA.md
     plugins/platforms/qwindows.dll)
   file(WRITE "${fixture_directory}/${runtime}" "package verification fixture")
 endforeach()

@@ -14,6 +14,12 @@ platform documentation.
 
 ### Added
 
+- Disabled-by-default licensed online game-library enrichment, with exact SHA-256
+  identity, a locally matched Retronian Genesis index, a documented manifest API for
+  all supported systems, bounded asynchronous HTTPS/cache handling, durable provider
+  attribution, validated licensed artwork, stale-cache fallback, settings/library/game
+  information UI, and real TLS plus database/GUI/security regressions.
+
 - Disabled-by-default HTTPS WebDAV synchronization for cartridge SRAM, Sega CD BRAM,
   RAM-cartridge data, and wrapped state slots, with native secure password storage,
   bounded TLS transfers, content-addressed integrity, ETag-conditional manifests,

@@ -1,6 +1,7 @@
 #pragma once
 
 #include "genplusgx/library/game_metadata.h"
+#include "genplusgx/library/online_metadata.h"
 
 #include <cstddef>
 #include <cstdint>
@@ -65,6 +66,10 @@ struct LibraryGame final {
   std::optional<std::int64_t> lastPlayedEpochMilliseconds;
   std::uint64_t playCount{0};
   std::filesystem::path artworkPath;
+  std::optional<OnlineMetadataRecord> onlineMetadata;
+  bool artworkManaged{false};
+
+  [[nodiscard]] std::string displayTitle() const;
 };
 
 struct LibraryGamesResult final {
@@ -89,7 +94,7 @@ struct LibraryScanFinishResult final {
 
 class GameLibraryDatabase final {
 public:
-  static constexpr std::uint32_t currentSchemaVersion = 1U;
+  static constexpr std::uint32_t currentSchemaVersion = 2U;
   static constexpr std::size_t maximumConfiguredDirectories = 256U;
   static constexpr std::size_t maximumScanBatchSize = 128U;
 
@@ -120,6 +125,11 @@ public:
   [[nodiscard]] GameLibraryStatus setArtworkPath(
     std::int64_t gameId,
     const std::filesystem::path& artworkPath);
+  [[nodiscard]] GameLibraryStatus setOnlineMetadata(
+    std::int64_t gameId,
+    const OnlineMetadataRecord& metadata,
+    const std::filesystem::path& managedArtworkPath = {});
+  [[nodiscard]] GameLibraryStatus clearOnlineMetadata(std::int64_t gameId);
   [[nodiscard]] GameLibraryStatus recordLaunch(
     std::int64_t gameId,
     std::int64_t epochMilliseconds);

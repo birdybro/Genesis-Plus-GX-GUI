@@ -1,5 +1,6 @@
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/main_window.h"
+#include "genplusgx/ui/online_metadata_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/run_ahead_settings_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
@@ -46,6 +47,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .runAhead = genplusgx::settings::defaultRunAheadSettings(),
     .session = genplusgx::settings::defaultSessionSettings(),
     .speed = genplusgx::settings::defaultSpeedSettings(),
+    .onlineMetadata = genplusgx::library::defaultOnlineMetadataSettings(),
     .paths = genplusgx::ApplicationPaths{
       root, genplusgx::ApplicationDataMode::portable},
     .connectedControllerCount = 2U,
@@ -116,12 +118,15 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
   QTest::mouseClick(
     dialog.findChild<QPushButton*>(QStringLiteral("configureRunAheadButton")),
     Qt::LeftButton);
+  QTest::mouseClick(dialog.findChild<QPushButton*>(
+    QStringLiteral("configureOnlineMetadataButton")), Qt::LeftButton);
   const std::vector expectedActions{
     genplusgx::ui::SettingsPageAction::video,
     genplusgx::ui::SettingsPageAction::playerAssignments,
     genplusgx::ui::SettingsPageAction::speed,
     genplusgx::ui::SettingsPageAction::rewind,
-    genplusgx::ui::SettingsPageAction::runAhead};
+    genplusgx::ui::SettingsPageAction::runAhead,
+    genplusgx::ui::SettingsPageAction::onlineMetadata};
   QCOMPARE(actions, expectedActions);
 
   auto* perGame =
@@ -197,6 +202,15 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
     QStringLiteral("runAheadSettingsDialog"));
   QVERIFY(runAhead != nullptr);
   runAhead->reject();
+
+  QTest::mouseClick(center->findChild<QPushButton*>(
+    QStringLiteral("configureOnlineMetadataButton")), Qt::LeftButton);
+  QApplication::processEvents();
+  auto* onlineMetadata =
+    window.findChild<genplusgx::ui::OnlineMetadataDialog*>(
+      QStringLiteral("onlineMetadataDialog"));
+  QVERIFY(onlineMetadata != nullptr);
+  onlineMetadata->reject();
 
   settingsAction->trigger();
   QApplication::processEvents();

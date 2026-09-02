@@ -1,5 +1,43 @@
 find_package(Threads REQUIRED)
 
+add_executable(genplusgx_online_metadata_test online_metadata_test.cpp)
+target_link_libraries(
+  genplusgx_online_metadata_test
+  PRIVATE GenesisPlusGX::Library genplusgx_project_warnings Qt6::Core Qt6::Gui
+)
+add_test(NAME unit.online_metadata COMMAND genplusgx_online_metadata_test)
+set_tests_properties(
+  unit.online_metadata
+  PROPERTIES LABELS "unit;integration;metadata;artwork;network;security;persistence;bounded"
+    TIMEOUT 30
+)
+
+qt_add_executable(genplusgx_online_metadata_https_test
+  online_metadata_https_test.cpp
+)
+set_target_properties(genplusgx_online_metadata_https_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_online_metadata_https_test
+  PRIVATE GenesisPlusGX::Library genplusgx_project_warnings Qt6::Network Qt6::Test
+)
+add_test(
+  NAME integration.online_metadata_https
+  COMMAND genplusgx_online_metadata_https_test
+)
+set_tests_properties(
+  integration.online_metadata_https
+  PROPERTIES
+    ENVIRONMENT "GENPLUSGX_TEST_FIXTURES=${PROJECT_SOURCE_DIR}/tests/fixtures"
+    LABELS "integration;metadata;artwork;network;tls;security;bounded;fixture"
+    TIMEOUT 30
+)
+if(APPLE)
+  set_property(
+    TEST integration.online_metadata_https
+    APPEND PROPERTY ENVIRONMENT "QT_SSL_USE_TEMPORARY_KEYCHAIN=1"
+  )
+endif()
+
 add_executable(genplusgx_cloud_sync_test cloud_sync_test.cpp)
 target_link_libraries(
   genplusgx_cloud_sync_test
@@ -321,7 +359,8 @@ add_test(
 )
 set_tests_properties(
   unit.game_library_database
-  PROPERTIES LABELS "unit;library;database;filesystem;persistence" TIMEOUT 30
+  PROPERTIES LABELS "unit;library;database;filesystem;persistence;metadata;artwork"
+    TIMEOUT 30
 )
 
 add_executable(

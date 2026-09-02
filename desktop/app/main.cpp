@@ -23,6 +23,8 @@
 #include "genplusgx/library/game_library_database.h"
 #include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/library/game_metadata_service.h"
+#include "genplusgx/library/online_metadata_service.h"
+#include "genplusgx/library/online_metadata_settings.h"
 #include "genplusgx/localization/localization.h"
 #include "genplusgx/netplay/netplay_bridge.h"
 #include "genplusgx/netplay/netplay_session.h"
@@ -480,6 +482,16 @@ int main(int argc, char* argv[])
       "Cloud synchronization settings", loadedCloudSettings.status.message);
   }
   auto cloudSettings = loadedCloudSettings.settings;
+  genplusgx::library::OnlineMetadataSettingsStore onlineMetadataSettingsStore{
+    applicationPaths.configDirectory() / "online-metadata.json"};
+  auto loadedOnlineMetadataSettings = onlineMetadataSettingsStore.load();
+  if (!loadedOnlineMetadataSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedOnlineMetadataSettings.status.message);
+    recordStartupIssue(
+      "Online metadata settings", loadedOnlineMetadataSettings.status.message);
+  }
+  auto onlineMetadataSettings = loadedOnlineMetadataSettings.settings;
   const auto translationApplied = translationManager.apply(
     appearanceSettings.language);
   if (!translationApplied) {
@@ -792,6 +804,14 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(metadataServiceStarted.message);
     recordStartupIssue("Game metadata service", metadataServiceStarted.message);
   }
+  genplusgx::library::OnlineMetadataService onlineMetadataService;
+  const auto onlineMetadataServiceStarted = onlineMetadataService.start();
+  if (!onlineMetadataServiceStarted && onlineMetadataSettings.enabled) {
+    qWarning().noquote() << QString::fromStdString(
+      onlineMetadataServiceStarted.message);
+    recordStartupIssue(
+      "Online metadata service", onlineMetadataServiceStarted.message);
+  }
   const auto physicalMediaCache =
     applicationPaths.cacheDirectory() / "physical-media";
   genplusgx::platform::PhysicalMediaService physicalMediaService{
@@ -857,6 +877,7 @@ int main(int argc, char* argv[])
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
+    static_cast<void>(onlineMetadataService.stop());
     static_cast<void>(physicalMediaService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(screenshotService.stop());
@@ -917,6 +938,18 @@ int main(int argc, char* argv[])
   window.setPhysicalMediaSupported(
     genplusgx::platform::nativePhysicalMediaSupported() &&
     physicalMediaServiceStarted.ok());
+  window.setOnlineMetadataSettings(onlineMetadataSettings);
+  window.setOnlineMetadataSettingsSink(
+    [&onlineMetadataSettings, &onlineMetadataSettingsStore, &window](
+      const genplusgx::library::OnlineMetadataSettings& settings) {
+      const auto saved = onlineMetadataSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      onlineMetadataSettings = settings;
+      window.setOnlineMetadataSettings(settings);
+      return genplusgx::PersistenceStatus{};
+    });
   window.displayWidget()->setRendererFailureSink(
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
@@ -1182,6 +1215,85 @@ int main(int argc, char* argv[])
       window.showGameLibraryError(status.message);
     }
   };
+  std::uint64_t onlineMetadataOperationId = 5'100'000U;
+  std::optional<std::uint64_t> pendingOnlineMetadataOperation;
+  std::int64_t pendingOnlineMetadataGameId = 0;
+  bool pendingOnlineMetadataAutomatic = false;
+  genplusgx::BoundedQueue<std::int64_t> automaticMetadataQueue{256U};
+  std::function<void(std::int64_t, bool)> requestOnlineMetadata;
+  std::function<void()> startNextAutomaticMetadata;
+  requestOnlineMetadata =
+    [&applicationPaths, &automaticMetadataQueue, &gameLibrary,
+     &onlineMetadataOperationId, &onlineMetadataService,
+     &onlineMetadataSettings, &pendingOnlineMetadataAutomatic,
+     &pendingOnlineMetadataGameId, &pendingOnlineMetadataOperation,
+     &window](std::int64_t gameId, bool automatic) {
+      if (pendingOnlineMetadataOperation) {
+        if (automatic) {
+          if (!automaticMetadataQueue.tryPush(gameId)) {
+            qWarning() << "Automatic online metadata queue reached its 256-game "
+                          "capacity; skipping library game"
+                       << gameId;
+          }
+        } else {
+          window.showGameLibraryError(
+            "Another online metadata lookup is already in progress.");
+        }
+        return;
+      }
+      if (!onlineMetadataSettings.enabled) {
+        if (!automatic) {
+          window.showGameLibraryError(
+            "Enable online metadata before starting a lookup.");
+        }
+        return;
+      }
+      const auto games = gameLibrary.games();
+      if (!games.status) {
+        if (!automatic) {
+          window.showGameLibraryError(games.status.message);
+        }
+        return;
+      }
+      const auto found = std::ranges::find_if(
+        games.games, [gameId](const auto& game) { return game.id == gameId; });
+      if (found == games.games.end()) {
+        if (!automatic) {
+          window.showGameLibraryError(
+            "The selected library game no longer exists.");
+        }
+        return;
+      }
+      const auto operationId = ++onlineMetadataOperationId;
+      const auto submitted = onlineMetadataService.request(operationId, gameId,
+        onlineMetadataSettings, found->metadata,
+        applicationPaths.cacheDirectory());
+      if (!submitted) {
+        if (!automatic) {
+          window.showOnlineMetadataFailed(gameId, submitted.message);
+        }
+        return;
+      }
+      pendingOnlineMetadataOperation = operationId;
+      pendingOnlineMetadataGameId = gameId;
+      pendingOnlineMetadataAutomatic = automatic;
+      if (!automatic) {
+        window.showOnlineMetadataStarted(gameId);
+      }
+    };
+  startNextAutomaticMetadata =
+    [&automaticMetadataQueue, &pendingOnlineMetadataOperation,
+     &requestOnlineMetadata] {
+      if (pendingOnlineMetadataOperation) {
+        return;
+      }
+      while (auto gameId = automaticMetadataQueue.pop()) {
+        requestOnlineMetadata(*gameId, true);
+        if (pendingOnlineMetadataOperation) {
+          return;
+        }
+      }
+    };
   const auto requestLibraryScan =
     [&gameLibraryScanner, &libraryScanOperationId, &libraryScansInFlight,
      &window](std::int64_t directoryId, const std::filesystem::path& path) {
@@ -1308,6 +1420,25 @@ int main(int argc, char* argv[])
         const auto updated = gameLibrary.setArtworkPath(gameId, path);
         if (!updated) {
           window.showGameLibraryError(updated.message);
+          return;
+        }
+        showLibraryStatus(refreshGameLibrary());
+      },
+    .lookupOnlineMetadata =
+      [&requestOnlineMetadata](std::int64_t gameId) {
+        requestOnlineMetadata(gameId, false);
+      },
+    .clearOnlineMetadata =
+      [&gameLibrary, &pendingOnlineMetadataOperation, &refreshGameLibrary,
+       &showLibraryStatus, &window](std::int64_t gameId) {
+        if (pendingOnlineMetadataOperation) {
+          window.showGameLibraryError(
+            "Wait for the online metadata lookup before clearing metadata.");
+          return;
+        }
+        const auto cleared = gameLibrary.clearOnlineMetadata(gameId);
+        if (!cleared) {
+          window.showGameLibraryError(cleared.message);
           return;
         }
         showLibraryStatus(refreshGameLibrary());
@@ -2960,6 +3091,10 @@ int main(int argc, char* argv[])
      &controllerInput, &cloudOperationAutomatic, &cloudSettings,
      &cloudSyncService, &pendingCloudOperation, &requestCloudSync,
      &startupCloudSyncDeferred,
+     &automaticMetadataQueue, &gameLibrary, &onlineMetadataService,
+     &onlineMetadataSettings, &pendingOnlineMetadataAutomatic,
+     &pendingOnlineMetadataGameId, &pendingOnlineMetadataOperation,
+     &startNextAutomaticMetadata,
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
      &loggedPresentationCoalesces, &loggedVideoProducerDrops,
      &loggedVideoSkippedFrames,
@@ -3038,6 +3173,72 @@ int main(int argc, char* argv[])
         }
       }
       cloudOperationAutomatic = false;
+    }
+    while (auto event = onlineMetadataService.pollEvent()) {
+      using EventType = genplusgx::library::OnlineMetadataEventType;
+      if (event->type == EventType::serviceStarted) {
+        qInfo() << "Online metadata service started.";
+        continue;
+      }
+      if (event->type == EventType::serviceStopped) {
+        if (pendingOnlineMetadataOperation && !pendingOnlineMetadataAutomatic) {
+          window.showOnlineMetadataFailed(pendingOnlineMetadataGameId,
+            "The online metadata service stopped before completing the lookup.");
+        }
+        pendingOnlineMetadataOperation.reset();
+        pendingOnlineMetadataGameId = 0;
+        pendingOnlineMetadataAutomatic = false;
+        automaticMetadataQueue.clear();
+        continue;
+      }
+      if (!pendingOnlineMetadataOperation ||
+          event->operationId != *pendingOnlineMetadataOperation ||
+          event->libraryGameId != pendingOnlineMetadataGameId) {
+        continue;
+      }
+      const auto gameId = pendingOnlineMetadataGameId;
+      const bool automatic = pendingOnlineMetadataAutomatic;
+      pendingOnlineMetadataOperation.reset();
+      pendingOnlineMetadataGameId = 0;
+      pendingOnlineMetadataAutomatic = false;
+      if (event->type == EventType::lookupCompleted && event->result.status) {
+        const auto stored = gameLibrary.setOnlineMetadata(gameId,
+          event->result.record, event->result.artworkPath);
+        if (!stored) {
+          qWarning().noquote() << "Online metadata database update failed:"
+                               << QString::fromStdString(stored.message);
+          if (!automatic) {
+            window.showOnlineMetadataFailed(gameId, stored.message);
+          }
+        } else {
+          const auto refreshed = refreshGameLibrary();
+          if (!refreshed) {
+            qWarning().noquote() << "Online metadata library refresh failed:"
+                                 << QString::fromStdString(refreshed.message);
+            if (!automatic) {
+              window.showOnlineMetadataFailed(gameId, refreshed.message);
+            }
+          } else if (!automatic) {
+            window.showOnlineMetadataCompleted(gameId, event->result.fromCache,
+              event->result.staleCache);
+          }
+          qInfo().noquote() << "Online metadata updated for library game"
+                            << gameId << "from"
+                            << QString::fromStdString(
+                                 event->result.record.providerName)
+                            << "cache" << event->result.fromCache;
+        }
+      } else {
+        const auto detail = event->result.status.message.empty()
+          ? std::string{"Online metadata lookup failed without diagnostic detail."}
+          : event->result.status.message;
+        qWarning().noquote() << "Online metadata lookup failed for library game"
+                             << gameId << ':' << QString::fromStdString(detail);
+        if (!automatic) {
+          window.showOnlineMetadataFailed(gameId, detail);
+        }
+      }
+      startNextAutomaticMetadata();
     }
     achievementNetwork.pump();
     static_cast<void>(controllerInput.pollEvents());
@@ -4312,6 +4513,23 @@ int main(int argc, char* argv[])
           if (!refreshed) {
             window.showGameLibraryError(refreshed.message);
           }
+          if (refreshed && onlineMetadataSettings.enabled &&
+              onlineMetadataSettings.automaticLookup) {
+            const auto games = gameLibrary.games();
+            if (games.status) {
+              for (const auto& game : games.games) {
+                if (game.directoryId == event->directoryId &&
+                    !game.onlineMetadata) {
+                  if (!automaticMetadataQueue.tryPush(game.id)) {
+                    qWarning() << "Automatic online metadata queue reached its "
+                                  "256-game capacity; skipping library game"
+                               << game.id;
+                  }
+                }
+              }
+              startNextAutomaticMetadata();
+            }
+          }
           window.showGameLibraryScanCompleted(
             event->directoryId, event->summary);
           if (libraryScansInFlight.empty()) {
@@ -4590,6 +4808,7 @@ int main(int argc, char* argv[])
   window.setCloudPasswordSink({});
   window.setCloudForgetSink({});
   window.setCloudSyncSink({});
+  window.setOnlineMetadataSettingsSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});
@@ -4606,6 +4825,8 @@ int main(int argc, char* argv[])
   };
   const auto cloudSyncServiceStopped = cloudSyncService.stop();
   recordCleanup("Cloud synchronization service", cloudSyncServiceStopped);
+  const auto onlineMetadataServiceStopped = onlineMetadataService.stop();
+  recordCleanup("Online metadata service", onlineMetadataServiceStopped);
   const auto workerStopped = worker.stop();
   recordCleanup("Emulation worker", workerStopped);
   const auto physicalMediaServiceStopped = physicalMediaService.stop();

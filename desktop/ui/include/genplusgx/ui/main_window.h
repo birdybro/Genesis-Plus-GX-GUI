@@ -12,6 +12,7 @@
 #include "genplusgx/library/game_metadata.h"
 #include "genplusgx/library/game_library_database.h"
 #include "genplusgx/library/game_library_scanner.h"
+#include "genplusgx/library/online_metadata_settings.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/appearance_settings.h"
@@ -144,6 +145,8 @@ public:
     std::string, std::string, std::string)>;
   using CloudAccountSink = std::function<void(std::string, std::string)>;
   using CloudSyncSink = std::function<void(std::string)>;
+  using OnlineMetadataSettingsSink = std::function<PersistenceStatus(
+    const library::OnlineMetadataSettings&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -192,6 +195,9 @@ public:
   void showCloudSyncStatus(const std::string& detail);
   void showCloudSyncError(const std::string& detail);
   void showCloudSync();
+  void setOnlineMetadataSettings(library::OnlineMetadataSettings settings);
+  void setOnlineMetadataSettingsSink(OnlineMetadataSettingsSink sink);
+  void showOnlineMetadataSettings();
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
@@ -301,6 +307,12 @@ public:
     std::int64_t directoryId,
     const std::string& detail);
   void showGameLibraryError(const std::string& detail);
+  void showOnlineMetadataStarted(std::int64_t gameId);
+  void showOnlineMetadataCompleted(
+    std::int64_t gameId,
+    bool fromCache,
+    bool staleCache);
+  void showOnlineMetadataFailed(std::int64_t gameId, const std::string& detail);
   void setScreenshotSink(ScreenshotSink sink);
   void setScreenshotBusy(bool busy);
   void showScreenshotSaved(const std::filesystem::path& path);
@@ -496,9 +508,11 @@ private:
   CloudPasswordSink cloudPasswordSink_;
   CloudAccountSink cloudForgetSink_;
   CloudSyncSink cloudSyncSink_;
+  OnlineMetadataSettingsSink onlineMetadataSettingsSink_;
   achievements::Settings achievementSettings_;
   achievements::Snapshot achievementSnapshot_;
   cloud::Settings cloudSettings_;
+  library::OnlineMetadataSettings onlineMetadataSettings_;
   bool cloudSyncBusy_{false};
   netplay::NetplaySessionState netplayState_{
     netplay::NetplaySessionState::disconnected};

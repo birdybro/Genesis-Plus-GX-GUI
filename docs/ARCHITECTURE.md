@@ -111,6 +111,48 @@ contain no password. The provider sees unencrypted save/state contents after TLS
 termination because this feature does not implement client-side encryption. Immutable
 superseded objects are retained rather than risk racy generic-WebDAV garbage collection.
 
+### Online metadata and artwork data flow
+
+```text
+Qt settings / game library (explicit opt-in)
+              | game ID + immutable local metadata snapshot
+              v
+bounded OnlineMetadataService command queue (4)
+              |
+              v
+worker-owned Qt HTTPS transport --> Retronian static hash index / licensed manifest
+              |                         (manual redirects, TLS, fixed byte limits)
+              v
+exact SHA-256 + attribution/license validation
+              |
+              +--> bounded provider cache / decoded image validation
+              |
+              v
+GUI-thread SQLite update --> immutable library snapshot --> Qt library/info UI
+```
+
+The emulator thread and Genesis Plus GX core do not participate in enrichment. The
+library already computes the source identity; Retronian matching happens locally after
+downloading its public index, while a custom manifest endpoint receives only a system
+slug and SHA-256. No provider receives ROM bytes, filenames, paths, saves, states, or
+firmware. Online lookup is disabled by default, automatic lookup and artwork download
+require separate opt-ins, and every command/event/cache/HTTP/image dimension is bounded.
+
+The worker owns its `QNetworkAccessManager`. TLS verification remains enabled, URLs may
+not contain credentials, redirects are not followed, and cancellation is sampled during
+the request. Metadata is accepted only with an exact lowercase SHA-256 and approved
+license/attribution. Artwork additionally requires an approved per-asset license,
+supported content type, optional digest match, decoder validation, and no more than 16
+megapixels. Retronian thumbnail links without those asset declarations are ignored.
+
+The SQLite schema stores canonical validated record JSON and an explicit managed-artwork
+bit. Rescans preserve enrichment. User-selected local artwork always wins and is never
+removed when online metadata is cleared. Cache records are namespaced by provider and
+endpoint; corrupt/mismatched records and images are detached, a corrupt Retronian index
+is refreshed, and transport failures may use a previously validated stale record. On
+shutdown, the metadata service is cancelled and joined before application resources are
+destroyed; it never outlives the GUI-owned database or calls core teardown.
+
 ```text
              +-------------------+
              | Qt 6 Widgets GUI  |
@@ -1234,7 +1276,9 @@ validates both `quick_check` and required tables/columns at startup. Corrupt or
 structurally incomplete current databases are preserved under a collision-safe
 `.corrupt-<timestamp>` name before a clean rebuild. Future schema versions fail closed
 without modification. Configured roots are canonical, non-overlapping, and bounded.
-No network access is part of scanning or artwork handling.
+No network access is part of scanning or local-artwork handling. The separately
+opt-in online enrichment service starts only requests selected by the user or explicitly
+enabled automatic post-scan policy; it never runs inside the scan transaction.
 
 The modeless Qt library dialog consumes immutable directory/game snapshots from the GUI
 thread's read connection and filters/sorts them through a proxy model. UI mutations are

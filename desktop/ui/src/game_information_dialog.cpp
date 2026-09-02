@@ -15,6 +15,7 @@
 #include <QWidget>
 
 #include <cstdint>
+#include <optional>
 
 namespace genplusgx::ui {
 namespace {
@@ -109,6 +110,17 @@ GameInformationDialog::GameInformationDialog(
     {"File size", "gameInfoFileSizeValue"},
     {"SHA-256", "gameInfoSha256Value"},
     {"Notes", "gameInfoNotesValue"},
+    {"Online title", "gameInfoOnlineTitleValue"},
+    {"Online alternate title", "gameInfoOnlineAlternateTitleValue"},
+    {"Release date", "gameInfoOnlineReleaseDateValue"},
+    {"Developer", "gameInfoOnlineDeveloperValue"},
+    {"Publisher", "gameInfoOnlinePublisherValue"},
+    {"Genres", "gameInfoOnlineGenresValue"},
+    {"Description", "gameInfoOnlineDescriptionValue"},
+    {"Metadata provider", "gameInfoOnlineProviderValue"},
+    {"Metadata license", "gameInfoOnlineLicenseValue"},
+    {"Metadata attribution", "gameInfoOnlineAttributionValue"},
+    {"Metadata source", "gameInfoOnlineSourceValue"},
   };
   for (const auto& row : rows) {
     const auto labelText = tr(row.label);
@@ -128,6 +140,7 @@ GameInformationDialog::GameInformationDialog(
   outerLayout->addWidget(buttons);
 
   setMetadata(metadata);
+  setOnlineMetadata(std::nullopt);
 }
 
 void GameInformationDialog::setMetadata(const library::GameMetadata& metadata)
@@ -163,6 +176,46 @@ void GameInformationDialog::setMetadata(const library::GameMetadata& metadata)
     ? tr("Game Information")
     : tr("Game Information — %1").arg(
         QString::fromStdString(metadata.displayTitle())));
+}
+
+void GameInformationDialog::setOnlineMetadata(
+  const std::optional<library::OnlineMetadataRecord>& metadata)
+{
+  const auto set = [this](const char* objectName, const std::string& value) {
+    auto* field = findChild<QLineEdit*>(QString::fromLatin1(objectName));
+    field->setText(optionalText(value));
+    field->setCursorPosition(0);
+  };
+  if (!metadata) {
+    for (const auto* objectName : {
+           "gameInfoOnlineTitleValue", "gameInfoOnlineAlternateTitleValue",
+           "gameInfoOnlineReleaseDateValue", "gameInfoOnlineDeveloperValue",
+           "gameInfoOnlinePublisherValue", "gameInfoOnlineGenresValue",
+           "gameInfoOnlineDescriptionValue", "gameInfoOnlineProviderValue",
+           "gameInfoOnlineLicenseValue", "gameInfoOnlineAttributionValue",
+           "gameInfoOnlineSourceValue"}) {
+      set(objectName, {});
+    }
+    return;
+  }
+  std::string genres;
+  for (const auto& genre : metadata->genres) {
+    if (!genres.empty()) {
+      genres += ", ";
+    }
+    genres += genre;
+  }
+  set("gameInfoOnlineTitleValue", metadata->preferredTitle);
+  set("gameInfoOnlineAlternateTitleValue", metadata->alternateTitle);
+  set("gameInfoOnlineReleaseDateValue", metadata->releaseDate);
+  set("gameInfoOnlineDeveloperValue", metadata->developer);
+  set("gameInfoOnlinePublisherValue", metadata->publisher);
+  set("gameInfoOnlineGenresValue", genres);
+  set("gameInfoOnlineDescriptionValue", metadata->description);
+  set("gameInfoOnlineProviderValue", metadata->providerName);
+  set("gameInfoOnlineLicenseValue", metadata->attribution.licenseSpdx);
+  set("gameInfoOnlineAttributionValue", metadata->attribution.creator);
+  set("gameInfoOnlineSourceValue", metadata->attribution.sourceUrl);
 }
 
 } // namespace genplusgx::ui

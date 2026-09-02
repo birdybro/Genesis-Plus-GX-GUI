@@ -81,6 +81,33 @@ Run the focused set with:
 ctest --preset debug -L cloud --output-on-failure
 ```
 
+## Online metadata and artwork tests
+
+`unit.online_metadata` covers private disabled defaults, strict HTTPS/settings
+serialization, approved-license handling, bounded Retronian and Licensed Manifest
+parsers, exact game identity, full metadata/artwork cache workflows, digest/image
+validation, corrupt cache recovery, queue behavior, and joined worker shutdown.
+`integration.online_metadata_https` uses the same generated loopback-only CA fixture as
+the WebDAV test and the production Qt transport to require certificate validation,
+explicit test-CA trust, manual redirect refusal, embedded-credential rejection, and
+response-byte enforcement. `unit.game_library_database` covers schema-1-to-2 migration,
+record round trips, rescan preservation, wrong-record rejection, managed-art cleanup,
+and local-art priority. `gui.online_metadata`, `gui.game_library`, and `gui.settings`
+drive validation, defaults, persistence callbacks, accessible object names, progress,
+attribution, clearing, and settings-center routing.
+
+Required tests use generated JSON/images and loopback TLS only; they never contact the
+Internet. A maintainer may separately confirm current provider availability by fetching
+Retronian's public `api/v1/rom-index/md.json` and a matched game record, but live service
+availability is not a reproducible CI requirement. An optional user-owned ROM may be
+scanned and looked up in place; it must never be copied into test fixtures or logs.
+
+Run the focused set with:
+
+```bash
+ctest --preset debug -L metadata --output-on-failure
+```
+
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
 `rewind`, `run-ahead`, `localization`, `packaging`, `release`, and `documentation`:

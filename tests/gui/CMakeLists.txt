@@ -9,6 +9,23 @@ qt_add_executable(genplusgx_achievements_dialog_test
 qt_add_executable(genplusgx_cloud_sync_dialog_test
   cloud_sync_dialog_test.cpp
 )
+
+qt_add_executable(genplusgx_online_metadata_dialog_test
+  online_metadata_dialog_test.cpp
+)
+set_target_properties(genplusgx_online_metadata_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_online_metadata_dialog_test
+  PRIVATE genplusgx::ui genplusgx_project_warnings Qt6::Test Qt6::Widgets
+)
+add_test(NAME gui.online_metadata COMMAND genplusgx_online_metadata_dialog_test)
+set_tests_properties(
+  gui.online_metadata
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;unit;integration;metadata;artwork;security;persistence;accessibility"
+    TIMEOUT 30
+)
 set_target_properties(genplusgx_cloud_sync_dialog_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_cloud_sync_dialog_test
@@ -230,7 +247,7 @@ set_tests_properties(
   gui.settings
   PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-    LABELS "gui;unit;settings;accessibility;filesystem"
+    LABELS "gui;unit;settings;accessibility;filesystem;metadata"
     TIMEOUT 30
 )
 
@@ -445,7 +462,7 @@ set_tests_properties(
   gui.game_library
   PROPERTIES
     ENVIRONMENT "QT_QPA_PLATFORM=offscreen"
-    LABELS "gui;unit;integration;library;database;filesystem"
+    LABELS "gui;unit;integration;library;database;filesystem;metadata;artwork"
     TIMEOUT 30
 )
 

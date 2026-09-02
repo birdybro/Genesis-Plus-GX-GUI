@@ -1,6 +1,7 @@
 #include "genplusgx/library/game_library_database.h"
 
 #include <QDateTime>
+#include <QByteArray>
 #include <QDir>
 #include <QFileInfo>
 #include <QSqlDatabase>
@@ -393,7 +394,8 @@ public:
       "region, rom_type, peripheral_support, mapper, sha256, notes, "
       "header_checksum, computed_checksum, declared_rom_size, track_count, "
       "header_recognized, last_modified, favorite, last_played, play_count, "
-      "artwork_path FROM library_games ORDER BY display_title, path"))) {
+      "artwork_path, online_metadata_json, artwork_managed FROM library_games "
+      "ORDER BY display_title, path"))) {
       return {
         .status = queryFailure("Game-library entries could not be read", query),
         .games = {},
@@ -434,6 +436,16 @@ public:
       }
       game.playCount = query.value(25).toULongLong();
       game.artworkPath = pathFromQString(query.value(26).toString());
+      game.artworkManaged = query.value(28).toBool();
+      const auto onlineJson = query.value(27).toByteArray();
+      if (!onlineJson.isEmpty()) {
+        const auto decoded = decodeOnlineMetadataRecord({
+          reinterpret_cast<const std::uint8_t*>(onlineJson.constData()),
+          static_cast<std::size_t>(onlineJson.size())});
+        if (decoded.status && decoded.record.lookupSha256 == game.metadata.sha256) {
+          game.onlineMetadata = decoded.record;
+        }
+      }
       result.games.push_back(std::move(game));
     }
     return result;
@@ -455,7 +467,8 @@ public:
     if (artworkPath.empty()) {
       return updateGameField(
         gameId,
-        QStringLiteral("UPDATE library_games SET artwork_path = ? WHERE id = ?"),
+        QStringLiteral("UPDATE library_games SET artwork_path = ?, "
+          "artwork_managed = 0 WHERE id = ?"),
         QStringLiteral(""),
         "The local artwork path could not be cleared");
     }
@@ -473,9 +486,90 @@ public:
     }
     return updateGameField(
       gameId,
-      QStringLiteral("UPDATE library_games SET artwork_path = ? WHERE id = ?"),
+      QStringLiteral("UPDATE library_games SET artwork_path = ?, "
+        "artwork_managed = 0 WHERE id = ?"),
       pathToQString(canonical),
       "The local artwork path could not be updated");
+  }
+
+  GameLibraryStatus setOnlineMetadata(
+    std::int64_t gameId,
+    const OnlineMetadataRecord& metadata,
+    const std::filesystem::path& managedArtworkPath)
+  {
+    if (const auto ready = checkReady(); !ready) {
+      return ready;
+    }
+    if (gameId <= 0) {
+      return failure(GameLibraryError::invalidRecord, "The game ID is invalid.");
+    }
+    const auto validation = validateOnlineMetadataRecord(metadata);
+    const auto encoded = encodeOnlineMetadataRecord(metadata);
+    if (!validation || encoded.empty()) {
+      return failure(GameLibraryError::invalidRecord,
+        validation.message.empty() ? "The online metadata record is invalid."
+                                   : validation.message);
+    }
+    QString artwork;
+    bool replaceArtwork = false;
+    if (!managedArtworkPath.empty()) {
+      std::error_code error;
+      if (!std::filesystem::is_regular_file(managedArtworkPath, error) || error) {
+        return failure(GameLibraryError::invalidPath,
+          "The managed online artwork file does not exist.");
+      }
+      const auto canonical = std::filesystem::canonical(managedArtworkPath, error);
+      if (error || canonical.native().size() > 4'096U) {
+        return failure(GameLibraryError::invalidPath,
+          "The managed online artwork path could not be resolved safely.");
+      }
+      artwork = pathToQString(canonical);
+      replaceArtwork = true;
+    }
+    QSqlQuery query{database_};
+    query.prepare(QStringLiteral(
+      "UPDATE library_games SET online_metadata_json = ?, "
+      "artwork_path = CASE WHEN ? = 1 AND "
+      "(artwork_path = '' OR artwork_managed = 1) THEN ? ELSE artwork_path END, "
+      "artwork_managed = CASE WHEN ? = 1 AND "
+      "(artwork_path = '' OR artwork_managed = 1) THEN 1 ELSE artwork_managed END "
+      "WHERE id = ? AND sha256 = ?"));
+    query.addBindValue(QByteArray{reinterpret_cast<const char*>(encoded.data()),
+      static_cast<qsizetype>(encoded.size())});
+    query.addBindValue(replaceArtwork ? 1 : 0);
+    query.addBindValue(artwork);
+    query.addBindValue(replaceArtwork ? 1 : 0);
+    query.addBindValue(static_cast<qlonglong>(gameId));
+    query.addBindValue(QString::fromStdString(metadata.lookupSha256));
+    if (!query.exec()) {
+      return queryFailure("Online game metadata could not be stored", query);
+    }
+    return query.numRowsAffected() == 1
+      ? GameLibraryStatus{}
+      : failure(GameLibraryError::invalidRecord,
+          "The game no longer exists or its content hash changed.");
+  }
+
+  GameLibraryStatus clearOnlineMetadata(std::int64_t gameId)
+  {
+    if (const auto ready = checkReady(); !ready) {
+      return ready;
+    }
+    if (gameId <= 0) {
+      return failure(GameLibraryError::invalidRecord, "The game ID is invalid.");
+    }
+    QSqlQuery query{database_};
+    query.prepare(QStringLiteral(
+      "UPDATE library_games SET online_metadata_json = '', "
+      "artwork_path = CASE WHEN artwork_managed = 1 THEN '' ELSE artwork_path END, "
+      "artwork_managed = 0 WHERE id = ?"));
+    query.addBindValue(static_cast<qlonglong>(gameId));
+    if (!query.exec()) {
+      return queryFailure("Online game metadata could not be cleared", query);
+    }
+    return query.numRowsAffected() == 1
+      ? GameLibraryStatus{}
+      : failure(GameLibraryError::invalidRecord, "The game no longer exists.");
   }
 
   GameLibraryStatus recordLaunch(
@@ -579,6 +673,13 @@ public:
       "computed_checksum=excluded.computed_checksum, "
       "declared_rom_size=excluded.declared_rom_size, track_count=excluded.track_count, "
       "header_recognized=excluded.header_recognized, "
+      "artwork_path=CASE WHEN library_games.sha256 <> excluded.sha256 "
+      "AND library_games.artwork_managed = 1 THEN '' "
+      "ELSE library_games.artwork_path END, "
+      "online_metadata_json=CASE WHEN library_games.sha256 <> excluded.sha256 "
+      "THEN '' ELSE library_games.online_metadata_json END, "
+      "artwork_managed=CASE WHEN library_games.sha256 <> excluded.sha256 "
+      "THEN 0 ELSE library_games.artwork_managed END, "
       "last_modified=excluded.last_modified, scan_generation=excluded.scan_generation"))) {
       return queryFailure("The game-library scan statement could not be prepared", query);
     }
@@ -794,13 +895,15 @@ private:
         "The game-library schema transaction could not start.");
     }
     QSqlQuery query{database_};
-    const std::array statements{
-      QStringLiteral(
+    std::vector<QString> statements;
+    if (version == 0U) {
+      statements = {
+        QStringLiteral(
         "CREATE TABLE IF NOT EXISTS library_directories("
         "id INTEGER PRIMARY KEY, path TEXT NOT NULL UNIQUE, "
         "recursive INTEGER NOT NULL CHECK(recursive IN (0,1)), "
         "created_at INTEGER NOT NULL)"),
-      QStringLiteral(
+        QStringLiteral(
         "CREATE TABLE IF NOT EXISTS library_games("
         "id INTEGER PRIMARY KEY, directory_id INTEGER NOT NULL "
         "REFERENCES library_directories(id) ON DELETE CASCADE, "
@@ -816,22 +919,36 @@ private:
         "track_count INTEGER NOT NULL DEFAULT 0, header_recognized INTEGER NOT NULL, "
         "last_modified INTEGER NOT NULL, favorite INTEGER NOT NULL DEFAULT 0, "
         "last_played INTEGER, play_count INTEGER NOT NULL DEFAULT 0, "
-        "artwork_path TEXT NOT NULL DEFAULT '', scan_generation INTEGER NOT NULL, "
+        "artwork_path TEXT NOT NULL DEFAULT '', "
+        "online_metadata_json BLOB NOT NULL DEFAULT '', "
+        "artwork_managed INTEGER NOT NULL DEFAULT 0 "
+        "CHECK(artwork_managed IN (0,1)), scan_generation INTEGER NOT NULL, "
         "UNIQUE(directory_id, path))"),
-      QStringLiteral(
+        QStringLiteral(
         "CREATE INDEX IF NOT EXISTS library_games_title_idx "
         "ON library_games(display_title)"),
-      QStringLiteral(
+        QStringLiteral(
         "CREATE INDEX IF NOT EXISTS library_games_system_idx "
         "ON library_games(system)"),
-      QStringLiteral(
+        QStringLiteral(
         "CREATE INDEX IF NOT EXISTS library_games_favorite_idx "
         "ON library_games(favorite)"),
-      QStringLiteral(
+        QStringLiteral(
         "CREATE INDEX IF NOT EXISTS library_games_recent_idx "
         "ON library_games(last_played)"),
-      QStringLiteral("PRAGMA user_version = 1"),
-    };
+        QStringLiteral("PRAGMA user_version = 2"),
+      };
+    } else if (version == 1U) {
+      statements = {
+        QStringLiteral(
+          "ALTER TABLE library_games ADD COLUMN online_metadata_json "
+          "BLOB NOT NULL DEFAULT ''"),
+        QStringLiteral(
+          "ALTER TABLE library_games ADD COLUMN artwork_managed INTEGER "
+          "NOT NULL DEFAULT 0 CHECK(artwork_managed IN (0,1))"),
+        QStringLiteral("PRAGMA user_version = 2"),
+      };
+    }
     for (const auto& statement : statements) {
       if (!query.exec(statement)) {
         const auto status = queryFailure("The game-library schema could not be created", query);
@@ -855,7 +972,8 @@ private:
     for (const auto* statement : {
            "SELECT id, path, recursive, created_at FROM library_directories LIMIT 0",
            "SELECT id, directory_id, path, display_title, file_size, system, "
-           "sha256, favorite, play_count, scan_generation "
+           "sha256, favorite, play_count, scan_generation, online_metadata_json, "
+           "artwork_managed "
            "FROM library_games LIMIT 0"}) {
       if (!query.exec(QString::fromLatin1(statement))) {
         return failure(
@@ -943,6 +1061,12 @@ private:
   bool scanActive_{false};
 };
 
+std::string LibraryGame::displayTitle() const
+{
+  return onlineMetadata && !onlineMetadata->preferredTitle.empty()
+    ? onlineMetadata->preferredTitle : metadata.displayTitle();
+}
+
 GameLibraryDatabase::GameLibraryDatabase(std::filesystem::path databasePath)
   : private_(std::make_unique<Private>(std::move(databasePath)))
 {
@@ -1013,6 +1137,19 @@ GameLibraryStatus GameLibraryDatabase::setArtworkPath(
   const std::filesystem::path& artworkPath)
 {
   return private_->setArtworkPath(gameId, artworkPath);
+}
+
+GameLibraryStatus GameLibraryDatabase::setOnlineMetadata(
+  std::int64_t gameId,
+  const OnlineMetadataRecord& metadata,
+  const std::filesystem::path& managedArtworkPath)
+{
+  return private_->setOnlineMetadata(gameId, metadata, managedArtworkPath);
+}
+
+GameLibraryStatus GameLibraryDatabase::clearOnlineMetadata(std::int64_t gameId)
+{
+  return private_->clearOnlineMetadata(gameId);
 }
 
 GameLibraryStatus GameLibraryDatabase::recordLaunch(

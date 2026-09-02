@@ -295,6 +295,8 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::runAhead},
       {tr("Per-Game Settings…"), "configurePerGameButton",
         SettingsPageAction::perGame},
+      {tr("Online Metadata and Artwork…"), "configureOnlineMetadataButton",
+        SettingsPageAction::onlineMetadata},
       {tr("Log and Diagnostics…"), "openDiagnosticsButton",
         SettingsPageAction::diagnostics},
     }));
@@ -430,11 +432,19 @@ void SettingsDialog::refresh()
   const auto runAheadSummary = overview_.runAhead.enabled
     ? tr("Run-ahead: enabled, %1 frame(s)").arg(overview_.runAhead.frames)
     : tr("Run-ahead: disabled");
+  const auto metadataSummary = tr("Online metadata: %1 (%2)")
+    .arg(overview_.onlineMetadata.enabled ? tr("enabled") : tr("disabled"),
+      [&overview = overview_] {
+        const auto name = library::onlineMetadataProviderName(
+          overview.onlineMetadata.provider);
+        return QString::fromLatin1(
+          name.data(), static_cast<qsizetype>(name.size()));
+      }());
   advancedSummary_->setText(overview_.gameLoaded
-    ? tr("%1\n%2\n%3\nPer-game overrides are available. Diagnostics omit personal secrets.")
-        .arg(speedSummary, rewindSummary, runAheadSummary)
-    : tr("%1\n%2\n%3\nLoad a game to configure per-game overrides. Diagnostics remain available.")
-        .arg(speedSummary, rewindSummary, runAheadSummary));
+    ? tr("%1\n%2\n%3\n%4\nPer-game overrides are available. Diagnostics omit personal secrets.")
+        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary)
+    : tr("%1\n%2\n%3\n%4\nLoad a game to configure per-game overrides. Diagnostics remain available.")
+        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary));
   perGameButton_->setEnabled(overview_.gameLoaded);
 }
 

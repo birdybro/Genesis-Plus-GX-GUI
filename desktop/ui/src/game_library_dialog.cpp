@@ -240,9 +240,9 @@ void GameLibraryDialog::buildUi()
   gamesLayout->addWidget(gameTable_, 1);
 
   auto* selectionPanel = new QHBoxLayout;
-  artworkLabel_ = new QLabel(tr("No local artwork"), gamesPanel);
+  artworkLabel_ = new QLabel(tr("No artwork"), gamesPanel);
   artworkLabel_->setObjectName(QStringLiteral("libraryArtworkLabel"));
-  artworkLabel_->setAccessibleName(tr("Selected game local artwork"));
+  artworkLabel_->setAccessibleName(tr("Selected game artwork"));
   artworkLabel_->setAlignment(Qt::AlignCenter);
   artworkLabel_->setFrameShape(QFrame::StyledPanel);
   artworkLabel_->setMinimumSize(120, 150);
@@ -260,10 +260,25 @@ void GameLibraryDialog::buildUi()
   chooseArtworkButton_->setObjectName(QStringLiteral("libraryChooseArtworkButton"));
   clearArtworkButton_ = new QPushButton(tr("Clear Artwork"), gamesPanel);
   clearArtworkButton_->setObjectName(QStringLiteral("libraryClearArtworkButton"));
+  lookupMetadataButton_ = new QPushButton(tr("Fetch Online Metadata…"), gamesPanel);
+  lookupMetadataButton_->setObjectName(
+    QStringLiteral("libraryLookupMetadataButton"));
+  clearMetadataButton_ = new QPushButton(tr("Clear Online Metadata"), gamesPanel);
+  clearMetadataButton_->setObjectName(
+    QStringLiteral("libraryClearMetadataButton"));
   for (auto* button : {favoriteButton_, launchButton_, informationButton_,
-                       chooseArtworkButton_, clearArtworkButton_}) {
+                       chooseArtworkButton_, clearArtworkButton_,
+                       lookupMetadataButton_, clearMetadataButton_}) {
     selectionButtons->addWidget(button);
   }
+  metadataDetailsLabel_ = new QLabel(tr("No online metadata"), gamesPanel);
+  metadataDetailsLabel_->setObjectName(
+    QStringLiteral("libraryOnlineMetadataDetailsLabel"));
+  metadataDetailsLabel_->setAccessibleName(
+    tr("Selected game online metadata attribution"));
+  metadataDetailsLabel_->setWordWrap(true);
+  metadataDetailsLabel_->setTextInteractionFlags(Qt::TextSelectableByMouse);
+  selectionButtons->addWidget(metadataDetailsLabel_);
   selectionButtons->addStretch();
   selectionPanel->addLayout(selectionButtons);
   gamesLayout->addLayout(selectionPanel);
@@ -320,6 +335,10 @@ void GameLibraryDialog::buildUi()
     this, &GameLibraryDialog::chooseArtwork);
   connect(clearArtworkButton_, &QPushButton::clicked,
     this, &GameLibraryDialog::clearArtwork);
+  connect(lookupMetadataButton_, &QPushButton::clicked,
+    this, &GameLibraryDialog::lookupOnlineMetadata);
+  connect(clearMetadataButton_, &QPushButton::clicked,
+    this, &GameLibraryDialog::clearOnlineMetadata);
   rebuildRegionFilter();
   updateDirectorySelection();
   updateGameSelection();
@@ -408,7 +427,7 @@ void GameLibraryDialog::rebuildGameRows()
   gameModel_->removeRows(0, gameModel_->rowCount());
   for (const auto& game : games_) {
     const auto favorite = game.favorite ? QStringLiteral("★") : QString{};
-    const auto title = QString::fromStdString(game.metadata.displayTitle());
+    const auto title = QString::fromStdString(game.displayTitle());
     const auto system = systemText(game.metadata.system);
     const auto region = QString::fromStdString(game.metadata.region);
     const auto path = pathToQString(game.metadata.path);
@@ -452,6 +471,45 @@ void GameLibraryDialog::setServiceAvailable(
   }
   updateBusyPresentation();
   updateDirectorySelection();
+}
+
+void GameLibraryDialog::setOnlineMetadataEnabled(bool enabled)
+{
+  onlineMetadataEnabled_ = enabled;
+  updateGameSelection();
+}
+
+void GameLibraryDialog::showOnlineMetadataStarted(std::int64_t gameId)
+{
+  onlineMetadataGameId_ = gameId;
+  statusLabel_->setText(tr("Looking up licensed online metadata…"));
+  updateBusyPresentation();
+}
+
+void GameLibraryDialog::showOnlineMetadataCompleted(
+  std::int64_t gameId,
+  bool fromCache,
+  bool staleCache)
+{
+  if (onlineMetadataGameId_ == gameId) {
+    onlineMetadataGameId_ = 0;
+  }
+  statusLabel_->setText(staleCache
+    ? tr("Online provider unavailable; restored validated cached metadata.")
+    : (fromCache ? tr("Validated metadata loaded from the local cache.")
+                 : tr("Licensed online metadata updated.")));
+  updateBusyPresentation();
+}
+
+void GameLibraryDialog::showOnlineMetadataFailed(
+  std::int64_t gameId,
+  const std::string& detail)
+{
+  if (onlineMetadataGameId_ == gameId) {
+    onlineMetadataGameId_ = 0;
+  }
+  updateBusyPresentation();
+  showOperationError(detail);
 }
 
 void GameLibraryDialog::showScanStarted(
@@ -568,17 +626,35 @@ void GameLibraryDialog::updateGameSelection()
     selected && writable && static_cast<bool>(actions_.setArtwork));
   clearArtworkButton_->setEnabled(selected && writable && !game->artworkPath.empty() &&
     static_cast<bool>(actions_.setArtwork));
+  lookupMetadataButton_->setEnabled(selected && writable && onlineMetadataEnabled_ &&
+    onlineMetadataGameId_ == 0 && static_cast<bool>(actions_.lookupOnlineMetadata));
+  lookupMetadataButton_->setToolTip(onlineMetadataEnabled_ ? QString{} :
+    tr("Enable online metadata in Tools → Online Metadata and Artwork."));
+  clearMetadataButton_->setEnabled(selected && writable && game->onlineMetadata &&
+    onlineMetadataGameId_ == 0 && static_cast<bool>(actions_.clearOnlineMetadata));
   if (!selected) {
     favoriteButton_->setText(tr("Add to Favorites"));
     artworkLabel_->setPixmap({});
-    artworkLabel_->setText(tr("No local artwork"));
+    artworkLabel_->setText(tr("No artwork"));
+    metadataDetailsLabel_->setText(tr("No online metadata"));
     return;
   }
   favoriteButton_->setText(
     game->favorite ? tr("Remove from Favorites") : tr("Add to Favorites"));
+  if (game->onlineMetadata) {
+    const auto& online = *game->onlineMetadata;
+    metadataDetailsLabel_->setText(
+      tr("%1\n%2 · %3\nAttribution: %4")
+        .arg(QString::fromStdString(online.preferredTitle),
+          QString::fromStdString(online.providerName),
+          QString::fromStdString(online.attribution.licenseSpdx),
+          QString::fromStdString(online.attribution.creator)));
+  } else {
+    metadataDetailsLabel_->setText(tr("No online metadata"));
+  }
   if (game->artworkPath.empty()) {
     artworkLabel_->setPixmap({});
-    artworkLabel_->setText(tr("No local artwork"));
+    artworkLabel_->setText(tr("No artwork"));
     return;
   }
   QImageReader reader{pathToQString(game->artworkPath)};
@@ -664,6 +740,23 @@ void GameLibraryDialog::clearArtwork()
   }
 }
 
+void GameLibraryDialog::lookupOnlineMetadata()
+{
+  const auto* game = selectedGame();
+  if (game != nullptr && onlineMetadataEnabled_ &&
+      actions_.lookupOnlineMetadata) {
+    actions_.lookupOnlineMetadata(game->id);
+  }
+}
+
+void GameLibraryDialog::clearOnlineMetadata()
+{
+  const auto* game = selectedGame();
+  if (game != nullptr && actions_.clearOnlineMetadata) {
+    actions_.clearOnlineMetadata(game->id);
+  }
+}
+
 void GameLibraryDialog::launchSelected()
 {
   const auto* game = selectedGame();
@@ -681,18 +774,21 @@ void GameLibraryDialog::showSelectedInformation()
   if (auto* existing = findChild<GameInformationDialog*>(
         QStringLiteral("gameInformationDialog"))) {
     existing->setMetadata(game->metadata);
+    existing->setOnlineMetadata(game->onlineMetadata);
     existing->raise();
     existing->activateWindow();
     return;
   }
   auto* dialog = new GameInformationDialog(game->metadata, this);
+  dialog->setOnlineMetadata(game->onlineMetadata);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->open();
 }
 
 void GameLibraryDialog::updateBusyPresentation()
 {
-  progressBar_->setVisible(!scanningDirectoryIds_.empty());
+  progressBar_->setVisible(
+    !scanningDirectoryIds_.empty() || onlineMetadataGameId_ != 0);
   updateDirectorySelection();
   updateGameSelection();
 }
