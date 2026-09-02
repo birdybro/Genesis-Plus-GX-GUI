@@ -61,6 +61,7 @@ bool submitAndWait(
 
 struct RuntimeObservation final {
   std::uint64_t latestFrame{0U};
+  std::uint64_t latestRemoteFrame{0U};
   std::string failure;
 };
 
@@ -107,8 +108,12 @@ int runPeer(bool hosting, std::uint16_t port)
   std::string sessionFailure;
   NetplaySessionError sessionError = NetplaySessionError::none;
   bool peerDisconnected = false;
+  RuntimeObservation observation;
   QObject::connect(&session, &NetplaySession::inputReceived, &session,
-    [&worker, &remoteOperation, &sessionFailure](NetplayInputFrame frame) {
+    [&worker, &remoteOperation, &sessionFailure,
+     &observation](NetplayInputFrame frame) {
+      observation.latestRemoteFrame = std::max(
+        observation.latestRemoteFrame, frame.frameNumber);
       const auto status = worker.submit(EmulationCommand::remoteNetplayFrame(
         ++remoteOperation, frame));
       if (!status && sessionFailure.empty()) {
@@ -171,13 +176,12 @@ int runPeer(bool hosting, std::uint16_t port)
     return peerFailure("atomic netplay worker startup failed");
   }
 
-  RuntimeObservation observation;
   std::optional<NetplayInputFrame> delayedFrame;
   bool delayedFrameSent = hosting;
   QElapsedTimer runtime;
   runtime.start();
-  const auto runtimeMilliseconds = hosting ? 4'000 : 3'000;
-  while (runtime.elapsed() < runtimeMilliseconds) {
+  bool runtimeValid = false;
+  while (runtime.elapsed() < 10'000) {
     QCoreApplication::processEvents(QEventLoop::AllEvents, 5);
     observeWorker(worker, observation);
     while (auto frame = bridge->pollOutgoing()) {
@@ -191,7 +195,7 @@ int runPeer(bool hosting, std::uint16_t port)
       }
     }
     if (!hosting && delayedFrame && !delayedFrameSent &&
-        observation.latestFrame >= 5U) {
+        observation.latestRemoteFrame >= delayedFrame->frameNumber + 3U) {
       if (const auto sent = session.sendInput(*delayedFrame); !sent) {
         sessionFailure = sent.message;
       } else {
@@ -202,34 +206,49 @@ int runPeer(bool hosting, std::uint16_t port)
         session.state() == NetplaySessionState::disconnected) {
       break;
     }
+    const auto workerMetrics = worker.metrics();
+    const auto transportMetrics = session.metrics();
+    runtimeValid = delayedFrameSent && observation.latestFrame >= 120U &&
+      workerMetrics.netplayActive &&
+      (!hosting || workerMetrics.netplayRollbacks > 0U) &&
+      workerMetrics.netplayHistoryFrames <= 9U &&
+      bridge->metrics().outgoingDepth <= bridge->metrics().outgoingCapacity &&
+      transportMetrics.sentPackets > 100U &&
+      transportMetrics.receivedPackets > 100U;
+    if (runtimeValid) {
+      break;
+    }
     QTest::qWait(1);
   }
 
   const auto workerMetrics = worker.metrics();
   const auto transportMetrics = session.metrics();
-  const bool coveredPeerClose = hosting && peerDisconnected &&
-    sessionError == NetplaySessionError::connectionFailed &&
-    runtime.elapsed() >= 2'500 && observation.latestFrame >= 120U;
-  const bool runtimeValid = (sessionFailure.empty() || coveredPeerClose) &&
-    observation.failure.empty() && delayedFrameSent &&
-    observation.latestFrame >= 120U && workerMetrics.netplayActive &&
-    (!hosting || workerMetrics.netplayRollbacks > 0U) &&
-    workerMetrics.netplayHistoryFrames <= 9U &&
-    bridge->metrics().outgoingDepth <= bridge->metrics().outgoingCapacity &&
-    transportMetrics.sentPackets > 100U &&
-    transportMetrics.receivedPackets > 100U;
-
-  session.disconnectFromPeer("End-to-end test complete.");
-  const bool stopped = submitAndWait(worker, EmulationCommand::simple(
-    EmulationCommandType::stopNetplay, 30'001U)) && worker.stop();
-  if (!runtimeValid) {
+  if (!runtimeValid || !sessionFailure.empty() ||
+      !observation.failure.empty() || peerDisconnected ||
+      sessionError != NetplaySessionError::none) {
+    session.disconnectFromPeer("End-to-end test failed.");
+    static_cast<void>(submitAndWait(worker, EmulationCommand::simple(
+      EmulationCommandType::stopNetplay, 30'001U)));
+    static_cast<void>(worker.stop());
     return peerFailure("runtime validation failed: " +
       (sessionFailure.empty() ? observation.failure : sessionFailure) +
       " frame=" + std::to_string(observation.latestFrame) +
+      " remote=" + std::to_string(observation.latestRemoteFrame) +
       " rollbacks=" + std::to_string(workerMetrics.netplayRollbacks) +
       " sent=" + std::to_string(transportMetrics.sentPackets) +
       " received=" + std::to_string(transportMetrics.receivedPackets));
   }
+
+  std::cout << "VERIFIED frame=" << observation.latestFrame
+            << " rollbacks=" << workerMetrics.netplayRollbacks << '\n'
+            << std::flush;
+  std::string control;
+  if (!std::getline(std::cin, control) || control != "STOP") {
+    return peerFailure("parent did not release the verified peer");
+  }
+  session.disconnectFromPeer("End-to-end test complete.");
+  const bool stopped = submitAndWait(worker, EmulationCommand::simple(
+    EmulationCommandType::stopNetplay, 30'001U)) && worker.stop();
   if (!stopped) {
     return peerFailure("worker shutdown failed");
   }
@@ -241,6 +260,33 @@ int runPeer(bool hosting, std::uint16_t port)
 std::string processOutput(QProcess& process)
 {
   return process.readAll().toStdString();
+}
+
+bool waitForBothVerified(
+  QProcess& host,
+  QProcess& guest,
+  std::string& hostLog,
+  std::string& guestLog)
+{
+  QElapsedTimer timer;
+  timer.start();
+  while (timer.elapsed() < 15'000) {
+    QCoreApplication::processEvents(QEventLoop::AllEvents, 10);
+    hostLog += processOutput(host);
+    guestLog += processOutput(guest);
+    if (hostLog.find("VERIFIED frame=") != std::string::npos &&
+        guestLog.find("VERIFIED frame=") != std::string::npos) {
+      return true;
+    }
+    if (host.state() == QProcess::NotRunning ||
+        guest.state() == QProcess::NotRunning) {
+      return false;
+    }
+    QTest::qWait(1);
+  }
+  hostLog += processOutput(host);
+  guestLog += processOutput(guest);
+  return false;
 }
 
 } // namespace
@@ -266,6 +312,7 @@ private slots:
     QVERIFY2(host.waitForReadyRead(5'000), "Host did not publish readiness");
     const auto readiness = host.readAllStandardOutput();
     QVERIFY2(readiness.contains("READY"), readiness.constData());
+    std::string hostLog = readiness.toStdString();
 
     QProcess guest;
     guest.setProcessChannelMode(QProcess::MergedChannels);
@@ -273,10 +320,20 @@ private slots:
       {QStringLiteral("--peer"), QStringLiteral("guest"),
        QString::number(port)});
     QVERIFY(guest.waitForStarted(5'000));
+    std::string guestLog;
+    const bool bothVerified = waitForBothVerified(
+      host, guest, hostLog, guestLog);
+    const auto verificationLog =
+      "host:\n" + hostLog + "\nguest:\n" + guestLog;
+    QVERIFY2(bothVerified, verificationLog.c_str());
+    QCOMPARE(host.write("STOP\n"), qint64{5});
+    QCOMPARE(guest.write("STOP\n"), qint64{5});
+    QVERIFY(host.waitForBytesWritten(5'000));
+    QVERIFY(guest.waitForBytesWritten(5'000));
     const bool guestFinished = guest.waitForFinished(15'000);
     const bool hostFinished = host.waitForFinished(15'000);
-    const auto guestLog = processOutput(guest);
-    const auto hostLog = processOutput(host);
+    guestLog += processOutput(guest);
+    hostLog += processOutput(host);
     QVERIFY2(guestFinished, guestLog.c_str());
     QVERIFY2(hostFinished, hostLog.c_str());
     QCOMPARE(guest.exitStatus(), QProcess::NormalExit);

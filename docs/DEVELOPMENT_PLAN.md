@@ -3785,8 +3785,9 @@ cannot contain its own SHA)
 
 ## Milestone 94 detail
 
-**Status:** IN PROGRESS — implementation and every local gate are complete; exact hosted
-matrix, complete-log inspection, and downloaded-package audit are pending.
+**Status:** IN PROGRESS — implementation and every corrected local gate are complete;
+replacement exact hosted matrix, complete-log inspection, and downloaded-package audit
+are pending.
 
 **Goal:** Add deterministic direct peer play without moving networking into the core or
 weakening local emulation safety.
@@ -3818,7 +3819,8 @@ overflow teardown, post-session checkpoint capture, disconnect, and clean worker
 shutdown.
 
 **Gate evidence:** The focused six-test netplay set passes locally under Debug, and the
-two-process end-to-end case passes ten consecutive repetitions. Warning-as-error Debug,
+corrected two-process end-to-end case passes fifty normal plus twenty single-CPU
+constrained repetitions. Warning-as-error Debug,
 optimized Release, ASan/UBSan with leak detection, CHD-disabled, and fresh Clang graphs
 each pass 118/118; the shader-disabled graph passes all 116 applicable tests. The strict
 legacy Unix libretro target builds, links as x86-64 ELF, and cleans warning-free. A fresh
@@ -3836,8 +3838,28 @@ disconnected before automatic shutdown checkpointing, debug breakpoints are clea
 and Sega CD sessions reject open trays, playlists, or an arbitrary swapped disc whose
 content is not the launch identity. The supplied NAS ROM directory is not mounted on
 this host, so no external commercial-ROM netplay smoke was attempted; generated CC0
-Genesis processes exercise the same production socket/worker/core path. Exact hosted
-Windows/Linux/macOS confirmation is the remaining completion gate.
+Genesis processes exercise the same production socket/worker/core path.
+
+Initial exact hosted run
+[`33604070435`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33604070435)
+passed Windows Debug/Release, Linux Debug/Release/ASan+UBSan/legacy, and both macOS
+Release jobs, but correctly exposed a scheduler-dependent assertion in the two-process
+rollback test on both macOS Debug architectures. The test withheld frame 2 until a
+fixed amount of *local* guest progress; on those runners, it could still reach the host
+before the host consumed that frame, so no rollback was required. The guest then
+completed first and the normal remote close was classified as a connection failure.
+The corrected test waits until an authenticated host input proves the host is already
+past the withheld frame, requires both processes to publish complete runtime evidence,
+and releases both together through their process control channels. The production Qt
+session now lets `RemoteHostClosedError` reach the disconnect handler as one orderly
+peer departure. Fifty normal and twenty single-CPU constrained repetitions pass.
+
+All 15,975 lines (2,142,331 bytes) from that first hosted run were inspected. No other
+authored compiler/linker warning, sanitizer finding, test failure, workflow warning, or
+package error appears. The known Windows real-OpenGL capability skip remains documented
+and covered by its unsupported-context fallback; Linux and both macOS architectures
+execute that render test. Exact replacement Windows/Linux/macOS confirmation is the
+remaining completion gate.
 
 **Acceptance criteria:** Networking is explicitly opt-in; the session code is never
 persisted or logged; peers authenticate mutually and every gameplay packet has integrity

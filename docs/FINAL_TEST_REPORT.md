@@ -1150,7 +1150,8 @@ operations remain locked in both GUI and worker command paths until disconnect.
 The six focused tests cover bounded timeline behavior, protocol mutation/fuzz input,
 real localhost authentication and rejection, rollback worker lifecycle, two independent
 core processes exchanging delayed traffic in both directions, and semantic Qt controls.
-The independent-process workflow also passes ten consecutive repetitions. Final-source
+The corrected independent-process workflow passes fifty consecutive normal repetitions
+and twenty more constrained to one CPU. Final-source
 warning-as-error Debug, optimized Release, CHD-disabled, and Clang graphs each pass
 118/118; ASan/UBSan passes 118/118 with leak detection and no finding; the
 shader-disabled graph passes all 116 applicable tests. The strict Unix libretro target
@@ -1158,7 +1159,31 @@ builds, links as x86-64 ELF, and cleans without a warning. A fresh Linux Release
 passes the production package verifier, installed CLI and complete portable event-loop
 smoke, dependency inspection, TGZ/checksum generation, and confirms that Qt Network and
 the netplay guide ship. Hosted cross-platform evidence is intentionally pending until
-this implementation commit is pushed.
+the corrective exact-commit matrix passes and its complete logs and packages are
+inspected.
+
+Initial exact hosted run
+[`33604070435`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33604070435)
+passed eight of ten jobs: Windows Debug/Release, Linux Debug/Release/ASan+UBSan/legacy,
+and macOS arm64/x86_64 Release. Both macOS Debug jobs exposed the same test-only
+scheduling assumption: delaying a packet against guest-local frame progress did not
+prove that the independent host had already predicted it. One host therefore reached
+175–180 frames with zero rollbacks before the guest closed. The replacement waits for
+an authenticated host frame beyond the withheld frame, latches complete validation in
+both processes, and uses parent-controlled simultaneous teardown. The same audit also
+fixed a production classification issue in which Qt's orderly
+`RemoteHostClosedError` became a connection failure before the normal disconnect
+signal. A loopback assertion now requires a single peer-departure notification and no
+session error.
+
+All 15,975 complete log lines (2,142,331 bytes) from that run were inspected. Aside from
+the two instances of this one netplay test failure, there is no authored compiler or
+linker warning, sanitizer signature, workflow warning, timeout, runtime error, or
+packaging failure. The Windows Debug and Release jobs each capability-skip only the
+documented real-OpenGL test because their software context is below OpenGL 3.3; the
+fallback path is covered and Linux plus both macOS architectures execute the real
+render test. Replacement exact-commit hosted evidence and package inspection remain
+pending.
 
 The final adversarial pass additionally verifies disconnect-before-checkpoint shutdown,
 post-session state capture, runtime bridge-overflow reporting, password clearing,

@@ -267,6 +267,14 @@ void NetplaySession::socketError()
       state_ == NetplaySessionState::disconnected) {
     return;
   }
+  // Qt reports an orderly peer FIN through errorOccurred before it emits
+  // disconnected.  Let socketDisconnected classify that as a peer departure;
+  // treating it as a connection failure produces a duplicate, misleading
+  // error whenever the other player leaves normally.
+  if (socket_ != nullptr &&
+      socket_->error() == QAbstractSocket::RemoteHostClosedError) {
+    return;
+  }
   fail(NetplaySessionError::connectionFailed,
     socket_ == nullptr ? "The peer connection failed." : socketMessage(*socket_),
     false);

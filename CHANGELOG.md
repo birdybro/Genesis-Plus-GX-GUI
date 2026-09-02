@@ -112,6 +112,11 @@ platform documentation.
 
 ### Fixed
 
+- Netplay's two-process regression now waits for remote-frame proof before releasing
+  its intentionally delayed input and coordinates both verified peers before teardown,
+  eliminating a scheduler-dependent false pass/failure on macOS Debug. Orderly remote
+  socket closure is also reported once as a peer departure instead of as a connection
+  failure followed by a duplicate disconnect.
 - Cross-platform release gates retain the complete 108-case software-OpenGL matrix
   with a realistic bounded timeout, and macOS DMG creation retries only the transient
   `hdiutil` resource-busy condition with scoped staging cleanup.

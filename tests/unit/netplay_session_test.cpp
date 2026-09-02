@@ -43,6 +43,8 @@ private slots:
     QSignalSpy hostConnected{&host, &NetplaySession::peerConnected};
     QSignalSpy guestConnected{&guest, &NetplaySession::peerConnected};
     QSignalSpy received{&guest, &NetplaySession::inputReceived};
+    QSignalSpy guestDisconnected{&guest, &NetplaySession::peerDisconnected};
+    QSignalSpy guestErrors{&guest, &NetplaySession::sessionError};
 
     QVERIFY(host.host(descriptor(), "shared-secret", 0U, 2U, 8U,
       QHostAddress::LocalHost));
@@ -74,6 +76,8 @@ private slots:
     QVERIFY(waitUntil([&] {
       return guest.state() == NetplaySessionState::disconnected;
     }));
+    QCOMPARE(guestDisconnected.size(), 1);
+    QCOMPARE(guestErrors.size(), 0);
   }
 
   void rejectsWrongCodeAndIdentity()
