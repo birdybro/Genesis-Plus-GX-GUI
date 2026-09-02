@@ -227,8 +227,9 @@ DebugToolsWindow -> bounded worker command -> CoreAdapter -> C host bridge -> co
        +----------- immutable snapshot/response event <-------------+
 ```
 
-The window keeps at most one snapshot and one memory read outstanding. Its 250 ms
-refresh timer does not drive emulation, queue duplicate work, or allocate per frame.
+The window keeps at most one snapshot, one memory read, and one trace drain outstanding.
+Its 250 ms refresh timer does not drive emulation, queue duplicate work, or allocate per
+frame.
 Closing or hiding the window stops polling; disabling the opt-in setting destroys it.
 Save-state buttons deliberately route through the normal asynchronous state manager,
 retaining game identity, checksum, atomic-write, and wrong-game protections.
@@ -237,12 +238,15 @@ RAM search is pure frontend analysis over the immutable 64 KiB 68000 and 8 KiB Z
 copies. The Z80 copy selects the Genesis sound-CPU RAM for Genesis/Sega CD hardware and
 the active work RAM for SG-1000, Master System/Mark III, Game Gear, and Power Base
 Converter sessions. Candidate storage is capped at 65,536, watches at 256, displayed
-candidates at 1,024, and breakpoint configuration at 64. Frame breakpoints live only
-on the worker.
+candidates at 1,024, breakpoint configuration at 64, and trace history at 4,096. Frame
+breakpoints live only on the worker.
 When the list is nonempty, one lightweight C-host call samples both program counters
-after a complete frame; a match pauses pacing and emits a typed hit event. There is no
-CPU instruction hook, no GUI-side core access, and no normal-play per-frame cost while
-the list is empty.
+after a complete frame; a match pauses pacing and emits a typed hit event. Paused
+instruction steps call one selected CPU engine through the C bridge. Optional tracing
+uses the inherited 68000 execute hook plus the equivalent narrow Z80 execute boundary;
+its callback is null by default and its core ring overwrites at 4,096 records with loss
+instrumentation. Symbol parsing and versioned JSON serialization remain frontend-only.
+No GUI-side core access or externally writable debugger socket exists.
 
 ## Per-game settings resolution
 

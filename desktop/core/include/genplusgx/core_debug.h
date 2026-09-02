@@ -123,6 +123,25 @@ struct CoreDebugProgramCounters final {
 };
 
 inline constexpr std::size_t maximumCoreDebugBreakpoints = 64U;
+inline constexpr std::size_t maximumCoreDebugTraceEntries = 4096U;
+
+struct CoreDebugTraceEntry final {
+  std::uint64_t sequence{0};
+  CoreDebugCpu cpu{CoreDebugCpu::m68k};
+  std::uint32_t address{0};
+  std::uint32_t cycles{0};
+
+  [[nodiscard]] bool operator==(const CoreDebugTraceEntry&) const = default;
+};
+
+struct CoreDebugInstructionStep final {
+  CoreDebugCpu cpu{CoreDebugCpu::m68k};
+  std::uint32_t beforeAddress{0};
+  std::uint32_t afterAddress{0};
+  std::uint32_t cycles{0};
+
+  [[nodiscard]] bool operator==(const CoreDebugInstructionStep&) const = default;
+};
 
 enum class CoreDebugRequestType : std::uint8_t {
   captureSnapshot,
@@ -132,6 +151,9 @@ enum class CoreDebugRequestType : std::uint8_t {
   setZ80Registers,
   setVdpRegister,
   setFrameBreakpoints,
+  stepInstruction,
+  configureTrace,
+  takeTrace,
 };
 
 struct CoreDebugRequest final {
@@ -145,6 +167,10 @@ struct CoreDebugRequest final {
   std::uint8_t vdpRegister{0};
   std::uint8_t vdpValue{0};
   std::vector<CoreDebugBreakpoint> breakpoints;
+  CoreDebugCpu cpu{CoreDebugCpu::m68k};
+  bool traceM68k{false};
+  bool traceZ80{false};
+  bool clearTrace{false};
   std::uint64_t clientToken{0};
 };
 
@@ -155,6 +181,11 @@ struct CoreDebugResponse final {
   std::shared_ptr<const CoreDebugSnapshot> snapshot;
   std::vector<std::uint8_t> bytes;
   std::optional<CoreDebugBreakpoint> breakpointHit;
+  std::optional<CoreDebugInstructionStep> instructionStep;
+  std::vector<CoreDebugTraceEntry> traceEntries;
+  std::uint64_t droppedTraceEntries{0};
+  bool traceM68k{false};
+  bool traceZ80{false};
   std::uint64_t clientToken{0};
 };
 

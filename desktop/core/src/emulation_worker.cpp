@@ -1073,6 +1073,8 @@ private:
         const auto writesCore = requestType !=
             CoreDebugRequestType::captureSnapshot &&
           requestType != CoreDebugRequestType::readMemory &&
+          requestType != CoreDebugRequestType::configureTrace &&
+          requestType != CoreDebugRequestType::takeTrace &&
           requestType != CoreDebugRequestType::setFrameBreakpoints;
         validTransition = current == EmulationWorkerState::paused ||
           (!writesCore && current == EmulationWorkerState::running);

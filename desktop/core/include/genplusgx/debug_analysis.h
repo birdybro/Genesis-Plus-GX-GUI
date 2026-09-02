@@ -4,7 +4,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
+#include <optional>
 #include <span>
+#include <string>
+#include <string_view>
 #include <vector>
 
 namespace genplusgx {
@@ -70,6 +74,37 @@ private:
   bool active_{false};
 };
 
+struct DebugSymbol final {
+  CoreDebugCpu cpu{CoreDebugCpu::m68k};
+  std::uint32_t address{0};
+  std::string name;
+
+  [[nodiscard]] bool operator==(const DebugSymbol&) const = default;
+};
+
+class DebugSymbolTable final {
+public:
+  static constexpr std::size_t maximumFileBytes = 1024U * 1024U;
+  static constexpr std::size_t maximumSymbols = 65'536U;
+  static constexpr std::size_t maximumNameBytes = 128U;
+
+  [[nodiscard]] bool load(
+    std::string_view text,
+    std::string& error);
+  [[nodiscard]] bool loadFile(
+    const std::filesystem::path& path,
+    std::string& error);
+  void clear() noexcept;
+
+  [[nodiscard]] const DebugSymbol* find(
+    CoreDebugCpu cpu,
+    std::uint32_t address) const noexcept;
+  [[nodiscard]] const std::vector<DebugSymbol>& symbols() const noexcept;
+
+private:
+  std::vector<DebugSymbol> symbols_;
+};
+
 [[nodiscard]] bool debugReadValue(
   std::span<const std::uint8_t> memory,
   std::uint32_t offset,
@@ -81,5 +116,10 @@ private:
   std::uint32_t value,
   DebugValueWidth width,
   DebugValueFormat format) noexcept;
+
+[[nodiscard]] std::string debugTraceJson(
+  std::span<const CoreDebugTraceEntry> entries,
+  const DebugSymbolTable& symbols,
+  std::uint64_t droppedEntries);
 
 } // namespace genplusgx

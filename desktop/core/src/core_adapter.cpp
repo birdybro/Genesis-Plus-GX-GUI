@@ -451,6 +451,7 @@ CoreResult CoreAdapter::initialize()
   private_ = privateState.release();
   activeAdapter = this;
   genplusgx_host_reset_defaults();
+  genplusgx_debug_reset_trace();
   audio_shutdown();
 
   std::memset(&bitmap, 0, sizeof(bitmap));
@@ -1284,6 +1285,11 @@ CoreResult CoreAdapter::debugRequest(
     .snapshot = {},
     .bytes = {},
     .breakpointHit = {},
+    .instructionStep = {},
+    .traceEntries = {},
+    .droppedTraceEntries = 0U,
+    .traceM68k = false,
+    .traceZ80 = false,
     .clientToken = request.clientToken,
   };
   if (const auto owner = requireOwner(true); !owner) {
@@ -1448,6 +1454,54 @@ CoreResult CoreAdapter::debugRequest(
     case CoreDebugRequestType::setFrameBreakpoints:
       return failure(CoreError::invalidDebugRequest,
         "Frame breakpoints are owned by the emulation worker.");
+    case CoreDebugRequestType::stepInstruction: {
+      genplusgx_debug_step_result step{};
+      const auto cpu = static_cast<unsigned int>(request.cpu);
+      if (cpu > GENPLUSGX_DEBUG_CPU_Z80 ||
+          genplusgx_debug_step_instruction(cpu, &step) == 0) {
+        return failure(CoreError::invalidDebugRequest,
+          "The selected CPU cannot execute an instruction in this system.");
+      }
+      response.instructionStep = CoreDebugInstructionStep{
+        .cpu = static_cast<CoreDebugCpu>(step.cpu),
+        .beforeAddress = step.before_address,
+        .afterAddress = step.after_address,
+        .cycles = step.cycles,
+      };
+      return success();
+    }
+    case CoreDebugRequestType::configureTrace: {
+      const auto mask =
+        (request.traceM68k
+          ? static_cast<unsigned int>(GENPLUSGX_DEBUG_TRACE_M68K) : 0U) |
+        (request.traceZ80
+          ? static_cast<unsigned int>(GENPLUSGX_DEBUG_TRACE_Z80) : 0U);
+      if (genplusgx_debug_configure_trace(mask, request.clearTrace ? 1 : 0) == 0) {
+        return failure(
+          CoreError::invalidDebugRequest, "The trace configuration was rejected.");
+      }
+      response.traceM68k = request.traceM68k;
+      response.traceZ80 = request.traceZ80;
+      return success();
+    }
+    case CoreDebugRequestType::takeTrace: {
+      std::vector<genplusgx_debug_trace_entry> raw(
+        maximumCoreDebugTraceEntries);
+      std::uint64_t dropped = 0U;
+      const auto count = genplusgx_debug_take_trace(
+        raw.data(), raw.size(), &dropped);
+      response.traceEntries.reserve(count);
+      for (std::size_t index = 0U; index < count; ++index) {
+        response.traceEntries.push_back({
+          .sequence = raw[index].sequence,
+          .cpu = static_cast<CoreDebugCpu>(raw[index].cpu),
+          .address = raw[index].address,
+          .cycles = raw[index].cycles,
+        });
+      }
+      response.droppedTraceEntries = dropped;
+      return success();
+    }
   }
   return failure(
     CoreError::invalidDebugRequest, "The debug request type is invalid.");
@@ -1663,6 +1717,7 @@ void CoreAdapter::applyPendingInput() noexcept
 
 void CoreAdapter::unloadUnchecked() noexcept
 {
+  genplusgx_debug_reset_trace();
   genplusgx_host_clear_cheats();
   audio_shutdown();
   ggenie_shutdown();

@@ -14,6 +14,10 @@ platform documentation.
 
 ### Added
 
+- Advanced hidden debugger tooling with real paused 68000/Z80 single-instruction
+  stepping, opt-in bounded execution traces and drop accounting, atomic local symbol
+  import, and versioned atomic JSON export for offline external analysis.
+
 - Qt Linguist localization infrastructure with a schema-migrated System/English
   preference, startup-before-widgets catalog installation, package-relative resource
   discovery, safe English fallback, diagnostics, and a complete compiled expanded

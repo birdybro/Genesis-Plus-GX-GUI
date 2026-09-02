@@ -3,6 +3,8 @@
 #include <array>
 #include <cstdint>
 #include <iostream>
+#include <random>
+#include <string>
 
 namespace {
 
@@ -136,6 +138,85 @@ int main()
         DebugValueFormat::unsignedInteger),
       "Cleared search accepted a filter")) {
     return 7;
+  }
+
+  DebugSymbolTable symbols;
+  std::string symbolError;
+  constexpr std::string_view symbolText{
+    "# canonical mixed-CPU symbol file\n"
+    "m68k 000200 ResetEntry\n"
+    "z80 $0038 IrqVector\n"
+    "0x000250 ControllerPoll ; defaults to m68k\n"
+    "m68k 000200 ResetEntry\n"};
+  if (!check(symbols.load(symbolText, symbolError) && symbolError.empty(),
+        "Valid mixed-CPU symbols were rejected") ||
+      !check(symbols.symbols().size() == 3U,
+        "Duplicate symbols were not normalized") ||
+      !check(symbols.find(CoreDebugCpu::m68k, 0x200U) != nullptr &&
+          symbols.find(CoreDebugCpu::m68k, 0x200U)->name == "ResetEntry" &&
+          symbols.find(CoreDebugCpu::z80, 0x38U) != nullptr &&
+          symbols.find(CoreDebugCpu::z80, 0x38U)->name == "IrqVector" &&
+          symbols.find(CoreDebugCpu::z80, 0x200U) == nullptr,
+        "Symbol lookup lost CPU/address identity")) {
+    return 8;
+  }
+
+  const auto acceptedSymbols = symbols.symbols();
+  if (!check(!symbols.load("z80 10000 OutsideAddress\n", symbolError) &&
+          !symbolError.empty(),
+        "Out-of-range Z80 symbol was accepted") ||
+      !check(symbols.symbols() == acceptedSymbols,
+        "Failed symbol import replaced the active table") ||
+      !check(!symbols.load("m68k 000200 name with spaces\n", symbolError),
+        "Ambiguous symbol record was accepted") ||
+      !check(!symbols.load(std::string(
+          DebugSymbolTable::maximumFileBytes + 1U, 'x'), symbolError),
+        "Oversized symbol content was accepted")) {
+    return 9;
+  }
+
+  std::mt19937 generator{0x47505844U};
+  std::uniform_int_distribution<std::size_t> mutationCount{1U, 4U};
+  for (std::size_t iteration = 0U; iteration < 512U; ++iteration) {
+    if (!check(symbols.load(symbolText, symbolError),
+          "The deterministic symbol baseline stopped parsing")) {
+      return 10;
+    }
+    const auto beforeMutation = symbols.symbols();
+    std::string mutated{symbolText};
+    std::uniform_int_distribution<std::size_t> position{0U, mutated.size() - 1U};
+    std::uniform_int_distribution<unsigned int> byte{0U, 255U};
+    const auto count = mutationCount(generator);
+    for (std::size_t mutation = 0U; mutation < count; ++mutation) {
+      mutated[position(generator)] = static_cast<char>(byte(generator));
+    }
+    const auto accepted = symbols.load(mutated, symbolError);
+    if (!check(accepted || symbols.symbols() == beforeMutation,
+          "A rejected mutated symbol file changed the active table") ||
+        !check(!accepted || symbols.symbols().size() <=
+            DebugSymbolTable::maximumSymbols,
+          "A mutated symbol file bypassed the record bound")) {
+      return 10;
+    }
+  }
+  if (!check(symbols.load(symbolText, symbolError),
+        "The canonical symbol table could not be restored after fuzzing")) {
+    return 10;
+  }
+
+  const std::array trace{
+    CoreDebugTraceEntry{1U, CoreDebugCpu::m68k, 0x200U, 28U},
+    CoreDebugTraceEntry{2U, CoreDebugCpu::z80, 0x38U, 13U},
+  };
+  const auto json = debugTraceJson(trace, symbols, 7U);
+  if (!check(json.find("\"schema\": 1") != std::string::npos &&
+          json.find("\"droppedEntries\": 7") != std::string::npos &&
+          json.find("\"cpu\": \"m68k\"") != std::string::npos &&
+          json.find("\"address\": \"0x200\"") != std::string::npos &&
+          json.find("\"symbol\": \"ResetEntry\"") != std::string::npos &&
+          json.find("\"symbol\": \"IrqVector\"") != std::string::npos,
+        "Versioned trace JSON omitted identity, loss, or symbols")) {
+    return 11;
   }
 
   return 0;

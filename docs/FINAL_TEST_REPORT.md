@@ -5,7 +5,7 @@ Linux startup correction, tagged-release audits, and the post-release Libretro s
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
 synchronization, local bezel/overlay, cheat import/search, portable-mode, and
-localization verification through 2026-09-01
+localization verification and the in-progress advanced-debugger verification through 2026-09-01
 (America/Denver).
 
 ## Candidate identity
@@ -341,6 +341,33 @@ job passed. The corrected graph uses the TS `OUTPUT_LOCATION` property supported
 the declared Qt 6.8 minimum and adds a compatibility regression. The complete
 7,671-line, 1,002,995-byte failed-run log contains that one repeated root cause and no
 second project issue.
+
+## Advanced debugger verification (in progress)
+
+Milestone 92 adds owner-thread paused single-instruction execution for the real 68000
+and Z80 engines, an opt-in 4,096-entry circular execution trace with explicit loss
+accounting, an equally bounded frontend history, a 1 MiB/65,536-record atomic symbol
+parser, and atomic versioned JSON export. Only execute callbacks are compiled into the
+desktop core; inherited memory hooks remain disabled, the callback pointer is null until
+the user opts in, and load/unload/shutdown clear it. External analysis is file-only: no
+debugger port or remotely writable memory service is opened.
+
+The four existing focused tests now prove both CPU steps and inactive/running rejection,
+real hook identity, overflow behavior, mixed-CPU symbols and failure atomicity, JSON
+schema/content, a fixed-seed 512-case symbol mutation corpus, every new stable GUI
+control, actual symbol annotation/export, and a live worker trace. Warning-gated Debug
+and optimized Release pass 109/109;
+leak-detecting ASan/UBSan passes 109/109 with no finding; fresh warning-as-error Clang
+22 and CHD-disabled graphs each pass 109/109; and shader-disabled passes all 107
+applicable tests. The fresh Clang log contains no warning diagnostic after making two
+pre-existing inherited Tremor/libchdr exceptions host-independent and target-local.
+The strict legacy libretro target builds, links, and cleans warning-free. A fresh Linux
+stage and TGZ pass the production package verifier, checksum, dependency, offscreen,
+real XCB event-loop, extracted-layout, and prohibited-payload checks. Exact pushed
+GitHub Actions, complete log inspection, and downloaded-artifact audit are still
+pending, so this section does not yet claim Milestone 92 completion. The user-supplied
+Phantasy Star IV NAS path was not mounted during this gate; the optional real-ROM runner
+was therefore unavailable and no copyrighted substitute was fetched.
 
 ## Build configurations tested
 
@@ -1123,8 +1150,8 @@ directories.
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
   formats. Physical optical drives, netplay,
-  achievements, cloud sync, online scraping/downloading, instruction-level stepping,
-  an external debugger server, TAS tooling, and streaming remain intentionally outside
+  achievements, cloud sync, online scraping/downloading, a network-accessible external
+  debugger server, TAS tooling, and streaming remain intentionally outside
   scope.
 
 These limitations do not leave an advertised control inert and do not weaken the

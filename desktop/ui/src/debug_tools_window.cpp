@@ -6,6 +6,7 @@
 #include <QCheckBox>
 #include <QComboBox>
 #include <QFormLayout>
+#include <QFileDialog>
 #include <QGroupBox>
 #include <QHeaderView>
 #include <QHideEvent>
@@ -18,6 +19,7 @@
 #include <QPushButton>
 #include <QPixmap>
 #include <QRegularExpression>
+#include <QSaveFile>
 #include <QScrollArea>
 #include <QShowEvent>
 #include <QSpinBox>
@@ -86,6 +88,25 @@ bool parseHex(const QString& text, std::uint64_t maximum, std::uint64_t& value)
   }
   value = parsed;
   return true;
+}
+
+std::filesystem::path filesystemPath(const QString& path)
+{
+#ifdef Q_OS_WIN
+  return std::filesystem::path{path.toStdWString()};
+#else
+  const auto encoded = path.toUtf8();
+  return std::filesystem::path{encoded.constData()};
+#endif
+}
+
+QString displayPath(const std::filesystem::path& path)
+{
+#ifdef Q_OS_WIN
+  return QString::fromStdWString(path.native());
+#else
+  return QString::fromUtf8(path.native());
+#endif
 }
 
 void setRegisterRow(
@@ -357,6 +378,10 @@ void DebugToolsWindow::buildToolbar()
   resumeAction_->setObjectName(QStringLiteral("debugResumeAction"));
   frameAdvanceAction_ = toolbar->addAction(tr("Step Frame"));
   frameAdvanceAction_->setObjectName(QStringLiteral("debugFrameAdvanceAction"));
+  stepM68kAction_ = toolbar->addAction(tr("Step 68000"));
+  stepM68kAction_->setObjectName(QStringLiteral("debugStepM68kAction"));
+  stepZ80Action_ = toolbar->addAction(tr("Step Z80"));
+  stepZ80Action_->setObjectName(QStringLiteral("debugStepZ80Action"));
   hardResetAction_ = toolbar->addAction(tr("Hard Reset"));
   hardResetAction_->setObjectName(QStringLiteral("debugHardResetAction"));
   softResetAction_ = toolbar->addAction(tr("Soft Reset"));
@@ -374,6 +399,10 @@ void DebugToolsWindow::buildToolbar()
     [control] { control(DebugControlOperation::resume); });
   connect(frameAdvanceAction_, &QAction::triggered, this,
     [control] { control(DebugControlOperation::frameAdvance); });
+  connect(stepM68kAction_, &QAction::triggered, this,
+    [this] { stepInstruction(CoreDebugCpu::m68k); });
+  connect(stepZ80Action_, &QAction::triggered, this,
+    [this] { stepInstruction(CoreDebugCpu::z80); });
   connect(hardResetAction_, &QAction::triggered, this,
     [control] { control(DebugControlOperation::hardReset); });
   connect(softResetAction_, &QAction::triggered, this,
@@ -718,6 +747,61 @@ void DebugToolsWindow::buildAnalysisPage()
   updateBreakpointAddressRange();
   analysisTabs_->addTab(breakpointPage, tr("Breakpoints"));
 
+  auto* tracePage = new QWidget(analysisTabs_);
+  tracePage->setObjectName(QStringLiteral("debugTracePage"));
+  auto* traceLayout = new QVBoxLayout(tracePage);
+  auto* traceNote = new QLabel(tr(
+    "Execution tracing records a bounded tail of real CPU instruction addresses. "
+    "Sources change safely between frames; dropped records are counted rather than "
+    "allowing memory use to grow."), tracePage);
+  traceNote->setWordWrap(true);
+  traceLayout->addWidget(traceNote);
+  auto* traceControls = new QHBoxLayout;
+  traceM68k_ = new QCheckBox(tr("68000"), tracePage);
+  traceM68k_->setObjectName(QStringLiteral("debugTraceM68kCheck"));
+  traceZ80_ = new QCheckBox(tr("Z80"), tracePage);
+  traceZ80_->setObjectName(QStringLiteral("debugTraceZ80Check"));
+  traceApplyButton_ = new QPushButton(tr("Apply Trace Sources"), tracePage);
+  traceApplyButton_->setObjectName(QStringLiteral("debugTraceApplyButton"));
+  traceClearButton_ = new QPushButton(tr("Clear Trace"), tracePage);
+  traceClearButton_->setObjectName(QStringLiteral("debugTraceClearButton"));
+  auto* loadSymbols = new QPushButton(tr("Load Symbols…"), tracePage);
+  loadSymbols->setObjectName(QStringLiteral("debugLoadSymbolsButton"));
+  auto* clearSymbols = new QPushButton(tr("Clear Symbols"), tracePage);
+  clearSymbols->setObjectName(QStringLiteral("debugClearSymbolsButton"));
+  traceExportButton_ = new QPushButton(tr("Export JSON…"), tracePage);
+  traceExportButton_->setObjectName(QStringLiteral("debugTraceExportButton"));
+  traceControls->addWidget(traceM68k_);
+  traceControls->addWidget(traceZ80_);
+  traceControls->addWidget(traceApplyButton_);
+  traceControls->addWidget(traceClearButton_);
+  traceControls->addWidget(loadSymbols);
+  traceControls->addWidget(clearSymbols);
+  traceControls->addWidget(traceExportButton_);
+  traceControls->addStretch();
+  traceLayout->addLayout(traceControls);
+  traceStatus_ = new QLabel(tracePage);
+  traceStatus_->setObjectName(QStringLiteral("debugTraceStatusLabel"));
+  traceLayout->addWidget(traceStatus_);
+  traceTable_ = makeTable(tracePage, "debugTraceTable", 0,
+    {tr("Sequence"), tr("CPU"), tr("Address"), tr("Symbol"), tr("Cycles")});
+  traceLayout->addWidget(traceTable_);
+  connect(traceApplyButton_, &QPushButton::clicked, this,
+    [this] { configureTrace(false); });
+  connect(traceClearButton_, &QPushButton::clicked, this,
+    [this] { configureTrace(true); });
+  connect(loadSymbols, &QPushButton::clicked,
+    this, &DebugToolsWindow::chooseSymbolFile);
+  connect(clearSymbols, &QPushButton::clicked, this, [this] {
+    symbols_.clear();
+    updateTraceTable();
+    setStatus(tr("Symbols cleared."), 2'000);
+  });
+  connect(traceExportButton_, &QPushButton::clicked,
+    this, &DebugToolsWindow::chooseTraceExportFile);
+  updateTraceTable();
+  analysisTabs_->addTab(tracePage, tr("Trace & Symbols"));
+
   updateSearchValueControl();
   tabs_->addTab(analysisPage_, tr("Analysis"));
 }
@@ -781,13 +865,20 @@ void DebugToolsWindow::setGameLoaded(bool loaded)
     snapshot_.reset();
     snapshotPending_ = false;
     memoryPending_ = false;
+    tracePending_ = false;
     memoryView_->clear();
     ramSearch_.clear();
     watches_.clear();
     frameBreakpoints_.clear();
+    traceEntries_.clear();
+    droppedTraceEntries_ = 0U;
+    symbols_.clear();
+    traceM68k_->setChecked(false);
+    traceZ80_->setChecked(false);
     updateRamSearchTable();
     updateMemoryWatches();
     breakpointTable_->setRowCount(0);
+    updateTraceTable();
     setStatus(tr("Load a game to inspect emulator state."));
   } else {
     setStatus(tr("Waiting for emulator debug state…"));
@@ -802,12 +893,18 @@ void DebugToolsWindow::setPaused(bool paused)
   pauseAction_->setEnabled(gameLoaded_ && !paused);
   resumeAction_->setEnabled(gameLoaded_ && paused);
   frameAdvanceAction_->setEnabled(gameLoaded_ && paused);
+  stepM68kAction_->setEnabled(gameLoaded_ && paused && snapshot_ &&
+    snapshot_->m68kActive);
+  stepZ80Action_->setEnabled(gameLoaded_ && paused);
   hardResetAction_->setEnabled(gameLoaded_);
   softResetAction_->setEnabled(gameLoaded_);
   refreshAction_->setEnabled(gameLoaded_);
   memoryWriteButton_->setEnabled(gameLoaded_ && paused);
   statePage_->setEnabled(gameLoaded_);
   analysisPage_->setEnabled(gameLoaded_);
+  traceApplyButton_->setEnabled(gameLoaded_);
+  traceClearButton_->setEnabled(gameLoaded_);
+  traceExportButton_->setEnabled(!traceEntries_.empty());
   if (snapshot_) {
     updateCpuViews();
     updateVdpViews();
@@ -824,6 +921,7 @@ void DebugToolsWindow::requestRefresh()
   if (submit(std::move(request))) {
     snapshotPending_ = true;
   }
+  requestTrace();
 }
 
 void DebugToolsWindow::presentResponse(CoreDebugResponse response)
@@ -837,6 +935,8 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
       snapshotPending_ = false;
     } else if (response.type == CoreDebugRequestType::readMemory) {
       memoryPending_ = false;
+    } else if (response.type == CoreDebugRequestType::takeTrace) {
+      tracePending_ = false;
     }
     return;
   }
@@ -863,6 +963,7 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
       }
       snapshot_ = std::move(nextSnapshot);
       updateAllViews();
+      setPaused(paused_);
       setStatus(tr("Frame %1 • %2 • edits %3")
         .arg(static_cast<qulonglong>(snapshot_->frameNumber))
         .arg(snapshot_->vdp.pal ? tr("PAL") : tr("NTSC"))
@@ -892,6 +993,41 @@ void DebugToolsWindow::presentResponse(CoreDebugResponse response)
     }
     return;
   }
+  if (response.type == CoreDebugRequestType::stepInstruction) {
+    if (response.instructionStep) {
+      const auto& step = *response.instructionStep;
+      const auto cpu = step.cpu == CoreDebugCpu::m68k ? tr("68000") : tr("Z80");
+      const auto digits = step.cpu == CoreDebugCpu::m68k ? 6 : 4;
+      setStatus(tr("%1 instruction stepped: %2 → %3 (%4 master cycles).")
+        .arg(cpu, hexadecimal(step.beforeAddress, digits),
+          hexadecimal(step.afterAddress, digits))
+        .arg(step.cycles), 4'000);
+    }
+    requestRefresh();
+    return;
+  }
+  if (response.type == CoreDebugRequestType::configureTrace) {
+    traceM68k_->setChecked(response.traceM68k);
+    traceZ80_->setChecked(response.traceZ80);
+    setStatus(response.traceM68k || response.traceZ80
+      ? tr("Instruction tracing enabled.")
+      : tr("Instruction tracing disabled."), 3'000);
+    return;
+  }
+  if (response.type == CoreDebugRequestType::takeTrace) {
+    tracePending_ = false;
+    droppedTraceEntries_ += response.droppedTraceEntries;
+    traceEntries_.insert(traceEntries_.end(), response.traceEntries.begin(),
+      response.traceEntries.end());
+    if (traceEntries_.size() > maximumCoreDebugTraceEntries) {
+      const auto removed = traceEntries_.size() - maximumCoreDebugTraceEntries;
+      traceEntries_.erase(traceEntries_.begin(),
+        traceEntries_.begin() + static_cast<std::ptrdiff_t>(removed));
+      droppedTraceEntries_ += removed;
+    }
+    updateTraceTable();
+    return;
+  }
   setStatus(tr("Debug edit applied."), 2'000);
   requestRefresh();
   requestMemory();
@@ -905,6 +1041,7 @@ void DebugToolsWindow::showRequestError(
   }
   snapshotPending_ = false;
   memoryPending_ = false;
+  tracePending_ = false;
   setStatus(tr("Debug request failed: %1").arg(QString::fromStdString(detail)),
     6'000);
 }
@@ -912,6 +1049,137 @@ void DebugToolsWindow::showRequestError(
 std::shared_ptr<const CoreDebugSnapshot> DebugToolsWindow::snapshot() const
 {
   return snapshot_;
+}
+
+bool DebugToolsWindow::loadSymbolsFromFile(const std::filesystem::path& path)
+{
+  std::string error;
+  if (!symbols_.loadFile(path, error)) {
+    setStatus(tr("Symbol import failed: %1").arg(QString::fromStdString(error)),
+      6'000);
+    return false;
+  }
+  updateTraceTable();
+  setStatus(tr("Loaded %1 symbols from %2.")
+    .arg(static_cast<qulonglong>(symbols_.symbols().size()))
+    .arg(displayPath(path)), 4'000);
+  return true;
+}
+
+bool DebugToolsWindow::exportTraceToFile(const std::filesystem::path& path)
+{
+  if (traceEntries_.empty()) {
+    setStatus(tr("There are no trace entries to export."), 4'000);
+    return false;
+  }
+  const auto payload = debugTraceJson(
+    traceEntries_, symbols_, droppedTraceEntries_);
+  QSaveFile file{displayPath(path)};
+  if (!file.open(QIODevice::WriteOnly) ||
+      file.write(payload.data(), static_cast<qint64>(payload.size())) !=
+        static_cast<qint64>(payload.size()) ||
+      !file.commit()) {
+    file.cancelWriting();
+    setStatus(tr("The trace export could not be written atomically."), 6'000);
+    return false;
+  }
+  setStatus(tr("Trace exported to %1.").arg(displayPath(path)), 4'000);
+  return true;
+}
+
+void DebugToolsWindow::stepInstruction(CoreDebugCpu cpu)
+{
+  if (!paused_) {
+    setStatus(tr("Pause emulation before stepping an instruction."), 4'000);
+    return;
+  }
+  CoreDebugRequest request;
+  request.type = CoreDebugRequestType::stepInstruction;
+  request.cpu = cpu;
+  static_cast<void>(submit(std::move(request)));
+}
+
+void DebugToolsWindow::configureTrace(bool clear)
+{
+  CoreDebugRequest request;
+  request.type = CoreDebugRequestType::configureTrace;
+  request.traceM68k = traceM68k_->isChecked();
+  request.traceZ80 = traceZ80_->isChecked();
+  request.clearTrace = clear;
+  if (submit(std::move(request)) && clear) {
+    traceEntries_.clear();
+    droppedTraceEntries_ = 0U;
+    tracePending_ = false;
+    updateTraceTable();
+  }
+}
+
+void DebugToolsWindow::requestTrace()
+{
+  if (!gameLoaded_ || tracePending_ ||
+      (!traceM68k_->isChecked() && !traceZ80_->isChecked())) {
+    return;
+  }
+  CoreDebugRequest request;
+  request.type = CoreDebugRequestType::takeTrace;
+  if (submit(std::move(request))) {
+    tracePending_ = true;
+  }
+}
+
+void DebugToolsWindow::updateTraceTable()
+{
+  if (!traceTable_) {
+    return;
+  }
+  constexpr std::size_t maximumDisplayedEntries = 1024U;
+  const auto first = traceEntries_.size() > maximumDisplayedEntries
+    ? traceEntries_.size() - maximumDisplayedEntries : 0U;
+  traceTable_->setRowCount(static_cast<int>(traceEntries_.size() - first));
+  for (std::size_t index = first; index < traceEntries_.size(); ++index) {
+    const auto& entry = traceEntries_[index];
+    const int row = static_cast<int>(index - first);
+    const int digits = entry.cpu == CoreDebugCpu::m68k ? 6 : 4;
+    itemAt(*traceTable_, row, 0)->setText(
+      QString::number(static_cast<qulonglong>(entry.sequence)));
+    itemAt(*traceTable_, row, 1)->setText(
+      entry.cpu == CoreDebugCpu::m68k ? tr("68000") : tr("Z80"));
+    itemAt(*traceTable_, row, 2)->setText(hexadecimal(entry.address, digits));
+    const auto* symbol = symbols_.find(entry.cpu, entry.address);
+    itemAt(*traceTable_, row, 3)->setText(symbol
+      ? QString::fromStdString(symbol->name) : QString{});
+    itemAt(*traceTable_, row, 4)->setText(QString::number(entry.cycles));
+    for (int column = 0; column < traceTable_->columnCount(); ++column) {
+      itemAt(*traceTable_, row, column)->setFlags(
+        Qt::ItemIsEnabled | Qt::ItemIsSelectable);
+    }
+  }
+  traceStatus_->setText(tr("%1 retained entries • %2 dropped • %3 symbols")
+    .arg(static_cast<qulonglong>(traceEntries_.size()))
+    .arg(static_cast<qulonglong>(droppedTraceEntries_))
+    .arg(static_cast<qulonglong>(symbols_.symbols().size())));
+  if (traceExportButton_) {
+    traceExportButton_->setEnabled(!traceEntries_.empty());
+  }
+}
+
+void DebugToolsWindow::chooseSymbolFile()
+{
+  const auto selected = QFileDialog::getOpenFileName(this, tr("Load Symbols"),
+    {}, tr("Debugger symbols (*.sym *.map *.txt);;All files (*)"));
+  if (!selected.isEmpty()) {
+    static_cast<void>(loadSymbolsFromFile(filesystemPath(selected)));
+  }
+}
+
+void DebugToolsWindow::chooseTraceExportFile()
+{
+  const auto selected = QFileDialog::getSaveFileName(this,
+    tr("Export Execution Trace"), QStringLiteral("genplusgx-trace.json"),
+    tr("JSON files (*.json)"));
+  if (!selected.isEmpty()) {
+    static_cast<void>(exportTraceToFile(filesystemPath(selected)));
+  }
 }
 
 bool DebugToolsWindow::submit(CoreDebugRequest request)
@@ -934,6 +1202,14 @@ void DebugToolsWindow::showEvent(QShowEvent* event)
 void DebugToolsWindow::hideEvent(QHideEvent* event)
 {
   refreshTimer_->stop();
+  if (gameLoaded_ && (traceM68k_->isChecked() || traceZ80_->isChecked())) {
+    traceM68k_->setChecked(false);
+    traceZ80_->setChecked(false);
+    CoreDebugRequest request;
+    request.type = CoreDebugRequestType::configureTrace;
+    request.clearTrace = true;
+    static_cast<void>(submit(std::move(request)));
+  }
   QMainWindow::hideEvent(event);
 }
 

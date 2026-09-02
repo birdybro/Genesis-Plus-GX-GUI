@@ -1,11 +1,66 @@
 #include "desktop_core_debug.h"
 
 #include "shared.h"
+#include "cpuhook.h"
 
 #include <string.h>
 
 extern uint8 genplusgx_debug_fm_registers[2][0x100];
 extern const int *genplusgx_debug_psg_registers(void);
+
+static genplusgx_debug_trace_entry trace_entries[
+  GENPLUSGX_DEBUG_TRACE_CAPACITY];
+static size_t trace_head;
+static size_t trace_count;
+static uint64_t trace_sequence;
+static uint64_t trace_dropped;
+static unsigned int trace_cpu_mask;
+
+static void trace_hook(
+  hook_type_t type,
+  int width,
+  unsigned int address,
+  unsigned int value)
+{
+  genplusgx_debug_trace_entry entry;
+  size_t index;
+  unsigned int cpu;
+  (void)width;
+  (void)value;
+  if (type == HOOK_M68K_E)
+  {
+    cpu = GENPLUSGX_DEBUG_CPU_M68K;
+    entry.cycles = m68k.cycles;
+  }
+  else if (type == HOOK_Z80_E)
+  {
+    cpu = GENPLUSGX_DEBUG_CPU_Z80;
+    entry.cycles = Z80.cycles;
+  }
+  else
+  {
+    return;
+  }
+  if ((trace_cpu_mask & (1U << cpu)) == 0U)
+  {
+    return;
+  }
+  entry.sequence = ++trace_sequence;
+  entry.address = address;
+  entry.cpu = (uint8_t)cpu;
+  if (trace_count < GENPLUSGX_DEBUG_TRACE_CAPACITY)
+  {
+    index = (trace_head + trace_count) % GENPLUSGX_DEBUG_TRACE_CAPACITY;
+    ++trace_count;
+  }
+  else
+  {
+    index = trace_head;
+    trace_head = (trace_head + 1U) % GENPLUSGX_DEBUG_TRACE_CAPACITY;
+    ++trace_dropped;
+  }
+  trace_entries[index] = entry;
+}
 
 static uint8_t genesis_hardware(void)
 {
@@ -320,4 +375,99 @@ int genplusgx_debug_set_vdp_register(unsigned int index, uint8_t value)
   }
   reg[index] = value;
   return 1;
+}
+
+int genplusgx_debug_step_instruction(
+  unsigned int cpu,
+  genplusgx_debug_step_result *output)
+{
+  uint32_t before_cycles;
+  uint32_t after_cycles;
+  if (output == NULL)
+  {
+    return 0;
+  }
+  memset(output, 0, sizeof(*output));
+  output->cpu = (uint8_t)cpu;
+  if (cpu == GENPLUSGX_DEBUG_CPU_M68K)
+  {
+    if (!genesis_hardware())
+    {
+      return 0;
+    }
+    output->before_address = m68k_get_reg(M68K_REG_PC);
+    before_cycles = m68k.cycles;
+    m68k_run(before_cycles + 1U);
+    after_cycles = m68k.cycles;
+    output->after_address = m68k_get_reg(M68K_REG_PC);
+  }
+  else if (cpu == GENPLUSGX_DEBUG_CPU_Z80)
+  {
+    if (genesis_hardware() && (zstate != 1U))
+    {
+      return 0;
+    }
+    output->before_address = Z80.pc.w.l;
+    before_cycles = Z80.cycles;
+    z80_run(before_cycles + 1U);
+    after_cycles = Z80.cycles;
+    output->after_address = Z80.pc.w.l;
+  }
+  else
+  {
+    return 0;
+  }
+  output->cycles = after_cycles - before_cycles;
+  return 1;
+}
+
+int genplusgx_debug_configure_trace(unsigned int cpu_mask, int clear)
+{
+  if ((cpu_mask & ~GENPLUSGX_DEBUG_TRACE_ALL) != 0U)
+  {
+    return 0;
+  }
+  if (clear)
+  {
+    trace_head = 0U;
+    trace_count = 0U;
+    trace_dropped = 0U;
+  }
+  trace_cpu_mask = cpu_mask;
+  set_cpu_hook(cpu_mask != 0U ? trace_hook : NULL);
+  return 1;
+}
+
+size_t genplusgx_debug_take_trace(
+  genplusgx_debug_trace_entry *output,
+  size_t capacity,
+  uint64_t *dropped)
+{
+  size_t index;
+  size_t copied;
+  if (((capacity != 0U) && (output == NULL)) || (dropped == NULL))
+  {
+    return 0U;
+  }
+  copied = trace_count < capacity ? trace_count : capacity;
+  for (index = 0U; index < copied; ++index)
+  {
+    output[index] = trace_entries[
+      (trace_head + index) % GENPLUSGX_DEBUG_TRACE_CAPACITY];
+  }
+  trace_head = (trace_head + copied) % GENPLUSGX_DEBUG_TRACE_CAPACITY;
+  trace_count -= copied;
+  *dropped = trace_dropped;
+  trace_dropped = 0U;
+  return copied;
+}
+
+void genplusgx_debug_reset_trace(void)
+{
+  trace_cpu_mask = 0U;
+  trace_head = 0U;
+  trace_count = 0U;
+  trace_sequence = 0U;
+  trace_dropped = 0U;
+  set_cpu_hook(NULL);
 }

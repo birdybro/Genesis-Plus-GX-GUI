@@ -290,7 +290,7 @@ void m68k_run(unsigned int cycles)
     /* Set the address space for reads */
     m68ki_use_data_space() /* auto-disable (see m68kcpu.h) */
 
-#ifdef HOOK_CPU
+#if defined(HOOK_CPU) || defined(HOOK_CPU_EXECUTE)
     /* Trigger execution hook */
     if (UNLIKELY(cpu_hook))
       cpu_hook(HOOK_M68K_E, 0, REG_PC, 0);

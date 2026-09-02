@@ -80,7 +80,7 @@ typedef enum {
 
 /* CPU hook is called on read, write, and execute.
  */
-void (*cpu_hook)(hook_type_t type, int width, unsigned int address, unsigned int value);
+extern void (*cpu_hook)(hook_type_t type, int width, unsigned int address, unsigned int value);
 
 /* Use set_cpu_hook() to assign a callback that can process the data provided
  * by cpu_hook().

@@ -7,6 +7,7 @@
 
 #include <cstdint>
 #include <functional>
+#include <filesystem>
 #include <memory>
 #include <string>
 
@@ -65,6 +66,8 @@ public:
   void presentResponse(CoreDebugResponse response);
   void showRequestError(const std::string& detail, std::uint64_t clientToken);
   [[nodiscard]] std::shared_ptr<const CoreDebugSnapshot> snapshot() const;
+  [[nodiscard]] bool loadSymbolsFromFile(const std::filesystem::path& path);
+  [[nodiscard]] bool exportTraceToFile(const std::filesystem::path& path);
   void requestRefresh();
 
 protected:
@@ -103,6 +106,12 @@ private:
   void removeFrameBreakpoint();
   void updateBreakpointTable();
   [[nodiscard]] bool submitFrameBreakpoints();
+  void stepInstruction(CoreDebugCpu cpu);
+  void configureTrace(bool clear);
+  void requestTrace();
+  void updateTraceTable();
+  void chooseSymbolFile();
+  void chooseTraceExportFile();
   void applyM68kEdit(int row, int column);
   void applyZ80Edit(int row, int column);
   void applyVdpEdit(int row, int column);
@@ -118,6 +127,8 @@ private:
   QAction* pauseAction_{nullptr};
   QAction* resumeAction_{nullptr};
   QAction* frameAdvanceAction_{nullptr};
+  QAction* stepM68kAction_{nullptr};
+  QAction* stepZ80Action_{nullptr};
   QAction* hardResetAction_{nullptr};
   QAction* softResetAction_{nullptr};
   QAction* refreshAction_{nullptr};
@@ -156,18 +167,29 @@ private:
   QComboBox* breakpointCpu_{nullptr};
   QSpinBox* breakpointAddress_{nullptr};
   QTableWidget* breakpointTable_{nullptr};
+  QCheckBox* traceM68k_{nullptr};
+  QCheckBox* traceZ80_{nullptr};
+  QPushButton* traceApplyButton_{nullptr};
+  QPushButton* traceClearButton_{nullptr};
+  QPushButton* traceExportButton_{nullptr};
+  QLabel* traceStatus_{nullptr};
+  QTableWidget* traceTable_{nullptr};
   QComboBox* stateSlot_{nullptr};
   QWidget* statePage_{nullptr};
   bool gameLoaded_{false};
   bool paused_{false};
   bool snapshotPending_{false};
   bool memoryPending_{false};
+  bool tracePending_{false};
   bool updating_{false};
   DebugRamSearch ramSearch_;
   CoreDebugMemoryRegion ramSearchMemoryRegion_{CoreDebugMemoryRegion::m68kRam};
   DebugValueFormat ramSearchFormat_{DebugValueFormat::unsignedInteger};
   std::vector<DebugMemoryWatch> watches_;
   std::vector<CoreDebugBreakpoint> frameBreakpoints_;
+  std::vector<CoreDebugTraceEntry> traceEntries_;
+  std::uint64_t droppedTraceEntries_{0U};
+  DebugSymbolTable symbols_;
 };
 
 } // namespace genplusgx::ui

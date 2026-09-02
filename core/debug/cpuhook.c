@@ -38,7 +38,7 @@
  *
  ****************************************************************************************/
 
-#ifdef HOOK_CPU
+#if defined(HOOK_CPU) || defined(HOOK_CPU_EXECUTE)
 
 #include <stdio.h>
 #include "cpuhook.h"
@@ -50,4 +50,4 @@ void set_cpu_hook(void(*hook)(hook_type_t type, int width, unsigned int address,
 	cpu_hook = hook;
 }
 
-#endif /* HOOK_CPU */
+#endif /* HOOK_CPU || HOOK_CPU_EXECUTE */

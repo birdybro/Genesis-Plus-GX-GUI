@@ -11,6 +11,7 @@ set(
   ${GENPLUSGX_CORE_ROOT}/memz80.c
   ${GENPLUSGX_CORE_ROOT}/state.c
   ${GENPLUSGX_CORE_ROOT}/system.c
+  ${GENPLUSGX_CORE_ROOT}/debug/cpuhook.c
   ${GENPLUSGX_CORE_ROOT}/vdp_ctrl.c
   ${GENPLUSGX_CORE_ROOT}/vdp_render.c
   ${GENPLUSGX_CORE_ROOT}/z80/z80.c
@@ -95,6 +96,7 @@ target_include_directories(
   PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/c_api
     ${GENPLUSGX_CORE_ROOT}
+    ${GENPLUSGX_CORE_ROOT}/debug
     ${GENPLUSGX_CORE_ROOT}/z80
     ${GENPLUSGX_CORE_ROOT}/m68k
     ${GENPLUSGX_CORE_ROOT}/input_hw
@@ -114,6 +116,8 @@ target_include_directories(
   genplusgx_core
   PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/c_api>
+  PRIVATE
+    ${GENPLUSGX_CORE_ROOT}/debug
 )
 target_include_directories(
   genplusgx_core
@@ -139,6 +143,8 @@ target_compile_definitions(
     HAVE_OPLL_CORE
     ENABLE_SUB_68K_ADDRESS_ERROR_EXCEPTIONS
 )
+target_compile_definitions(genplusgx_core PRIVATE HOOK_CPU_EXECUTE)
+target_compile_definitions(genplusgx_core_host PRIVATE HOOK_CPU_EXECUTE)
 
 include(TestBigEndian)
 test_big_endian(GENPLUSGX_BIG_ENDIAN)
@@ -220,14 +226,13 @@ if(MSVC)
   target_compile_options(genplusgx_core_host PRIVATE /wd4324)
 endif()
 
-if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+if(CMAKE_C_COMPILER_ID MATCHES "Clang")
   # Keep inherited core/vendor diagnostics separate from the frontend warning gate.
-  # -fno-common also prevents Apple's linker from inferring oversized alignment for
-  # large tentative core globals on arm64.
+  # These diagnostics come from the bundled Tremor and compression sources on every
+  # Clang host; keep the exceptions target-local rather than weakening frontend code.
   target_compile_options(
     genplusgx_core
     PRIVATE
-      $<$<COMPILE_LANGUAGE:C>:-fno-common>
       $<$<COMPILE_LANGUAGE:C>:-Wno-absolute-value>
       $<$<COMPILE_LANGUAGE:C>:-Wno-typedef-redefinition>
   )
@@ -238,6 +243,14 @@ if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
       PRIVATE $<$<COMPILE_LANGUAGE:C>:-Wno-typedef-redefinition>
     )
   endif()
+endif()
+
+if(APPLE AND CMAKE_C_COMPILER_ID MATCHES "Clang")
+  # Prevent Apple's linker from inferring oversized alignment for large tentative
+  # core globals on arm64.
+  target_compile_options(
+    genplusgx_core PRIVATE $<$<COMPILE_LANGUAGE:C>:-fno-common>
+  )
 endif()
 
 if(UNIX)

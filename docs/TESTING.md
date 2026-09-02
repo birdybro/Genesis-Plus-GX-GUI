@@ -134,7 +134,13 @@ Genesis and Master System work RAM, discovers them through the production debug
 snapshot and search model, converts them to Action Replay and Fusion RAM codes, applies
 each on the core owner, and verifies the patched value after a frame. `core.debug_tools`
 also requires request tokens to survive adapter, queue, and asynchronous breakpoint-hit
-paths.
+paths. It additionally executes exactly one real 68000 and Z80 instruction while
+paused, rejects inactive/running steps, records both execute-hook identities, fills the
+fixed 4,096-record ring, and verifies exact overwrite accounting.
+`unit.debug_analysis` validates the bounded atomic symbol grammar and versioned JSON
+trace export. The two debugger GUI tests drive the stable step/trace/symbol/export
+controls and collect a live worker trace; closing the workspace must disable and clear
+the core hook.
 
 `gui.libretro_shader_render` intentionally uses a real OpenGL context. Linux CI installs
 Xvfb and runs the test through XCB/GLX with `GENPLUSGX_REQUIRE_OPENGL_SHADER_TEST=1`, so

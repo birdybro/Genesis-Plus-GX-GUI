@@ -52,7 +52,7 @@
 
 #include <setjmp.h>
 #include "macros.h"
-#ifdef HOOK_CPU
+#if defined(HOOK_CPU) || defined(HOOK_CPU_EXECUTE)
 #include "cpuhook.h"
 #endif
 

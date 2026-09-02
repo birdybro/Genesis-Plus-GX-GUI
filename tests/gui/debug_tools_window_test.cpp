@@ -3,7 +3,9 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
+#include <QFile>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -13,6 +15,7 @@
 #include <QTabWidget>
 #include <QTableWidget>
 #include <QTest>
+#include <QTemporaryDir>
 
 #include <memory>
 #include <optional>
@@ -179,10 +182,14 @@ void DebugToolsWindowTest::workspacePresentsEveryLiveInspectionSurface()
   auto* analysisTabs = window.findChild<QTabWidget*>(
     QStringLiteral("debugAnalysisTabs"));
   QVERIFY(analysisTabs != nullptr);
-  QCOMPARE(analysisTabs->count(), 3);
+  QCOMPARE(analysisTabs->count(), 4);
   QCOMPARE(analysisTabs->tabText(0), QStringLiteral("RAM Search"));
   QCOMPARE(analysisTabs->tabText(1), QStringLiteral("RAM Watch"));
   QCOMPARE(analysisTabs->tabText(2), QStringLiteral("Breakpoints"));
+  QCOMPARE(analysisTabs->tabText(3), QStringLiteral("Trace & Symbols"));
+  QVERIFY(window.findChild<QTableWidget*>(QStringLiteral("debugTraceTable")));
+  QVERIFY(window.findChild<QPushButton*>(
+    QStringLiteral("debugTraceApplyButton")));
 
   window.findChild<QLineEdit*>(QStringLiteral("debugRamSearchValueEdit"))
     ->setText(QStringLiteral("0x13"));
@@ -257,6 +264,56 @@ void DebugToolsWindowTest::pausedEditsControlsAndStateActionsUseTypedCallbacks()
   QCOMPARE(requests.back().bytes,
     std::vector<std::uint8_t>({0x12U, 0x34U, 0xABU, 0xCDU}));
 
+  window.findChild<QAction*>(QStringLiteral("debugStepM68kAction"))->trigger();
+  QCOMPARE(requests.back().type,
+    genplusgx::CoreDebugRequestType::stepInstruction);
+  QCOMPARE(requests.back().cpu, genplusgx::CoreDebugCpu::m68k);
+
+  window.findChild<QCheckBox*>(QStringLiteral("debugTraceM68kCheck"))
+    ->setChecked(true);
+  QTest::mouseClick(window.findChild<QPushButton*>(
+    QStringLiteral("debugTraceApplyButton")), Qt::LeftButton);
+  QCOMPARE(requests.back().type,
+    genplusgx::CoreDebugRequestType::configureTrace);
+  QVERIFY(requests.back().traceM68k);
+  QVERIFY(!requests.back().traceZ80);
+
+  genplusgx::CoreDebugResponse trace;
+  trace.type = genplusgx::CoreDebugRequestType::takeTrace;
+  trace.traceEntries = {
+    {7U, genplusgx::CoreDebugCpu::m68k, 0x200U, 28U},
+    {8U, genplusgx::CoreDebugCpu::z80, 0x38U, 13U},
+  };
+  trace.droppedTraceEntries = 3U;
+  window.presentResponse(std::move(trace));
+  auto* traceTable = window.findChild<QTableWidget*>(
+    QStringLiteral("debugTraceTable"));
+  QCOMPARE(traceTable->rowCount(), 2);
+  QCOMPARE(traceTable->item(0, 2)->text(), QStringLiteral("0X000200"));
+  QVERIFY(window.findChild<QLabel*>(QStringLiteral("debugTraceStatusLabel"))
+    ->text().contains(QStringLiteral("3 dropped")));
+
+  QTemporaryDir directory;
+  QVERIFY(directory.isValid());
+  const auto symbolPath = directory.filePath(QStringLiteral("fixture.sym"));
+  QFile symbolFile{symbolPath};
+  QVERIFY(symbolFile.open(QIODevice::WriteOnly));
+  QVERIFY(symbolFile.write(
+    "m68k 000200 ResetEntry\nz80 0038 IrqVector\n") > 0);
+  symbolFile.close();
+  QVERIFY(window.loadSymbolsFromFile(
+    std::filesystem::path{symbolPath.toStdString()}));
+  QCOMPARE(traceTable->item(0, 3)->text(), QStringLiteral("ResetEntry"));
+  QCOMPARE(traceTable->item(1, 3)->text(), QStringLiteral("IrqVector"));
+  const auto exportPath = directory.filePath(QStringLiteral("trace.json"));
+  QVERIFY(window.exportTraceToFile(
+    std::filesystem::path{exportPath.toStdString()}));
+  QFile exported{exportPath};
+  QVERIFY(exported.open(QIODevice::ReadOnly));
+  const auto exportedJson = exported.readAll();
+  QVERIFY(exportedJson.contains("\"schema\": 1"));
+  QVERIFY(exportedJson.contains("\"symbol\": \"ResetEntry\""));
+
   auto* m68k = window.findChild<QTableWidget*>(
     QStringLiteral("debugM68kRegisterTable"));
   m68k->item(0, 1)->setText(QStringLiteral("DEADBEEF"));
@@ -285,6 +342,14 @@ void DebugToolsWindowTest::pausedEditsControlsAndStateActionsUseTypedCallbacks()
   window.setPaused(false);
   QVERIFY(!write->isEnabled());
   QVERIFY((m68k->item(0, 1)->flags() & Qt::ItemIsEditable) == 0);
+  window.show();
+  QApplication::processEvents();
+  window.hide();
+  QCOMPARE(requests.back().type,
+    genplusgx::CoreDebugRequestType::configureTrace);
+  QVERIFY(!requests.back().traceM68k);
+  QVERIFY(!requests.back().traceZ80);
+  QVERIFY(requests.back().clearTrace);
 }
 
 } // namespace

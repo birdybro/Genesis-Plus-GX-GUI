@@ -19,6 +19,21 @@ enum
   GENPLUSGX_DEBUG_VDP_REGISTERS = 6,
 };
 
+enum
+{
+  GENPLUSGX_DEBUG_CPU_M68K = 0,
+  GENPLUSGX_DEBUG_CPU_Z80 = 1,
+};
+
+enum
+{
+  GENPLUSGX_DEBUG_TRACE_M68K = 1U << GENPLUSGX_DEBUG_CPU_M68K,
+  GENPLUSGX_DEBUG_TRACE_Z80 = 1U << GENPLUSGX_DEBUG_CPU_Z80,
+  GENPLUSGX_DEBUG_TRACE_ALL = GENPLUSGX_DEBUG_TRACE_M68K |
+    GENPLUSGX_DEBUG_TRACE_Z80,
+  GENPLUSGX_DEBUG_TRACE_CAPACITY = 4096,
+};
+
 typedef struct
 {
   uint32_t data[8];
@@ -75,6 +90,22 @@ typedef struct
   uint8_t m68k_active;
 } genplusgx_debug_program_counters;
 
+typedef struct
+{
+  uint64_t sequence;
+  uint32_t address;
+  uint32_t cycles;
+  uint8_t cpu;
+} genplusgx_debug_trace_entry;
+
+typedef struct
+{
+  uint32_t before_address;
+  uint32_t after_address;
+  uint32_t cycles;
+  uint8_t cpu;
+} genplusgx_debug_step_result;
+
 int genplusgx_debug_capture(genplusgx_debug_snapshot *output);
 int genplusgx_debug_get_program_counters(
   genplusgx_debug_program_counters *output);
@@ -94,6 +125,15 @@ int genplusgx_debug_set_m68k_registers(
 int genplusgx_debug_set_z80_registers(
   const genplusgx_debug_z80_registers *registers);
 int genplusgx_debug_set_vdp_register(unsigned int index, uint8_t value);
+int genplusgx_debug_step_instruction(
+  unsigned int cpu,
+  genplusgx_debug_step_result *output);
+int genplusgx_debug_configure_trace(unsigned int cpu_mask, int clear);
+size_t genplusgx_debug_take_trace(
+  genplusgx_debug_trace_entry *output,
+  size_t capacity,
+  uint64_t *dropped);
+void genplusgx_debug_reset_trace(void);
 
 #ifdef __cplusplus
 }

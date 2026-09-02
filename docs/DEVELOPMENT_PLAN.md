@@ -103,7 +103,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
-| 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
+| 92 Advanced debugger | IN PROGRESS | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
@@ -4271,6 +4271,59 @@ Qt 6.8 baseline correction `aba5546001798cd25d05befdc065d669c82b2d5c`;
 Apple static-link correction `dd1bd30797d04542c7435d2a37fa5f2a74d3602c`;
 canonical macOS package correction and exact hosted baseline
 `58e624e573e9d7e9d8768edb04e4f77617f07602`
+
+## Milestone 92 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Extend the hidden debugger with real paused CPU instruction stepping,
+bounded opt-in execution tracing, local symbols, and a safe file-only external-analysis
+boundary without exposing Genesis Plus GX globals or adding a network attack surface.
+
+**Files changed:**
+
+- narrow 68000/Z80 execute-hook activation and fixed 4,096-entry core trace ring
+- typed C/C++ debug requests for CPU stepping, trace configuration, and trace draining
+- atomic bounded symbol parsing and versioned trace JSON serialization
+- hidden debugger toolbar and Trace & Symbols GUI with stable automation identifiers
+- generated-ROM core/worker, unit parser/export, headless GUI, live GUI, localization,
+  architecture, user, testing, changelog, and release-report coverage
+
+**Tests added:** Existing `core.debug_tools` now steps both real CPU engines, rejects
+inactive/running steps, verifies hook CPU/address identity, fills and overflows the
+bounded ring, and checks exact loss instrumentation. `unit.debug_analysis` covers the
+closed symbol grammar, duplicate normalization, CPU-specific ranges, atomic rejection,
+size bounds, lookup, a fixed-seed 512-case mutation corpus, and deterministic schema-1
+JSON. `gui.debug_tools` drives every new control and validates symbol annotation plus
+atomic export; `gui.debug_tools_live` collects real 68000 trace data through the actual
+worker.
+
+**Gate evidence:** The complete warning-as-error Debug and optimized Release graphs
+pass 109/109. Leak-detecting ASan/UBSan passes 109/109 with no finding. A fresh
+warning-as-error Clang 22 graph passes 109/109 with a zero-diagnostic build log; the
+target-local inherited Tremor/libchdr exceptions previously used on Apple now apply to
+every Clang host without weakening frontend warnings. CHD-disabled passes 109/109 and
+shader-disabled passes all 107 applicable tests. The strict Unix libretro target builds,
+links as x86-64 ELF, has no warning/error diagnostic, and cleans. A fresh optimized
+Linux stage passes the production self-contained-package verifier, offscreen and real
+XCB event-loop startup/shutdown, TGZ creation, checksum verification, extracted-layout
+verification, dependency resolution, and the prohibited-ROM/firmware/save scan. The
+required Xvfb package smoke remains assigned to hosted Ubuntu because this local host
+does not provide `xvfb-run`. The previously supplied Phantasy Star IV NAS directory was
+not mounted for this gate, so the optional copyrighted-ROM acceptance runner could not
+be repeated; all required hook, option, and lifecycle coverage uses the generated legal
+fixtures. Exact pushed hosted gates and their complete log/artifact audit remain pending;
+this milestone cannot be marked complete or permit Milestone 93 to begin until those
+results pass.
+
+**Acceptance criteria:** Only the selected CPU executes during a paused instruction
+step; running mutation is rejected by the worker; trace storage and UI history cannot
+grow without bound; disabled tracing installs no callback; game replacement clears the
+hook; malformed symbol files preserve the prior table; external integration is an
+atomic read-only JSON file rather than a listening service; hidden-default behavior and
+all prior emulator workflows remain unchanged.
+
+**Commit SHA:** pending
 
 ## Milestone 83 detail
 

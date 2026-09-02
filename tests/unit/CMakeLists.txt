@@ -122,7 +122,7 @@ target_link_libraries(
 add_test(NAME unit.debug_analysis COMMAND genplusgx_debug_analysis_test)
 set_tests_properties(
   unit.debug_analysis
-  PROPERTIES LABELS "unit;debug;parser" TIMEOUT 30
+  PROPERTIES LABELS "unit;debug;parser;fuzz" TIMEOUT 30
 )
 
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)

@@ -98,12 +98,55 @@ int main()
   readRom.region = genplusgx::CoreDebugMemoryRegion::rom;
   readRom.offset = 0U;
   readRom.size = 8U;
+  genplusgx::CoreDebugRequest traceConfiguration;
+  traceConfiguration.type = genplusgx::CoreDebugRequestType::configureTrace;
+  traceConfiguration.traceM68k = true;
+  traceConfiguration.clearTrace = true;
+  genplusgx::CoreDebugRequest stepM68k;
+  stepM68k.type = genplusgx::CoreDebugRequestType::stepInstruction;
+  stepM68k.cpu = genplusgx::CoreDebugCpu::m68k;
+  genplusgx::CoreDebugRequest takeTrace;
+  takeTrace.type = genplusgx::CoreDebugRequestType::takeTrace;
   if (!check(adapter.debugRequest(readRom, response),
         "Logical ROM read failed") ||
       !check(response.bytes == std::vector<std::uint8_t>(
           {0x00U, 0xFFU, 0xFFU, 0x00U, 0x00U, 0x00U, 0x02U, 0x00U}),
         "ROM bytes were not exposed in emulated big-endian order") ||
+      !check(adapter.debugRequest(traceConfiguration, response) &&
+          response.traceM68k && !response.traceZ80,
+        "68000 trace configuration failed") ||
+      !check(adapter.debugRequest(stepM68k, response) &&
+          response.instructionStep &&
+          response.instructionStep->cpu == genplusgx::CoreDebugCpu::m68k &&
+          response.instructionStep->beforeAddress == 0x200U &&
+          response.instructionStep->afterAddress == 0x206U &&
+          response.instructionStep->cycles > 0U,
+        "The real 68000 engine did not execute exactly the first instruction") ||
+      !check(adapter.debugRequest(takeTrace, response) &&
+          response.traceEntries.size() == 1U &&
+          response.traceEntries.front().cpu == genplusgx::CoreDebugCpu::m68k &&
+          response.traceEntries.front().address == 0x200U &&
+          response.droppedTraceEntries == 0U,
+        "The 68000 execution hook did not produce a bounded trace record") ||
       !check(adapter.runFrame(true), "Synthetic frame execution failed")) {
+    return 2;
+  }
+
+  if (!check(adapter.debugRequest(takeTrace, response) &&
+          !response.traceEntries.empty() &&
+          response.traceEntries.size() <= genplusgx::maximumCoreDebugTraceEntries &&
+          response.traceEntries.front().sequence <
+            response.traceEntries.back().sequence,
+        "Frame execution did not produce an ordered bounded trace") ||
+      !check(adapter.runFrame(true) && adapter.runFrame(true) &&
+          adapter.runFrame(true) && adapter.runFrame(true),
+        "Trace overflow frames failed") ||
+      !check(adapter.debugRequest(takeTrace, response) &&
+          response.traceEntries.size() == genplusgx::maximumCoreDebugTraceEntries &&
+          response.droppedTraceEntries > 0U &&
+          response.traceEntries.front().sequence <
+            response.traceEntries.back().sequence,
+        "Trace overflow did not retain only the newest bounded tail")) {
     return 2;
   }
 
@@ -112,7 +155,7 @@ int main()
   if (!check(adapter.debugRequest(capture, response), "Debug snapshot failed") ||
       !check(response.snapshot != nullptr, "Snapshot response has no payload") ||
       !check(response.clientToken == capture.clientToken &&
-          response.snapshot->frameNumber == 1U &&
+          response.snapshot->frameNumber == 5U &&
           response.snapshot->romSize == 64U * 1024U &&
           response.snapshot->m68kActive,
         "Snapshot identity is incorrect") ||
@@ -204,8 +247,36 @@ int main()
   writeZ80Ram.bytes = {0x3CU};
   auto inactiveM68kRead = readZ80Ram;
   inactiveM68kRead.region = genplusgx::CoreDebugMemoryRegion::m68kRam;
+  auto z80TraceConfiguration = traceConfiguration;
+  z80TraceConfiguration.traceM68k = false;
+  z80TraceConfiguration.traceZ80 = true;
+  genplusgx::CoreDebugRequest stepZ80;
+  stepZ80.type = genplusgx::CoreDebugRequestType::stepInstruction;
+  stepZ80.cpu = genplusgx::CoreDebugCpu::z80;
   if (!check(adapter.unloadGame(), "Genesis fixture unload failed") ||
       !check(adapter.loadGame(z80Fixture.path()), "Z80 fixture load failed") ||
+      !check(adapter.debugRequest(takeTrace, response) &&
+          response.traceEntries.empty() &&
+          response.droppedTraceEntries == 0U,
+        "Game replacement did not clear and disable execution tracing") ||
+      !check(adapter.debugRequest(stepM68k, response).error ==
+          genplusgx::CoreError::invalidDebugRequest,
+        "Inactive 68000 instruction stepping was accepted") ||
+      !check(adapter.debugRequest(z80TraceConfiguration, response) &&
+          !response.traceM68k && response.traceZ80,
+        "Z80 trace configuration failed") ||
+      !check(adapter.debugRequest(stepZ80, response) &&
+          response.instructionStep &&
+          response.instructionStep->cpu == genplusgx::CoreDebugCpu::z80 &&
+          response.instructionStep->beforeAddress == 0x0000U &&
+          response.instructionStep->afterAddress == 0x0001U &&
+          response.instructionStep->cycles > 0U,
+        "The real Z80 engine did not execute exactly the first instruction") ||
+      !check(adapter.debugRequest(takeTrace, response) &&
+          response.traceEntries.size() == 1U &&
+          response.traceEntries.front().cpu == genplusgx::CoreDebugCpu::z80 &&
+          response.traceEntries.front().address == 0x0000U,
+        "The Z80 execution hook did not produce a trace record") ||
       !check(adapter.runFrame(true), "Z80 fixture execution failed") ||
       !check(adapter.debugRequest(capture, response),
         "Z80 debug snapshot failed") ||
@@ -276,15 +347,31 @@ int main()
           event.debug.snapshot != nullptr,
         "Worker did not return a paused debug snapshot") ||
       !check(submitAndWait(worker,
+          genplusgx::EmulationCommand::debug(111U, stepM68k), event) &&
+          event.succeeded() && event.debug.instructionStep &&
+          event.debug.instructionStep->beforeAddress == 0x200U &&
+          event.debug.instructionStep->afterAddress == 0x206U,
+        "Worker did not serialize paused 68000 instruction stepping") ||
+      !check(submitAndWait(worker,
           genplusgx::EmulationCommand::simple(
             genplusgx::EmulationCommandType::start, 12U), event) &&
           event.succeeded(),
         "Worker emulation start failed") ||
       !check(submitAndWait(worker,
+          genplusgx::EmulationCommand::debug(
+            121U, traceConfiguration), event) &&
+          event.succeeded() && event.debug.traceM68k,
+        "Running trace configuration was not serialized between frames") ||
+      !check(submitAndWait(worker,
           genplusgx::EmulationCommand::debug(13U, writeRam), event) &&
           !event.succeeded() &&
           event.error == genplusgx::EmulationWorkerError::invalidTransition,
         "A debug write raced running emulation") ||
+      !check(submitAndWait(worker,
+          genplusgx::EmulationCommand::debug(131U, stepM68k), event) &&
+          !event.succeeded() &&
+          event.error == genplusgx::EmulationWorkerError::invalidTransition,
+        "Instruction stepping raced running emulation") ||
       !check(submitAndWait(worker,
           genplusgx::EmulationCommand::debug(14U, capture), event) &&
           event.succeeded() && event.debug.snapshot != nullptr,

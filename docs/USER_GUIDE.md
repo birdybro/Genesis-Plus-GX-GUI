@@ -609,7 +609,9 @@ again; the choice is versioned and persists between launches.
 The workspace samples CPU, memory, VDP, sound, and logical input state between emulated
 frames. It can pause/resume, advance one whole frame, reset, inspect bounded memory,
 search and watch typed RAM values, pause on 68000/Z80 frame-boundary program counters,
-and use the normal game-identity-checked state slots. On the 8-bit consoles, the Z80
+step either real CPU while paused, collect bounded 68000/Z80 instruction traces, load
+local symbols, atomically export versioned trace JSON, and use the normal
+game-identity-checked state slots. On the 8-bit consoles, the Z80
 RAM view follows the active console work RAM. Memory or register edits require pause
 and are rejected again by the emulation worker if UI state is stale. This is a developer
 facility: editing live state can crash the emulated program, but it must not race the

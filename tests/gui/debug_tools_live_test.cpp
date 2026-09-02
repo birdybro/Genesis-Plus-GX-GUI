@@ -4,6 +4,7 @@
 
 #include <QAction>
 #include <QApplication>
+#include <QCheckBox>
 #include <QComboBox>
 #include <QPlainTextEdit>
 #include <QPushButton>
@@ -149,6 +150,15 @@ void DebugToolsLiveTest::generatedRomDrivesLiveWorkspaceAndBreakpoint()
   QCOMPARE(window.findChild<QTableWidget*>(
     QStringLiteral("debugBreakpointTable"))->rowCount(), 3);
 
+  window.findChild<QCheckBox*>(QStringLiteral("debugTraceM68kCheck"))
+    ->setChecked(true);
+  window.findChild<QPushButton*>(QStringLiteral("debugTraceApplyButton"))
+    ->click();
+  auto traceConfigurationOperation = latestDebugOperation;
+  QVERIFY(routeUntil(worker, window, [traceConfigurationOperation](const auto& event) {
+    return event.operationId == traceConfigurationOperation && event.succeeded();
+  }));
+
   window.findChild<QAction*>(QStringLiteral("debugResumeAction"))->trigger();
   QVERIFY(routeUntil(worker, window, [](const auto& event) {
     return event.type == genplusgx::EmulationEventType::debugBreakpointHit;
@@ -160,6 +170,10 @@ void DebugToolsLiveTest::generatedRomDrivesLiveWorkspaceAndBreakpoint()
     return window.snapshot() && window.snapshot()->frameNumber > 0U;
   }));
   QVERIFY(window.snapshot()->m68kRam[0] == 0x13U);
+  QVERIFY(routeUntil(worker, window, [&window](const auto&) {
+    return window.findChild<QTableWidget*>(QStringLiteral("debugTraceTable"))
+      ->rowCount() > 0;
+  }));
 
   window.close();
   QVERIFY(worker.stop());

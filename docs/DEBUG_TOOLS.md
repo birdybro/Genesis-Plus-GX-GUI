@@ -15,7 +15,9 @@ leave it disabled.
 Load a game before inspecting state. The workspace refreshes at four samples per second
 while visible. Refreshing observes the core between frames and does not pace or pause it.
 Use the toolbar to pause, resume, advance one whole frame, hard reset, soft reset, or
-request an immediate sample.
+request an immediate sample. While paused, **Step 68000** and **Step Z80** execute one
+instruction through the selected real CPU engine; the inactive 68000 is rejected on
+8-bit systems.
 
 ## Inspection pages
 
@@ -70,18 +72,49 @@ to the breakpoint page. Resume re-arms the breakpoint.
 
 These are explicitly frame-boundary breakpoints: they are useful for stable main loops,
 idle loops, and frame handlers but do not stop midway through an instruction. This
-design keeps the debugger fully outside the authoritative CPU algorithms and imposes no
-per-instruction branch or callback when developer tools are disabled. **Step Frame**
-likewise advances one complete frame; instruction-level stepping and an external IDA
-server are not claimed by this frontend.
+design keeps breakpoint decisions outside the authoritative CPU algorithms. **Step
+Frame** advances a complete synchronized video frame; the two CPU step actions instead
+advance only the selected CPU and are intended for paused code inspection.
+
+## Instruction trace, symbols, and external analysis
+
+**Analysis → Trace & Symbols** can record 68000 execution, Z80 execution, or both. The
+desktop build enables only the inherited execute-hook boundary; memory read/write hooks
+remain absent from normal builds. A null hook is the default until tracing is explicitly
+enabled. The core-side circular buffer holds 4,096 records, overwrites the oldest record
+on overflow, and reports the exact dropped count. The GUI retains at most 4,096 records
+and renders only the newest 1,024 rows, so leaving trace enabled cannot create an
+unbounded core, command, event, or widget allocation. Closing/changing a game disables
+and clears tracing.
+
+Symbol import is local and atomic. Files are limited to 1 MiB and 65,536 records using
+one of these whitespace-separated forms:
+
+```text
+m68k 000200 ResetEntry
+z80 $0038 IrqVector
+0x000250 ControllerPoll
+```
+
+An omitted CPU means 68000. Addresses are hexadecimal, names are bounded printable
+tokens, and `#` or `;` starts a comment. Any malformed record rejects the complete new
+file and leaves the prior table active. Symbols annotate exact trace addresses only;
+they never write to the game or core.
+
+**Export JSON…** writes the retained trace atomically using versioned schema 1. Each
+entry contains its monotonic sequence, CPU, hexadecimal address, master-cycle counter,
+and an exact symbol when available; the top level includes the dropped-record total.
+This file-only integration is suitable for scripts and offline analysis without opening
+a debugger socket, accepting commands from the network, or granting another process
+access to emulation memory. A GDB/IDA server is deliberately not claimed.
 
 ## Safety and threading
 
 Genesis Plus GX global state is not thread-safe. No debug widget reads it. Requests use
 the same bounded command queue as other emulator operations and execute on the sole
 emulation-owner thread between frames. Responses own immutable copied data. The window
-allows no more than one snapshot and one memory read to remain outstanding, preventing
-refresh delay from becoming queue or memory growth.
+allows no more than one snapshot, one memory read, and one trace drain to remain
+outstanding, preventing refresh delay from becoming queue or memory growth.
 
 The worker, not the checkbox state, is the authority for mutation: memory and register
 writes received while running are rejected. A write is range-checked against the
@@ -96,13 +129,18 @@ errors are shown in the workspace status bar and logged without frame-by-frame n
 
 The generated-ROM `core.debug_tools` regression verifies Genesis, SG-1000, Master
 System, and Game Gear snapshots, active CPU/RAM selection, byte order, transfer limits,
+real single-instruction execution, bounded 68000/Z80 hooks, trace overflow accounting,
 edits, rejection while running, command serialization, and a real pause-on-breakpoint
-workflow. `unit.debug_analysis` verifies typed/endian reads and RAM filter semantics.
+workflow. `unit.debug_analysis` verifies typed/endian reads, RAM filter semantics,
+atomic bounded symbol parsing, CPU-address identity, and versioned JSON output.
+It also mutates the symbol format through a fixed-seed 512-case bounded corpus and
+requires every rejected input to preserve the prior active table.
 The headless `gui.debug_tools` regression verifies default hiding, every inspection
-page, searches, watches, breakpoints, controls, and validated state routing.
+page, searches, watches, breakpoints, step/trace controls, symbol annotation, atomic
+export, and validated state routing.
 `gui.debug_tools_live` connects the actual workspace to the actual worker and proves
-both 68000 and Z80 generated programs pause at configured breakpoints and expose their
-written RAM. Run them with:
+both 68000 and Z80 generated programs pause at configured breakpoints, expose their
+written RAM, and route a live execution trace. Run them with:
 
 ```bash
 ctest --preset debug -L debug --output-on-failure

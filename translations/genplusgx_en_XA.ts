@@ -1274,18 +1274,18 @@ Arguments:
     <context>
         <name>genplusgx::ui::DebugToolsWindow</name>
         <message>
-            <location filename="../desktop/ui/src/debug_tools_window.cpp" line="+325" />
+            <location filename="../desktop/ui/src/debug_tools_window.cpp" line="+346" />
             <source>Genesis Plus GX Debug Tools</source>
             <translation>⟦Ɠëńëšïš Ƥŀüš ƓẊ Ðëƀüɠ Ŧööŀš~~~~~~⟧</translation>
         </message>
         <message>
             <location line="+21" />
-            <location line="+445" />
+            <location line="+515" />
             <source>Load a game to inspect emulator state.</source>
             <translation>⟦Ŀöåð å ɠåḿë ŧö ïńšƥëçŧ ëḿüŀåŧöŕ šŧåŧë.~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-439" />
+            <location line="-509" />
             <source>Debug controls</source>
             <translation>⟦Ðëƀüɠ çöńŧŕöŀš~~~~⟧</translation>
         </message>
@@ -1306,6 +1306,16 @@ Arguments:
         </message>
         <message>
             <location line="+2" />
+            <source>Step 68000</source>
+            <translation>⟦Šŧëƥ 68000~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Step Z80</source>
+            <translation>⟦Šŧëƥ Ž80~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
             <source>Hard Reset</source>
             <translation>⟦Ħåŕð Ŕëšëŧ~~~⟧</translation>
         </message>
@@ -1320,7 +1330,7 @@ Arguments:
             <translation>⟦Ŕëƒŕëšħ~~⟧</translation>
         </message>
         <message>
-            <location line="+26" />
+            <location line="+30" />
             <source>Register values are sampled between frames. Pause emulation before editing a value; press Enter to apply a hexadecimal edit.</source>
             <translation>⟦Ŕëɠïšŧëŕ ṽåŀüëš åŕë šåḿƥŀëð ƀëŧŵëëń ƒŕåḿëš. Ƥåüšë ëḿüŀåŧïöń ƀëƒöŕë ëðïŧïńɠ å ṽåŀüë; ƥŕëšš Ëńŧëŕ ŧö åƥƥŀÿ å ħëẋåðëçïḿåŀ ëðïŧ.~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
         </message>
@@ -1346,11 +1356,12 @@ Arguments:
         <message>
             <location line="+8" />
             <location line="+303" />
+            <location line="+48" />
             <source>CPU</source>
             <translation>⟦ÇƤÜ~⟧</translation>
         </message>
         <message>
-            <location line="-278" />
+            <location line="-326" />
             <location line="+156" />
             <source>&amp;Region:</source>
             <translation>⟦&amp;Ŕëɠïöń:~~⟧</translation>
@@ -1545,11 +1556,12 @@ Arguments:
             <location line="+8" />
             <location line="+91" />
             <location line="+57" />
+            <location line="+91" />
             <source>Address</source>
             <translation>⟦Åððŕëšš~~⟧</translation>
         </message>
         <message>
-            <location line="-148" />
+            <location line="-239" />
             <source>YM bank 0</source>
             <translation>⟦ŸḾ ƀåńҡ 0~~⟧</translation>
         </message>
@@ -1711,12 +1723,12 @@ Arguments:
         </message>
         <message>
             <location line="+7" />
-            <location line="+652" />
+            <location line="+899" />
             <source>No active search.</source>
             <translation>⟦Ńö åçŧïṽë šëåŕçħ.~~~~⟧</translation>
         </message>
         <message>
-            <location line="-648" />
+            <location line="-895" />
             <source>Current</source>
             <translation>⟦Çüŕŕëńŧ~~⟧</translation>
         </message>
@@ -1773,20 +1785,26 @@ Arguments:
         </message>
         <message>
             <location line="+9" />
-            <location line="+193" />
-            <location line="+559" />
+            <location line="+39" />
+            <location line="+226" />
+            <location line="+13" />
+            <location line="+147" />
+            <location line="+574" />
             <source>68000</source>
             <translation>⟦68000⟧</translation>
         </message>
         <message>
-            <location line="-751" />
-            <location line="+192" />
-            <location line="+559" />
+            <location line="-998" />
+            <location line="+40" />
+            <location line="+224" />
+            <location line="+13" />
+            <location line="+147" />
+            <location line="+574" />
             <source>Z80</source>
             <translation>⟦Ž80~⟧</translation>
         </message>
         <message>
-            <location line="-746" />
+            <location line="-993" />
             <source>Add Breakpoint</source>
             <translation>⟦Åðð Ɓŕëåҡƥöïńŧ~~~~⟧</translation>
         </message>
@@ -1799,6 +1817,61 @@ Arguments:
             <location line="+9" />
             <source>Breakpoints</source>
             <translation>⟦Ɓŕëåҡƥöïńŧš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Execution tracing records a bounded tail of real CPU instruction addresses. Sources change safely between frames; dropped records are counted rather than allowing memory use to grow.</source>
+            <translation>⟦Ëẋëçüŧïöń ŧŕåçïńɠ ŕëçöŕðš å ƀöüńðëð ŧåïŀ öƒ ŕëåŀ ÇƤÜ ïńšŧŕüçŧïöń åððŕëššëš. Šöüŕçëš çħåńɠë šåƒëŀÿ ƀëŧŵëëń ƒŕåḿëš; ðŕöƥƥëð ŕëçöŕðš åŕë çöüńŧëð ŕåŧħëŕ ŧħåń åŀŀöŵïńɠ ḿëḿöŕÿ üšë ŧö ɠŕöŵ.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Apply Trace Sources</source>
+            <translation>⟦Åƥƥŀÿ Ŧŕåçë Šöüŕçëš~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Clear Trace</source>
+            <translation>⟦Çŀëåŕ Ŧŕåçë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Load Symbols…</source>
+            <translation>⟦Ŀöåð Šÿḿƀöŀš…~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Clear Symbols</source>
+            <translation>⟦Çŀëåŕ Šÿḿƀöŀš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Export JSON…</source>
+            <translation>⟦Ëẋƥöŕŧ ĴŠÖŃ…~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+15" />
+            <source>Sequence</source>
+            <translation>⟦Šëǫüëńçë~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Symbol</source>
+            <translation>⟦Šÿḿƀöŀ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Cycles</source>
+            <translation>⟦Çÿçŀëš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Symbols cleared.</source>
+            <translation>⟦Šÿḿƀöŀš çŀëåŕëð.~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Trace &amp; Symbols</source>
+            <translation>⟦Ŧŕåçë &amp; Šÿḿƀöŀš~~~⟧</translation>
         </message>
         <message>
             <location line="+3" />
@@ -1836,12 +1909,12 @@ Arguments:
             <translation>⟦Šŧåŧëš~~⟧</translation>
         </message>
         <message>
-            <location line="+34" />
+            <location line="+41" />
             <source>Waiting for emulator debug state…</source>
             <translation>⟦Ŵåïŧïńɠ ƒöŕ ëḿüŀåŧöŕ ðëƀüɠ šŧåŧë…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+73" />
+            <location line="+83" />
             <source>Frame %1 • %2 • edits %3</source>
             <translation>⟦Ƒŕåḿë ~~%1 • %2 • ëðïŧš ~~%3⟧</translation>
         </message>
@@ -1876,22 +1949,92 @@ Arguments:
             <translation>⟦Ƒŕåḿë~~-boundary ƀŕëåҡƥöïńŧ ŀïšŧ üƥðåŧëð.~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+4" />
+            <location line="+9" />
+            <source>%1 instruction stepped: %2 → %3 (%4 master cycles).</source>
+            <translation>⟦%1 ïńšŧŕüçŧïöń šŧëƥƥëð: ~~~~~%2 → %3 (%4 ḿåšŧëŕ çÿçŀëš).~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+12" />
+            <source>Instruction tracing enabled.</source>
+            <translation>⟦Ïńšŧŕüçŧïöń ŧŕåçïńɠ ëńåƀŀëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Instruction tracing disabled.</source>
+            <translation>⟦Ïńšŧŕüçŧïöń ŧŕåçïńɠ ðïšåƀŀëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+17" />
             <source>Debug edit applied.</source>
             <translation>⟦Ðëƀüɠ ëðïŧ åƥƥŀïëð.~~~~⟧</translation>
         </message>
         <message>
-            <location line="+13" />
+            <location line="+14" />
             <source>Debug request failed: %1</source>
             <translation>⟦Ðëƀüɠ ŕëǫüëšŧ ƒåïŀëð: ~~~~~%1⟧</translation>
         </message>
         <message>
             <location line="+13" />
+            <source>Symbol import failed: %1</source>
+            <translation>⟦Šÿḿƀöŀ ïḿƥöŕŧ ƒåïŀëð: ~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Loaded %1 symbols from %2.</source>
+            <translation>⟦Ŀöåðëð ~~%1 šÿḿƀöŀš ƒŕöḿ ~~~%2.⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>There are no trace entries to export.</source>
+            <translation>⟦Ŧħëŕë åŕë ńö ŧŕåçë ëńŧŕïëš ŧö ëẋƥöŕŧ.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>The trace export could not be written atomically.</source>
+            <translation>⟦Ŧħë ŧŕåçë ëẋƥöŕŧ çöüŀð ńöŧ ƀë ŵŕïŧŧëń åŧöḿïçåŀŀÿ.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Trace exported to %1.</source>
+            <translation>⟦Ŧŕåçë ëẋƥöŕŧëð ŧö ~~~~%1.⟧</translation>
+        </message>
+        <message>
+            <location line="+7" />
+            <source>Pause emulation before stepping an instruction.</source>
+            <translation>⟦Ƥåüšë ëḿüŀåŧïöń ƀëƒöŕë šŧëƥƥïńɠ åń ïńšŧŕüçŧïöń.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+64" />
+            <source>%1 retained entries • %2 dropped • %3 symbols</source>
+            <translation>⟦%1 ŕëŧåïńëð ëńŧŕïëš • ~~~~%2 ðŕöƥƥëð • ~~%3 šÿḿƀöŀš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>Load Symbols</source>
+            <translation>⟦Ŀöåð Šÿḿƀöŀš~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Debugger symbols (*.sym *.map *.txt);;All files (*)</source>
+            <translation>⟦Ðëƀüɠɠëŕ šÿḿƀöŀš (~~~~*.sym *.map *.txt);;Åŀŀ ƒïŀëš (*)~~⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>Export Execution Trace</source>
+            <translation>⟦Ëẋƥöŕŧ Ëẋëçüŧïöń Ŧŕåçë~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>JSON files (*.json)</source>
+            <translation>⟦ĴŠÖŃ ƒïŀëš (~~~*.json)⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
             <source>The debug request queue is unavailable.</source>
             <translation>⟦Ŧħë ðëƀüɠ ŕëǫüëšŧ ǫüëüë ïš üńåṽåïŀåƀŀë.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+44" />
+            <location line="+52" />
             <source>D%1</source>
             <translation>⟦Ð~%1⟧</translation>
         </message>
