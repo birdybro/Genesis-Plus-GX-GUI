@@ -5,7 +5,7 @@ Linux startup correction, tagged-release audits, and the post-release Libretro s
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
 synchronization, local bezel/overlay, cheat import/search, portable-mode, and
-localization and advanced-debugger verification through 2026-09-02
+localization, advanced-debugger, and physical-optical-media verification through 2026-09-02
 (America/Denver).
 
 ## Candidate identity
@@ -385,6 +385,31 @@ prohibited-payload scan pass. The user-supplied Phantasy Star IV NAS path was no
 mounted during this gate; the optional real-ROM runner was therefore unavailable and
 no copyrighted substitute was fetched. Milestone 92 is complete.
 
+## Physical optical-media verification
+
+Milestone 93 adds native read-only optical-device backends for Windows, Linux, and
+macOS behind one injected platform interface. A bounded worker discovers drives and
+imports one leading data track plus optional CDDA into a private raw BIN/CUE cache
+snapshot. The GUI receives only owned drive records, progress, and terminal results;
+the ordinary metadata, emulation-worker, regional BIOS, Genesis Plus GX disc, CDDA,
+timing, and persistence paths remain authoritative after import. Failed/cancelled
+imports leave no partial directory, existing same-size cache data is fully rehashed,
+and completed snapshots are removed on rejection, replacement, unload, or shutdown.
+
+Three new tests bring the default graph to 112 cases. They cover native discovery
+contracts; valid and invalid TOCs; exact CUE text; bounded raw reads; signature, size,
+hash, and same-size tamper validation; atomic commit/removal; injected read failure;
+monotonic progress; queued and active cancellation; bounded service lifecycle; a real
+core load/frame/unload using generated firmware and mixed data/CDDA sectors; and the
+complete accessible dialog workflow. No test reads an actual drive, commercial disc,
+or proprietary BIOS. Warning-gated GCC Debug and optimized Release, ASan/UBSan, fresh
+Clang 22, and CHD-disabled graphs pass 112/112; the shader-disabled graph passes all
+110 applicable tests. The strict inherited libretro target and a fresh staged/extracted
+Linux TGZ pass. The package checksum, safe paths, production layout, physical guide,
+dependencies, version command, portable offscreen event loop, and absence of packaged
+user data all verify. Exact hosted cross-platform evidence remains required before
+Milestone 93 closes.
+
 ## Build configurations tested
 
 The primary Debug, Release, and sanitizer configurations were rebuilt against the exact
@@ -393,12 +418,12 @@ warnings as errors. Newly authored frontend code produced no compiler warning.
 
 | Configuration | Build | CTest | Result |
 | --- | --- | --- | --- |
-| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 109/109 | Passed |
-| Release | Optimized native x86-64 | 109/109 | Passed |
-| ASan + UBSan | Debug instrumentation, leak detection | 109/109 | Passed; no finding |
-| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 107/107 | Passed |
-| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 109/109 | Passed |
-| Clang 22 | Warning-gated Debug | 109/109 | Passed; frontend warning-clean |
+| Debug | C++20, Qt Widgets/OpenGL, SDL3, SQLite, libchdr, librashader | 112/112 | Passed |
+| Release | Optimized native x86-64 | 112/112 | Passed |
+| ASan + UBSan | Debug instrumentation, leak detection | 112/112 | Passed; no finding |
+| Shaders disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_LIBRETRO_SHADERS=OFF` | 110/110 | Passed |
+| CHD disabled | Warning-gated Debug with `GENPLUSGX_ENABLE_CHD=OFF` | 112/112 | Passed |
+| Clang 22 | Warning-gated Debug | 112/112 | Passed; frontend warning-clean |
 | Legacy libretro | `Makefile.libretro`, Unix Release | Build/link/clean | Passed; warning-clean with truncation/qualifier gates |
 
 All shader-enabled CMake suites include legal generated cartridge, disc, and firmware inputs;
@@ -411,23 +436,23 @@ path. No suppression was added for project code.
 
 ## Test totals
 
-The default shader-enabled build registers 109 distinct tests:
+The default shader-enabled build registers 112 distinct tests:
 
 | Named family | Count |
 | --- | ---: |
 | Infrastructure | 11 |
 | Core | 20 |
-| Integration | 5 |
-| Unit | 43 |
-| GUI/smoke | 30 |
-| **Total** | **109** |
+| Integration | 6 |
+| Unit | 44 |
+| GUI/smoke | 31 |
+| **Total** | **112** |
 
 Tests carry overlapping labels because end-to-end workflows intentionally cross
-layers. Label counts are 70 `unit`, 25 `core`, 44 `integration`, and 30 `gui`. Focused
-coverage also includes persistence (33), fixtures (30), concurrency (19), settings
+layers. Label counts are 71 `unit`, 26 `core`, 46 `integration`, and 31 `gui`. Focused
+coverage also includes persistence (33), fixtures (33), concurrency (20), settings
 (21), input (10), video (13), audio (9), timing (7), presentation (1), rewind (4),
-run-ahead (3), state (9), release (5), fuzz/property (4), shader (2), recording (2),
-packaging (5), portable mode (2), and localization (6).
+run-ahead (3), state (9), release (5), fuzz/property (5), shader (2), recording (2),
+packaging (5), portable mode (2), localization (6), and physical media (3).
 
 `unit.shader_configuration` covers preset modes, path/size bounds, malformed data,
 parameter count/name/value validation, real built-in metadata, undeclared overrides,
@@ -1094,7 +1119,8 @@ startup and clean shutdown, and prohibited-payload scans pass.
   rollback, authoritative audio/input/state, pad/multitap support, fail-closed
   determinism verification, mode suspension, settings, status, and diagnostics.
 - [x] All eight supported regional firmware slots, validation, CUE/BIN/ISO/CHD, CDDA,
-  disc change/eject, and missing-firmware errors without bundled firmware.
+  disc change/eject, native Windows/Linux/macOS original-disc import with bounded
+  progress/cancellation, and missing-firmware errors without bundled firmware.
 - [x] Versioned global settings and migration, a unified eight-page Preferences center,
   sparse per-game overrides, themes, startup-safe locale selection with complete English
   fallback, accessibility, metadata, cheats, diagnostics, and privacy-filtered structured
@@ -1165,8 +1191,7 @@ directories.
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Physical optical drives, netplay,
-  achievements, cloud sync, online scraping/downloading, a network-accessible external
+  formats. Netplay, achievements, cloud sync, online scraping/downloading, a network-accessible external
   debugger server, TAS tooling, and streaming remain intentionally outside
   scope.
 

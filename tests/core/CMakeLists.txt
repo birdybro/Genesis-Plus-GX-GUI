@@ -227,6 +227,29 @@ set_tests_properties(
   PROPERTIES LABELS "core;integration;sega-cd;firmware;disc;persistence;fixture;lifecycle" TIMEOUT 30
 )
 
+add_executable(
+  genplusgx_physical_media_workflow_test physical_media_workflow_test.cpp
+)
+target_link_libraries(
+  genplusgx_physical_media_workflow_test
+  PRIVATE
+    GenesisPlusGX::CoreAdapter
+    GenesisPlusGX::Platform
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(
+  NAME integration.physical_media
+  COMMAND genplusgx_physical_media_workflow_test
+)
+set_tests_properties(
+  integration.physical_media
+  PROPERTIES
+    LABELS "core;integration;platform;physical-media;sega-cd;cdda;firmware;disc;fixture;lifecycle"
+    TIMEOUT 30
+)
+
 if(GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS)
   add_executable(
     genplusgx_sega_cd_external_bios_test

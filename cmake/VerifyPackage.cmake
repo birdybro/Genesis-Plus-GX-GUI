@@ -134,4 +134,15 @@ require_file(
   "${translation_directory}/genplusgx_en_XA.qm"
   "pseudo-localization catalog")
 
+if(VERIFY_PLATFORM STREQUAL "macos")
+  set(documentation_directory
+    "${bundle}/Contents/Resources/documentation")
+else()
+  set(documentation_directory
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI")
+endif()
+require_file(
+  "${documentation_directory}/PHYSICAL_MEDIA.md"
+  "physical optical media guide")
+
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

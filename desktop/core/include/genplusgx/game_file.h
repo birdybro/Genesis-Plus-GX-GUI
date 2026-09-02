@@ -1,6 +1,7 @@
 #pragma once
 
 #include <filesystem>
+#include <optional>
 #include <span>
 #include <string>
 #include <string_view>
@@ -63,16 +64,33 @@ struct DiscPlaylistInfo final {
   std::vector<std::filesystem::path> discs;
 };
 
+struct PhysicalMediaLaunch final {
+  std::string driveId;
+  std::string displayName;
+  std::filesystem::path storageDirectory;
+  std::string sha256;
+  std::uint64_t byteSize{0U};
+
+  [[nodiscard]] bool valid() const noexcept
+  {
+    return !driveId.empty() && !displayName.empty() &&
+      !storageDirectory.empty() && sha256.size() == 64U && byteSize != 0U;
+  }
+  [[nodiscard]] bool operator==(const PhysicalMediaLaunch&) const = default;
+};
+
 struct GameLaunchTarget final {
   std::filesystem::path sourcePath;
   std::filesystem::path runtimePath;
   std::filesystem::path patchPath;
   std::string archiveEntry;
   std::vector<std::filesystem::path> playlistDiscs;
+  std::optional<PhysicalMediaLaunch> physicalMedia;
 
   [[nodiscard]] bool valid() const noexcept
   {
-    return !sourcePath.empty() && !runtimePath.empty();
+    return !sourcePath.empty() && !runtimePath.empty() &&
+      (!physicalMedia || physicalMedia->valid());
   }
   [[nodiscard]] bool isArchive() const noexcept
   {
@@ -85,6 +103,10 @@ struct GameLaunchTarget final {
   [[nodiscard]] bool isPatched() const noexcept
   {
     return !patchPath.empty();
+  }
+  [[nodiscard]] bool isPhysicalMedia() const noexcept
+  {
+    return physicalMedia.has_value();
   }
   [[nodiscard]] bool operator==(const GameLaunchTarget&) const = default;
 };

@@ -14,6 +14,7 @@ foreach(runtime IN ITEMS
     share/Genesis-Plus-GX-GUI/shaders/genplusgx-crt.slang
     share/Genesis-Plus-GX-GUI/translations/genplusgx_en_XA.qm
     share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md
+    share/doc/Genesis-Plus-GX-GUI/PHYSICAL_MEDIA.md
     plugins/platforms/qwindows.dll)
   file(WRITE "${fixture_directory}/${runtime}" "package verification fixture")
 endforeach()

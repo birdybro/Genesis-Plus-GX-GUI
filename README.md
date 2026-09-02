@@ -63,6 +63,8 @@ rewritten.
 - Opt-in clean-shutdown session checkpoints that safely reopen and resume the last
   running game, while explicit command-line games always take precedence
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
+- Native Windows, Linux, and macOS optical-drive import for original mixed-mode Sega
+  CD/Mega CD media, with responsive progress/cancellation and atomic transient cleanup
 - Bounded ZIP cartridge browser and traversal-safe M3U/M3U8 multi-disc playlists
 - Non-destructive IPS/BPS/UPS soft patching with automatic sidecars, explicit selection,
   checksum validation, patched-content save/state identity, and session resume
@@ -171,7 +173,10 @@ deterministic. Sega CD is currently excluded from speculation. See the
 
 For Sega CD, configure your own USA, Europe, and/or Japan firmware under
 **Tools → BIOS Settings** before opening a disc. Firmware is validated locally and is
-never downloaded by the application. See [BIOS.md](docs/BIOS.md).
+never downloaded by the application. An original disc can be opened through **File →
+Open Physical Sega CD Disc…**; it is read without modification into a validated private
+BIN/CUE cache snapshot before emulation starts. See [BIOS.md](docs/BIOS.md) and the
+[physical-media guide](docs/PHYSICAL_MEDIA.md).
 
 The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
 cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),

@@ -14,6 +14,11 @@ platform documentation.
 
 ### Added
 
+- Native Windows, Linux, and macOS optical-drive support for original mixed-mode Sega
+  CD/Mega CD media, using a cancellable bounded worker, raw data/CDDA reads, validated
+  atomic BIN/CUE snapshots, transient lifecycle cleanup, and generated legal core/GUI
+  regressions without bundling games or firmware.
+
 - Advanced hidden debugger tooling with real paused 68000/Z80 single-instruction
   stepping, opt-in bounded execution traces and drop accounting, atomic local symbol
   import, and versioned atomic JSON export for offline external analysis.

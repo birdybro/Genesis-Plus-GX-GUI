@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+353" />
+            <location filename="../desktop/app/main.cpp" line="+354" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+374" />
+            <location line="+387" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -273,7 +273,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+91" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+92" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -2737,12 +2737,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+2597" />
+            <location line="+2604" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2593" />
+            <location line="-2600" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -2777,7 +2777,17 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Öƥëń å çåŕŧŕïðɠë ïḿåɠë ŵïŧħ åń ÏƤŠ, ƁƤŠ, öŕ ÜƤŠ šöƒŧ ƥåŧçħ~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+3" />
+            <location line="+4" />
+            <source>Open &amp;Physical Sega CD Disc…</source>
+            <translation>⟦Öƥëń &amp;Ƥħÿšïçåŀ Šëɠå ÇÐ Ðïšç…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Import a Sega CD or Mega CD from a local optical drive</source>
+            <translation>⟦Ïḿƥöŕŧ å Šëɠå ÇÐ öŕ Ḿëɠå ÇÐ ƒŕöḿ å ŀöçåŀ öƥŧïçåŀ ðŕïṽë~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
             <source>Open &amp;Recent</source>
             <translation>⟦Öƥëń &amp;Ŕëçëńŧ~~~⟧</translation>
         </message>
@@ -3040,12 +3050,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3278" />
+            <location line="+3424" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3273" />
+            <location line="-3419" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3414,35 +3424,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+2679" />
+            <location line="+2825" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-2678" />
+            <location line="-2824" />
             <location line="+1800" />
-            <location line="+716" />
-            <location line="+163" />
+            <location line="+846" />
+            <location line="+179" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2678" />
+            <location line="-2824" />
             <location line="+1800" />
-            <location line="+716" />
-            <location line="+163" />
+            <location line="+846" />
+            <location line="+179" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2678" />
-            <location line="+2517" />
-            <location line="+162" />
+            <location line="-2824" />
+            <location line="+2647" />
+            <location line="+178" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-2677" />
+            <location line="-2823" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3595,24 +3605,24 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         <message>
             <location line="+3" />
             <location line="+47" />
-            <location line="+1591" />
-            <location line="+496" />
+            <location line="+1716" />
+            <location line="+517" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2123" />
+            <location line="-2269" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2126" />
+            <location line="+2272" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2074" />
+            <location line="-2220" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
@@ -3832,12 +3842,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+810" />
+            <location line="+944" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="-788" />
+            <location line="-922" />
             <source>Replacement disc inserted.</source>
             <translation>⟦Ŕëƥŀåçëḿëńŧ ðïšç ïńšëŕŧëð.~~~~~~⟧</translation>
         </message>
@@ -3887,7 +3897,27 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ (ḿüŧëð)~~⟧</translation>
         </message>
         <message>
-            <location line="+230" />
+            <location line="+112" />
+            <source>Physical Media Unavailable</source>
+            <translation>⟦Ƥħÿšïçåŀ Ḿëðïå Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>This build does not support native optical-media access.</source>
+            <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ šüƥƥöŕŧ ńåŧïṽë öƥŧïçåŀ~~~~~~~~~-media åççëšš.~~⟧</translation>
+        </message>
+        <message>
+            <location line="+44" />
+            <source>Physical disc could not be opened.</source>
+            <translation>⟦Ƥħÿšïçåŀ ðïšç çöüŀð ńöŧ ƀë öƥëńëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Physical-disc import cancelled.</source>
+            <translation>⟦Ƥħÿšïçåŀ~~-disc ïḿƥöŕŧ çåńçëŀŀëð.~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+170" />
             <source>saved</source>
             <translation>⟦šåṽëð~~⟧</translation>
         </message>
@@ -3983,7 +4013,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ŕëçëńŧ ɠåḿë ħïšŧöŕÿ çöüŀð ńöŧ ƀë üƥðåŧëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+120" />
+            <location line="+142" />
             <source>Restoring the previous session…</source>
             <translation>⟦Ŕëšŧöŕïńɠ ŧħë ƥŕëṽïöüš šëššïöń…~~~~~~~⟧</translation>
         </message>
@@ -3993,23 +4023,23 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Šëššïöń ŕëšŧöŕåŧïöń çöḿƥŀëŧë.~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+54" />
+            <location line="+58" />
             <source>Loading %1…</source>
             <translation>⟦Ŀöåðïńɠ ~~%1…⟧</translation>
         </message>
         <message>
             <location line="+7" />
-            <location line="+162" />
+            <location line="+178" />
             <source>Speed %1%</source>
             <translation>⟦Šƥëëð ~~%1%⟧</translation>
         </message>
         <message>
-            <location line="-161" />
+            <location line="-177" />
             <source>Loading game…</source>
             <translation>⟦Ŀöåðïńɠ ɠåḿë…~~~⟧</translation>
         </message>
         <message>
-            <location line="+50" />
+            <location line="+54" />
             <source>%1 — %2</source>
             <translation>⟦%1 — %2⟧</translation>
         </message>
@@ -4029,12 +4059,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Šÿšŧëḿ: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="+13" />
+            <location line="+24" />
             <source>%1 FPS</source>
             <translation>⟦%1 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="+156" />
+            <location line="+157" />
             <source>Disc %1 of %2</source>
             <translation>⟦Ðïšç ~%1 öƒ ~%2⟧</translation>
         </message>
@@ -4112,12 +4142,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ŧħë åçŧïṽë ŕëçöŕðïńɠ çöüŀð ńöŧ ƀë šŧöƥƥëð ƀëƒöŕë çŀöšïńɠ ŧħë ɠåḿë.~~~~~~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+9" />
+            <location line="+10" />
             <source>Closing game…</source>
             <translation>⟦Çŀöšïńɠ ɠåḿë…~~~⟧</translation>
         </message>
         <message>
-            <location line="+106" />
+            <location line="+107" />
             <source>Empty</source>
             <translation>⟦Ëḿƥŧÿ~~⟧</translation>
         </message>
@@ -4223,6 +4253,89 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <location line="+5" />
             <source>Choose an input profile or use the global profile.</source>
             <translation>⟦Çħööšë åń ïńƥüŧ ƥŕöƒïŀë öŕ üšë ŧħë ɠŀöƀåŀ ƥŕöƒïŀë.~~~~~~~~~~~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::PhysicalMediaDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/physical_media_dialog.cpp" line="+20" />
+            <source>Open Physical Sega CD Disc</source>
+            <translation>⟦Öƥëń Ƥħÿšïçåŀ Šëɠå ÇÐ Ðïšç~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Select a local CD/DVD drive containing a Sega CD or Mega CD disc. The disc is read without modification into a private BIN/CUE snapshot before emulation starts; proprietary BIOS firmware is still required.</source>
+            <translation>⟦Šëŀëçŧ å ŀöçåŀ ÇÐ/ÐṼÐ ðŕïṽë çöńŧåïńïńɠ å Šëɠå ÇÐ öŕ Ḿëɠå ÇÐ ðïšç. Ŧħë ðïšç ïš ŕëåð ŵïŧħöüŧ ḿöðïƒïçåŧïöń ïńŧö å ƥŕïṽåŧë ƁÏŃ/ÇÜË šńåƥšħöŧ ƀëƒöŕë ëḿüŀåŧïöń šŧåŕŧš; ƥŕöƥŕïëŧåŕÿ ƁÏÖŠ ƒïŕḿŵåŕë ïš šŧïŀŀ ŕëǫüïŕëð.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Available optical drives</source>
+            <translation>⟦Åṽåïŀåƀŀë öƥŧïçåŀ ðŕïṽëš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Select Refresh to find optical drives.</source>
+            <translation>⟦Šëŀëçŧ Ŕëƒŕëšħ ŧö ƒïńð öƥŧïçåŀ ðŕïṽëš.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+17" />
+            <source>&amp;Refresh</source>
+            <translation>⟦&amp;Ŕëƒŕëšħ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>&amp;Open Disc</source>
+            <translation>⟦&amp;Öƥëń Ðïšç~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>&amp;Cancel Import</source>
+            <translation>⟦&amp;Çåńçëŀ Ïḿƥöŕŧ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+34" />
+            <source>Searching for optical drives…</source>
+            <translation>⟦Šëåŕçħïńɠ ƒöŕ öƥŧïçåŀ ðŕïṽëš…~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+22" />
+            <source>Insert a Sega CD or Mega CD disc, select its drive, then choose Open Disc.</source>
+            <translation>⟦Ïńšëŕŧ å Šëɠå ÇÐ öŕ Ḿëɠå ÇÐ ðïšç, šëŀëçŧ ïŧš ðŕïṽë, ŧħëń çħööšë Öƥëń Ðïšç.~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>No optical drives were found. Connect a drive, insert a disc, and refresh.</source>
+            <translation>⟦Ńö öƥŧïçåŀ ðŕïṽëš ŵëŕë ƒöüńð. Çöńńëçŧ å ðŕïṽë, ïńšëŕŧ å ðïšç, åńð ŕëƒŕëšħ.~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+13" />
+            <source>Reading the physical disc… Keep the drive connected until import finishes.</source>
+            <translation>⟦Ŕëåðïńɠ ŧħë ƥħÿšïçåŀ ðïšç… Ҡëëƥ ŧħë ðŕïṽë çöńńëçŧëð üńŧïŀ ïḿƥöŕŧ ƒïńïšħëš.~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+18" />
+            <source>Reading physical disc… %1% (%2 of %3 sectors)</source>
+            <translation>⟦Ŕëåðïńɠ ƥħÿšïçåŀ ðïšç… ~~~~~%1% (%2 öƒ ~%3 šëçŧöŕš)~~⟧</translation>
+        </message>
+        <message>
+            <location line="+10" />
+            <source>Physical disc could not be opened: %1</source>
+            <translation>⟦Ƥħÿšïçåŀ ðïšç çöüŀð ńöŧ ƀë öƥëńëð: ~~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>Physical-disc import cancelled.</source>
+            <translation>⟦Ƥħÿšïçåŀ~~-disc ïḿƥöŕŧ çåńçëŀŀëð.~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+9" />
+            <source>Physical disc imported; starting emulation…</source>
+            <translation>⟦Ƥħÿšïçåŀ ðïšç ïḿƥöŕŧëð; šŧåŕŧïńɠ ëḿüŀåŧïöń…~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+43" />
+            <source>Cancelling physical-disc import…</source>
+            <translation>⟦Çåńçëŀŀïńɠ ƥħÿšïçåŀ~~~~~-disc ïḿƥöŕŧ…~~⟧</translation>
         </message>
     </context>
     <context>

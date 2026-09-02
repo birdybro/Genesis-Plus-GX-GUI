@@ -16,6 +16,7 @@
 #include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
+#include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
 #include "genplusgx/ui/run_ahead_settings_dialog.h"
 #include "genplusgx/ui/session_settings_dialog.h"
@@ -166,6 +167,13 @@ void MainWindow::buildMenus()
     tr("Open a cartridge image with an IPS, BPS, or UPS soft patch"));
   connect(openPatchedGame, &QAction::triggered,
     this, &MainWindow::chooseGameWithPatch);
+  auto* openPhysicalDisc = addAction(
+    *file, tr("Open &Physical Sega CD Disc…"), "openPhysicalDiscAction");
+  openPhysicalDisc->setToolTip(tr(
+    "Import a Sega CD or Mega CD from a local optical drive"));
+  openPhysicalDisc->setEnabled(false);
+  connect(openPhysicalDisc, &QAction::triggered,
+    this, &MainWindow::showPhysicalMedia);
   auto* recent = file->addMenu(tr("Open &Recent"));
   recent->setObjectName(QStringLiteral("openRecentMenu"));
   recent->setEnabled(false);
@@ -2980,6 +2988,110 @@ void MainWindow::setGameLoadSink(GameLoadSink sink)
   gameLoadSink_ = std::move(sink);
 }
 
+void MainWindow::setPhysicalMediaSupported(bool supported)
+{
+  physicalMediaSupported_ = supported;
+  updatePhysicalMediaAction();
+}
+
+void MainWindow::setPhysicalMediaActions(PhysicalMediaDialogActions actions)
+{
+  physicalMediaActions_ = std::move(actions);
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setActions(physicalMediaActions_);
+  }
+  updatePhysicalMediaAction();
+}
+
+void MainWindow::showPhysicalMedia()
+{
+  if (!physicalMediaSupported_) {
+    dialogService_->showError(this, tr("Physical Media Unavailable"), tr(
+      "This build does not support native optical-media access."));
+    return;
+  }
+  if (physicalMediaDialog_ == nullptr) {
+    physicalMediaDialog_ = new PhysicalMediaDialog(this);
+    physicalMediaDialog_->setActions(physicalMediaActions_);
+  }
+  physicalMediaDialog_->show();
+  physicalMediaDialog_->raise();
+  physicalMediaDialog_->activateWindow();
+  if (!physicalMediaDialog_->busy()) {
+    physicalMediaDialog_->beginDiscovery();
+  }
+}
+
+void MainWindow::setPhysicalMediaDrives(
+  std::vector<platform::PhysicalDrive> drives)
+{
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setDrives(std::move(drives));
+  }
+}
+
+void MainWindow::setPhysicalMediaImportStarted()
+{
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setImportStarted();
+  }
+}
+
+void MainWindow::setPhysicalMediaImportProgress(
+  std::uint32_t completedSectors, std::uint32_t totalSectors)
+{
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setImportProgress(completedSectors, totalSectors);
+  }
+}
+
+void MainWindow::showPhysicalMediaError(const std::string& detail)
+{
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setOperationFailed(detail);
+  }
+  statusBar()->showMessage(tr("Physical disc could not be opened."), 5'000);
+}
+
+void MainWindow::showPhysicalMediaCancelled()
+{
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setOperationCancelled();
+  }
+  statusBar()->showMessage(tr("Physical-disc import cancelled."), 3'000);
+}
+
+bool MainWindow::requestPhysicalMediaLoad(
+  const platform::PhysicalMediaSnapshot& snapshot)
+{
+  if (!snapshot.valid()) {
+    showPhysicalMediaError("The imported physical-disc snapshot is incomplete.");
+    return false;
+  }
+  if (const auto status = validateGameFile(snapshot.cuePath); !status) {
+    showPhysicalMediaError(status.message);
+    return false;
+  }
+  GameLaunchTarget target{
+    .sourcePath = snapshot.cuePath,
+    .runtimePath = snapshot.cuePath,
+    .patchPath = {},
+    .archiveEntry = {},
+    .playlistDiscs = {},
+    .physicalMedia = PhysicalMediaLaunch{
+      .driveId = snapshot.disc.drive.id,
+      .displayName = snapshot.disc.drive.displayName,
+      .storageDirectory = snapshot.storageDirectory,
+      .sha256 = snapshot.sha256,
+      .byteSize = snapshot.byteSize,
+    },
+  };
+  if (physicalMediaDialog_ != nullptr) {
+    physicalMediaDialog_->setImportReady();
+  }
+  return submitGameLoadTarget(std::move(target));
+}
+
 void MainWindow::setArchiveCacheDirectory(std::filesystem::path directory)
 {
   archiveCacheDirectory_ = std::move(directory);
@@ -3246,6 +3358,7 @@ bool MainWindow::requestGameLoad(
     .patchPath = {},
     .archiveEntry = {},
     .playlistDiscs = {},
+    .physicalMedia = std::nullopt,
   };
   if (hasZipArchiveExtension(path)) {
     const auto inspection = inspectZipArchive(path);
@@ -3305,6 +3418,26 @@ bool MainWindow::requestGameLoad(
     target.runtimePath = patched.path;
     target.patchPath = *patchPath;
   }
+  return submitGameLoadTarget(std::move(target));
+}
+
+bool MainWindow::submitGameLoadTarget(GameLaunchTarget target)
+{
+  const auto& path = target.sourcePath;
+  if (!target.valid()) {
+    presentGameLoadError(path, "The game launch target is incomplete.");
+    return false;
+  }
+  if (gameLoading_ || sessionResumeBusy_) {
+    presentGameLoadError(path, "Another game operation is still in progress.");
+    return false;
+  }
+  if (recordingState_ == RecordingUiState::starting ||
+      recordingState_ == RecordingUiState::stopping) {
+    presentGameLoadError(path,
+      "Wait for the current recording operation to finish before changing games.");
+    return false;
+  }
   if (!gameLoadSink_) {
     presentGameLoadError(path, "The emulation service is not available.");
     return false;
@@ -3338,6 +3471,7 @@ void MainWindow::setSessionResumeBusy(bool busy)
     !gameLoading_ && !sessionResumeBusy_);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(
     !gameLoading_ && !sessionResumeBusy_);
+  updatePhysicalMediaAction();
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
     hasRecentGames_ && !gameLoading_ && !sessionResumeBusy_);
   if (sessionResumeBusy_) {
@@ -3389,15 +3523,19 @@ void MainWindow::setGameLoading(const std::filesystem::path& path)
       .patchPath = {},
       .archiveEntry = {},
       .playlistDiscs = {},
+      .physicalMedia = std::nullopt,
     };
   }
   displayWidget_->clearFrame();
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
+  updatePhysicalMediaAction();
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
   setGameActionsEnabled(false);
-  gameStatus_->setText(
-    tr("Loading %1…").arg(pathToQString(path.filename())));
+  const auto loadingName = pendingGameTarget_.isPhysicalMedia()
+    ? QString::fromStdString(pendingGameTarget_.physicalMedia->displayName)
+    : pathToQString(path.filename());
+  gameStatus_->setText(tr("Loading %1…").arg(loadingName));
   if (!replacingLoadedGame) {
     systemStatus_->setText(tr("System: —"));
     regionStatus_->setText(tr("Region: —"));
@@ -3421,6 +3559,7 @@ void MainWindow::setGameLoaded(const std::filesystem::path& path)
     .patchPath = {},
     .archiveEntry = {},
     .playlistDiscs = {},
+    .physicalMedia = std::nullopt,
   });
 }
 
@@ -3451,10 +3590,13 @@ void MainWindow::setGameLoaded(const GameLaunchTarget& target)
   gameInformationBusy_ = false;
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
+  updatePhysicalMediaAction();
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(true);
   updateStateSlotPresentation();
-  auto gameDescription = target.isArchive()
+  auto gameDescription = target.isPhysicalMedia()
+    ? QString::fromStdString(target.physicalMedia->displayName)
+    : target.isArchive()
     ? tr("%1 — %2")
         .arg(pathToQString(target.sourcePath.filename()),
           QString::fromUtf8(target.archiveEntry))
@@ -3488,6 +3630,17 @@ void MainWindow::setGameRuntimeIdentity(std::string system, std::string region)
     tr("System: %1").arg(QString::fromStdString(system)));
   regionStatus_->setText(
     tr("Region: %1").arg(QString::fromStdString(region)));
+}
+
+void MainWindow::updatePhysicalMediaAction()
+{
+  if (auto* action = findChild<QAction*>(
+        QStringLiteral("openPhysicalDiscAction"))) {
+    action->setEnabled(physicalMediaSupported_ &&
+      static_cast<bool>(physicalMediaActions_.discover) &&
+      static_cast<bool>(physicalMediaActions_.importDisc) &&
+      !gameLoading_ && !sessionResumeBusy_);
+  }
 }
 
 void MainWindow::setMeasuredFrameRate(double framesPerSecond)
@@ -3559,6 +3712,7 @@ void MainWindow::setNoGameLoaded()
   }
   findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(true);
   findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(true);
+  updatePhysicalMediaAction();
   findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(hasRecentGames_);
   setGameActionsEnabled(false);
   gameStatus_->setText(tr("No game loaded"));
@@ -3821,6 +3975,7 @@ void MainWindow::closeGame()
     gameLoading_ = true;
     findChild<QAction*>(QStringLiteral("openGameAction"))->setEnabled(false);
     findChild<QAction*>(QStringLiteral("openGameWithPatchAction"))->setEnabled(false);
+    updatePhysicalMediaAction();
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(false);
     setGameActionsEnabled(false);
     gameStatus_->setText(tr("Closing game…"));
@@ -3914,6 +4069,7 @@ void MainWindow::updateStateActions()
     findChild<QMenu*>(QStringLiteral("openRecentMenu"))->setEnabled(
       hasRecentGames_);
   }
+  updatePhysicalMediaAction();
   updateRecordingAction();
 }
 

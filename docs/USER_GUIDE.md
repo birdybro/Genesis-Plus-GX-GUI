@@ -159,6 +159,18 @@ tray open with no partially mounted image, allowing another selection or closing
 application normally. CDDA tracks described by a supported image are played by the
 existing Genesis Plus GX CD subsystem through the normal bounded audio pipeline.
 
+To start from an original disc, insert it and choose **File → Open Physical Sega CD
+Disc…**. Select the local optical drive and choose **Open Disc**. Drive discovery and a
+complete raw-sector/CDDA import run away from the GUI and show bounded progress; the
+operation can be cancelled without leaving a partial cache. The source disc is never
+written. The importer accepts one leading Sega CD data track followed by optional audio
+tracks, rejects unsafe or unsupported layouts, and starts the ordinary core disc path
+only after validating the generated BIN/CUE snapshot and SHA-256. Keep the disc and
+drive available until the import finishes. The temporary content-addressed snapshot is
+removed after unload or clean shutdown, and physical sessions are not placed in Recents
+or automatic session resume. Platform permissions, cache size, drive limitations, and
+the test contract are detailed in [PHYSICAL_MEDIA.md](PHYSICAL_MEDIA.md).
+
 ## Save memory
 
 Cartridge SRAM is loaded automatically before the first emulated frame and saved

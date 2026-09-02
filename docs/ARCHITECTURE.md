@@ -1028,6 +1028,37 @@ Closing the tray resumes the mounted image through the same status transition us
 the upstream libretro frontend. CUE/BIN, CDDA, and CHD decoding remain upstream core
 responsibilities; the frontend adds no alternate sector or audio algorithms.
 
+Physical optical media enters through an additional platform boundary, not through the
+GUI or core directly. Windows uses the CD-ROM device-control API, Linux uses the kernel
+CD-ROM ioctls, and macOS uses IOKit discovery plus its raw CD read interface. Each
+backend returns the same owned table-of-contents model and implements bounded
+track-local 2,352-byte sector reads. The GUI never owns a device handle.
+
+```text
+PhysicalMediaDialog --> bounded command queue --> PhysicalMediaService thread
+       ^                                               |
+       |                                  native read-only optical handle
+       |                                               |
+       +-- bounded progress/terminal event <-- raw sectors + validated TOC
+                                                       |
+                                  private temporary BIN/CUE + SHA-256
+                                                       |
+                                     ordinary metadata/load command
+                                                       |
+                                           emulation thread/CoreAdapter
+```
+
+The service reads at most 16 sectors per iteration, checks cancellation between reads,
+and drops superseded progress rather than allowing either queue to grow. It accepts one
+leading data track and following CDDA tracks within the 100-minute bound, verifies the
+Sega CD signature before committing, and publishes a completed directory with an atomic
+same-filesystem rename. Existing content-addressed entries require an exact CUE, size,
+and full hash match. Failed, cancelled, rejected, replaced, unloaded, and shutdown paths
+all release only an exact `disc-<sha256>` child of the dedicated cache. The application
+does not persist transient paths in recents/library/session-resume state. Once loaded,
+the unchanged Genesis Plus GX disc code remains responsible for sectors, CDDA, region,
+timing, and BIOS behavior.
+
 Internal 8 KiB BRAM and the 512 KiB RAM cartridge are discovered immediately after CD
 initialization and use the normal per-content atomic persistence lifecycle. Disc swaps
 do not change the game identity or reinitialize backup memory. Tests exercise ISO and
@@ -1225,16 +1256,18 @@ Shutdown is an explicit, idempotent workflow:
 2. wake the emulation worker, stop frame execution, atomically flush available
    SRAM/BRAM on the core-owning thread, shut down the core, and join the worker even
    when a save failed;
-3. stop and close the SDL3 audio stream/device;
-4. stop controller input and close its SDL handles on the GUI/owner thread;
-5. request cooperative cancellation of any in-flight backup, state, metadata, or
+3. cancel and join physical-media discovery/import, drain terminal events, and remove
+   any completed or active transient disc snapshots after the core has released them;
+4. stop and close the SDL3 audio stream/device;
+5. stop controller input and close its SDL handles on the GUI/owner thread;
+6. request cooperative cancellation of any in-flight backup, state, metadata, or
    library identity hash, then stop and join the state, metadata, screenshot, and
    library-scanner workers, clearing any pending UI operation rather than leaving it
    busy;
-6. release the bounded display frame exchange after its producer has joined;
-7. aggregate every cleanup failure without replacing a prior nonzero application exit,
+7. release the bounded display frame exchange after its producer has joined;
+8. aggregate every cleanup failure without replacing a prior nonzero application exit,
    emit the final structured log, and shut down logging;
-8. return the aggregate process status while Qt destroys the window and graphics
+9. return the aggregate process status while Qt destroys the window and graphics
    resources.
 
 Each stage has tests for no-game, running, paused, audio-disabled, dirty-save, and

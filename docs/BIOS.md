@@ -46,6 +46,12 @@ disc. An optional real-firmware smoke test can be enabled at configure time with
 CTest. That path is read locally, never copied into the source/build tree, and never
 uploaded by project automation.
 
+Original media opened through **File → Open Physical Sega CD Disc…** uses this same
+regional selection and validation path. Copying the disc to the private transient
+BIN/CUE cache does not copy, replace, or bypass firmware, and a missing regional BIOS
+still fails before a playable session is exposed. See [PHYSICAL_MEDIA.md](PHYSICAL_MEDIA.md)
+for drive access and snapshot details.
+
 ## Troubleshooting statuses
 
 - **Not configured:** no path is stored for the slot.

@@ -25,6 +25,7 @@ target_link_libraries(
   PRIVATE
     GenesisPlusGX::AppSupport
     GenesisPlusGX::Capture
+    GenesisPlusGX::Platform
     GenesisPlusGX::Screenshots
     genplusgx::ui
     GenesisPlusGX::CoreAdapter

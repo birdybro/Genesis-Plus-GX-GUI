@@ -20,6 +20,7 @@
 #include "genplusgx/ui/dialog_service.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/game_library_dialog.h"
+#include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/state_manager_dialog.h"
 #include "genplusgx/settings/rewind_settings.h"
@@ -154,6 +155,17 @@ public:
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
   void setGameLoadSink(GameLoadSink sink);
+  void setPhysicalMediaSupported(bool supported);
+  void setPhysicalMediaActions(PhysicalMediaDialogActions actions);
+  void showPhysicalMedia();
+  void setPhysicalMediaDrives(std::vector<platform::PhysicalDrive> drives);
+  void setPhysicalMediaImportStarted();
+  void setPhysicalMediaImportProgress(
+    std::uint32_t completedSectors, std::uint32_t totalSectors);
+  void showPhysicalMediaError(const std::string& detail);
+  void showPhysicalMediaCancelled();
+  [[nodiscard]] bool requestPhysicalMediaLoad(
+    const platform::PhysicalMediaSnapshot& snapshot);
   void setArchiveCacheDirectory(std::filesystem::path directory);
   void setPatchCacheDirectory(std::filesystem::path directory);
   void setGameCloseSink(GameCloseSink sink);
@@ -333,6 +345,8 @@ private:
   void buildStatusBar();
   void createCanvas();
   void setGameActionsEnabled(bool enabled);
+  [[nodiscard]] bool submitGameLoadTarget(GameLaunchTarget target);
+  void updatePhysicalMediaAction();
   void chooseGame();
   void chooseGameWithPatch();
   void closeGame();
@@ -397,6 +411,7 @@ private:
   ControllerAssignmentSink controllerAssignmentSink_;
   std::shared_ptr<DialogService> dialogService_;
   GameLoadSink gameLoadSink_;
+  PhysicalMediaDialogActions physicalMediaActions_;
   GameCloseSink gameCloseSink_;
   ClearRecentGamesSink clearRecentGamesSink_;
   StateOperationSink stateOperationSink_;
@@ -442,6 +457,7 @@ private:
   std::vector<library::LibraryGame> gameLibraryGames_;
   std::array<StateSlotView, 10> stateSlotViews_{};
   StateManagerDialog* stateManagerDialog_{nullptr};
+  PhysicalMediaDialog* physicalMediaDialog_{nullptr};
   std::filesystem::path loadedGamePath_;
   std::filesystem::path loadedRuntimePath_;
   GameLaunchTarget loadedGameTarget_;
@@ -451,6 +467,7 @@ private:
   std::filesystem::path patchCacheDirectory_;
   bool hasRecentGames_{false};
   bool gameLoading_{false};
+  bool physicalMediaSupported_{false};
   bool stateSessionReady_{false};
   bool stateOperationBusy_{false};
   bool sessionResumeBusy_{false};

@@ -149,6 +149,26 @@ USA and Europe variants and a CUE sheet that references a generated local BIN fi
 There is no game program, Sega security program, sampled audio, artwork, or third-party
 data. Real-BIOS testing is excluded by default and never creates or fetches firmware.
 
+## Generated physical mixed-mode Sega CD fixture
+
+| Field | Value |
+| --- | --- |
+| Stored filename | None; runtime output is a temporary `disc.cue` and `disc.bin` |
+| Generator | `SyntheticPhysicalMediaBackend` in `tests/utilities/physical_media_fixture.cpp` |
+| Purpose | Exercise native-neutral optical discovery, raw data/CDDA reads, atomic snapshots, cancellation, GUI launch, and real core loading |
+| Size | 225 raw 2,352-byte sectors (150 Mode 1 data plus 75 deterministic audio sectors) |
+| Provenance | Original fixture authored for this project; generated output is dedicated to CC0-1.0 |
+| Expected system | Sega CD / Mega CD (`SYSTEM_MCD`) |
+
+The data track wraps the generated Sega CD test disc above in project-authored Mode 1
+raw-sector framing. The second track contains a deterministic byte pattern generated
+from its sector and byte indices; it is not recorded or synthesized music. Tests vary
+the table of contents, inject read and discovery failures/delays, alter one cache byte,
+cancel active and queued requests, and remove every completed snapshot inside a Qt
+temporary directory. Platform runners also instantiate their native discovery backend,
+but hosted CI never requires or reads an actual optical disc. No generated BIN/CUE,
+drive data, or user media survives the test process.
+
 `unit.game_file` creates all CUE sheets and referenced files inside temporary directories.
 Its original text cases cover valid multi-file data/audio layouts, malformed quoting,
 track/index ordering, invalid time fields, overlong lines/files, binary controls,

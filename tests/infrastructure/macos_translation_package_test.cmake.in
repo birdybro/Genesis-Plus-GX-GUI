@@ -12,6 +12,7 @@ foreach(runtime IN ITEMS
     Contents/Resources/shaders/genplusgx-crt.slangp
     Contents/Resources/shaders/genplusgx-crt.slang
     Contents/Resources/translations/genplusgx_en_XA.qm
+    Contents/Resources/documentation/PHYSICAL_MEDIA.md
     Contents/Resources/licenses/librashader-MPL-2.0.md)
   get_filename_component(parent "${bundle}/${runtime}" DIRECTORY)
   file(MAKE_DIRECTORY "${parent}")

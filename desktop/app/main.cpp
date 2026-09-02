@@ -20,6 +20,7 @@
 #include "genplusgx/localization/localization.h"
 #include "genplusgx/persistence.h"
 #include "genplusgx/platform/bios_manager.h"
+#include "genplusgx/platform/physical_media.h"
 #include "genplusgx/recent_games.h"
 #include "genplusgx/screenshots/screenshot_service.h"
 #include "genplusgx/state_storage_service.h"
@@ -690,6 +691,18 @@ int main(int argc, char* argv[])
     qWarning().noquote() << QString::fromStdString(metadataServiceStarted.message);
     recordStartupIssue("Game metadata service", metadataServiceStarted.message);
   }
+  const auto physicalMediaCache =
+    applicationPaths.cacheDirectory() / "physical-media";
+  genplusgx::platform::PhysicalMediaService physicalMediaService{
+    genplusgx::platform::createNativePhysicalMediaBackend(),
+    physicalMediaCache};
+  const auto physicalMediaServiceStarted = physicalMediaService.start();
+  if (!physicalMediaServiceStarted) {
+    qWarning().noquote() << QString::fromStdString(
+      physicalMediaServiceStarted.message);
+    recordStartupIssue(
+      "Physical optical media", physicalMediaServiceStarted.message);
+  }
   genplusgx::screenshots::ScreenshotService screenshotService;
   const auto screenshotServiceStarted = screenshotService.start();
   if (!screenshotServiceStarted) {
@@ -718,6 +731,7 @@ int main(int argc, char* argv[])
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
+    static_cast<void>(physicalMediaService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(screenshotService.stop());
     static_cast<void>(recordingService->stop());
@@ -764,6 +778,9 @@ int main(int argc, char* argv[])
     applicationPaths.cacheDirectory() / "archives");
   window.setPatchCacheDirectory(
     applicationPaths.cacheDirectory() / "patches");
+  window.setPhysicalMediaSupported(
+    genplusgx::platform::nativePhysicalMediaSupported() &&
+    physicalMediaServiceStarted.ok());
   window.displayWidget()->setRendererFailureSink(
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
@@ -1642,6 +1659,7 @@ int main(int argc, char* argv[])
     std::optional<genplusgx::GameIdentity> previousIdentity;
     genplusgx::settings::PerGameSettings previousOverrides;
     genplusgx::settings::EffectiveGameSettings previousEffective;
+    genplusgx::GameLaunchTarget previousTarget;
     std::string diagnosticGame;
     std::string diagnosticSystem;
     std::string diagnosticRegion;
@@ -1655,6 +1673,8 @@ int main(int argc, char* argv[])
   std::uint64_t gameGeneration = 0U;
   bool stateSessionAvailable = false;
   std::optional<PendingLoad> pendingLoad;
+  std::uint64_t physicalMediaOperationId = 2'400'000U;
+  std::optional<std::uint64_t> pendingPhysicalMediaOperation;
   std::optional<std::uint64_t> pendingUnload;
   struct PendingDisc final {
     std::uint64_t operationId{0};
@@ -1664,6 +1684,26 @@ int main(int argc, char* argv[])
   std::uint64_t discOperationId = 2'500'000U;
   std::optional<PendingDisc> pendingDisc;
   genplusgx::GameLaunchTarget closingGameTarget;
+  const auto releasePhysicalTarget =
+    [&physicalMediaCache](const genplusgx::GameLaunchTarget& target) {
+      if (!target.isPhysicalMedia()) {
+        return genplusgx::platform::PhysicalMediaStatus{};
+      }
+      const auto& media = *target.physicalMedia;
+      return genplusgx::platform::releasePhysicalMediaSnapshot(
+        physicalMediaCache,
+        {
+          .disc = {
+            .drive = {.id = media.driveId, .displayName = media.displayName},
+            .tracks = {},
+            .leadOutSector = 0U,
+          },
+          .cuePath = target.runtimePath,
+          .storageDirectory = media.storageDirectory,
+          .sha256 = media.sha256,
+          .byteSize = media.byteSize,
+        });
+    };
   enum class PendingStatePhase {
     capturing,
     saving,
@@ -1951,12 +1991,53 @@ int main(int argc, char* argv[])
         activePerGameSettings, globalGameSettings());
       return genplusgx::PersistenceStatus{};
     });
+  window.setPhysicalMediaActions({
+    .discover = [&pendingPhysicalMediaOperation, &physicalMediaOperationId,
+                  &physicalMediaService, &window] {
+      if (pendingPhysicalMediaOperation) {
+        return;
+      }
+      const auto operationId = ++physicalMediaOperationId;
+      const auto submitted = physicalMediaService.discover(operationId);
+      if (!submitted) {
+        window.showPhysicalMediaError(submitted.message);
+        return;
+      }
+      pendingPhysicalMediaOperation = operationId;
+    },
+    .importDisc = [&pendingPhysicalMediaOperation, &physicalMediaOperationId,
+                    &physicalMediaService, &window](const std::string& driveId) {
+      if (pendingPhysicalMediaOperation) {
+        return;
+      }
+      const auto operationId = ++physicalMediaOperationId;
+      const auto submitted = physicalMediaService.importDisc(
+        operationId, driveId);
+      if (!submitted) {
+        window.showPhysicalMediaError(submitted.message);
+        return;
+      }
+      pendingPhysicalMediaOperation = operationId;
+      window.setPhysicalMediaImportStarted();
+    },
+    .cancel = [&pendingPhysicalMediaOperation, &physicalMediaService, &window] {
+      if (!pendingPhysicalMediaOperation) {
+        return;
+      }
+      const auto cancelled = physicalMediaService.cancel(
+        *pendingPhysicalMediaOperation);
+      if (!cancelled) {
+        window.showPhysicalMediaError(cancelled.message);
+      }
+    },
+  });
   window.setGameLoadSink(
     [&activeEffectiveSettings, &activePerGameIdentity, &activePerGameSettings,
      &applyEffectiveSettings, &automaticResumePatchPath, &automaticResumePath,
      &globalGameSettings,
      &lifecycleOperationId, &loadMetadataOperationId, &metadataService,
-     &pendingAutomaticResume, &pendingLoad, &window, &worker](
+     &pendingAutomaticResume, &pendingLoad, &releasePhysicalTarget,
+     &window, &worker](
       const genplusgx::GameLaunchTarget& target) {
       if (pendingAutomaticResume) {
         pendingAutomaticResume.reset();
@@ -1976,6 +2057,7 @@ int main(int argc, char* argv[])
         .previousIdentity = activePerGameIdentity,
         .previousOverrides = activePerGameSettings,
         .previousEffective = activeEffectiveSettings,
+        .previousTarget = window.loadedGameTarget(),
         .diagnosticGame = {},
         .diagnosticSystem = {},
         .diagnosticRegion = {},
@@ -1994,8 +2076,13 @@ int main(int argc, char* argv[])
       const auto applied = applyEffectiveSettings(pendingLoad->effective);
       if (!applied) {
         const auto previous = pendingLoad->previousEffective;
+        const auto abandonedTarget = pendingLoad->target;
         pendingLoad.reset();
         static_cast<void>(applyEffectiveSettings(previous));
+        const auto released = releasePhysicalTarget(abandonedTarget);
+        if (!released) {
+          qWarning().noquote() << QString::fromStdString(released.message);
+        }
         window.showGameLoadError(target.sourcePath, applied.message, false);
         return;
       }
@@ -2005,8 +2092,13 @@ int main(int argc, char* argv[])
         pendingLoad->operationId, target.runtimePath));
       if (!submitted) {
         const auto previous = pendingLoad->previousEffective;
+        const auto abandonedTarget = pendingLoad->target;
         pendingLoad.reset();
         static_cast<void>(applyEffectiveSettings(previous));
+        const auto released = releasePhysicalTarget(abandonedTarget);
+        if (!released) {
+          qWarning().noquote() << QString::fromStdString(released.message);
+        }
         window.showGameLoadError(target.sourcePath, submitted.message, false);
       }
     });
@@ -2275,7 +2367,8 @@ int main(int argc, char* argv[])
      &inputConfiguration,
      &libraryScansInFlight,
      &lifecycleOperationId,
-     &metadataService, &pendingDisc,
+     &metadataService, &pendingDisc, &physicalMediaCache,
+     &physicalMediaService, &pendingPhysicalMediaOperation,
      &pendingAutomaticResume, &pendingLoad, &pendingMetadata, &pendingState,
      &pendingUnload,
      &activeCheatConfiguration, &activeCheatIdentity, &activeCheatSystem,
@@ -2287,9 +2380,77 @@ int main(int argc, char* argv[])
      &sessionSettings, &sessionSettingsStore, &startLoadedGame,
      &stateOperationId,
      &stateServiceFailureReported, &stateSessionAvailable, &stateStorage,
-     &reportRuntimeFailure, &runtimeFailureReported, &worker, &window,
+     &releasePhysicalTarget, &reportRuntimeFailure, &runtimeFailureReported,
+     &worker, &window,
      automatedQuitMilliseconds, automatedQuitWhenGameReady] {
     static_cast<void>(controllerInput.pollEvents());
+    while (auto event = physicalMediaService.pollEvent()) {
+      using EventType = genplusgx::platform::PhysicalMediaEventType;
+      if (event->type == EventType::serviceStarted) {
+        qInfo() << "Physical-media service started.";
+        continue;
+      }
+      if (event->type == EventType::serviceStopped) {
+        pendingPhysicalMediaOperation.reset();
+        window.setPhysicalMediaSupported(false);
+        continue;
+      }
+      if (!pendingPhysicalMediaOperation ||
+          event->operationId != *pendingPhysicalMediaOperation) {
+        if (event->type == EventType::importReady && event->snapshot.valid()) {
+          const auto released =
+            genplusgx::platform::releasePhysicalMediaSnapshot(
+              physicalMediaCache, event->snapshot);
+          if (!released) {
+            qWarning().noquote() << QString::fromStdString(released.message);
+          }
+        }
+        continue;
+      }
+      switch (event->type) {
+        case EventType::discoveryReady:
+          pendingPhysicalMediaOperation.reset();
+          window.setPhysicalMediaDrives(std::move(event->drives));
+          break;
+        case EventType::importStarted:
+          window.setPhysicalMediaImportStarted();
+          break;
+        case EventType::importProgress:
+          window.setPhysicalMediaImportProgress(
+            event->completedSectors, event->totalSectors);
+          break;
+        case EventType::importReady: {
+          pendingPhysicalMediaOperation.reset();
+          qInfo().noquote()
+            << "Physical Sega CD imported from"
+            << QString::fromStdString(event->snapshot.disc.drive.displayName)
+            << "bytes" << static_cast<qulonglong>(event->snapshot.byteSize);
+          if (!window.requestPhysicalMediaLoad(event->snapshot)) {
+            const auto released =
+              genplusgx::platform::releasePhysicalMediaSnapshot(
+                physicalMediaCache, event->snapshot);
+            if (!released) {
+              qWarning().noquote() << QString::fromStdString(released.message);
+            }
+          }
+          break;
+        }
+        case EventType::operationFailed:
+          pendingPhysicalMediaOperation.reset();
+          qWarning().noquote() << "Physical-media operation failed:"
+                               << QString::fromStdString(event->status.message);
+          window.showPhysicalMediaError(event->status.message);
+          break;
+        case EventType::operationCancelled:
+          pendingPhysicalMediaOperation.reset();
+          qInfo() << "Physical-media import cancelled.";
+          window.showPhysicalMediaCancelled();
+          break;
+        case EventType::serviceStarted:
+        case EventType::serviceStopped:
+          break;
+      }
+    }
     const auto audioDeviceEvents = audioOutput.pollDeviceEvents();
     if (audioDeviceEvents.playbackDevicesChanged) {
       std::vector<std::string> names;
@@ -2561,6 +2722,21 @@ int main(int argc, char* argv[])
             event->disc.discPresent);
           window.setGameRuntimeIdentity(
             diagnosticLoadedSystem, diagnosticLoadedRegion);
+          const bool previousSnapshotStillActive =
+            completedLoad.previousTarget.isPhysicalMedia() &&
+            completedLoad.target.isPhysicalMedia() &&
+            completedLoad.previousTarget.physicalMedia->storageDirectory ==
+              completedLoad.target.physicalMedia->storageDirectory;
+          if (completedLoad.previousTarget.isPhysicalMedia() &&
+              !previousSnapshotStillActive) {
+            const auto released = releasePhysicalTarget(
+              completedLoad.previousTarget);
+            if (!released) {
+              qWarning().noquote()
+                << "Previous physical-media snapshot cleanup failed:"
+                << QString::fromStdString(released.message);
+            }
+          }
           qInfo().noquote() << "Game loaded:"
                             << QString::fromStdString(
                                  diagnosticLoadedGame.empty()
@@ -2617,30 +2793,33 @@ int main(int argc, char* argv[])
           }
           const auto now = std::chrono::duration_cast<std::chrono::milliseconds>(
             std::chrono::system_clock::now().time_since_epoch()).count();
-          auto recentCandidate = recentGames;
-          if (recentCandidate.add(loadedPath, now)) {
-            const auto saved = recentGamesStore.save(recentCandidate);
-            if (!saved) {
-              qWarning().noquote() << QString::fromStdString(saved.message);
-              window.showRecentGamesError(saved.message);
+          if (!completedLoad.target.isPhysicalMedia()) {
+            auto recentCandidate = recentGames;
+            if (recentCandidate.add(loadedPath, now)) {
+              const auto saved = recentGamesStore.save(recentCandidate);
+              if (!saved) {
+                qWarning().noquote() << QString::fromStdString(saved.message);
+                window.showRecentGamesError(saved.message);
+              } else {
+                recentGames = std::move(recentCandidate);
+                refreshRecentGamesMenu();
+              }
+            }
+            if (libraryScansInFlight.empty()) {
+              const auto recorded = recordLibraryLaunch(loadedPath, now);
+              if (!recorded) {
+                qWarning().noquote()
+                  << QString::fromStdString(recorded.message);
+                window.showGameLibraryError(recorded.message);
+              }
             } else {
-              recentGames = std::move(recentCandidate);
-              refreshRecentGamesMenu();
-            }
-          }
-          if (libraryScansInFlight.empty()) {
-            const auto recorded = recordLibraryLaunch(loadedPath, now);
-            if (!recorded) {
-              qWarning().noquote() << QString::fromStdString(recorded.message);
-              window.showGameLibraryError(recorded.message);
-            }
-          } else {
-            if (!deferredLibraryLaunches.tryPush({loadedPath, now})) {
-              const std::string detail =
-                "The bounded library-history queue is full; this launch "
-                "could not be recorded.";
-              qWarning().noquote() << QString::fromStdString(detail);
-              window.showGameLibraryError(detail);
+              if (!deferredLibraryLaunches.tryPush({loadedPath, now})) {
+                const std::string detail =
+                  "The bounded library-history queue is full; this launch "
+                  "could not be recorded.";
+                qWarning().noquote() << QString::fromStdString(detail);
+                window.showGameLibraryError(detail);
+              }
             }
           }
           if (!shouldResumeAutomatically) {
@@ -2679,6 +2858,21 @@ int main(int argc, char* argv[])
             event->coreError == genplusgx::CoreError::persistenceFailed &&
             (event->workerState == genplusgx::EmulationWorkerState::paused ||
              event->workerState == genplusgx::EmulationWorkerState::running);
+          const bool candidateIsPreviousSnapshot =
+            previousGameRemainsLoaded &&
+            completedLoad.target.isPhysicalMedia() &&
+            completedLoad.previousTarget.isPhysicalMedia() &&
+            completedLoad.target.physicalMedia->storageDirectory ==
+              completedLoad.previousTarget.physicalMedia->storageDirectory;
+          if (completedLoad.target.isPhysicalMedia() &&
+              !candidateIsPreviousSnapshot) {
+            const auto released = releasePhysicalTarget(completedLoad.target);
+            if (!released) {
+              qWarning().noquote()
+                << "Rejected physical-media snapshot cleanup failed:"
+                << QString::fromStdString(released.message);
+            }
+          }
           window.showGameLoadError(
             loadedPath, event->message, !previousGameRemainsLoaded);
           if (previousGameRemainsLoaded) {
@@ -2797,6 +2991,12 @@ int main(int argc, char* argv[])
           activeCheatConfiguration = {};
           pendingCheatMetadata.reset();
           pendingCheatOperation.reset();
+          const auto released = releasePhysicalTarget(closingGameTarget);
+          if (!released) {
+            qWarning().noquote()
+              << "Physical-media snapshot cleanup after unload failed:"
+              << QString::fromStdString(released.message);
+          }
           closingGameTarget = {};
         } else {
           window.setGameLoaded(closingGameTarget);
@@ -3177,8 +3377,13 @@ int main(int argc, char* argv[])
         if (pendingLoad && pendingLoad->phase == PendingLoadPhase::metadata) {
           const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
+          const auto abandonedTarget = pendingLoad->target;
           pendingLoad.reset();
           const auto restored = applyEffectiveSettings(previous);
+          const auto released = releasePhysicalTarget(abandonedTarget);
+          if (!released) {
+            qWarning().noquote() << QString::fromStdString(released.message);
+          }
           std::string detail{stoppedDetail};
           if (!restored) {
             detail += " The previous runtime settings also could not be "
@@ -3249,8 +3454,13 @@ int main(int argc, char* argv[])
         if (!applied) {
           const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
+          const auto abandonedTarget = pendingLoad->target;
           pendingLoad.reset();
           static_cast<void>(applyEffectiveSettings(previous));
+          const auto released = releasePhysicalTarget(abandonedTarget);
+          if (!released) {
+            qWarning().noquote() << QString::fromStdString(released.message);
+          }
           window.showGameLoadError(path, applied.message, false);
           continue;
         }
@@ -3261,8 +3471,13 @@ int main(int argc, char* argv[])
         if (!submitted) {
           const auto path = pendingLoad->target.sourcePath;
           const auto previous = pendingLoad->previousEffective;
+          const auto abandonedTarget = pendingLoad->target;
           pendingLoad.reset();
           static_cast<void>(applyEffectiveSettings(previous));
+          const auto released = releasePhysicalTarget(abandonedTarget);
+          if (!released) {
+            qWarning().noquote() << QString::fromStdString(released.message);
+          }
           window.showGameLoadError(path, submitted.message, false);
         }
         continue;
@@ -3473,7 +3688,7 @@ int main(int argc, char* argv[])
   }
   const bool resumeCheckpointRequested = result == 0 &&
     sessionSettings.resumeOnLaunch && window.isGameLoaded() &&
-    !pendingAutomaticResume;
+    !window.loadedGameTarget().isPhysicalMedia() && !pendingAutomaticResume;
   if (resumeCheckpointRequested && gameGeneration != 0U &&
       stateSessionAvailable &&
       (worker.state() == genplusgx::EmulationWorkerState::paused ||
@@ -3608,6 +3823,7 @@ int main(int argc, char* argv[])
   window.setInputConfigurationSink({});
   window.setControllerAssignmentSink({});
   window.setGameLoadSink({});
+  window.setPhysicalMediaActions({});
   window.setGameCloseSink({});
   window.setClearRecentGamesSink({});
   window.setStateOperationSink({});
@@ -3639,6 +3855,28 @@ int main(int argc, char* argv[])
   };
   const auto workerStopped = worker.stop();
   recordCleanup("Emulation worker", workerStopped);
+  const auto physicalMediaServiceStopped = physicalMediaService.stop();
+  recordCleanup("Physical-media service", physicalMediaServiceStopped);
+  while (auto event = physicalMediaService.pollEvent()) {
+    if (event->type ==
+          genplusgx::platform::PhysicalMediaEventType::importReady &&
+        event->snapshot.valid()) {
+      recordCleanup("Physical-media pending snapshot",
+        genplusgx::platform::releasePhysicalMediaSnapshot(
+          physicalMediaCache, event->snapshot));
+    }
+  }
+  recordCleanup(
+    "Physical-media active snapshot",
+    releasePhysicalTarget(window.loadedGameTarget()));
+  if (pendingLoad &&
+      (!window.loadedGameTarget().isPhysicalMedia() ||
+       pendingLoad->target.physicalMedia !=
+         window.loadedGameTarget().physicalMedia)) {
+    recordCleanup(
+      "Physical-media pending game snapshot",
+      releasePhysicalTarget(pendingLoad->target));
+  }
   const auto recordingServiceStopped = recordingService->stop();
   recordCleanup("Lossless recording service", recordingServiceStopped);
   const auto audioOutputStopped = audioOutput.shutdown();

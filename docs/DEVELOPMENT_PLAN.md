@@ -104,7 +104,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
-| 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
+| 93 Physical optical media | IN PROGRESS | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending hosted gate |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
 | 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
@@ -4341,6 +4341,59 @@ atomic read-only JSON file rather than a listening service; hidden-default behav
 all prior emulator workflows remain unchanged.
 
 **Commit SHA:** implementation `cfa611a2ebbcba76862f7a80255ee1b75e31f453`
+
+## Milestone 93 detail
+
+**Status:** IN PROGRESS
+
+**Goal:** Add native original-disc startup for Sega CD/Mega CD on Windows, Linux, and
+macOS while keeping device access outside the core, the GUI responsive, and transient
+disc bytes bounded, private, validated, and lifecycle-safe.
+
+**Files changed:**
+
+- native-neutral physical-media model/service under `desktop/platform`, with Linux
+  CD-ROM ioctls, Windows CD-ROM device controls, macOS IOKit/raw-CD APIs, and a
+  fail-closed unsupported-platform backend
+- non-modal accessible drive/progress/cancellation UI and File-menu integration
+- composition-root snapshot ownership, ordinary metadata/core load handoff, exclusion
+  from durable recent/library/session-resume paths, and deterministic cleanup
+- install, documentation-validation, and package-verification gates requiring the
+  physical-media guide in every supported native layout
+- generated mixed-mode optical backend plus unit, real-core integration, GUI, fixture,
+  architecture, BIOS, user, testing, changelog, localization, and milestone coverage
+
+**Tests added:** `unit.physical_media` covers the native discovery contract, strict TOC
+and raw-read bounds, CUE generation, Sega CD signature, content-addressed full hashing,
+same-size tamper rejection, atomic commit/removal, injected failure, monotonic progress,
+active/queued cancellation, bounded events, and joined shutdown.
+`integration.physical_media` loads the generated 150-sector raw data plus 75-sector CDDA
+snapshot through the real adapter with generated legal firmware, validates the mounted
+two-track session and Sega CD timing, executes a frame, then unloads before cleanup.
+`gui.physical_media` drives discovery, selection, progress, cancellation, error recovery,
+typed launch/status, action gating, and cleanup through stable object names.
+
+**Gate evidence:** The three focused tests pass. Complete warning-as-error GCC Debug
+and optimized Release graphs pass 112/112; leak-detecting ASan/UBSan passes 112/112
+without a finding; fresh warning-as-error Clang 22 and CHD-disabled graphs pass
+112/112; and the shader-disabled graph passes all 110 applicable tests. The strict
+inherited Unix libretro target builds, links, identifies as x86-64 ELF, and cleans. A
+fresh staged Linux installation and extracted TGZ pass the production layout and
+physical-guide verifier, SHA-256, archive-path, no-user-data, dependency, installed
+version, and complete portable offscreen event-loop checks. The development host has
+no optical drive and no `xvfb-run`, so physical hardware remains an optional manual
+test and native XCB startup remains a hosted Linux gate. Exact hosted Windows/Linux/
+macOS compilation, tests, logs, and artifact verification are still required before
+the milestone can be marked complete.
+
+**Acceptance criteria:** Native code opens optical devices read-only; GUI/core threads
+never own those handles; sector, disc, queue, path, and cache sizes are bounded; imports
+are cancellable and atomically published; malformed/non-Sega-CD/read-failing media never
+reaches the core; successful media uses the unchanged Sega CD/BIOS/CDDA path; transient
+snapshots cannot become stale durable history and are removed after every terminal
+lifecycle; CI requires no commercial disc or proprietary firmware.
+
+**Commit SHA:** pending successful local and hosted verification
 
 ## Milestone 83 detail
 

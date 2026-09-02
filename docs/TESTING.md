@@ -96,6 +96,20 @@ members plus an M3U-driven generated Sega CD disc change through the real core a
 The GUI suite covers archive selection, cancellation, drag/drop/open source identity,
 playlist action gating, and an isolated executable ZIP resume workflow.
 
+`unit.physical_media` uses an injected mixed-mode optical backend to validate table of
+contents and CUE generation, raw-sector bounds, the Sega CD signature, exact complete
+SHA-256 cache verification, same-size tamper rejection, atomic commit/removal, injected
+read failure, monotonic progress, active and queued cancellation, bounded service
+events, native backend discovery contracts, and joined shutdown.
+`integration.physical_media` imports the same generated raw BIN/CDDA layout, loads it
+through `CoreAdapter` with generated non-proprietary firmware, verifies two-track Sega
+CD timing, executes a frame, and releases the snapshot only after core shutdown.
+`gui.physical_media` drives the stable File action and non-modal selector through
+discovery, keyboard-accessible selection, progress, cancellation, failure recovery,
+typed launch, status, and cleanup. Required CI covers each native backend's compile and
+discovery boundary without requiring user hardware; optional real-drive qualification
+is documented in [PHYSICAL_MEDIA.md](PHYSICAL_MEDIA.md).
+
 `unit.game_patch` exercises IPS literals/RLE/growth/truncation, every BPS action,
 forward and reverse UPS, all CRC/source mismatch paths, cache reuse/collisions,
 sidecar ambiguity, and a fixed-seed 512-case mutation corpus. `integration.soft_patch`

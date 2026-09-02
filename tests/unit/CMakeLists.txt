@@ -539,6 +539,24 @@ set_tests_properties(
   unit.bios_manager PROPERTIES LABELS "unit;bios;platform;persistence" TIMEOUT 30
 )
 
+add_executable(genplusgx_physical_media_test physical_media_test.cpp)
+target_link_libraries(
+  genplusgx_physical_media_test
+  PRIVATE
+    GenesisPlusGX::GameFiles
+    GenesisPlusGX::Platform
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Core
+)
+add_test(NAME unit.physical_media COMMAND genplusgx_physical_media_test)
+set_tests_properties(
+  unit.physical_media
+  PROPERTIES
+    LABELS "unit;platform;physical-media;sega-cd;filesystem;security;concurrency;bounded;fixture"
+    TIMEOUT 30
+)
+
 add_executable(genplusgx_frame_pacer_test frame_pacer_test.cpp)
 target_link_libraries(
   genplusgx_frame_pacer_test

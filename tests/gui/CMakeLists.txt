@@ -44,6 +44,27 @@ set_tests_properties(
     TIMEOUT 30
 )
 
+qt_add_executable(genplusgx_physical_media_gui_test physical_media_test.cpp)
+set_target_properties(genplusgx_physical_media_gui_test PROPERTIES AUTOMOC ON)
+target_link_libraries(
+  genplusgx_physical_media_gui_test
+  PRIVATE
+    genplusgx::ui
+    GenesisPlusGX::Platform
+    genplusgx_project_warnings
+    genplusgx_test_utilities
+    Qt6::Test
+    Qt6::Widgets
+)
+add_test(NAME gui.physical_media COMMAND genplusgx_physical_media_gui_test)
+set_tests_properties(
+  gui.physical_media
+  PROPERTIES
+    ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+    LABELS "gui;integration;platform;physical-media;sega-cd;filesystem;accessibility;fixture"
+    TIMEOUT 30
+)
+
 qt_add_executable(genplusgx_debug_tools_live_test debug_tools_live_test.cpp)
 set_target_properties(genplusgx_debug_tools_live_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
