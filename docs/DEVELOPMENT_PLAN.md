@@ -4391,8 +4391,14 @@ unsigned TOC descriptor count was compared with a signed loop index. The complet
 9,798-line log contains no fourth failure cause. The GUI assertion is synchronous,
 the Windows expression now uses the macro-safe standard spelling, and the macOS index
 now has IOKit's exact `UInt32` type. All six complete local graphs and the legacy gate
-pass again after those corrections. A corrective hosted run, complete log review, and
-artifact audit are still required before the milestone can be marked complete.
+pass again after those corrections. Corrective hosted run
+[`33587875814`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33587875814)
+passes all ten jobs, but the required complete-log audit found Apple's linker still
+reporting harmless duplicate static archives inherited from CMake's legacy link-line
+policy. The project now opts into CMake's capability-aware archive de-duplication when
+available (and preserves the documented CMake 3.25 fallback). A warning-clean hosted
+rerun, complete log review, and artifact audit are still required before the milestone
+can be marked complete.
 
 **Acceptance criteria:** Native code opens optical devices read-only; GUI/core threads
 never own those handles; sector, disc, queue, path, and cache sizes are bounded; imports

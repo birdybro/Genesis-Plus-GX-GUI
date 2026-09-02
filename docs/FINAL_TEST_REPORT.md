@@ -416,8 +416,13 @@ all 9,798 log lines confirms those are the only failure roots. The assertion is 
 synchronous because the dialog is shown synchronously, the standard-library maximum
 call is macro-safe, and the IOKit loop uses `UInt32`. Rebuilt GCC Debug, Release,
 ASan/UBSan, fresh Clang 22, CHD-disabled, shader-disabled, and strict legacy gates all
-pass after correction. Exact corrective hosted and artifact evidence remains required
-before Milestone 93 closes.
+pass after correction. Corrective hosted run
+[`33587875814`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33587875814)
+passes all ten jobs. Its complete 15,517-line log contains no compiler, test, sanitizer,
+or runtime failure, but the required audit found Apple linker warnings for repeated
+static archives. Capability-aware CMake link de-duplication is now enabled on CMake
+3.29 and newer, with the CMake 3.25 fallback retained. A warning-clean hosted rerun and
+artifact audit remain required before Milestone 93 closes.
 
 ## Build configurations tested
 

@@ -1,5 +1,15 @@
 cmake_minimum_required(VERSION 3.25)
 
+# Modern Apple and Windows linkers rescan static archives and do not require CMake's
+# legacy repeated-library ordering.  Let newer CMake releases remove those duplicate
+# entries while retaining compatibility with the documented CMake 3.25 minimum.
+if(POLICY CMP0156)
+  cmake_policy(SET CMP0156 NEW)
+endif()
+if(POLICY CMP0179)
+  cmake_policy(SET CMP0179 NEW)
+endif()
+
 project(
   GenesisPlusGXGUI
   VERSION 0.1.1
