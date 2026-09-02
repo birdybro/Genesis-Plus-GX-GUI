@@ -26,6 +26,14 @@ set_tests_properties(
     LABELS "integration;cloud;network;tls;security;bounded;fixture"
     TIMEOUT 30
 )
+if(APPLE)
+  # Secure Transport imports explicitly configured CAs into a keychain. Keep the
+  # loopback fixture isolated from the user's or CI runner's login keychain.
+  set_property(
+    TEST integration.cloud_webdav
+    APPEND PROPERTY ENVIRONMENT "QT_SSL_USE_TEMPORARY_KEYCHAIN=1"
+  )
+endif()
 
 if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
   add_executable(genplusgx_achievements_test achievements_test.cpp)
