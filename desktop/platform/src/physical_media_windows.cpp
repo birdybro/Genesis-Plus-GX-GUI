@@ -107,7 +107,7 @@ public:
     const auto required = static_cast<std::size_t>(sectorCount) *
       compactDiscRawSectorBytes;
     if (sectorCount == 0U || destination.size() != required ||
-        required > std::numeric_limits<DWORD>::max() ||
+        required > (std::numeric_limits<DWORD>::max)() ||
         firstSector >= disc_.leadOutSector ||
         sectorCount > disc_.leadOutSector - firstSector) {
       return {.error = PhysicalMediaError::invalidRequest,

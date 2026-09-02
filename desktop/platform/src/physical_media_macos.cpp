@@ -220,7 +220,7 @@ public:
       .tracks = {},
       .leadOutSector = 0U,
     };
-    for (int index = 0; index < descriptorCount; ++index) {
+    for (UInt32 index = 0U; index < descriptorCount; ++index) {
       const auto& entry = toc->descriptors[index];
       if (entry.adr != 1U) {
         continue;

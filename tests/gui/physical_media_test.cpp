@@ -51,7 +51,7 @@ void PhysicalMediaGuiTest::physicalDiscDialogAndLaunchAreTypedAndRecoverable()
   auto* dialog = window.findChild<PhysicalMediaDialog*>(
     QStringLiteral("physicalMediaDialog"));
   QVERIFY(dialog != nullptr);
-  QTRY_VERIFY(dialog->isVisible());
+  QVERIFY(dialog->isVisible());
   QCOMPARE(discoveries, 1);
   QVERIFY(dialog->busy());
 

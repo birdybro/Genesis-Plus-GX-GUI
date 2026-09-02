@@ -407,8 +407,17 @@ Clang 22, and CHD-disabled graphs pass 112/112; the shader-disabled graph passes
 110 applicable tests. The strict inherited libretro target and a fresh staged/extracted
 Linux TGZ pass. The package checksum, safe paths, production layout, physical guide,
 dependencies, version command, portable offscreen event loop, and absence of packaged
-user data all verify. Exact hosted cross-platform evidence remains required before
-Milestone 93 closes.
+user data all verify. Initial hosted run
+[`33586745073`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33586745073)
+then identified three warning-gated portability defects before tests could run: a Qt
+6.8-only narrowing warning in the GUI test's asynchronous assertion, a Windows SDK
+`max` macro collision, and a signed/unsigned IOKit TOC loop comparison. Inspection of
+all 9,798 log lines confirms those are the only failure roots. The assertion is now
+synchronous because the dialog is shown synchronously, the standard-library maximum
+call is macro-safe, and the IOKit loop uses `UInt32`. Rebuilt GCC Debug, Release,
+ASan/UBSan, fresh Clang 22, CHD-disabled, shader-disabled, and strict legacy gates all
+pass after correction. Exact corrective hosted and artifact evidence remains required
+before Milestone 93 closes.
 
 ## Build configurations tested
 

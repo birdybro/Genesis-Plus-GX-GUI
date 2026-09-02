@@ -4382,9 +4382,17 @@ fresh staged Linux installation and extracted TGZ pass the production layout and
 physical-guide verifier, SHA-256, archive-path, no-user-data, dependency, installed
 version, and complete portable offscreen event-loop checks. The development host has
 no optical drive and no `xvfb-run`, so physical hardware remains an optional manual
-test and native XCB startup remains a hosted Linux gate. Exact hosted Windows/Linux/
-macOS compilation, tests, logs, and artifact verification are still required before
-the milestone can be marked complete.
+test and native XCB startup remains a hosted Linux gate. Initial hosted run
+[`33586745073`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33586745073)
+failed at the warning-gated build step for three platform-specific reasons: Qt 6.8's
+`QTRY_VERIFY` implementation narrowed a chrono duration in the new GUI test, the
+Windows SDK `max` macro expanded through `numeric_limits<DWORD>::max()`, and IOKit's
+unsigned TOC descriptor count was compared with a signed loop index. The complete
+9,798-line log contains no fourth failure cause. The GUI assertion is synchronous,
+the Windows expression now uses the macro-safe standard spelling, and the macOS index
+now has IOKit's exact `UInt32` type. All six complete local graphs and the legacy gate
+pass again after those corrections. A corrective hosted run, complete log review, and
+artifact audit are still required before the milestone can be marked complete.
 
 **Acceptance criteria:** Native code opens optical devices read-only; GUI/core threads
 never own those handles; sector, disc, queue, path, and cache sizes are bounded; imports
