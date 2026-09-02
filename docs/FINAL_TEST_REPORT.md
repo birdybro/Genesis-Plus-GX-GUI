@@ -5,8 +5,9 @@ Linux startup correction, tagged-release audits, and the post-release Libretro s
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
 synchronization, local bezel/overlay, cheat import/search, portable-mode,
-localization, advanced-debugger, physical-optical-media, and authenticated-netplay
-verification through 2026-09-02 (America/Denver).
+localization, advanced-debugger, physical-optical-media, authenticated-netplay,
+RetroAchievements, and conflict-safe cloud-synchronization verification through
+2026-09-02 (America/Denver).
 
 ## Candidate identity
 
@@ -59,6 +60,10 @@ verification through 2026-09-02 (America/Denver).
   `9e98c3377bee0e668abd81d4357b7a8cdab7b4ea`
 - Exact netplay cross-platform corrective and hosted baseline:
   `5c4ee3fdb57e0da4bfdf3237a07c64ccf7b1f9c4`
+- Exact RetroAchievements implementation and hosted baseline:
+  `95695f20f8de4e627bc3823ad1ceaef29a5db380`
+- Exact cloud-synchronization implementation and hosted baseline:
+  `4a73a085b30eb93dbaf165e871613b8f2f889f47`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -1337,7 +1342,7 @@ all six TGZ/ZIP/DMG SHA-256 files verify; native package verifiers passed; execu
 documentation, rcheevos, and QtKeychain license payloads are present; and no game, BIOS,
 firmware, or save image was packaged.
 
-## Milestone 96 local validation
+## Milestone 96 cloud synchronization validation
 
 The cloud implementation is locally release-gated. The default graph contains 124
 tests: 11 infrastructure, 20 core, 11 integration, 48 unit, and 34 GUI/process tests.
@@ -1365,9 +1370,43 @@ data. Pinned `actionlint` 1.7.7 reports no workflow finding. Native XCB installe
 startup and the Windows/macOS package layouts remain mandatory hosted gates because
 this local host image has no `xvfb-run` or foreign platform runtime.
 
-Exact hosted commit/run evidence and the complete successful-log/artifact audit remain
-pending until this implementation commit is pushed. The milestone is not marked
-complete until those results are green and inspected.
+The initial hosted runs exposed and drove correction of two Apple-specific issues that
+the Linux host could not reproduce. Runs
+[`33638118585`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33638118585)
+and
+[`33639510847`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33639510847)
+showed that macOS Secure Transport rejects a ten-year TLS server test certificate even
+when its private CA is explicitly configured. The regenerated fixture has critical
+CA/basic/key-usage constraints, an 824-day leaf, and an isolated Qt temporary keychain.
+Run
+[`33640990285`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33640990285)
+then passed all ten jobs and exposed one warning-only issue in the complete log: macOS
+linked the cloud static library twice. The redundant direct executable link was removed
+without weakening the public UI dependency.
+
+Final exact-SHA run
+[`33645028773`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33645028773)
+at `4a73a085b30eb93dbaf165e871613b8f2f889f47` passes all ten jobs. Each of
+Linux Debug/Release/ASan+UBSan, Windows x64 Debug/Release, macOS arm64 Debug/Release,
+and macOS x86_64 Debug/Release registers and passes 124/124 tests; the inherited Linux
+libretro build also passes. The real production-path TLS/WebDAV integration test passes
+on all nine native jobs. Windows skips only its two expected executions of the real
+OpenGL shader-render test because the hosted software context is below OpenGL 3.3;
+Linux and both macOS architectures execute it.
+
+The complete final log contains 16,934 lines and 2,283,557 bytes. It has zero authored
+compiler/linker warnings, workflow error annotations, sanitizer/undefined-behavior
+findings, failed tests, nonzero commands, or duplicate-library warnings. Expected text
+is limited to CMake platform probes, successful negative tests, timeout arguments, and
+the two Windows renderer capability skips.
+
+Four downloaded artifact bundles contain six final package payloads: Linux x86-64 TGZ,
+Windows x86-64 ZIP, and macOS arm64/x86_64 ZIP+DMG. All six SHA-256 sidecars verify;
+ZIP/TGZ/DMG integrity checks pass; all four extracted platform layouts pass the native
+package verifier; and binaries report the correct ELF/PE32+/Mach-O architectures and
+version 0.1.1. Each package contains `CLOUD_SYNC.md`, Qt Network, and the QtKeychain
+license. No ROM, BIOS, save RAM, state, private key, certificate, or test fixture is
+present. Milestone 96 is complete.
 
 ## Adversarial review
 

@@ -107,7 +107,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
 | 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
 | 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
-| 96 Cloud synchronization | IN PROGRESS | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
+| 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
 | 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
 | 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
@@ -3785,9 +3785,9 @@ cannot contain its own SHA)
 
 ## Milestone 96 detail
 
-**Status:** IN PROGRESS — implementation and all local gates pass; exact hosted
-cross-platform confirmation, complete-log inspection, and downloaded-package audit
-begin after the implementation commit is pushed.
+**Status:** COMPLETE — implementation, local matrices, exact hosted matrix,
+complete-log inspection, CI-driven macOS TLS/link corrections, and downloaded-package
+audit all pass.
 
 **Goal:** Add disabled-by-default, conflict-safe synchronization of application-owned
 save RAM and wrapped save states through a user-provided HTTPS WebDAV account without
@@ -3833,6 +3833,45 @@ contains no test certificate/key, game, firmware, save RAM, or state fixture. Th
 does not provide `xvfb-run`; the required native XCB installed-package smoke remains in
 the hosted Linux Release gate.
 
+The first exact implementation runs
+[`33638118585`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33638118585)
+and
+[`33639510847`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33639510847)
+exposed a real Apple-platform fixture defect: macOS Secure Transport correctly rejected
+the ten-year TLS server leaf even though OpenSSL accepted the private test chain. The
+fixture generator now emits critical CA/basic/key-usage constraints and an 824-day
+server leaf within Apple's 825-day limit, while the test uses Qt's isolated temporary
+keychain. Both failed runs otherwise passed every completed non-Apple test; their
+superseded tail jobs were cancelled by the repository's serialized CI policy.
+
+The replacement exact-SHA run
+[`33640990285`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33640990285)
+at `b9996743b90a1aa642d608db1911f3240ba7116b` passed all ten jobs and all
+124 tests in each of the nine native graphs. Its complete-log audit found one remaining
+authored warning on all four macOS configurations: the final executable linked
+`libgenplusgx_cloud.a` twice. Removing the redundant direct application dependency left
+the public UI dependency as the single required link and preserved all local tests.
+
+Final exact-SHA run
+[`33645028773`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33645028773)
+at `4a73a085b30eb93dbaf165e871613b8f2f889f47` passes all ten jobs: Linux
+Debug/Release/ASan+UBSan/legacy; Windows x64 Debug/Release; macOS arm64 Debug/Release;
+and macOS x86_64 Debug/Release. Each native graph registers and passes 124/124 tests,
+including the production TLS/WebDAV integration test on all nine native jobs. The only
+test skips are the two documented Windows real-OpenGL shader cases; Linux and both
+macOS architectures execute that test.
+
+All 16,934 combined log lines (2,283,557 bytes) were inspected. There is no authored
+compiler/linker warning, workflow error annotation, sanitizer finding, failed test,
+nonzero command, or duplicate-library warning. Remaining diagnostic-like text is
+limited to successful negative tests, expected CMake platform probes, test timeout
+arguments, and the two Windows OpenGL capability skips. Four downloaded artifact
+bundles contain the expected Linux x86-64 TGZ, Windows x86-64 ZIP, and arm64/x86_64
+macOS ZIP+DMG outputs plus six SHA-256 sidecars. Every checksum and archive integrity
+test passes; every extracted layout passes `VerifyPackage.cmake`; executable
+architectures and version 0.1.1 are correct; cloud documentation and the QtKeychain
+notice are present; and no game, BIOS, save, state, key, or TLS fixture is packaged.
+
 **Acceptance criteria:** Only exact per-game save/state paths are selected; TLS and
 conditional manifest writes prevent silent transport/lost-update failure; local data
 is never overwritten on a conflict; remote conflict copies are atomically recoverable;
@@ -3842,8 +3881,10 @@ shutdown waits are bounded; sync and active game ownership cannot overlap; offic
 packages and feature-off builds remain complete; all applicable local and exact hosted
 gates pass; and the Genesis Plus GX core remains unchanged.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Implementation and hosted evidence baseline:**
+`4a73a085b30eb93dbaf165e871613b8f2f889f47`. The ledger-closure commit is the
+commit containing this section and can be resolved with
+`git log -1 -- docs/DEVELOPMENT_PLAN.md` without embedding a circular SHA.
 
 ## Milestone 95 detail
 
