@@ -51,6 +51,10 @@ localization, advanced-debugger, and physical-optical-media verification through
   `58e624e573e9d7e9d8768edb04e4f77617f07602`
 - Exact advanced-debugger implementation and hosted evidence baseline:
   `cfa611a2ebbcba76862f7a80255ee1b75e31f453`
+- Exact physical-optical-media implementation baseline:
+  `696be36a5ca9e0896f44719eec4729f6aced98c8`
+- Exact physical-media portability and warning-clean hosted baseline:
+  `1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -426,8 +430,30 @@ static archives. Capability-aware CMake link de-duplication is now enabled on CM
 passes all ten jobs and removes all but eight warning lines: the app and physical-media
 GUI test each still linked the platform archive both directly and through the UI's
 public interface in all four macOS configurations. Those two redundant direct edges
-are now removed. A warning-clean hosted rerun and artifact audit remain required before
-Milestone 93 closes.
+are now removed. Final implementation run
+[`33591312080`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33591312080)
+passes all ten jobs against exact commit
+`1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`. Linux Debug, Release, and ASan/UBSan
+plus macOS arm64/x86-64 Debug/Release pass 112/112; Windows Debug/Release pass all 111
+supported tests and capability-skip only the real-OpenGL shader probe. The three
+physical-media tests pass everywhere, and the strict legacy libretro gate passes.
+
+The complete 15,449-line, 2,071,396-byte log contains no compiler/linker warning,
+duplicate archive, test failure, sanitizer/runtime finding, timeout, or unexplained
+skip. Normal Windows pthread discovery failure and `windeployqt` omission of its unused
+OpenSSL backend are capability messages, not application failures. Four downloaded
+artifact families contain six SHA-256-valid distributions: Linux x86-64 TGZ
+(40,414,641 bytes), Windows x86-64 ZIP (52,837,545 bytes), macOS arm64 ZIP/DMG
+(32,258,928/32,192,582 bytes), and macOS x86-64 ZIP/DMG
+(33,093,501/33,020,089 bytes). Every extracted ZIP/TGZ and DMG layout passes the
+production verifier; executable architectures match; each ZIP/DMG app binary is
+identical for its architecture; Linux has no unresolved dependency; archive members
+and symlinks are contained; and the payload scan finds no ROM, disc, proprietary BIOS,
+save, state, credential, or pre-created user data outside expected documentation. The
+downloaded Linux application reports 0.1.1 and completes both portable offscreen and
+real-XCB event-loop startup/shutdown with physical-media service lifecycle messages.
+No optical drive is attached to the development host, so real-device validation remains
+an optional documented hardware test. Milestone 93 is complete.
 
 ## Build configurations tested
 

@@ -104,7 +104,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
 | 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
-| 93 Physical optical media | IN PROGRESS | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending hosted gate |
+| 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
 | 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
 | 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
@@ -4344,7 +4344,7 @@ all prior emulator workflows remain unchanged.
 
 ## Milestone 93 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Add native original-disc startup for Sega CD/Mega CD on Windows, Linux, and
 macOS while keeping device access outside the core, the GUI responsive, and transient
@@ -4401,9 +4401,29 @@ available (and preserves the documented CMake 3.25 fallback). Verification run
 passes all ten jobs and removes every repeated persistence/game-file archive. Its
 15,430-line audit narrows the remaining warning to two targets that each named the
 platform archive directly and also consumed it through the UI's required public API;
-those redundant direct edges are now removed. A warning-clean hosted rerun, complete
-log review, and artifact audit are still required before the milestone can be marked
-complete.
+those redundant direct edges are now removed. Final implementation run
+[`33591312080`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33591312080)
+passes all ten jobs against exact commit
+`1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`. All nine desktop configurations
+register 112 tests: Linux Debug/Release/ASan+UBSan and both macOS architectures in
+Debug/Release pass 112/112; Windows Debug/Release pass 111 plus only the established
+real-OpenGL capability skip. The strict legacy job passes. The complete 15,449-line,
+2,071,396-byte log has no compiler/linker warning, duplicate archive, failed test,
+sanitizer/runtime finding, timeout, or unexplained skip.
+
+All four artifact families and six distributions verify against their published
+SHA-256 files: Linux x86-64 TGZ (40,414,641 bytes), Windows x86-64 ZIP (52,837,545
+bytes), macOS arm64 ZIP/DMG (32,258,928/32,192,582 bytes), and macOS x86-64 ZIP/DMG
+(33,093,501/33,020,089 bytes). Every ZIP/TGZ layout plus both extracted DMG layouts
+passes the production verifier and contains the physical-media guide. Executables have
+the declared ELF, PE32+, Mach-O arm64, and Mach-O x86-64 architectures; ZIP/DMG app
+executables are byte-identical per architecture; Linux dependencies resolve; archive
+paths and symlinks are contained; and no ROM, disc, BIOS, save, state, credential, or
+pre-created portable-data payload is present outside expected documentation. The
+downloaded Linux artifact reports version 0.1.1 and completes both a portable offscreen
+and a real-XCB event-loop startup/shutdown with the physical-media service active. The
+development host has no optical drive, so actual-device testing remains the explicitly
+documented optional hardware gate. Milestone 93 is complete.
 
 **Acceptance criteria:** Native code opens optical devices read-only; GUI/core threads
 never own those handles; sector, disc, queue, path, and cache sizes are bounded; imports
@@ -4412,7 +4432,10 @@ reaches the core; successful media uses the unchanged Sega CD/BIOS/CDDA path; tr
 snapshots cannot become stale durable history and are removed after every terminal
 lifecycle; CI requires no commercial disc or proprietary firmware.
 
-**Commit SHA:** pending successful local and hosted verification
+**Commit SHA:** implementation `696be36a5ca9e0896f44719eec4729f6aced98c8`;
+hosted portability and warning closure `0e61c199e8d9a4445c7abd48058188432e224fb3`,
+`8ae6eb1fd14380f4b03af918c57daa68c2f029f0`, and
+`1ec12ec42dbdbd5a5b1dac09d952e64d64ed3021`
 
 ## Milestone 83 detail
 
