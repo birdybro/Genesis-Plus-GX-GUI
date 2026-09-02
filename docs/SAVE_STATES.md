@@ -48,9 +48,10 @@ identical text, while relocating an unchanged sheet/track set preserves its iden
 Save-state activation hashes on its storage thread and checks the service's atomic stop
 request between 64 KiB chunks, so a large disc cannot delay shutdown until EOF.
 
-New `.gpgxstate` files use schema 2. They begin with a fixed 176-byte little-endian
-`GPGXST01` envelope, followed by a checksummed bounded presentation block and then the
-unchanged Genesis Plus GX state payload. The envelope stores schema/header lengths,
+New `.gpgxstate` files use schema 3. They begin with a fixed 176-byte little-endian
+`GPGXST01` envelope, followed by a checksummed bounded presentation block, an optional
+bounded RetroAchievements progress block, and then the unchanged Genesis Plus GX state
+payload. The envelope stores schema/header lengths,
 millisecond timestamp, hardware identifier, slot, frontend frame number, payload
 length, the full game SHA-256, payload SHA-256, presentation length/SHA-256, and the raw
 core-version signature. The presentation block stores length-framed UTF-8 name and PNG
@@ -58,9 +59,11 @@ preview bytes. Payloads are bounded to 2 MiB, previews to 512 KiB and 1024×1024
 and writes use the same atomic transaction mechanism as save RAM. Frontend-generated
 previews are at most 256×192.
 
-Existing schema-1 files retain their original 128-byte header and remain readable,
-loadable, exportable, and importable. Saving or renaming a slot writes schema 2. The
-core payload format itself is neither translated nor modified.
+Existing schema-1 files retain their original 128-byte header, and schema-2 files retain
+their presentation data; both remain readable, loadable, exportable, and importable.
+Saving or renaming a slot writes schema 3. The schema-3 payload checksum covers both the
+separately length-bounded achievement progress and raw state. The core payload format
+itself is neither translated nor modified.
 
 Before loading, the frontend validates the regular file, total length, magic, schema,
 slot, game identity, hardware, timestamp, payload and presentation checksums, bounded

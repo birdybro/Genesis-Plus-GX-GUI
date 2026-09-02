@@ -41,6 +41,35 @@ events cannot drop protocol data. Prediction correction restores `CoreRollbackSt
 and re-simulates without publishing corrective audio/video/capture output. All core
 access remains owned by the emulation thread.
 
+### RetroAchievements data flow
+
+```text
+Qt GUI / secure credential store       Qt HTTPS client (4 concurrent, 4 MiB each)
+        | settings/login command                 ^            |
+        v                                        |            v
+bounded worker command queue          bounded request/response bridge (32/32)
+        |                                        ^            |
+        v                                        |            v
+emulation-thread rcheevos rc_client <--- authoritative frame + logical memory map
+        |
+        v
+Genesis Plus GX core
+```
+
+`rc_client` and every emulated-memory read stay on the single emulation owner thread.
+The GUI thread owns Qt Network and QtKeychain, pumping only bounded provider messages;
+neither callback can enter the core. Requests are restricted to provider HTTPS hosts,
+manual redirects, valid TLS, 15 seconds, and 4 MiB. Passwords are transient and returned
+tokens enter only the OS credential store with plaintext fallback disabled. The settings
+file contains a username and non-secret preferences.
+
+Only authoritative frames call `rc_client_do_frame`; netplay correction, rewind, and
+run-ahead speculation do not. A paused client receives `rc_client_idle` at least once per
+second. The adapter translates rcheevos logical addresses to bounds-checked Genesis,
+Sega CD, Master System, Game Gear, or SG-1000 memory regions without exporting core
+pointers. Active Hardcore restrictions are checked at the worker command boundary, so
+programmatic commands cannot bypass disabled GUI actions.
+
 ```text
              +-------------------+
              | Qt 6 Widgets GUI  |
@@ -95,6 +124,7 @@ desktop/input/           neutral snapshots, mappings, SDL3 controller service
 desktop/persistence/     application paths, atomic files, RAM and states
 desktop/settings/        versioned global and per-game configuration
 desktop/localization/    catalog discovery, installation, and fallback policy
+desktop/achievements/    rcheevos runtime, bounded service bridge, secure credentials
 desktop/library/         metadata and asynchronous SQLite index
 desktop/cheats/          validation, persistence, adapter application
 desktop/platform/        platform paths, diagnostics, deployment helpers
@@ -883,18 +913,27 @@ save. An atomic-write failure blocks unload or replacement and preserves the act
 paused/running core. Final shutdown still tears resources down, releases the identity,
 and returns a failed status so the loss cannot be silent.
 
-Schema-2 save-state files use a fixed 176-byte little-endian `GPGXST01` envelope, a
-checksummed length-framed presentation block, and the unchanged raw Genesis Plus GX
+Schema-3 save-state files use a fixed 176-byte little-endian `GPGXST01` envelope, a
+checksummed length-framed presentation block, an optional achievement-progress block,
+and the unchanged raw Genesis Plus GX
 payload. The envelope records its schema/header lengths, millisecond timestamp,
 hardware, slot, emulated frame number, full game SHA-256, payload length/SHA-256,
-presentation length/SHA-256, and raw core version signature. The presentation block
-holds an optional bounded UTF-8 name and decoded/bounded PNG thumbnail; schema-1
-128-byte states remain readable. The manager accepts only slots 0-9, payloads up to
+presentation length/SHA-256, achievement-progress length, and raw core version
+signature. The payload checksum covers progress plus raw core bytes. The presentation
+block holds an optional bounded UTF-8 name and decoded/bounded PNG thumbnail; schema-1
+128-byte and schema-2 presentation states remain readable. The manager accepts only
+slots 0-9, payloads up to
 2 MiB, and thumbnails up to 512 KiB/1024×1024, validates the entire envelope before
 exposing bytes, and uses the same atomic transaction primitive as RAM persistence. The adapter independently
 asks the running core for its exact hardware-specific state size before calling the
 core's lengthless `state_load()` API. It keeps the current raw snapshot in reusable
 storage and reloads it if the core rejects a candidate, making failed loads transactional.
+
+The rcheevos progress block is independently capped at 4 MiB and remains separate from
+the unmodified core payload. Softcore capture/restore serializes it on the owner thread;
+Hardcore rejects both operations before serialization. Automatic-resume markers are
+not created during active Hardcore play and are cleared before startup restoration when
+the enabled persisted preference requests Hardcore.
 
 Save-state UI file work runs on `StateStorageService`, a dedicated bounded worker that
 owns `SaveStateManager`. Activating a successful game computes its content identity and

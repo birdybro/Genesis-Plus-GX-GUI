@@ -14,6 +14,7 @@ regenerate those legacy builds.
 - SDL 3.2 or newer with its CMake config package
 - Rust and Cargo 1.88 or newer for the default Libretro shader runtime
 - Platform OpenGL/window-system development files on Linux
+- Linux `libsecret-1` development files for the default secure credential-store backend
 
 Hosted CI and release builds pin Qt 6.8.3 and SDL 3.4.14. A newer compatible local Qt
 or SDL is acceptable; the exact detected versions are printed during configure and in
@@ -39,8 +40,10 @@ cannot link a MinGW Qt package, and an arm64 application cannot link x86-64 SDL.
 
 The CHD, zlib, zstd, LZMA, FLAC, Tremor, and minimp3 decoder sources needed by the core
 are bundled. With shader support enabled, CMake downloads the checksum-pinned
-librashader 0.12.0 source archive and Cargo builds its OpenGL C API runtime. CMake never
-downloads ROM/BIOS material or an external shader pack.
+librashader 0.12.0 source archive and Cargo builds its OpenGL C API runtime. With
+achievement support enabled, CMake downloads checksum-pinned rcheevos 12.4.0 and
+QtKeychain 0.17.0 sources. CMake never downloads ROM/BIOS material, credentials,
+achievement data, or an external shader pack.
 
 Qt LinguistTools provides `lupdate` and `lrelease`. The normal desktop build compiles
 the committed translation catalog and stages it beside the build-tree executable;
@@ -56,7 +59,7 @@ by the distribution. On Ubuntu 24.04 the native prerequisites used by CI begin w
 
 ```bash
 sudo apt-get update
-sudo apt-get install ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev
+sudo apt-get install ninja-build g++ libgl1-mesa-dev libegl1-mesa-dev libsecret-1-dev
 ```
 
 Install Qt 6.8+ and SDL3 through their official packages, a suitable distribution
@@ -120,6 +123,7 @@ Useful cache options are:
 | `GENPLUSGX_ENABLE_CHD` | `ON` | Build bundled libchdr CHD decoding |
 | `GENPLUSGX_ENABLE_TREMOR` | `ON` | Build integer Ogg/Vorbis CD-audio decoding |
 | `GENPLUSGX_ENABLE_LIBRETRO_SHADERS` | `ON` | Fetch/build the pinned librashader OpenGL runtime and ship Slang preset support; requires Rust 1.88+ |
+| `GENPLUSGX_ENABLE_ACHIEVEMENTS` | `ON` | Fetch/build pinned rcheevos and QtKeychain integration; Linux requires `libsecret-1` headers |
 | `GENPLUSGX_WINDOWS_REDIST` | empty | Official `vc_redist.x64.exe` included in Windows packages |
 | `GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS` | `OFF` | Register user-owned BIOS fixture tests |
 

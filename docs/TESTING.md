@@ -41,6 +41,27 @@ Run the focused set with:
 ctest --preset debug -R netplay --output-on-failure
 ```
 
+## RetroAchievements tests
+
+`unit.achievements` verifies disabled defaults, bounded atomic settings, credential-free
+JSON, username/key normalization, strict provider HTTPS allowlisting, bridge saturation,
+and an official `rc_client` password-login exchange against an injected response.
+`integration.achievement_worker` loads the generated Genesis ROM, completes the same
+mock login across the real worker bridge, activates Hardcore, rejects state capture,
+frame advance, slow motion, rewind, and below-real-time pacing, permits accelerated
+pacing/fast-forward, signs out, and shuts down cleanly. `core.lifecycle` verifies each
+supported console ID plus endian-correct logical memory reads and boundary rejection.
+State-manager/storage tests cover schema-3 progress round trips, import, rename, resume,
+checksum corruption, and the 4 MiB cap. `gui.achievements` drives account controls,
+password clearing, achievement rows, accessible object names, and Hardcore action
+gating. All provider traffic is mocked; required tests need no account or Internet.
+
+Run the focused set with:
+
+```bash
+ctest --preset debug -L achievements --output-on-failure
+```
+
 Useful focused labels include `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `fuzz`, `timing`, `audio`, `video`, `input`, `lifecycle`, `stress`,
 `rewind`, `run-ahead`, `localization`, `packaging`, `release`, and `documentation`:

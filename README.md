@@ -65,6 +65,9 @@ rewritten.
 - Opt-in authenticated direct TCP netplay for one peer, with content/build/settings
   compatibility checks, configurable input delay, bounded owner-thread rollback,
   replay/tamper rejection, and deterministic operation lockouts
+- Opt-in RetroAchievements through the official rcheevos client, with recognized-game
+  progress, rich presence, leaderboards, secure native token storage, offline fallback,
+  and owner-thread Hardcore enforcement
 - BIOS validation, Sega CD disc change/eject, CDDA, CUE/BIN, ISO, and CHD workflows
 - Native Windows, Linux, and macOS optical-drive import for original mixed-mode Sega
   CD/Mega CD media, with responsive progress/cancellation and atomic transient cleanup
@@ -275,6 +278,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [Lossless recording](docs/RECORDING.md)
 - [Run-ahead](docs/RUN_AHEAD.md)
 - [Netplay](docs/NETPLAY.md)
+- [RetroAchievements](docs/ACHIEVEMENTS.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

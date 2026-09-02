@@ -1,6 +1,7 @@
 #include "genplusgx/emulation_worker.h"
 
 #include "genplusgx/bounded_queue.h"
+#include "genplusgx/achievements/achievement_runtime.h"
 #include "genplusgx/rewind_buffer.h"
 #include "genplusgx/timing/host_timer_resolution.h"
 
@@ -213,10 +214,13 @@ EmulationCommand EmulationCommand::changeDisc(
 
 EmulationCommand EmulationCommand::restore(
   std::uint64_t operationId,
-  std::span<const std::uint8_t> rawState)
+  std::span<const std::uint8_t> rawState,
+  std::span<const std::uint8_t> achievementProgress)
 {
   auto command = simple(EmulationCommandType::restoreState, operationId);
   command.rawState.assign(rawState.begin(), rawState.end());
+  command.achievementProgress.assign(
+    achievementProgress.begin(), achievementProgress.end());
   return command;
 }
 
@@ -247,6 +251,39 @@ EmulationCommand EmulationCommand::remoteNetplayFrame(
   return command;
 }
 
+EmulationCommand EmulationCommand::updateAchievementSettings(
+  std::uint64_t operationId,
+  achievements::Settings settings)
+{
+  auto command = simple(EmulationCommandType::achievementSettings, operationId);
+  command.achievementSettings = std::move(settings);
+  return command;
+}
+
+EmulationCommand EmulationCommand::achievementPasswordLogin(
+  std::uint64_t operationId,
+  std::string username,
+  std::string password)
+{
+  auto command = simple(
+    EmulationCommandType::achievementLoginPassword, operationId);
+  command.achievementUsername = std::move(username);
+  command.achievementSecret = std::move(password);
+  return command;
+}
+
+EmulationCommand EmulationCommand::achievementTokenLogin(
+  std::uint64_t operationId,
+  std::string username,
+  std::string token)
+{
+  auto command = simple(
+    EmulationCommandType::achievementLoginToken, operationId);
+  command.achievementUsername = std::move(username);
+  command.achievementSecret = std::move(token);
+  return command;
+}
+
 class EmulationWorker::Private final {
 public:
   Private(
@@ -258,7 +295,8 @@ public:
     std::shared_ptr<StereoAudioRingBuffer> audioFrames,
     std::shared_ptr<BackupMemoryPersistence> backupPersistence,
     std::shared_ptr<EmulationCaptureSink> captureSink,
-    std::shared_ptr<netplay::NetplayBridge> netplayBridge)
+    std::shared_ptr<netplay::NetplayBridge> netplayBridge,
+    std::shared_ptr<achievements::ServerBridge> achievementBridge)
     : owner_(owner),
       commands_(commandCapacity),
       events_(eventCapacity),
@@ -271,7 +309,9 @@ public:
       backupPersistence_(std::move(backupPersistence)),
       captureSink_(std::move(captureSink)),
       netplayBridge_(netplayBridge ? std::move(netplayBridge)
-                                  : std::make_shared<netplay::NetplayBridge>())
+                                  : std::make_shared<netplay::NetplayBridge>()),
+      achievementBridge_(achievementBridge ? std::move(achievementBridge)
+        : std::make_shared<achievements::ServerBridge>())
   {
   }
 
@@ -300,6 +340,7 @@ public:
     frameBreakpoints_.clear();
     frameBreakpointClientToken_ = 0U;
     lastBreakpointHit_.reset();
+    achievementHardcoreEnforced_ = false;
     owner_.state_.store(EmulationWorkerState::starting, std::memory_order_release);
     try {
       thread_ = std::thread{&Private::threadMain, this};
@@ -534,6 +575,14 @@ public:
       .netplayRollbacks = netplayRollbacksMetrics_,
       .netplayHistoryFrames = netplayHistoryFramesMetrics_,
       .netplayHistoryBytes = netplayHistoryBytesMetrics_,
+      .achievementsEnabled = achievementsEnabledMetrics_,
+      .achievementsAuthenticated = achievementsAuthenticatedMetrics_,
+      .achievementsGameLoaded = achievementsGameLoadedMetrics_,
+      .achievementsHardcore = achievementsHardcoreMetrics_,
+      .achievementRequestQueueDepth = achievementBridgeMetrics_.requestDepth,
+      .achievementResponseQueueDepth = achievementBridgeMetrics_.responseDepth,
+      .rejectedAchievementRequests = achievementBridgeMetrics_.rejectedRequests,
+      .rejectedAchievementResponses = achievementBridgeMetrics_.rejectedResponses,
     };
   }
 
@@ -545,6 +594,11 @@ public:
   std::shared_ptr<StereoAudioRingBuffer> audioFrames() const
   {
     return audioFrames_;
+  }
+
+  std::shared_ptr<achievements::ServerBridge> achievementBridge() const
+  {
+    return achievementBridge_;
   }
 
 private:
@@ -647,6 +701,12 @@ private:
       return;
     }
 
+    achievements_ = std::make_unique<achievements::Runtime>(
+      achievementBridge_, [&adapter](std::uint32_t address,
+        std::span<std::uint8_t> output) {
+        return adapter.readAchievementMemory(address, output);
+      });
+
     pacer_ = FramePacer{};
     updateMetrics(adapter);
     owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
@@ -656,6 +716,7 @@ private:
     while (true) {
       std::optional<EmulationCommand> command;
       bool executeFrame = false;
+      bool serviceIdle = false;
       {
         std::unique_lock lock{mutex_};
         if (stopRequested_.load(std::memory_order_acquire)) {
@@ -690,23 +751,37 @@ private:
             executeFrame = true;
           }
         } else {
-          wake_.wait(lock, [this] {
+          const auto ready = [this] {
             return stopRequested_.load(std::memory_order_acquire) ||
               !commands_.empty();
-          });
+          };
+          bool notified = true;
+          if (achievements_ && achievements_->enabled()) {
+            notified = wake_.wait_for(
+              lock, std::chrono::milliseconds{100}, ready);
+          } else {
+            wake_.wait(lock, ready);
+          }
           if (stopRequested_.load(std::memory_order_acquire)) {
             break;
           }
-          command = commands_.pop();
+          if (notified) {
+            command = commands_.pop();
+          } else {
+            serviceIdle = true;
+          }
         }
       }
 
       if (command) {
         processCommand(adapter, std::move(*command));
+        serviceAchievements(adapter, false);
         continue;
       }
       if (executeFrame) {
         runOneFrame(adapter);
+      } else if (serviceIdle) {
+        serviceAchievements(adapter, false);
       }
     }
 
@@ -717,6 +792,10 @@ private:
   {
     pacer_.pause();
     resetNetplaySession(true);
+    if (achievements_) {
+      achievements_->unloadGame();
+      achievements_.reset();
+    }
     updateMetrics(adapter);
     const auto persisted = saveBackupMemory(adapter);
     const auto shutdown = adapter.shutdown();
@@ -748,6 +827,7 @@ private:
     bool validTransition = true;
     EmulationEventType eventType = EmulationEventType::commandCompleted;
     std::vector<std::uint8_t> capturedState;
+    std::vector<std::uint8_t> capturedAchievementProgress;
     CoreDebugResponse debugResponse;
     const auto current = owner_.state_.load(std::memory_order_acquire);
 
@@ -757,10 +837,31 @@ private:
       command.type != EmulationCommandType::stopNetplay &&
       command.type != EmulationCommandType::resume &&
       command.type != EmulationCommandType::start;
+    const auto hardcore = achievements_ && achievements_->hardcoreActive();
+    const bool blockedByHardcore = hardcore &&
+      (command.type == EmulationCommandType::captureState ||
+       command.type == EmulationCommandType::restoreState ||
+       command.type == EmulationCommandType::frameAdvance ||
+       command.type == EmulationCommandType::debugRequest ||
+       (command.type == EmulationCommandType::setSlowMotion && command.enabled) ||
+       (command.type == EmulationCommandType::setRewinding && command.enabled) ||
+       (command.type == EmulationCommandType::rewindSettings &&
+          command.rewindConfiguration.enabled) ||
+       (command.type == EmulationCommandType::runAheadSettings &&
+          command.runAheadConfiguration.enabled) ||
+       (command.type == EmulationCommandType::speedSettings &&
+          command.speedConfiguration.normalPercent < 100U) ||
+       (command.type == EmulationCommandType::cheats &&
+          !command.coreCheats.empty()));
     if (blockedByNetplay) {
       coreResult = {
         CoreError::invalidStatePayload,
         "That operation is unavailable during an active netplay session.",
+      };
+    } else if (blockedByHardcore) {
+      coreResult = {
+        CoreError::invalidStatePayload,
+        "That operation is unavailable while RetroAchievements Hardcore Mode is active.",
       };
     } else switch (command.type) {
       case EmulationCommandType::loadGame: {
@@ -783,6 +884,11 @@ private:
         endBackupGame();
         coreResult = adapter.loadGame(command.path);
         if (!coreResult) {
+          if (achievements_) {
+            achievements_->unloadGame();
+          }
+          achievementGamePath_.clear();
+          achievementConsoleId_ = 0U;
           owner_.state_.store(EmulationWorkerState::idle, std::memory_order_release);
           fastForward_ = false;
           slowMotion_ = false;
@@ -807,11 +913,22 @@ private:
         }
         fastForward_ = false;
         slowMotion_ = false;
+        achievementGamePath_ = command.path;
+        achievementConsoleId_ = adapter.achievementConsoleId();
+        if (achievements_ && achievements_->authenticated()) {
+          achievements_->loadGame(achievementConsoleId_, achievementGamePath_);
+        }
         owner_.state_.store(
           EmulationWorkerState::paused, std::memory_order_release);
         break;
       }
       case EmulationCommandType::unloadGame:
+        if (achievements_) {
+          achievements_->unloadGame();
+        }
+        achievementGamePath_.clear();
+        achievementConsoleId_ = 0U;
+        achievementHardcoreEnforced_ = false;
         frameBreakpoints_.clear();
         frameBreakpointClientToken_ = 0U;
         lastBreakpointHit_.reset();
@@ -847,6 +964,17 @@ private:
         break;
       case EmulationCommandType::pause:
         validTransition = current == EmulationWorkerState::running;
+        if (validTransition && achievements_) {
+          std::uint32_t framesRemaining = 0U;
+          if (!achievements_->pauseAllowed(&framesRemaining)) {
+            coreResult = {
+              CoreError::invalidStatePayload,
+              "Hardcore Mode requires " + std::to_string(framesRemaining) +
+                " more frames before emulation may be paused.",
+            };
+            break;
+          }
+        }
         if (validTransition) {
           rewinding_ = false;
           pacer_.pause();
@@ -858,6 +986,9 @@ private:
         rewinding_ = false;
         rewindBuffer_.clear();
         coreResult = adapter.reset();
+        if (coreResult && achievements_) {
+          achievements_->reset();
+        }
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
@@ -871,6 +1002,9 @@ private:
         rewinding_ = false;
         rewindBuffer_.clear();
         coreResult = adapter.softReset();
+        if (coreResult && achievements_) {
+          achievements_->reset();
+        }
         if (coreResult) {
           coreResult = configurePacing(
             adapter, current == EmulationWorkerState::running);
@@ -1085,6 +1219,9 @@ private:
           audioFrames_->clear();
           coreResult = adapter.changeDisc(command.path);
           if (coreResult) {
+            if (achievements_) {
+              achievements_->changeMedia(command.path);
+            }
             coreResult = resetRewindHistory(adapter);
           }
         }
@@ -1092,6 +1229,8 @@ private:
       case EmulationCommandType::captureState:
         coreResult = adapter.saveRawState(capturedState);
         if (coreResult) {
+          capturedAchievementProgress = achievements_
+            ? achievements_->serializeProgress() : std::vector<std::uint8_t>{};
           eventType = EmulationEventType::stateCaptured;
         }
         break;
@@ -1109,6 +1248,17 @@ private:
         }
         if (coreResult) {
           coreResult = resetRewindHistory(adapter);
+        }
+        if (coreResult && achievements_) {
+          if (command.achievementProgress.empty()) {
+            achievements_->reset();
+          } else if (!achievements_->deserializeProgress(
+                       command.achievementProgress)) {
+            coreResult = {
+              CoreError::invalidStatePayload,
+              "The achievement progress in this save state is invalid.",
+            };
+          }
         }
         break;
       case EmulationCommandType::debugRequest: {
@@ -1145,6 +1295,14 @@ private:
         break;
       }
       case EmulationCommandType::startNetplay:
+        if (achievements_ && (achievements_->gameActive() ||
+            achievements_->gameIdentificationPending())) {
+          coreResult = {
+            CoreError::invalidStatePayload,
+            "Netplay cannot start while achievements are active for this game.",
+          };
+          break;
+        }
         validTransition =
           (current == EmulationWorkerState::paused ||
            current == EmulationWorkerState::running) &&
@@ -1224,6 +1382,31 @@ private:
           eventType = EmulationEventType::netplayStopped;
         }
         break;
+      case EmulationCommandType::achievementSettings:
+        if (achievements_) {
+          achievements_->configure(std::move(command.achievementSettings));
+        }
+        break;
+      case EmulationCommandType::achievementLoginPassword:
+        if (achievements_) {
+          achievements_->loginWithPassword(
+            std::move(command.achievementUsername),
+            std::move(command.achievementSecret));
+        }
+        break;
+      case EmulationCommandType::achievementLoginToken:
+        if (achievements_) {
+          achievements_->loginWithToken(
+            std::move(command.achievementUsername),
+            std::move(command.achievementSecret));
+        }
+        break;
+      case EmulationCommandType::achievementLogout:
+        if (achievements_) {
+          achievements_->logout();
+        }
+        achievementHardcoreEnforced_ = false;
+        break;
     }
 
     updateMetrics(adapter);
@@ -1288,12 +1471,112 @@ private:
     event.rewindAvailable = rewindBuffer_.canRewind(adapter.frameCount());
     populateRunAheadEvent(event, adapter);
     event.rawState = std::move(capturedState);
+    event.achievementProgress = std::move(capturedAchievementProgress);
     event.netplayActive = netplayTimeline_.active();
     event.debug = std::move(debugResponse);
     if (adapter.state() == CoreLifecycleState::loaded) {
       static_cast<void>(adapter.discInfo(event.disc));
     }
     publishOperation(std::move(event));
+  }
+
+  CoreResult enforceAchievementHardcore(CoreAdapter& adapter)
+  {
+    const auto active = achievements_ && achievements_->hardcoreActive();
+    if (!active) {
+      achievementHardcoreEnforced_ = false;
+      return {};
+    }
+    if (achievementHardcoreEnforced_) {
+      return {};
+    }
+
+    achievementHardcoreEnforced_ = true;
+    rewinding_ = false;
+    slowMotion_ = false;
+    rewindBuffer_.clear();
+    resetRunAheadSession(true);
+    frameBreakpoints_.clear();
+    frameBreakpointClientToken_ = 0U;
+    lastBreakpointHit_.reset();
+    audioFrames_->clear();
+    if (const auto cheatsCleared = adapter.applyCheats({}); !cheatsCleared) {
+      return cheatsCleared;
+    }
+    if (adapter.state() != CoreLifecycleState::loaded ||
+        adapter.frameCount() == 0U) {
+      return {};
+    }
+
+    discardLatestFrame();
+    if (const auto reset = adapter.reset(); !reset) {
+      return reset;
+    }
+    achievements_->reset();
+    const auto running = owner_.state_.load(std::memory_order_acquire) ==
+      EmulationWorkerState::running;
+    if (const auto pacing = configurePacing(adapter, running); !pacing) {
+      return pacing;
+    }
+    return resetRewindHistory(adapter);
+  }
+
+  void serviceAchievements(CoreAdapter& adapter, bool frameExecuted)
+  {
+    if (!achievements_) {
+      return;
+    }
+    if (frameExecuted && !netplayTimeline_.active() && !rewinding_) {
+      achievements_->doFrame();
+    } else {
+      achievements_->idle();
+    }
+
+    auto runtimeEvents = achievements_->takeEvents();
+    for (auto& runtimeEvent : runtimeEvents) {
+      if (runtimeEvent.type == achievements::EventType::loginSucceeded &&
+          !achievementGamePath_.empty() && achievementConsoleId_ != 0U &&
+          !achievements_->gameActive()) {
+        achievements_->loadGame(achievementConsoleId_, achievementGamePath_);
+      }
+      if (runtimeEvent.type == achievements::EventType::resetRequested &&
+          adapter.state() == CoreLifecycleState::loaded &&
+          adapter.frameCount() > 0U) {
+        discardLatestFrame();
+        rewindBuffer_.clear();
+        resetRunAheadSession(true);
+        const auto reset = adapter.reset();
+        if (reset) {
+          achievements_->reset();
+          static_cast<void>(configurePacing(adapter,
+            owner_.state_.load(std::memory_order_acquire) ==
+              EmulationWorkerState::running));
+          static_cast<void>(resetRewindHistory(adapter));
+        }
+      }
+      auto event = eventFor(EmulationEventType::achievementEvent,
+        owner_.state_.load(std::memory_order_acquire));
+      event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
+      event.achievement = std::move(runtimeEvent);
+      publishOperation(std::move(event));
+    }
+
+    if (const auto enforced = enforceAchievementHardcore(adapter); !enforced) {
+      owner_.state_.store(
+        EmulationWorkerState::paused, std::memory_order_release);
+      pacer_.pause();
+      auto event = eventFor(EmulationEventType::commandFailed,
+        EmulationWorkerState::paused);
+      event.error = EmulationWorkerError::coreFailure;
+      event.coreError = enforced.error;
+      event.message = "Hardcore Mode could not secure the emulation session: " +
+        enforced.message;
+      event.frameNumber = adapter.frameCount();
+      event.hardware = adapter.hardware();
+      publishOperation(std::move(event));
+    }
+    updateMetrics(adapter);
   }
 
   void runOneFrame(CoreAdapter& adapter)
@@ -1315,6 +1598,8 @@ private:
       publishOperation(std::move(event));
       return;
     }
+
+    serviceAchievements(adapter, true);
 
     pacer_.frameExecuted(Clock::now());
     auto frameState = EmulationWorkerState::running;
@@ -1609,7 +1894,7 @@ private:
     return adapter.state() == CoreLifecycleState::loaded &&
       runAheadConfiguration_.enabled && runAheadSupported_ &&
       !runAheadDeterminism_.faulted() && !fastForward_ && !slowMotion_ &&
-      !rewinding_;
+      !rewinding_ && !(achievements_ && achievements_->hardcoreActive());
   }
 
   CoreResult transferCoreAudio(
@@ -1885,8 +2170,12 @@ private:
       ? EmulationSpeedMode::fastForward
       : slowMotion_ ? EmulationSpeedMode::slowMotion
                     : EmulationSpeedMode::normal;
-    return pacer_.setSpeed(
-      mode, speedPercentForMode(speedConfiguration_, mode), now);
+    auto percent = speedPercentForMode(speedConfiguration_, mode);
+    if (mode == EmulationSpeedMode::normal &&
+        achievements_ && achievements_->hardcoreActive()) {
+      percent = std::max(percent, 100U);
+    }
+    return pacer_.setSpeed(mode, percent, now);
   }
 
   void updateMetrics(CoreAdapter& adapter)
@@ -1918,6 +2207,13 @@ private:
     netplayRollbacksMetrics_ = netplayRollbacks_;
     netplayHistoryFramesMetrics_ = netplayHistory_.size();
     netplayHistoryBytesMetrics_ = netplayHistoryBytes_;
+    achievementsEnabledMetrics_ = achievements_ && achievements_->enabled();
+    achievementsAuthenticatedMetrics_ =
+      achievements_ && achievements_->authenticated();
+    achievementsGameLoadedMetrics_ = achievements_ && achievements_->gameActive();
+    achievementsHardcoreMetrics_ =
+      achievements_ && achievements_->hardcoreActive();
+    achievementBridgeMetrics_ = achievementBridge_->metrics();
   }
 
   void resetNetplaySession(bool preserveCounters) noexcept
@@ -2008,6 +2304,11 @@ private:
   std::shared_ptr<BackupMemoryPersistence> backupPersistence_;
   std::shared_ptr<EmulationCaptureSink> captureSink_;
   std::shared_ptr<netplay::NetplayBridge> netplayBridge_;
+  std::shared_ptr<achievements::ServerBridge> achievementBridge_;
+  std::unique_ptr<achievements::Runtime> achievements_;
+  std::filesystem::path achievementGamePath_;
+  std::uint32_t achievementConsoleId_{0U};
+  bool achievementHardcoreEnforced_{false};
   bool backupGameActive_{false};
   std::array<StereoAudioFrame, maximumAudioFramesPerBatch> audioScratch_{};
   std::array<std::uint16_t, maximumCoreSurfacePixels> runAheadVideoScratch_{};
@@ -2049,6 +2350,11 @@ private:
   std::uint64_t netplayRollbacksMetrics_{0U};
   std::size_t netplayHistoryFramesMetrics_{0U};
   std::size_t netplayHistoryBytesMetrics_{0U};
+  achievements::BridgeMetrics achievementBridgeMetrics_;
+  bool achievementsEnabledMetrics_{false};
+  bool achievementsAuthenticatedMetrics_{false};
+  bool achievementsGameLoadedMetrics_{false};
+  bool achievementsHardcoreMetrics_{false};
   FramePacer pacer_;
   FramePacerMetrics pacingMetrics_;
   std::uint64_t coalescedInputCommands_{0};
@@ -2073,7 +2379,8 @@ EmulationWorker::EmulationWorker(
   std::shared_ptr<StereoAudioRingBuffer> audioFrames,
   std::shared_ptr<BackupMemoryPersistence> backupPersistence,
   std::shared_ptr<EmulationCaptureSink> captureSink,
-  std::shared_ptr<netplay::NetplayBridge> netplayBridge)
+  std::shared_ptr<netplay::NetplayBridge> netplayBridge,
+  std::shared_ptr<achievements::ServerBridge> achievementBridge)
   : private_(std::make_unique<Private>(
       *this,
       commandCapacity,
@@ -2083,7 +2390,8 @@ EmulationWorker::EmulationWorker(
       std::move(audioFrames),
       std::move(backupPersistence),
       std::move(captureSink),
-      std::move(netplayBridge)))
+      std::move(netplayBridge),
+      std::move(achievementBridge)))
 {
 }
 
@@ -2136,6 +2444,12 @@ std::shared_ptr<VideoFrameExchange> EmulationWorker::videoFrames() const
 std::shared_ptr<StereoAudioRingBuffer> EmulationWorker::audioFrames() const
 {
   return private_->audioFrames();
+}
+
+std::shared_ptr<achievements::ServerBridge>
+EmulationWorker::achievementBridge() const
+{
+  return private_->achievementBridge();
 }
 
 } // namespace genplusgx

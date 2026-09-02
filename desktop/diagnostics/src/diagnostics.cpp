@@ -450,6 +450,21 @@ std::string formatDiagnostics(
          << " requested, " << snapshot.netplayRollbacks << " performed\n"
          << "Netplay rollback history: " << snapshot.netplayHistoryFrames
          << " frames, " << snapshot.netplayHistoryBytes << " bytes\n"
+         << "RetroAchievements: "
+         << safeLine(snapshot.achievementsState, detectedHome)
+         << (snapshot.achievementsHardcore ? " (Hardcore active)" : "") << '\n'
+         << "RetroAchievements bridge: "
+         << snapshot.achievementRequestQueueDepth << " requests / "
+         << snapshot.achievementResponseQueueDepth << " responses / "
+         << snapshot.achievementQueueCapacity << " capacity\n"
+         << "RetroAchievements bridge rejections: "
+         << snapshot.rejectedAchievementRequests << " requests / "
+         << snapshot.rejectedAchievementResponses << " responses\n"
+         << "RetroAchievements HTTPS: " << snapshot.activeAchievementRequests
+         << " active, " << snapshot.completedAchievementRequests
+         << " completed, " << snapshot.failedAchievementRequests << " failed\n"
+         << "RetroAchievements last network error: "
+         << safeLine(snapshot.lastAchievementNetworkError, detectedHome) << '\n'
          << "Lossless recording: "
          << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
          << "Recording queue: " << snapshot.recordingQueuedFrames << " / "

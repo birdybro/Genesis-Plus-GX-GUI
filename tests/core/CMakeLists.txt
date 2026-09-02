@@ -7,6 +7,23 @@ target_link_libraries(
 add_test(NAME core.library_link COMMAND genplusgx_core_link_test)
 set_tests_properties(core.library_link PROPERTIES LABELS "core;smoke")
 
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
+  add_executable(genplusgx_achievement_worker_test achievement_worker_test.cpp)
+  target_link_libraries(
+    genplusgx_achievement_worker_test
+    PRIVATE
+      GenesisPlusGX::CoreAdapter
+      genplusgx_project_warnings
+      genplusgx_test_utilities
+  )
+  add_test(NAME integration.achievement_worker COMMAND genplusgx_achievement_worker_test)
+  set_tests_properties(
+    integration.achievement_worker
+    PROPERTIES LABELS "core;integration;achievements;security;state;fixture;concurrency"
+      TIMEOUT 30
+  )
+endif()
+
 add_executable(
   genplusgx_soft_patch_workflow_test soft_patch_workflow_test.cpp
 )

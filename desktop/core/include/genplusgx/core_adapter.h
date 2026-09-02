@@ -232,6 +232,10 @@ public:
     CoreDebugResponse& response);
   [[nodiscard]] CoreResult debugProgramCounters(
     CoreDebugProgramCounters& output) const;
+  [[nodiscard]] std::uint32_t achievementConsoleId() const;
+  [[nodiscard]] std::uint32_t readAchievementMemory(
+    std::uint32_t address,
+    std::span<std::uint8_t> output) const;
 
   [[nodiscard]] CoreLifecycleState state() const noexcept;
   [[nodiscard]] std::filesystem::path loadedPath() const;

@@ -54,11 +54,13 @@ struct SaveStateLoadResult final {
   SaveStateStatus status;
   SaveStateMetadata metadata;
   std::vector<std::uint8_t> rawPayload;
+  std::vector<std::uint8_t> achievementProgress{};
 };
 
 class SaveStateManager final {
 public:
-  static constexpr std::uint32_t currentSchemaVersion = 2U;
+  static constexpr std::uint32_t currentSchemaVersion = 3U;
+  static constexpr std::uint32_t presentationSchemaVersion = 2U;
   static constexpr std::uint32_t legacySchemaVersion = 1U;
   static constexpr std::uint32_t minimumSlot = 0U;
   static constexpr std::uint32_t maximumSlot = 9U;
@@ -66,8 +68,11 @@ public:
   static constexpr std::size_t maximumPayloadBytes = 2U * 1024U * 1024U;
   static constexpr std::size_t maximumDisplayNameBytes = 96U;
   static constexpr std::size_t maximumThumbnailBytes = 512U * 1024U;
+  static constexpr std::size_t maximumAchievementProgressBytes =
+    4U * 1024U * 1024U;
   static constexpr std::size_t maximumFileBytes =
-    maximumPayloadBytes + maximumThumbnailBytes + maximumDisplayNameBytes + 192U;
+    maximumPayloadBytes + maximumAchievementProgressBytes +
+    maximumThumbnailBytes + maximumDisplayNameBytes + 192U;
 
   explicit SaveStateManager(ApplicationPaths paths);
 
@@ -96,7 +101,8 @@ public:
     std::span<const std::uint8_t> rawPayload,
     const SaveStatePresentation& presentation,
     std::chrono::system_clock::time_point timestamp =
-      std::chrono::system_clock::now()) const;
+      std::chrono::system_clock::now(),
+    std::span<const std::uint8_t> achievementProgress = {}) const;
   [[nodiscard]] SaveStateLoadResult loadSlot(
     const GameIdentity& identity,
     std::uint32_t slot,
@@ -126,7 +132,8 @@ public:
     std::uint64_t emulatedFrameNumber,
     std::span<const std::uint8_t> rawPayload,
     std::chrono::system_clock::time_point timestamp =
-      std::chrono::system_clock::now()) const;
+      std::chrono::system_clock::now(),
+    std::span<const std::uint8_t> achievementProgress = {}) const;
   [[nodiscard]] SaveStateLoadResult loadResumeState(
     const GameIdentity& identity,
     std::uint32_t expectedHardware) const;
@@ -145,7 +152,8 @@ private:
     std::uint64_t emulatedFrameNumber,
     std::span<const std::uint8_t> rawPayload,
     const SaveStatePresentation& presentation,
-    std::chrono::system_clock::time_point timestamp) const;
+    std::chrono::system_clock::time_point timestamp,
+    std::span<const std::uint8_t> achievementProgress) const;
   [[nodiscard]] SaveStateLoadResult loadFile(
     const std::filesystem::path& path,
     const GameIdentity& expectedIdentity,

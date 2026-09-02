@@ -1,6 +1,9 @@
 #pragma once
 
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/achievements/achievement_bridge.h"
+#include "genplusgx/achievements/achievement_settings.h"
+#include "genplusgx/achievements/achievement_types.h"
 #include "genplusgx/emulation_capture_sink.h"
 #include "genplusgx/input_snapshot.h"
 #include "genplusgx/netplay/netplay_bridge.h"
@@ -65,6 +68,10 @@ enum class EmulationCommandType {
   startNetplay,
   remoteNetplayInput,
   stopNetplay,
+  achievementSettings,
+  achievementLoginPassword,
+  achievementLoginToken,
+  achievementLogout,
 };
 
 struct EmulationCommand final {
@@ -86,6 +93,10 @@ struct EmulationCommand final {
   CoreDebugRequest coreDebugRequest;
   netplay::NetplayConfiguration netplayConfiguration;
   netplay::NetplayInputFrame netplayInput;
+  achievements::Settings achievementSettings;
+  std::string achievementUsername;
+  std::string achievementSecret;
+  std::vector<std::uint8_t> achievementProgress;
 
   [[nodiscard]] static EmulationCommand simple(
     EmulationCommandType type,
@@ -140,7 +151,8 @@ struct EmulationCommand final {
     std::filesystem::path path);
   [[nodiscard]] static EmulationCommand restore(
     std::uint64_t operationId,
-    std::span<const std::uint8_t> rawState);
+    std::span<const std::uint8_t> rawState,
+    std::span<const std::uint8_t> achievementProgress = {});
   [[nodiscard]] static EmulationCommand debug(
     std::uint64_t operationId,
     CoreDebugRequest request);
@@ -150,6 +162,17 @@ struct EmulationCommand final {
   [[nodiscard]] static EmulationCommand remoteNetplayFrame(
     std::uint64_t operationId,
     netplay::NetplayInputFrame frame);
+  [[nodiscard]] static EmulationCommand updateAchievementSettings(
+    std::uint64_t operationId,
+    achievements::Settings settings);
+  [[nodiscard]] static EmulationCommand achievementPasswordLogin(
+    std::uint64_t operationId,
+    std::string username,
+    std::string password);
+  [[nodiscard]] static EmulationCommand achievementTokenLogin(
+    std::uint64_t operationId,
+    std::string username,
+    std::string token);
 };
 
 enum class EmulationWorkerError {
@@ -183,6 +206,7 @@ enum class EmulationEventType {
   netplayStarted,
   netplayStopped,
   netplayRollback,
+  achievementEvent,
   workerStopped,
 };
 
@@ -212,8 +236,10 @@ struct EmulationEvent final {
   std::uint64_t netplayRollbackFrame{0U};
   std::thread::id workerThreadId;
   std::vector<std::uint8_t> rawState;
+  std::vector<std::uint8_t> achievementProgress;
   CoreDiscInfo disc;
   CoreDebugResponse debug;
+  achievements::Event achievement;
 
   [[nodiscard]] bool succeeded() const noexcept
   {
@@ -268,6 +294,14 @@ struct EmulationWorkerMetrics final {
   std::uint64_t netplayRollbacks{0U};
   std::size_t netplayHistoryFrames{0U};
   std::size_t netplayHistoryBytes{0U};
+  bool achievementsEnabled{false};
+  bool achievementsAuthenticated{false};
+  bool achievementsGameLoaded{false};
+  bool achievementsHardcore{false};
+  std::size_t achievementRequestQueueDepth{0U};
+  std::size_t achievementResponseQueueDepth{0U};
+  std::uint64_t rejectedAchievementRequests{0U};
+  std::uint64_t rejectedAchievementResponses{0U};
 };
 
 class EmulationWorker final {
@@ -280,7 +314,8 @@ public:
     std::shared_ptr<StereoAudioRingBuffer> audioFrames = {},
     std::shared_ptr<BackupMemoryPersistence> backupPersistence = {},
     std::shared_ptr<EmulationCaptureSink> captureSink = {},
-    std::shared_ptr<netplay::NetplayBridge> netplayBridge = {});
+    std::shared_ptr<netplay::NetplayBridge> netplayBridge = {},
+    std::shared_ptr<achievements::ServerBridge> achievementBridge = {});
   ~EmulationWorker();
 
   EmulationWorker(const EmulationWorker&) = delete;
@@ -299,6 +334,8 @@ public:
   [[nodiscard]] EmulationWorkerMetrics metrics() const;
   [[nodiscard]] std::shared_ptr<VideoFrameExchange> videoFrames() const;
   [[nodiscard]] std::shared_ptr<StereoAudioRingBuffer> audioFrames() const;
+  [[nodiscard]] std::shared_ptr<achievements::ServerBridge>
+    achievementBridge() const;
 
 private:
   class Private;

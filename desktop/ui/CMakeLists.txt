@@ -1,4 +1,5 @@
 add_library(genplusgx_ui STATIC
+  include/genplusgx/ui/achievements_dialog.h
   include/genplusgx/ui/appearance_settings_dialog.h
   include/genplusgx/ui/audio_settings_dialog.h
   include/genplusgx/ui/archive_entry_dialog.h
@@ -28,6 +29,7 @@ add_library(genplusgx_ui STATIC
   include/genplusgx/ui/theme_controller.h
   include/genplusgx/ui/video_settings_dialog.h
   src/appearance_settings_dialog.cpp
+  src/achievements_dialog.cpp
   src/about_dialog.cpp
   src/audio_settings_dialog.cpp
   src/archive_entry_dialog.cpp
@@ -70,6 +72,7 @@ target_link_libraries(
   genplusgx_ui
   PUBLIC
     Qt6::Widgets
+    GenesisPlusGX::Achievements
     GenesisPlusGX::Cheats
     GenesisPlusGX::Diagnostics
     GenesisPlusGX::GameFiles

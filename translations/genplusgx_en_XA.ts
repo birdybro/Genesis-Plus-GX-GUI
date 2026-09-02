@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+414" />
+            <location filename="../desktop/app/main.cpp" line="+417" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+390" />
+            <location line="+422" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -273,7 +273,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+92" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+93" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -481,6 +481,174 @@ Arguments:
             <location line="+10" />
             <source>Genesis Plus GX is distributed under its existing non-commercial license. No games or proprietary firmware are included.</source>
             <translation>⟦Ɠëńëšïš Ƥŀüš ƓẊ ïš ðïšŧŕïƀüŧëð üńðëŕ ïŧš ëẋïšŧïńɠ ńöń~~~~~~~~~~~~-commercial ŀïçëńšë. Ńö ɠåḿëš öŕ ƥŕöƥŕïëŧåŕÿ ƒïŕḿŵåŕë åŕë ïńçŀüðëð.~~~~~~~~~~~~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::AchievementsDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/achievements_dialog.cpp" line="+22" />
+            <source>RetroAchievements</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Connect your own RetroAchievements account. Credentials are sent only to RetroAchievements over HTTPS; the returned token is kept in the operating-system credential store.</source>
+            <translation>⟦Çöńńëçŧ ÿöüŕ öŵń ŔëŧŕöÅçħïëṽëḿëńŧš åççöüńŧ. Çŕëðëńŧïåŀš åŕë šëńŧ öńŀÿ ŧö ŔëŧŕöÅçħïëṽëḿëńŧš öṽëŕ ĦŦŦƤŠ; ŧħë ŕëŧüŕńëð ŧöҡëń ïš ҡëƥŧ ïń ŧħë öƥëŕåŧïńɠ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~-system çŕëðëńŧïåŀ šŧöŕë.~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Account and mode</source>
+            <translation>⟦Åççöüńŧ åńð ḿöðë~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Enable RetroAchievements</source>
+            <translation>⟦Ëńåƀŀë ŔëŧŕöÅçħïëṽëḿëńŧš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>RetroAchievements username</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš üšëŕńåḿë~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Username:</source>
+            <translation>⟦Üšëŕńåḿë:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>RetroAchievements password</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš ƥåššŵöŕð~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Password:</source>
+            <translation>⟦Ƥåššŵöŕð:~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Hardcore Mode</source>
+            <translation>⟦Ħåŕðçöŕë Ḿöðë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Disables save states, rewind, run-ahead, slow motion, cheats, frame advance, netplay, and debugger access while active.</source>
+            <translation>⟦Ðïšåƀŀëš šåṽë šŧåŧëš, ŕëŵïńð, ŕüń~~~~~~~-ahead, šŀöŵ ḿöŧïöń, çħëåŧš, ƒŕåḿë åðṽåńçë, ńëŧƥŀåÿ, åńð ðëƀüɠɠëŕ åççëšš ŵħïŀë åçŧïṽë.~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Unofficial achievements</source>
+            <translation>⟦Üńöƒƒïçïåŀ åçħïëṽëḿëńŧš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Encore mode</source>
+            <translation>⟦Ëńçöŕë ḿöðë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Show achievement notifications</source>
+            <translation>⟦Šħöŵ åçħïëṽëḿëńŧ ńöŧïƒïçåŧïöńš~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Disabled</source>
+            <translation>⟦Ðïšåƀŀëð~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>RetroAchievements connection status</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš çöńńëçŧïöń šŧåŧüš~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Score: —</source>
+            <translation>⟦Šçöŕë: —~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Game: —</source>
+            <translation>⟦Ɠåḿë: —~⟧</translation>
+        </message>
+        <message>
+            <location line="+18" />
+            <source>Achievement</source>
+            <translation>⟦Åçħïëṽëḿëńŧ~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Description</source>
+            <translation>⟦Ðëšçŕïƥŧïöń~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Points</source>
+            <translation>⟦Ƥöïńŧš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Progress</source>
+            <translation>⟦Ƥŕöɠŕëšš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+13" />
+            <source>Apply</source>
+            <translation>⟦Åƥƥŀÿ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Sign In</source>
+            <translation>⟦Šïɠń Ïń~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Sign Out</source>
+            <translation>⟦Šïɠń Öüŧ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+34" />
+            <source>Status: %1%2</source>
+            <translation>⟦Šŧåŧüš: ~~%1%2⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source> — %1</source>
+            <translation>⟦ — %1⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Score: %1 hardcore, %2 softcore</source>
+            <translation>⟦Šçöŕë: ~~%1 ħåŕðçöŕë, ~~%2 šöƒŧçöŕë~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Game: no recognized game</source>
+            <translation>⟦Ɠåḿë: ńö ŕëçöɠńïžëð ɠåḿë~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Game: %1 — %2/%3 achievements, %4/%5 points</source>
+            <translation>⟦Ɠåḿë: ~%1 — %2/%3 åçħïëṽëḿëńŧš, ~~~%4/%5 ƥöïńŧš~~⟧</translation>
+        </message>
+        <message>
+            <location line="+17" />
+            <source>Hardcore unlocked</source>
+            <translation>⟦Ħåŕðçöŕë üńŀöçҡëð~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Unlocked</source>
+            <translation>⟦Üńŀöçҡëð~~⟧</translation>
+        </message>
+        <message>
+            <location line="+0" />
+            <source>Locked</source>
+            <translation>⟦Ŀöçҡëð~~⟧</translation>
+        </message>
+        <message>
+            <location line="+66" />
+            <source>Signing in…</source>
+            <translation>⟦Šïɠńïńɠ ïń…~~~⟧</translation>
         </message>
     </context>
     <context>
@@ -2737,12 +2905,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+2706" />
+            <location line="+2909" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2702" />
+            <location line="-2905" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -2823,12 +2991,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+1658" />
+            <location line="+1838" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-1657" />
+            <location line="-1837" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -2849,12 +3017,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+1041" />
+            <location line="+1216" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-1041" />
+            <location line="-1216" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3050,12 +3218,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3526" />
+            <location line="+3730" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3521" />
+            <location line="-3725" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3167,12 +3335,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2392" />
+            <location line="+2595" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2361" />
+            <location line="-2564" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3348,7 +3516,17 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦&amp;Ŧööŀš~~⟧</translation>
         </message>
         <message>
-            <location line="+1" />
+            <location line="+2" />
+            <source>&amp;RetroAchievements…</source>
+            <translation>⟦&amp;ŔëŧŕöÅçħïëṽëḿëńŧš…~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>This build does not include RetroAchievements support.</source>
+            <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë ŔëŧŕöÅçħïëṽëḿëńŧš šüƥƥöŕŧ.~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
             <source>&amp;Netplay…</source>
             <translation>⟦&amp;Ńëŧƥŀåÿ…~~⟧</translation>
         </message>
@@ -3429,35 +3607,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+2924" />
+            <location line="+3118" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-2923" />
-            <location line="+1899" />
-            <location line="+846" />
+            <location line="-3117" />
+            <location line="+2073" />
+            <location line="+866" />
             <location line="+179" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2923" />
-            <location line="+1899" />
-            <location line="+846" />
+            <location line="-3117" />
+            <location line="+2073" />
+            <location line="+866" />
             <location line="+179" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-2923" />
-            <location line="+2746" />
+            <location line="-3117" />
+            <location line="+2940" />
             <location line="+178" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-2922" />
+            <location line="-3116" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3472,17 +3650,57 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Åüŧħëńŧïçåŧëð ńëŧƥŀåÿ šëššïöń çöńńëçŧëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+127" />
+            <location line="+165" />
+            <source>Achievement unlocked: %1</source>
+            <translation>⟦Åçħïëṽëḿëńŧ üńŀöçҡëð: ~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>All achievements completed!</source>
+            <translation>⟦Åŀŀ åçħïëṽëḿëńŧš çöḿƥŀëŧëð!~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Leaderboard attempt started: %1</source>
+            <translation>⟦Ŀëåðëŕƀöåŕð åŧŧëḿƥŧ šŧåŕŧëð: ~~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Leaderboard attempt ended: %1</source>
+            <translation>⟦Ŀëåðëŕƀöåŕð åŧŧëḿƥŧ ëńðëð: ~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Leaderboard score submitted: %1</source>
+            <translation>⟦Ŀëåðëŕƀöåŕð šçöŕë šüƀḿïŧŧëð: ~~~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>RetroAchievements is offline; reconnecting automatically.</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš ïš öƒƒŀïńë; ŕëçöńńëçŧïńɠ åüŧöḿåŧïçåŀŀÿ.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>RetroAchievements reconnected.</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš ŕëçöńńëçŧëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+11" />
+            <source>RetroAchievements operation failed</source>
+            <translation>⟦ŔëŧŕöÅçħïëṽëḿëńŧš öƥëŕåŧïöń ƒåïŀëð~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+98" />
             <source>The emulation command could not be queued.</source>
             <translation>⟦Ŧħë ëḿüŀåŧïöń çöḿḿåńð çöüŀð ńöŧ ƀë ǫüëüëð.~~~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+171" />
+            <location line="+173" />
             <source>&amp;Resume</source>
             <translation>⟦&amp;Ŕëšüḿë~~⟧</translation>
         </message>
         <message>
-            <location line="+30" />
+            <location line="+32" />
             <source>Fast</source>
             <translation>⟦Ƒåšŧ~⟧</translation>
         </message>
@@ -3517,7 +3735,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Çħëåŧ Ëŕŕöŕ~~~⟧</translation>
         </message>
         <message>
-            <location line="+78" />
+            <location line="+80" />
             <source>This game now uses all global settings.</source>
             <translation>⟦Ŧħïš ɠåḿë ńöŵ üšëš åŀŀ ɠŀöƀåŀ šëŧŧïńɠš.~~~~~~~~⟧</translation>
         </message>
@@ -3537,7 +3755,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ƥëŕ~-Game Šëŧŧïńɠš Ëŕŕöŕ~~~~⟧</translation>
         </message>
         <message>
-            <location line="+22" />
+            <location line="+23" />
             <source>Reading game information…</source>
             <translation>⟦Ŕëåðïńɠ ɠåḿë ïńƒöŕḿåŧïöń…~~~~~~⟧</translation>
         </message>
@@ -3615,24 +3833,24 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         <message>
             <location line="+3" />
             <location line="+47" />
-            <location line="+1716" />
-            <location line="+517" />
+            <location line="+1739" />
+            <location line="+518" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2269" />
+            <location line="-2293" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2272" />
+            <location line="+2296" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2220" />
+            <location line="-2244" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
@@ -3712,7 +3930,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦š~⟧</translation>
         </message>
         <message>
-            <location line="+4" />
+            <location line="+6" />
             <source>Run-ahead is unavailable for the current system or controller configuration.</source>
             <translation>⟦Ŕüń~-ahead ïš üńåṽåïŀåƀŀë ƒöŕ ŧħë çüŕŕëńŧ šÿšŧëḿ öŕ çöńŧŕöŀŀëŕ çöńƒïɠüŕåŧïöń.~~~~~~~~~~~~~~~⟧</translation>
         </message>
@@ -3846,13 +4064,13 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ƁÏÖŠ çöńƒïɠüŕåŧïöń šåṽëð.~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+144" />
+            <location line="+145" />
             <source>System: Sega CD / Mega CD</source>
             <translation>⟦Šÿšŧëḿ: Šëɠå ÇÐ / Ḿëɠå ÇÐ~~~~~⟧</translation>
         </message>
         <message>
             <location line="+1" />
-            <location line="+944" />
+            <location line="+964" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
@@ -4074,7 +4292,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦%1 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="+157" />
+            <location line="+158" />
             <source>Disc %1 of %2</source>
             <translation>⟦Ðïšç ~%1 öƒ ~%2⟧</translation>
         </message>
@@ -4157,7 +4375,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Çŀöšïńɠ ɠåḿë…~~~⟧</translation>
         </message>
         <message>
-            <location line="+107" />
+            <location line="+109" />
             <source>Empty</source>
             <translation>⟦Ëḿƥŧÿ~~⟧</translation>
         </message>
@@ -4215,7 +4433,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Ḿöðë:~⟧</translation>
         </message>
         <message>
-            <location line="+4" />
+            <location line="+5" />
             <source>Netplay host name or address</source>
             <translation>⟦Ńëŧƥŀåÿ ħöšŧ ńåḿë öŕ åððŕëšš~~~~~~⟧</translation>
         </message>

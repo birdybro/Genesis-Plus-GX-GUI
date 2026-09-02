@@ -131,6 +131,17 @@ int main()
   snapshot.netplayRollbacks = 4U;
   snapshot.netplayHistoryFrames = 9U;
   snapshot.netplayHistoryBytes = 786'432U;
+  snapshot.achievementsState = "Authenticated; recognized game active";
+  snapshot.achievementsHardcore = true;
+  snapshot.achievementRequestQueueDepth = 1U;
+  snapshot.achievementResponseQueueDepth = 2U;
+  snapshot.achievementQueueCapacity = 32U;
+  snapshot.rejectedAchievementRequests = 3U;
+  snapshot.rejectedAchievementResponses = 4U;
+  snapshot.activeAchievementRequests = 1U;
+  snapshot.completedAchievementRequests = 8U;
+  snapshot.failedAchievementRequests = 2U;
+  snapshot.lastAchievementNetworkError = "token=must-not-appear";
   snapshot.recordingActive = true;
   snapshot.recordingQueuedFrames = 2U;
   snapshot.recordingQueueCapacity = 8U;
@@ -174,6 +185,9 @@ int main()
                report.find("Netplay output queue: 3 / 256") != std::string::npos &&
                report.find("Netplay prediction/rollback: 41 predicted, 4 requested, 4 performed") != std::string::npos &&
                report.find("Netplay rollback history: 9 frames, 786432 bytes") != std::string::npos &&
+               report.find("RetroAchievements: Authenticated; recognized game active (Hardcore active)") != std::string::npos &&
+               report.find("RetroAchievements bridge: 1 requests / 2 responses / 32 capacity") != std::string::npos &&
+               report.find("RetroAchievements HTTPS: 1 active, 8 completed, 2 failed") != std::string::npos &&
                report.find("Lossless recording: Active") != std::string::npos &&
                report.find("Recording queue: 2 / 8") != std::string::npos &&
                report.find("Recording frames: 144 written, 1 dropped") != std::string::npos &&
@@ -181,6 +195,7 @@ int main()
                report.find("Active speed: 50% (slow motion)") != std::string::npos &&
                report.find("/users/alex") == std::string::npos &&
                report.find("hunter2") == std::string::npos &&
+               report.find("must-not-appear") == std::string::npos &&
                report.find("Privacy:") != std::string::npos,
         "The diagnostics report was incomplete or exposed private data")) {
     return 2;

@@ -54,6 +54,14 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.netplayRollbacks = 2U;
     snapshot.netplayHistoryFrames = 9U;
     snapshot.netplayHistoryBytes = 196'608U;
+    snapshot.achievementsState = "Authenticated; recognized game active";
+    snapshot.achievementsHardcore = true;
+    snapshot.achievementRequestQueueDepth = 1U;
+    snapshot.achievementResponseQueueDepth = 2U;
+    snapshot.achievementQueueCapacity = 32U;
+    snapshot.completedAchievementRequests = 8U;
+    snapshot.failedAchievementRequests = 2U;
+    snapshot.lastAchievementNetworkError = "password=never-copy-this";
     snapshot.normalSpeedPercent = 125U;
     snapshot.slowMotionSpeedPercent = 50U;
     snapshot.fastForwardSpeedPercent = 800U;
@@ -106,10 +114,17 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Netplay prediction/rollback: 12 predicted, 2 requested, 2 performed")));
   QVERIFY(report->toPlainText().contains(
+    QStringLiteral("RetroAchievements: Authenticated; recognized game active (Hardcore active)")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("RetroAchievements bridge: 1 requests / 2 responses / 32 capacity")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("RetroAchievements HTTPS: 0 active, 8 completed, 2 failed")));
+  QVERIFY(report->toPlainText().contains(
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Active speed: 50% (slow motion)")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("do-not-copy")));
+  QVERIFY(!report->toPlainText().contains(QStringLiteral("never-copy-this")));
   QVERIFY(!report->toPlainText().contains(QStringLiteral("/users/private")));
 
   QTest::mouseClick(copy, Qt::LeftButton);

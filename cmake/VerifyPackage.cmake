@@ -40,6 +40,10 @@ if(VERIFY_PLATFORM STREQUAL "windows")
     "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
+  set(rcheevos_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/rcheevos-MIT.txt")
+  set(qtkeychain_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/QtKeychain-BSD-3-Clause.txt")
   set(portable_data_directory "${package_root}/bin/portable-data")
   set(translation_directory
     "${package_root}/share/Genesis-Plus-GX-GUI/translations")
@@ -60,6 +64,10 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
   set(shader_directory "${bundle}/Contents/Resources/shaders")
   set(librashader_license
     "${bundle}/Contents/Resources/licenses/librashader-MPL-2.0.md")
+  set(rcheevos_license
+    "${bundle}/Contents/Resources/licenses/rcheevos-MIT.txt")
+  set(qtkeychain_license
+    "${bundle}/Contents/Resources/licenses/QtKeychain-BSD-3-Clause.txt")
   set(portable_data_directory "${package_root}/portable-data")
   set(translation_directory "${bundle}/Contents/Resources/translations")
   set(forbidden_translation_directory
@@ -112,6 +120,10 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
     "${package_root}/share/Genesis-Plus-GX-GUI/shaders")
   set(librashader_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md")
+  set(rcheevos_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/rcheevos-MIT.txt")
+  set(qtkeychain_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/QtKeychain-BSD-3-Clause.txt")
   set(portable_data_directory "${package_root}/bin/portable-data")
   set(translation_directory
     "${package_root}/share/Genesis-Plus-GX-GUI/translations")
@@ -135,6 +147,8 @@ require_file(
 require_file(
   "${shader_directory}/genplusgx-crt.slang" "built-in CRT shader source")
 require_file("${librashader_license}" "librashader MPL-2.0 license")
+require_file("${rcheevos_license}" "rcheevos MIT license")
+require_file("${qtkeychain_license}" "QtKeychain BSD-3-Clause license")
 require_file(
   "${translation_directory}/genplusgx_en_XA.qm"
   "pseudo-localization catalog")
@@ -152,5 +166,8 @@ require_file(
 require_file(
   "${documentation_directory}/NETPLAY.md"
   "netplay guide")
+require_file(
+  "${documentation_directory}/ACHIEVEMENTS.md"
+  "RetroAchievements guide")
 
 message(STATUS "Verified self-contained ${VERIFY_PLATFORM} layout at ${package_root}")

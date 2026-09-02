@@ -156,6 +156,17 @@ struct DiagnosticsSnapshot final {
   std::uint64_t netplayRollbacks{0U};
   std::size_t netplayHistoryFrames{0U};
   std::size_t netplayHistoryBytes{0U};
+  std::string achievementsState;
+  bool achievementsHardcore{false};
+  std::size_t achievementRequestQueueDepth{0U};
+  std::size_t achievementResponseQueueDepth{0U};
+  std::size_t achievementQueueCapacity{0U};
+  std::uint64_t rejectedAchievementRequests{0U};
+  std::uint64_t rejectedAchievementResponses{0U};
+  std::size_t activeAchievementRequests{0U};
+  std::uint64_t completedAchievementRequests{0U};
+  std::uint64_t failedAchievementRequests{0U};
+  std::string lastAchievementNetworkError;
   bool recordingActive{false};
   std::size_t recordingQueuedFrames{0};
   std::size_t recordingQueueCapacity{0};

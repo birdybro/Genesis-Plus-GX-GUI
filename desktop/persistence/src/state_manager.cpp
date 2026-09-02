@@ -29,6 +29,7 @@ constexpr std::size_t coreVersionOffset = 112U;
 constexpr std::size_t coreVersionBytes = 16U;
 constexpr std::size_t presentationBytesOffset = 128U;
 constexpr std::size_t presentationHashOffset = 136U;
+constexpr std::size_t achievementProgressBytesOffset = 168U;
 constexpr std::string_view coreStatePrefix = "GENPLUS-GX ";
 constexpr std::array<std::uint8_t, 8> pngSignature{
   0x89U, 'P', 'N', 'G', 0x0DU, 0x0AU, 0x1AU, 0x0AU};
@@ -105,6 +106,21 @@ std::array<std::uint8_t, 32> sha256(std::span<const std::uint8_t> data)
   hash.addData(QByteArrayView{
     reinterpret_cast<const char*>(data.data()),
     static_cast<qsizetype>(data.size())});
+  const auto result = hash.result();
+  std::array<std::uint8_t, 32> output{};
+  std::memcpy(output.data(), result.constData(), output.size());
+  return output;
+}
+
+std::array<std::uint8_t, 32> sha256(
+  std::span<const std::uint8_t> first,
+  std::span<const std::uint8_t> second)
+{
+  QCryptographicHash hash{QCryptographicHash::Sha256};
+  hash.addData(QByteArrayView{reinterpret_cast<const char*>(first.data()),
+    static_cast<qsizetype>(first.size())});
+  hash.addData(QByteArrayView{reinterpret_cast<const char*>(second.data()),
+    static_cast<qsizetype>(second.size())});
   const auto result = hash.result();
   std::array<std::uint8_t, 32> output{};
   std::memcpy(output.data(), result.constData(), output.size());
@@ -242,7 +258,7 @@ SaveStateStatus SaveStateManager::saveSlot(
     return failure(SaveStateError::invalidSlot, "The save-state slot must be between 0 and 9.");
   }
   return saveFile(statePath(identity, slot), identity, slot, hardware,
-    emulatedFrameNumber, rawPayload, {}, timestamp);
+    emulatedFrameNumber, rawPayload, {}, timestamp, {});
 }
 
 SaveStateStatus SaveStateManager::saveSlot(
@@ -252,13 +268,15 @@ SaveStateStatus SaveStateManager::saveSlot(
   std::uint64_t emulatedFrameNumber,
   std::span<const std::uint8_t> rawPayload,
   const SaveStatePresentation& presentation,
-  std::chrono::system_clock::time_point timestamp) const
+  std::chrono::system_clock::time_point timestamp,
+  std::span<const std::uint8_t> achievementProgress) const
 {
   if (!isValidSlot(slot)) {
     return failure(SaveStateError::invalidSlot, "The save-state slot must be between 0 and 9.");
   }
   return saveFile(statePath(identity, slot), identity, slot, hardware,
-    emulatedFrameNumber, rawPayload, presentation, timestamp);
+    emulatedFrameNumber, rawPayload, presentation, timestamp,
+    achievementProgress);
 }
 
 SaveStateStatus SaveStateManager::saveResumeState(
@@ -266,10 +284,11 @@ SaveStateStatus SaveStateManager::saveResumeState(
   std::uint32_t hardware,
   std::uint64_t emulatedFrameNumber,
   std::span<const std::uint8_t> rawPayload,
-  std::chrono::system_clock::time_point timestamp) const
+  std::chrono::system_clock::time_point timestamp,
+  std::span<const std::uint8_t> achievementProgress) const
 {
   return saveFile(resumeStatePath(identity), identity, resumeSlot, hardware,
-    emulatedFrameNumber, rawPayload, {}, timestamp);
+    emulatedFrameNumber, rawPayload, {}, timestamp, achievementProgress);
 }
 
 SaveStateStatus SaveStateManager::saveFile(
@@ -280,7 +299,8 @@ SaveStateStatus SaveStateManager::saveFile(
   std::uint64_t emulatedFrameNumber,
   std::span<const std::uint8_t> rawPayload,
   const SaveStatePresentation& presentation,
-  std::chrono::system_clock::time_point timestamp) const
+  std::chrono::system_clock::time_point timestamp,
+  std::span<const std::uint8_t> achievementProgress) const
 {
   if (!identity.valid()) {
     return failure(SaveStateError::invalidGameIdentity, "The game identity is invalid.");
@@ -288,6 +308,10 @@ SaveStateStatus SaveStateManager::saveFile(
   if (rawPayload.size() < coreVersionBytes || rawPayload.size() > maximumPayloadBytes ||
       !std::ranges::equal(coreStatePrefix, rawPayload.first(coreStatePrefix.size()))) {
     return failure(SaveStateError::invalidPayload, "The raw Genesis Plus GX state payload is invalid.");
+  }
+  if (achievementProgress.size() > maximumAchievementProgressBytes) {
+    return failure(SaveStateError::invalidPayload,
+      "The RetroAchievements progress payload exceeds the 4 MiB limit.");
   }
   const auto gameHash = decodeSha256(identity.sha256);
   if (!gameHash) {
@@ -303,11 +327,12 @@ SaveStateStatus SaveStateManager::saveFile(
     return presentationStatus;
   }
 
-  const auto payloadHash = sha256(rawPayload);
+  const auto payloadHash = sha256(achievementProgress, rawPayload);
   const auto presentationBytes = encodePresentation(presentation);
   const auto presentationHash = sha256(presentationBytes);
   std::vector<std::uint8_t> file;
-  file.reserve(currentHeaderBytes + presentationBytes.size() + rawPayload.size());
+  file.reserve(currentHeaderBytes + presentationBytes.size() +
+    achievementProgress.size() + rawPayload.size());
   file.insert(file.end(), stateMagic.begin(), stateMagic.end());
   appendLittleEndian(file, currentSchemaVersion);
   appendLittleEndian(file, static_cast<std::uint32_t>(currentHeaderBytes));
@@ -321,11 +346,13 @@ SaveStateStatus SaveStateManager::saveFile(
   file.insert(file.end(), rawPayload.begin(), rawPayload.begin() + coreVersionBytes);
   appendLittleEndian(file, static_cast<std::uint64_t>(presentationBytes.size()));
   file.insert(file.end(), presentationHash.begin(), presentationHash.end());
-  file.resize(currentHeaderBytes, 0U);
+  appendLittleEndian(file,
+    static_cast<std::uint64_t>(achievementProgress.size()));
   if (file.size() != currentHeaderBytes) {
     return failure(SaveStateError::invalidPayload, "The save-state header layout is inconsistent.");
   }
   file.insert(file.end(), presentationBytes.begin(), presentationBytes.end());
+  file.insert(file.end(), achievementProgress.begin(), achievementProgress.end());
   file.insert(file.end(), rawPayload.begin(), rawPayload.end());
 
   const auto written = writeFileAtomically(path, file, maximumFileBytes);
@@ -428,7 +455,9 @@ SaveStateLoadResult SaveStateManager::loadFile(
       .rawPayload = {},
     };
   }
-  if (*schema != legacySchemaVersion && *schema != currentSchemaVersion) {
+  if (*schema != legacySchemaVersion &&
+      *schema != presentationSchemaVersion &&
+      *schema != currentSchemaVersion) {
     return {
       .status = failure(SaveStateError::unsupportedSchema, "The save-state schema is not supported."),
       .metadata = {},
@@ -454,7 +483,7 @@ SaveStateLoadResult SaveStateManager::loadFile(
     };
   }
   std::size_t presentationSize = 0U;
-  if (*schema == currentSchemaVersion) {
+  if (*schema >= presentationSchemaVersion) {
     const auto encodedPresentationBytes =
       readLittleEndian<std::uint64_t>(file, presentationBytesOffset);
     if (!encodedPresentationBytes ||
@@ -469,10 +498,30 @@ SaveStateLoadResult SaveStateManager::loadFile(
     }
     presentationSize = static_cast<std::size_t>(*encodedPresentationBytes);
   }
+  std::size_t achievementProgressSize = 0U;
+  if (*schema == currentSchemaVersion) {
+    const auto encodedProgressBytes = readLittleEndian<std::uint64_t>(
+      file, achievementProgressBytesOffset);
+    if (!encodedProgressBytes ||
+        *encodedProgressBytes > maximumAchievementProgressBytes) {
+      return {
+        .status = failure(SaveStateError::corruptState,
+          "The RetroAchievements progress length is invalid."),
+        .metadata = {},
+        .rawPayload = {},
+        .achievementProgress = {},
+      };
+    }
+    achievementProgressSize =
+      static_cast<std::size_t>(*encodedProgressBytes);
+  }
   if (*payloadBytes < coreVersionBytes || *payloadBytes > maximumPayloadBytes ||
       presentationSize > file.size() - requiredHeaderBytes ||
+      achievementProgressSize >
+        file.size() - requiredHeaderBytes - presentationSize ||
       static_cast<std::size_t>(*payloadBytes) !=
-        file.size() - requiredHeaderBytes - presentationSize) {
+        file.size() - requiredHeaderBytes - presentationSize -
+          achievementProgressSize) {
     return {
       .status = failure(SaveStateError::corruptState, "The save-state payload length is invalid."),
       .metadata = {},
@@ -503,7 +552,7 @@ SaveStateLoadResult SaveStateManager::loadFile(
   }
 
   SaveStatePresentation presentation;
-  if (*schema == currentSchemaVersion) {
+  if (*schema >= presentationSchemaVersion) {
     const auto encodedPresentation =
       file.subspan(requiredHeaderBytes, presentationSize);
     const auto actualPresentationHash = sha256(encodedPresentation);
@@ -551,10 +600,13 @@ SaveStateLoadResult SaveStateManager::loadFile(
     }
   }
 
+  const auto achievementProgress = file.subspan(
+    requiredHeaderBytes + presentationSize, achievementProgressSize);
   const auto payload = file.subspan(
-    requiredHeaderBytes + presentationSize,
+    requiredHeaderBytes + presentationSize + achievementProgressSize,
     static_cast<std::size_t>(*payloadBytes));
-  const auto actualPayloadHash = sha256(payload);
+  const auto actualPayloadHash = *schema == currentSchemaVersion
+    ? sha256(achievementProgress, payload) : sha256(payload);
   if (!std::ranges::equal(
         actualPayloadHash, file.subspan(payloadHashOffset, actualPayloadHash.size()))) {
     return {
@@ -587,6 +639,8 @@ SaveStateLoadResult SaveStateManager::loadFile(
       .thumbnailPng = std::move(presentation.thumbnailPng),
     },
     .rawPayload = std::vector<std::uint8_t>{payload.begin(), payload.end()},
+    .achievementProgress = std::vector<std::uint8_t>{
+      achievementProgress.begin(), achievementProgress.end()},
   };
 }
 
@@ -610,7 +664,7 @@ SaveStateStatus SaveStateManager::importSlot(
   };
   return saveSlot(identity, slot, expectedHardware,
     loaded.metadata.emulatedFrameNumber, loaded.rawPayload, presentation,
-    loaded.metadata.timestamp);
+    loaded.metadata.timestamp, loaded.achievementProgress);
 }
 
 SaveStateStatus SaveStateManager::exportSlot(
@@ -657,7 +711,7 @@ SaveStateStatus SaveStateManager::renameSlot(
   };
   return saveSlot(identity, slot, expectedHardware,
     loaded.metadata.emulatedFrameNumber, loaded.rawPayload, presentation,
-    loaded.metadata.timestamp);
+    loaded.metadata.timestamp, loaded.achievementProgress);
 }
 
 SaveStateStatus SaveStateManager::deleteSlot(

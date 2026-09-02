@@ -4,6 +4,7 @@
 #include "genplusgx/game_archive.h"
 #include "genplusgx/game_patch.h"
 #include "genplusgx/ui/about_dialog.h"
+#include "genplusgx/ui/achievements_dialog.h"
 #include "genplusgx/ui/appearance_settings_dialog.h"
 #include "genplusgx/ui/audio_settings_dialog.h"
 #include "genplusgx/ui/bios_settings_dialog.h"
@@ -752,6 +753,15 @@ void MainWindow::buildMenus()
   });
 
   auto* tools = createMenu(tr("&Tools"), "toolsMenu");
+  auto* achievements = addAction(
+    *tools, tr("&RetroAchievements…"), "achievementsAction");
+  connect(achievements, &QAction::triggered,
+    this, &MainWindow::showAchievements);
+#if !defined(GENPLUSGX_HAVE_ACHIEVEMENTS)
+  achievements->setEnabled(false);
+  achievements->setToolTip(
+    tr("This build does not include RetroAchievements support."));
+#endif
   auto* netplay = addAction(*tools, tr("&Netplay…"), "netplayAction");
   connect(netplay, &QAction::triggered, this, &MainWindow::showNetplay);
   tools->addSeparator();
@@ -942,7 +952,10 @@ void MainWindow::setNetplaySessionState(
   netplayState_ = state;
   if (auto* dialog = findChild<NetplayDialog*>(
         QStringLiteral("netplayDialog"))) {
-    dialog->setGameReady(isGameLoaded());
+    dialog->setGameReady(isGameLoaded() &&
+      !achievementSnapshot_.gameLoaded &&
+      achievementSnapshot_.state != achievements::ConnectionState::loadingGame &&
+      !achievementSnapshot_.hardcore);
     dialog->setSessionState(state, detail);
   }
   setGameActionsEnabled(isGameLoaded() && !sessionResumeBusy_);
@@ -955,7 +968,10 @@ void MainWindow::showNetplay()
 {
   if (auto* existing = findChild<NetplayDialog*>(
         QStringLiteral("netplayDialog"))) {
-    existing->setGameReady(isGameLoaded());
+    existing->setGameReady(isGameLoaded() &&
+      !achievementSnapshot_.gameLoaded &&
+      achievementSnapshot_.state != achievements::ConnectionState::loadingGame &&
+      !achievementSnapshot_.hardcore);
     existing->setSessionState(netplayState_);
     existing->show();
     existing->raise();
@@ -965,7 +981,10 @@ void MainWindow::showNetplay()
   auto* dialog = new NetplayDialog(this);
   dialog->setAttribute(Qt::WA_DeleteOnClose);
   dialog->setRequestSink(netplayRequestSink_);
-  dialog->setGameReady(isGameLoaded());
+  dialog->setGameReady(isGameLoaded() &&
+    !achievementSnapshot_.gameLoaded &&
+    achievementSnapshot_.state != achievements::ConnectionState::loadingGame &&
+    !achievementSnapshot_.hardcore);
   dialog->setSessionState(netplayState_);
   dialog->show();
 }
@@ -984,8 +1003,12 @@ void MainWindow::updateNetplayControls()
 {
   const bool sessionActive =
     netplayState_ != netplay::NetplaySessionState::disconnected;
+  const bool achievementSession = achievementSnapshot_.gameLoaded ||
+    achievementSnapshot_.state == achievements::ConnectionState::loadingGame ||
+    achievementSnapshot_.hardcore;
   if (auto* action = findChild<QAction*>(QStringLiteral("netplayAction"))) {
-    action->setEnabled(isGameLoaded() || sessionActive);
+    action->setEnabled((isGameLoaded() && !achievementSession) ||
+      sessionActive);
   }
   static constexpr const char* lockedActions[]{
     "pauseAction", "resetAction", "softResetAction", "fastForwardAction",
@@ -1033,19 +1056,158 @@ void MainWindow::updateNetplayControls()
     }
     if (auto* debugAction = findChild<QAction*>(
           QStringLiteral("debugToolsAction"))) {
-      debugAction->setEnabled(appearanceSettings_.developerToolsEnabled);
+      debugAction->setEnabled(appearanceSettings_.developerToolsEnabled &&
+        !achievementSnapshot_.hardcore);
     }
   }
   if (auto* speedGroup = findChild<QActionGroup*>(
         QStringLiteral("emulationSpeedActionGroup"))) {
     for (auto* action : speedGroup->actions()) {
-      action->setEnabled(!sessionActive);
+      const auto percent = action->data().toUInt();
+      action->setEnabled(!sessionActive &&
+        (!achievementSnapshot_.hardcore || percent >= 100U));
+    }
+  }
+  if (achievementSnapshot_.hardcore) {
+    static constexpr const char* hardcoreSettingsActions[]{
+      "runAheadSettingsAction", "rewindSettingsAction", "speedSettingsAction"};
+    for (const auto* name : hardcoreSettingsActions) {
+      if (auto* action = findChild<QAction*>(QString::fromLatin1(name))) {
+        action->setEnabled(false);
+      }
     }
   }
   if (auto* dialog = findChild<NetplayDialog*>(
         QStringLiteral("netplayDialog"))) {
-    dialog->setGameReady(isGameLoaded());
+    dialog->setGameReady(isGameLoaded() && !achievementSession);
   }
+}
+
+void MainWindow::setAchievementSettings(achievements::Settings settings)
+{
+  achievementSettings_ = std::move(settings);
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->setSettings(achievementSettings_);
+  }
+}
+
+void MainWindow::setAchievementSettingsSink(AchievementSettingsSink sink)
+{
+  achievementSettingsSink_ = std::move(sink);
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->setSettingsSink(achievementSettingsSink_);
+  }
+}
+
+void MainWindow::setAchievementLoginSink(AchievementLoginSink sink)
+{
+  achievementLoginSink_ = std::move(sink);
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->setLoginSink(achievementLoginSink_);
+  }
+}
+
+void MainWindow::setAchievementLogoutSink(AchievementLogoutSink sink)
+{
+  achievementLogoutSink_ = std::move(sink);
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->setLogoutSink(achievementLogoutSink_);
+  }
+}
+
+void MainWindow::setAchievementSnapshot(achievements::Snapshot snapshot)
+{
+  achievementSnapshot_ = std::move(snapshot);
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->setSnapshot(achievementSnapshot_);
+  }
+  updateAchievementControls();
+}
+
+void MainWindow::presentAchievementEvent(const achievements::Event& event)
+{
+  setAchievementSnapshot(event.snapshot);
+  if (event.type == achievements::EventType::achievementUnlocked &&
+      achievementSettings_.notifications) {
+    statusBar()->showMessage(
+      tr("Achievement unlocked: %1").arg(QString::fromStdString(event.title)),
+      8'000);
+  } else if (event.type == achievements::EventType::gameCompleted &&
+             achievementSettings_.notifications) {
+    statusBar()->showMessage(tr("All achievements completed!"), 8'000);
+  } else if (event.type == achievements::EventType::leaderboardStarted) {
+    statusBar()->showMessage(tr("Leaderboard attempt started: %1")
+      .arg(QString::fromStdString(event.title)), 5'000);
+  } else if (event.type == achievements::EventType::leaderboardFailed) {
+    statusBar()->showMessage(tr("Leaderboard attempt ended: %1")
+      .arg(QString::fromStdString(event.title)), 5'000);
+  } else if (event.type == achievements::EventType::leaderboardSubmitted) {
+    statusBar()->showMessage(tr("Leaderboard score submitted: %1")
+      .arg(QString::fromStdString(event.title)), 8'000);
+  } else if (event.type == achievements::EventType::disconnected) {
+    statusBar()->showMessage(
+      tr("RetroAchievements is offline; reconnecting automatically."), 8'000);
+  } else if (event.type == achievements::EventType::reconnected) {
+    statusBar()->showMessage(tr("RetroAchievements reconnected."), 5'000);
+  }
+}
+
+void MainWindow::showAchievementError(const std::string& detail)
+{
+  showAchievements();
+  if (auto* dialog = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    dialog->showError(detail);
+  }
+  statusBar()->showMessage(tr("RetroAchievements operation failed"), 8'000);
+}
+
+void MainWindow::showAchievements()
+{
+  if (auto* existing = findChild<AchievementsDialog*>(
+        QStringLiteral("achievementsDialog"))) {
+    existing->show();
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new AchievementsDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettings(achievementSettings_);
+  dialog->setSnapshot(achievementSnapshot_);
+  dialog->setSettingsSink(achievementSettingsSink_);
+  dialog->setLoginSink(achievementLoginSink_);
+  dialog->setLogoutSink(achievementLogoutSink_);
+  dialog->show();
+}
+
+void MainWindow::updateAchievementControls()
+{
+  const bool hardcore = achievementSnapshot_.hardcore;
+  if (hardcore) {
+    if (auto* debugger = findChild<DebugToolsWindow*>(
+          QStringLiteral("debugToolsWindow"))) {
+      debugger->close();
+    }
+    if (auto* cheats = findChild<CheatManagerDialog*>(
+          QStringLiteral("cheatManagerDialog"))) {
+      cheats->reject();
+    }
+    if (auto* netplay = findChild<NetplayDialog*>(
+          QStringLiteral("netplayDialog"))) {
+      netplay->close();
+    }
+  }
+  updateEmulationControls();
+  updateStateActions();
+  updateCheatAction();
+  updateRunAheadAction();
+  updateNetplayControls();
 }
 
 void MainWindow::setEmulationControlSink(EmulationControlSink sink)
@@ -1241,6 +1403,7 @@ bool MainWindow::eventFilter(QObject* watched, QEvent* event)
       (!belongsToWindow || (active != nullptr && active != this) ||
        !isGameLoaded() || gameLoading_ || emulationPaused_ ||
        netplayState_ != netplay::NetplaySessionState::disconnected ||
+       (achievementSnapshot_.hardcore && (slowPress || rewindPress)) ||
        (rewindPress && !rewindAvailable_))) {
     return QMainWindow::eventFilter(watched, event);
   }
@@ -1290,16 +1453,18 @@ void MainWindow::updateEmulationControls()
   if (slowMotion != nullptr) {
     const QSignalBlocker blocker{slowMotion};
     slowMotion->setChecked(available && slowMotionToggled_);
-    slowMotion->setEnabled(available);
+    slowMotion->setEnabled(available && !achievementSnapshot_.hardcore);
   }
   if (rewind != nullptr) {
     const QSignalBlocker blocker{rewind};
     rewind->setChecked(available && rewindToggled_);
-    rewind->setEnabled(available && !emulationPaused_ &&
+    rewind->setEnabled(available && !achievementSnapshot_.hardcore &&
+      !emulationPaused_ &&
       (rewindAvailable_ || rewindActive_));
   }
   if (frameAdvance != nullptr) {
-    frameAdvance->setEnabled(available && emulationPaused_);
+    frameAdvance->setEnabled(available && !achievementSnapshot_.hardcore &&
+      emulationPaused_);
   }
   if (speedStatus_ != nullptr) {
     const auto prefix = fastForwardActive_
@@ -1388,7 +1553,8 @@ void MainWindow::updateCheatAction()
   if (auto* action = findChild<QAction*>(QStringLiteral("cheatsAction"))) {
     action->setEnabled(
       netplayState_ == netplay::NetplaySessionState::disconnected &&
-      isGameLoaded() && !sessionResumeBusy_ && cheatSessionReady_);
+      !achievementSnapshot_.hardcore && isGameLoaded() &&
+      !sessionResumeBusy_ && cheatSessionReady_);
   }
 }
 
@@ -2224,6 +2390,7 @@ void MainWindow::updateRunAheadAction()
     .arg(runAheadSettings_.frames)
     .arg(runAheadSettings_.frames == 1U ? QString{} : tr("s")));
   action->setEnabled(isGameLoaded() && !gameLoading_ && runAheadSupported_ &&
+    !achievementSnapshot_.hardcore &&
     static_cast<bool>(runAheadSettingsSink_) &&
     netplayState_ == netplay::NetplaySessionState::disconnected);
   if (isGameLoaded() && !runAheadSupported_) {
@@ -4193,6 +4360,7 @@ void MainWindow::updateStateActions()
 {
   const bool ready = isGameLoaded() && !sessionResumeBusy_ &&
     stateSessionReady_ && !stateOperationBusy_ &&
+    !achievementSnapshot_.hardcore &&
     netplayState_ == netplay::NetplaySessionState::disconnected;
   const auto selectedState = stateSlotViews_[selectedStateSlot_].state;
   findChild<QAction*>(QStringLiteral("saveStateAction"))->setEnabled(ready);

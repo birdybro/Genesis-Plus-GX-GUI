@@ -1,5 +1,22 @@
 find_package(Threads REQUIRED)
 
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
+  add_executable(genplusgx_achievements_test achievements_test.cpp)
+  target_link_libraries(
+    genplusgx_achievements_test
+    PRIVATE
+      GenesisPlusGX::Achievements
+      genplusgx_project_warnings
+      Qt6::Core
+  )
+  add_test(NAME unit.achievements COMMAND genplusgx_achievements_test)
+  set_tests_properties(
+    unit.achievements
+    PROPERTIES LABELS "unit;integration;achievements;network;security;persistence;bounded"
+      TIMEOUT 30
+  )
+endif()
+
 add_executable(genplusgx_netplay_timeline_test netplay_timeline_test.cpp)
 target_link_libraries(
   genplusgx_netplay_timeline_test

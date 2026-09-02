@@ -1,4 +1,6 @@
 #include "genplusgx/core_adapter.h"
+
+#include "desktop_core_achievements.h"
 #include "genplusgx/game_file.h"
 
 #include "desktop_core_host.h"
@@ -19,6 +21,7 @@ extern sms_ntsc_t* sms_ntsc;
 #include <array>
 #include <cctype>
 #include <cstring>
+#include <limits>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -1645,6 +1648,27 @@ CoreResult CoreAdapter::describeAudioBatch(CoreAudioBatchInfo& output) const
     .droppedBatchCount = private_->droppedAudioBatches,
   };
   return success();
+}
+
+std::uint32_t CoreAdapter::achievementConsoleId() const
+{
+  if (!requireOwner(true)) {
+    return 0U;
+  }
+  return genplusgx_achievements_console_id();
+}
+
+std::uint32_t CoreAdapter::readAchievementMemory(
+  std::uint32_t address,
+  std::span<std::uint8_t> output) const
+{
+  if (!requireOwner(true) || output.empty() ||
+      output.size() > static_cast<std::size_t>(
+        std::numeric_limits<std::uint32_t>::max())) {
+    return 0U;
+  }
+  return static_cast<std::uint32_t>(genplusgx_achievements_read_memory(
+    address, output.data(), output.size()));
 }
 
 void CoreAdapter::applyPendingInput() noexcept

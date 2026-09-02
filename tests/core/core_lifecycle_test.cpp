@@ -9,6 +9,7 @@ extern "C" {
 #include <cstring>
 #include <filesystem>
 #include <iostream>
+#include <array>
 #include <thread>
 #include <utility>
 
@@ -101,6 +102,19 @@ int main()
       !check(adapter.frameCount() == 1U, "Frame count did not advance") ||
       !check(markerWasWritten(), "Synthetic program did not run through the adapter")) {
     return 3;
+  }
+  std::array<std::uint8_t, 8U> achievementMemory{};
+  if (!check(adapter.achievementConsoleId() == 1U,
+        "Mega Drive did not map to the RetroAchievements console ID") ||
+      !check(adapter.readAchievementMemory(0U, achievementMemory) ==
+          achievementMemory.size(),
+        "RetroAchievements could not read the logical work-RAM window") ||
+      !check(achievementMemory == std::array<std::uint8_t, 8U>{
+          0x13U, 0x57U, 0x9BU, 0xDFU, 0xCAU, 0xFEU, 0x42U, 0x00U},
+        "RetroAchievements work-RAM bytes were not in logical CPU order") ||
+      !check(adapter.readAchievementMemory(0x20'000U, achievementMemory) == 0U,
+        "RetroAchievements read beyond the bounded Mega Drive memory map")) {
+    return 12;
   }
 
   if (!check(adapter.reset(), "Hard reset failed") ||

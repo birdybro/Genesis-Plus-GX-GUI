@@ -1279,6 +1279,43 @@ worker, rollback, video, audio, and input route in separate processes.
   guarded release workflows; complete user, developer, architecture, testing, and legal
   documentation.
 
+## Milestone 95 local candidate validation
+
+The disabled-by-default RetroAchievements integration is locally release-gated and is
+awaiting the exact pushed-commit hosted matrix before the milestone is marked complete.
+It uses checksum-pinned rcheevos 12.4.0 through `rc_client`, a bounded HTTPS bridge, and
+QtKeychain with plaintext fallback disabled. Achievement evaluation and all emulated
+memory reads remain on the authoritative emulation owner thread. The Genesis Plus GX
+core algorithms are unchanged.
+
+| Configuration | CTest | Result |
+| --- | ---: | --- |
+| GCC Debug, warnings as errors | 121/121 | Passed |
+| GCC Release, warnings as errors | 121/121 | Passed |
+| ASan + UBSan | 121/121 | Passed; no finding |
+| Clang Release, warnings as errors | 121/121 | Passed |
+| CHD disabled | 121/121 | Passed |
+| RetroAchievements disabled | 119/119 | Passed |
+| Libretro shaders disabled | 119/119 | Passed |
+| Inherited Unix libretro | Build/link/clean | Passed; x86-64 ELF, warning-clean |
+
+The default graph contains 11 infrastructure, 20 core, 10 integration, 47 unit, and 33
+GUI/process tests. Overlapping behavioral labels report 77 unit, 29 core, 53 integration,
+and 33 GUI tests. New achievement coverage includes an official-client mock handshake,
+strict provider URL and transport bounds, secret-free atomic settings, console-specific
+logical memory, complete worker recognition/start-session flow, owner-thread
+Hardcore/Softcore exclusion policy, progress-bearing schema-3 states, legacy schema-1/2
+reads, accessible account/list UI, preference rollback, and diagnostics redaction.
+
+A fresh Linux Release stage passed the production package verifier, installed `--version`
+and offscreen event-loop smoke, runtime dependency inspection, TGZ generation, checksum
+verification, and archive inspection. The archive contains `ACHIEVEMENTS.md`, the
+rcheevos MIT license, and the QtKeychain BSD-3-Clause license. `xvfb-run` is unavailable
+in this local host image, so the native XCB package smoke is deferred to the required
+hosted Linux Release job. The user-supplied NAS ROM directory is also not mounted; no
+optional proprietary-ROM run was substituted. Legal generated fixtures execute the same
+production adapter, worker, state, and GUI paths.
+
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for
@@ -1337,9 +1374,8 @@ directories.
   Sega CD workflows and formats other than ZIP remain unsupported. Automatic soft
   patch discovery is intentionally limited to direct cartridge files; ZIP members can
   use an explicitly chosen patch, while disc images/playlists reject cartridge patch
-  formats. Achievements, cloud sync, online scraping/downloading, a network-accessible external
-  debugger server, TAS tooling, and streaming remain intentionally outside
-  scope.
+  formats. Cloud sync, online scraping/downloading, a network-accessible external
+  debugger server, TAS tooling, and streaming remain intentionally outside scope.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.

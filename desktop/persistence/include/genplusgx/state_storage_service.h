@@ -56,6 +56,7 @@ struct StateStorageCommand final {
   std::string name;
   std::vector<std::uint8_t> thumbnailPng;
   std::vector<std::uint8_t> rawPayload;
+  std::vector<std::uint8_t> achievementProgress{};
 
   [[nodiscard]] static StateStorageCommand activate(
     std::uint64_t operationId,
@@ -74,7 +75,8 @@ struct StateStorageCommand final {
     std::uint64_t emulatedFrameNumber,
     std::vector<std::uint8_t> rawPayload,
     std::string name = {},
-    std::vector<std::uint8_t> thumbnailPng = {});
+    std::vector<std::uint8_t> thumbnailPng = {},
+    std::vector<std::uint8_t> achievementProgress = {});
   [[nodiscard]] static StateStorageCommand file(
     StateStorageCommandType type,
     std::uint64_t operationId,
@@ -90,7 +92,8 @@ struct StateStorageCommand final {
     std::uint64_t operationId,
     std::uint64_t gameGeneration,
     std::uint64_t emulatedFrameNumber,
-    std::vector<std::uint8_t> rawPayload);
+    std::vector<std::uint8_t> rawPayload,
+    std::vector<std::uint8_t> achievementProgress = {});
 };
 
 enum class StateStorageServiceState {
@@ -151,6 +154,7 @@ struct StateStorageEvent final {
   StateSlotSummaries slotSummaries;
   SaveStateMetadata metadata;
   std::vector<std::uint8_t> rawPayload;
+  std::vector<std::uint8_t> achievementProgress{};
 
   [[nodiscard]] bool succeeded() const noexcept
   {

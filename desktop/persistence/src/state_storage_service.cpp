@@ -70,7 +70,8 @@ StateStorageCommand StateStorageCommand::save(
   std::uint64_t emulatedFrameNumber,
   std::vector<std::uint8_t> rawPayload,
   std::string name,
-  std::vector<std::uint8_t> thumbnailPng)
+  std::vector<std::uint8_t> thumbnailPng,
+  std::vector<std::uint8_t> achievementProgress)
 {
   auto command = simple(
     StateStorageCommandType::saveSlot, operationId, gameGeneration, slot);
@@ -78,6 +79,7 @@ StateStorageCommand StateStorageCommand::save(
   command.name = std::move(name);
   command.thumbnailPng = std::move(thumbnailPng);
   command.rawPayload = std::move(rawPayload);
+  command.achievementProgress = std::move(achievementProgress);
   return command;
 }
 
@@ -109,12 +111,14 @@ StateStorageCommand StateStorageCommand::saveResumeState(
   std::uint64_t operationId,
   std::uint64_t gameGeneration,
   std::uint64_t emulatedFrameNumber,
-  std::vector<std::uint8_t> rawPayload)
+  std::vector<std::uint8_t> rawPayload,
+  std::vector<std::uint8_t> achievementProgress)
 {
   auto command = simple(
     StateStorageCommandType::saveResume, operationId, gameGeneration);
   command.emulatedFrameNumber = emulatedFrameNumber;
   command.rawPayload = std::move(rawPayload);
+  command.achievementProgress = std::move(achievementProgress);
   return command;
 }
 
@@ -382,7 +386,7 @@ private:
           SaveStatePresentation{
             .name = command.name,
             .thumbnailPng = command.thumbnailPng,
-          });
+          }, std::chrono::system_clock::now(), command.achievementProgress);
         if (status) {
           event.type = StateStorageEventType::slotSaved;
           event.slotSummaries = scanSlots();
@@ -396,6 +400,7 @@ private:
           event.type = StateStorageEventType::slotLoaded;
           event.metadata = std::move(loaded.metadata);
           event.rawPayload = std::move(loaded.rawPayload);
+          event.achievementProgress = std::move(loaded.achievementProgress);
           event.slotSummaries = scanSlots();
         }
         break;
@@ -438,7 +443,8 @@ private:
       case StateStorageCommandType::saveResume:
         status = manager_.saveResumeState(
           *activeIdentity_, activeHardware_, command.emulatedFrameNumber,
-          command.rawPayload);
+          command.rawPayload, std::chrono::system_clock::now(),
+          command.achievementProgress);
         if (status) {
           event.type = StateStorageEventType::resumeSaved;
         }
@@ -451,6 +457,7 @@ private:
           event.type = StateStorageEventType::resumeLoaded;
           event.metadata = std::move(loaded.metadata);
           event.rawPayload = std::move(loaded.rawPayload);
+          event.achievementProgress = std::move(loaded.achievementProgress);
         }
         break;
       }

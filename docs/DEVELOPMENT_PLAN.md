@@ -106,7 +106,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 92 Advanced debugger | COMPLETE | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | 109-test local graphs; ten-job exact hosted, complete-log, and six-package artifact audit | Debug-only functionality remains hidden and cannot race the core | `cfa611a` |
 | 93 Physical optical media | COMPLETE | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | 112-test local graphs, mocked services, optional hardware, ten-job hosted and six-package audit | Image workflows remain primary and portable | `696be36` |
 | 94 Netplay | COMPLETE | Add deterministic peer play without weakening local emulation | networking/session/UI | 118-test local graphs, protocol/rollback/security, package, ten-job hosted matrix | Disabled-by-default networking is authenticated and bounded | `5c4ee3f` |
-| 95 Achievements | PLANNED | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
+| 95 Achievements | IN PROGRESS | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | pending |
 | 96 Cloud synchronization | PLANNED | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, encryption/privacy, hosted matrix | Local data stays authoritative and recoverable | pending |
 | 97 Online metadata and art | PLANNED | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | pending |
 | 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
@@ -3779,6 +3779,59 @@ normal video; schema-1 settings migrate safely; global and sparse per-game selec
 persist; frame/aspect timing uniforms are accurate; no framebuffer work enters the core;
 software/no-feature builds remain usable; required runtimes/resources/licenses ship on
 all package layouts; and every applicable local gate passes.
+
+**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
+cannot contain its own SHA)
+
+## Milestone 95 detail
+
+**Status:** LOCAL GATES COMPLETE — exact pushed-commit hosted matrix and artifact audit
+pending before the milestone is closed.
+
+**Goal:** Add disabled-by-default RetroAchievements support through its official client
+without allowing networking, UI timing, or Hardcore policy to weaken the authoritative
+Genesis Plus GX owner-thread boundary.
+
+**Files changed:**
+
+- Root/dependency/build/package/CI CMake and workflows
+- `desktop/achievements/`
+- Core achievement C bridge, adapter, and emulation worker
+- Save-state manager/storage and application composition
+- RetroAchievements dialog and MainWindow controls
+- Achievement/core/state/GUI tests and project documentation
+
+**Tests added:** `unit.achievements` covers settings, secret exclusion, strict URLs,
+bounded queues, offline rejection, and a mocked official-client login. The
+`integration.achievement_worker` test completes login, game identification, achievement
+set, and start-session responses through the real worker bridge and generated Genesis
+ROM. It verifies pending-game netplay exclusion, recognition-gated Hardcore, active
+Hardcore restrictions, and allowed fast-forward/acceleration. `gui.achievements` drives
+account, table, accessibility, invalid transactional edits, password clearing,
+notification preference, and Softcore/Hardcore action gating. Existing lifecycle and
+state tests now cover supported console IDs, bounds/endian-safe memory, schema-3
+progress round trips, corruption, explicit schema-2 compatibility, and schema-1 legacy
+compatibility.
+
+**Gate evidence:** Complete warning-as-error GCC Debug, optimized GCC Release,
+ASan/UBSan, CHD-disabled, and warning-as-error Clang graphs each pass 121/121. The
+achievement-disabled graph passes all 119 applicable tests, and the shader-disabled
+graph passes all 119 applicable tests. The strict inherited Unix libretro target builds,
+links as x86-64 ELF, and cleans warning-free. A fresh Release stage passes the Linux
+package verifier, installed version and offscreen event-loop smokes, dependency
+inspection, TGZ generation, SHA-256 verification, and archive inspection for the
+achievement guide and both dependency licenses. The supplied NAS ROM directory is not
+mounted on this host, so no optional proprietary-ROM smoke was attempted; generated
+CC0 fixtures traverse the production core/worker/GUI path. Exact hosted Windows, Linux,
+Apple Silicon, and Intel validation plus complete-log and downloaded-artifact inspection
+begin only after this candidate commit is pushed.
+
+**Acceptance criteria:** The emulator remains fully functional offline; the password is
+never persisted and the returned token uses only a secure platform store; provider
+traffic and all queues are bounded; `rc_client` executes only on authoritative owner-
+thread frames; supported games expose achievements/rich presence/leaderboards; Hardcore
+cannot be bypassed through a direct worker command; schema-1/2 states remain readable;
+all local and hosted platform gates and complete logs pass.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)

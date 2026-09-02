@@ -83,6 +83,7 @@ if(GENPLUSGX_ENABLE_TREMOR)
 endif()
 
 add_library(genplusgx_core_host OBJECT
+  c_api/desktop_core_achievements.c
   c_api/desktop_core_cheats.c
   c_api/desktop_core_debug.c
   c_api/desktop_core_host.c
@@ -179,6 +180,7 @@ if(GENPLUSGX_ENABLE_CHD)
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zstd-1.5.6/lib/common/xxhash.c
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zstd-1.5.6/lib/common/zstd_common.c
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/adler32.c
+    ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/crc32.c
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inffast.c
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inflate.c
     ${GENPLUSGX_LIBCHDR_ROOT}/deps/zlib-1.3.1/inftrees.c
@@ -345,6 +347,7 @@ target_link_libraries(
   genplusgx_core_adapter
   PUBLIC
     GenesisPlusGX::Audio
+    GenesisPlusGX::Achievements
     GenesisPlusGX::Core
     GenesisPlusGX::FrontendTypes
     GenesisPlusGX::NetplayCore

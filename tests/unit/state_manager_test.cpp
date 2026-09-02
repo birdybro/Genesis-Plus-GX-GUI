@@ -133,8 +133,11 @@ int main()
     .name = "Before the final boss",
     .thumbnailPng = fakePng(),
   };
+  const std::vector<std::uint8_t> achievementProgress{
+    0x52U, 0x41U, 0x50U, 0x01U, 0x23U, 0x45U};
   if (!check(manager.saveSlot(
-        firstIdentity, 0U, 0x80U, 99U, replacement, presentation, fixedTimestamp),
+        firstIdentity, 0U, 0x80U, 99U, replacement, presentation,
+        fixedTimestamp, achievementProgress),
         "Save-state slot replacement failed")) {
     return 5;
   }
@@ -142,7 +145,8 @@ int main()
   if (!check(replacementLoad.status && replacementLoad.rawPayload == replacement &&
           replacementLoad.metadata.emulatedFrameNumber == 99U &&
           replacementLoad.metadata.name == presentation.name &&
-          replacementLoad.metadata.thumbnailPng == presentation.thumbnailPng,
+          replacementLoad.metadata.thumbnailPng == presentation.thumbnailPng &&
+          replacementLoad.achievementProgress == achievementProgress,
         "Save-state slot replacement did not become visible atomically") ||
       !check(manager.loadStateFile(
           manager.statePath(firstIdentity, 0U), secondIdentity, 0x80U).status.error ==
@@ -168,6 +172,7 @@ int main()
   }
   const auto imported = manager.loadSlot(firstIdentity, 2U, 0x80U);
   if (!check(imported.status && imported.rawPayload == replacement &&
+        imported.achievementProgress == achievementProgress &&
         imported.metadata.slot == 2U &&
         imported.metadata.name == presentation.name &&
         imported.metadata.thumbnailPng == presentation.thumbnailPng,
@@ -181,6 +186,7 @@ int main()
   const auto protectedPayload = fakeRawState(0x44U);
   if (!check(renamed.status && renamed.metadata.name == "After the final boss" &&
         renamed.metadata.thumbnailPng == presentation.thumbnailPng &&
+        renamed.achievementProgress == achievementProgress &&
         renamed.metadata.timestamp == fixedTimestamp,
       "State rename did not preserve thumbnail/timestamp") ||
       !check(manager.saveSlot(
@@ -267,6 +273,14 @@ int main()
         "Oversized raw state payload was accepted")) {
     return 8;
   }
+  const std::vector<std::uint8_t> oversizedProgress(
+    genplusgx::SaveStateManager::maximumAchievementProgressBytes + 1U, 0U);
+  if (!check(manager.saveSlot(firstIdentity, 1U, 0x80U, 0U, replacement,
+        presentation, fixedTimestamp, oversizedProgress).error ==
+          genplusgx::SaveStateError::invalidPayload,
+      "Oversized achievement progress was accepted")) {
+    return 31;
+  }
 
   const auto stateFile = manager.statePath(firstIdentity, 0U);
   auto encoded = genplusgx::readFileBounded(
@@ -274,8 +288,8 @@ int main()
   if (!check(encoded.status && encoded.exists, "Could not read state for corruption test")) {
     return 9;
   }
-  const std::array<std::size_t, 11> mutationOffsets{
-    0U, 8U, 12U, 24U, 40U, 48U, 80U, 112U, 128U, 136U, 184U};
+  const std::array<std::size_t, 12> mutationOffsets{
+    0U, 8U, 12U, 24U, 40U, 48U, 80U, 112U, 128U, 136U, 168U, 184U};
   for (std::size_t index = 0U; index < mutationOffsets.size(); ++index) {
     auto mutation = encoded.data;
     mutation[mutationOffsets[index]] ^= 0x01U;
@@ -348,6 +362,27 @@ int main()
   }
   encoded = genplusgx::readFileBounded(
     stateFile, genplusgx::SaveStateManager::maximumFileBytes);
+  auto presentationSchema = encoded.data;
+  presentationSchema[8] = static_cast<std::uint8_t>(
+    genplusgx::SaveStateManager::presentationSchemaVersion);
+  const auto presentationSchemaPath = root / "legacy-schema-2.gpgxstate";
+  if (!check(genplusgx::writeFileAtomically(presentationSchemaPath,
+          presentationSchema, genplusgx::SaveStateManager::maximumFileBytes),
+        "Could not write schema-2 state fixture")) {
+    return 32;
+  }
+  const auto presentationSchemaLoad = manager.loadStateFile(
+    presentationSchemaPath, firstIdentity, 0x80U);
+  if (!check(presentationSchemaLoad.status &&
+        presentationSchemaLoad.rawPayload == replacement &&
+        presentationSchemaLoad.metadata.schemaVersion ==
+          genplusgx::SaveStateManager::presentationSchemaVersion &&
+        presentationSchemaLoad.metadata.name == presentation.name &&
+        presentationSchemaLoad.metadata.thumbnailPng == presentation.thumbnailPng &&
+        presentationSchemaLoad.achievementProgress.empty(),
+      "Schema-2 state did not remain backward compatible")) {
+    return 33;
+  }
   const auto presentationBytes =
     8U + presentation.name.size() + presentation.thumbnailPng.size();
   std::vector<std::uint8_t> legacy{

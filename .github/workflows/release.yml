@@ -55,7 +55,7 @@ jobs:
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev xvfb
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev libsecret-1-dev xvfb
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1
@@ -321,7 +321,7 @@ jobs:
       - name: Install native build tools
         run: |
           sudo apt-get update
-          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev xvfb
+          sudo apt-get install --yes ninja-build libgl1-mesa-dev libegl1-mesa-dev libsecret-1-dev xvfb
 
       - name: Install Qt
         uses: jurplel/install-qt-action@48d3ad6db93f3627c8ee7a0454bc6f3744f7e730 # v4.3.1

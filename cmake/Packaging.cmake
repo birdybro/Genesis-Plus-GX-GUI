@@ -42,6 +42,7 @@ foreach(document IN ITEMS
 endforeach()
 foreach(document IN ITEMS
     APPEARANCE_AND_ACCESSIBILITY.md
+    ACHIEVEMENTS.md
     ARCHITECTURE.md
     BIOS.md
     BUILDING.md

@@ -119,8 +119,10 @@ int main()
   }
 
   const auto payload = fakeRawState(0x5AU);
+  const std::vector<std::uint8_t> achievementProgress{1U, 2U, 3U, 4U};
   if (!check(service.submit(genplusgx::StateStorageCommand::save(
-        11U, generation, 3U, 77U, payload, "Boss door", fakePng())),
+        11U, generation, 3U, 77U, payload, "Boss door", fakePng(),
+        achievementProgress)),
       "slot save could not be queued")) {
     return 7;
   }
@@ -148,6 +150,7 @@ int main()
   if (!check(loaded && loaded->succeeded() &&
         loaded->type == genplusgx::StateStorageEventType::slotLoaded &&
         loaded->rawPayload == payload &&
+        loaded->achievementProgress == achievementProgress &&
         loaded->metadata.emulatedFrameNumber == 77U,
       "slot load did not return the validated raw payload")) {
     return 10;
@@ -192,7 +195,7 @@ int main()
   }
 
   if (!check(service.submit(genplusgx::StateStorageCommand::saveResumeState(
-        21U, generation, 78U, payload)),
+        21U, generation, 78U, payload, achievementProgress)),
       "resume checkpoint could not be queued")) {
     return 21;
   }
@@ -211,6 +214,7 @@ int main()
   if (!check(resumeLoaded && resumeLoaded->succeeded() &&
         resumeLoaded->type == genplusgx::StateStorageEventType::resumeLoaded &&
         resumeLoaded->rawPayload == payload &&
+        resumeLoaded->achievementProgress == achievementProgress &&
         resumeLoaded->metadata.emulatedFrameNumber == 78U,
       "resume checkpoint did not return validated payload") ||
       !check(service.submit(genplusgx::StateStorageCommand::simple(

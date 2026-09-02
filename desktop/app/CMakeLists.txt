@@ -155,6 +155,26 @@ if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
   )
 endif()
 
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
+  if(APPLE)
+    set(genplusgx_achievement_license_destination
+      "genesis-plus-gx-gui.app/Contents/Resources/licenses")
+  else()
+    set(genplusgx_achievement_license_destination
+      "${CMAKE_INSTALL_DATADIR}/doc/Genesis-Plus-GX-GUI")
+  endif()
+  install(
+    FILES "${GENPLUSGX_RCHEEVOS_LICENSE}"
+    DESTINATION "${genplusgx_achievement_license_destination}"
+    RENAME "rcheevos-MIT.txt"
+  )
+  install(
+    FILES "${GENPLUSGX_QTKEYCHAIN_LICENSE}"
+    DESTINATION "${genplusgx_achievement_license_destination}"
+    RENAME "QtKeychain-BSD-3-Clause.txt"
+  )
+endif()
+
 if(UNIX AND NOT APPLE)
   set(genplusgx_linux_plugins
     Qt6::QXcbIntegrationPlugin

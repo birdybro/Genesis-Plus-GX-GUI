@@ -37,6 +37,11 @@ option(
   "Enable libretro Slang shader preset support through librashader"
   ON
 )
+option(
+  GENPLUSGX_ENABLE_ACHIEVEMENTS
+  "Enable opt-in RetroAchievements support through rcheevos"
+  ON
+)
 set(
   GENPLUSGX_WINDOWS_REDIST
   ""
@@ -73,6 +78,10 @@ find_package(SDL3 3.2 REQUIRED CONFIG)
 
 if(GENPLUSGX_ENABLE_LIBRETRO_SHADERS)
   include(Librashader)
+endif()
+if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
+  include(Rcheevos)
+  include(QtKeychain)
 endif()
 
 execute_process(
@@ -120,6 +129,7 @@ message(STATUS "Genesis Plus GX GUI ${GENPLUSGX_VERSION} (${GENPLUSGX_GIT_COMMIT
 message(STATUS "Qt: ${Qt6_VERSION}")
 message(STATUS "SDL3: ${SDL3_VERSION}")
 message(STATUS "Netplay: authenticated direct TCP peer sessions")
+message(STATUS "RetroAchievements: ${GENPLUSGX_ENABLE_ACHIEVEMENTS}")
 message(STATUS "Libretro shaders: ${GENPLUSGX_ENABLE_LIBRETRO_SHADERS}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
@@ -128,6 +138,7 @@ add_subdirectory(desktop/video)
 add_subdirectory(desktop/audio)
 add_subdirectory(desktop/timing)
 add_subdirectory(desktop/netplay)
+add_subdirectory(desktop/achievements)
 add_subdirectory(desktop/core)
 add_subdirectory(desktop/persistence)
 add_subdirectory(desktop/diagnostics)

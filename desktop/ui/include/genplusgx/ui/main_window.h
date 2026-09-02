@@ -1,6 +1,8 @@
 #pragma once
 
 #include "genplusgx/core_adapter.h"
+#include "genplusgx/achievements/achievement_settings.h"
+#include "genplusgx/achievements/achievement_types.h"
 #include "genplusgx/game_file.h"
 #include "genplusgx/cheats/cheat_manager.h"
 #include "genplusgx/diagnostics/diagnostics.h"
@@ -129,6 +131,11 @@ public:
     std::function<diagnostics::DiagnosticsSnapshot()>;
   using DebugRequestSink = std::function<bool(CoreDebugRequest)>;
   using NetplayRequestSink = NetplayDialog::RequestSink;
+  using AchievementSettingsSink = std::function<PersistenceStatus(
+    const achievements::Settings&)>;
+  using AchievementLoginSink =
+    std::function<void(std::string, std::string)>;
+  using AchievementLogoutSink = std::function<void()>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -159,6 +166,14 @@ public:
     const std::string& detail = {});
   void showNetplay();
   void showNetplayError(const std::string& detail);
+  void setAchievementSettings(achievements::Settings settings);
+  void setAchievementSettingsSink(AchievementSettingsSink sink);
+  void setAchievementLoginSink(AchievementLoginSink sink);
+  void setAchievementLogoutSink(AchievementLogoutSink sink);
+  void setAchievementSnapshot(achievements::Snapshot snapshot);
+  void presentAchievementEvent(const achievements::Event& event);
+  void showAchievementError(const std::string& detail);
+  void showAchievements();
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
@@ -360,6 +375,7 @@ private:
   [[nodiscard]] bool submitGameLoadTarget(GameLaunchTarget target);
   void updatePhysicalMediaAction();
   void updateNetplayControls();
+  void updateAchievementControls();
   void chooseGame();
   void chooseGameWithPatch();
   void closeGame();
@@ -454,6 +470,11 @@ private:
   DiagnosticsSnapshotProvider diagnosticsSnapshotProvider_;
   DebugRequestSink debugRequestSink_;
   NetplayRequestSink netplayRequestSink_;
+  AchievementSettingsSink achievementSettingsSink_;
+  AchievementLoginSink achievementLoginSink_;
+  AchievementLogoutSink achievementLogoutSink_;
+  achievements::Settings achievementSettings_;
+  achievements::Snapshot achievementSnapshot_;
   netplay::NetplaySessionState netplayState_{
     netplay::NetplaySessionState::disconnected};
   cheats::CheatConfiguration cheatConfiguration_;

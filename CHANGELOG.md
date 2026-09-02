@@ -14,6 +14,11 @@ platform documentation.
 
 ### Added
 
+- Disabled-by-default RetroAchievements integration through the official rcheevos
+  `rc_client`, including supported-system hashing, achievements, measured progress,
+  leaderboards, rich presence, bounded HTTPS transport, native secure token storage,
+  offline recovery, schema-3 state progress, and emulation-thread Hardcore enforcement.
+
 - Authenticated direct TCP netplay for one peer, with game/build/settings/BIOS/cheat
   compatibility checks, HMAC-SHA-256 challenge/response and per-packet integrity,
   replay rejection, 0–8 frame input delay, bounded 1–12-frame rollback on the
@@ -61,9 +66,10 @@ platform documentation.
   PNGs, stereo PCM WAV, per-frame/manifest metadata, drop instrumentation, atomic
   finalization, configurable hotkey, diagnostics, and real generated-ROM coverage.
 - A visual save-state manager with native-frame PNG previews, optional per-slot names,
-  frame/size/timestamp details, and identity-validated import/export. Schema-2 state
-  envelopes remain backward-compatible with existing schema-1 files and keep all
-  presentation data outside the unchanged Genesis Plus GX payload.
+  frame/size/timestamp details, and identity-validated import/export. Schema-3 state
+  envelopes remain backward-compatible with existing schema-1/schema-2 files, keep all
+  presentation data outside the unchanged Genesis Plus GX payload, and optionally
+  carry separately bounded RetroAchievements progress.
 - Non-destructive IPS, BPS, and bidirectional UPS cartridge soft patching with strict
   bounds and CRC validation, automatic same-stem sidecars, explicit file/CLI/two-file
   drop selection, collision-safe caching, patched-content save/state/settings identity,

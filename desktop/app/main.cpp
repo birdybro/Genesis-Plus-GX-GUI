@@ -4,6 +4,9 @@
 #include "genplusgx/app/shutdown_report.h"
 #include "genplusgx/version.h"
 #include "genplusgx/audio_output.h"
+#include "genplusgx/achievements/achievement_credentials.h"
+#include "genplusgx/achievements/achievement_network_client.h"
+#include "genplusgx/achievements/achievement_settings.h"
 #include "genplusgx/backup_store.h"
 #include "genplusgx/bounded_queue.h"
 #include "genplusgx/cheats/cheat_manager.h"
@@ -448,6 +451,22 @@ int main(int argc, char* argv[])
       "Appearance settings", loadedAppearanceSettings.status.message);
   }
   auto appearanceSettings = loadedAppearanceSettings.settings;
+  genplusgx::achievements::SettingsStore achievementSettingsStore{
+    applicationPaths.configDirectory() / "achievements.json"};
+  auto loadedAchievementSettings = achievementSettingsStore.load();
+  if (!loadedAchievementSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedAchievementSettings.status.message);
+    recordStartupIssue(
+      "RetroAchievements settings", loadedAchievementSettings.status.message);
+  }
+  auto achievementSettings = loadedAchievementSettings.settings;
+  if (loadedAchievementSettings.migrated) {
+    const auto migrated = achievementSettingsStore.save(achievementSettings);
+    if (!migrated) {
+      recordStartupIssue("RetroAchievements settings migration", migrated.message);
+    }
+  }
   const auto translationApplied = translationManager.apply(
     appearanceSettings.language);
   if (!translationApplied) {
@@ -652,6 +671,15 @@ int main(int argc, char* argv[])
       recordStartupIssue("Session settings migration", migrated.message);
     }
   }
+  if (achievementSettings.enabled && achievementSettings.hardcore &&
+      sessionSettings.lastGamePath) {
+    sessionSettings.lastGamePath.reset();
+    sessionSettings.lastPatchPath.reset();
+    const auto cleared = sessionSettingsStore.save(sessionSettings);
+    if (!cleared) {
+      recordStartupIssue("Hardcore session checkpoint cleanup", cleared.message);
+    }
+  }
   std::optional<std::filesystem::path> automaticResumePath;
   std::optional<std::filesystem::path> automaticResumePatchPath;
   if (!commandLine.gamePath && sessionSettings.resumeOnLaunch &&
@@ -781,6 +809,12 @@ int main(int argc, char* argv[])
   }
   auto netplayBridge =
     std::make_shared<genplusgx::netplay::NetplayBridge>();
+  auto achievementBridge =
+    std::make_shared<genplusgx::achievements::ServerBridge>();
+  genplusgx::achievements::NetworkClient achievementNetwork{
+    achievementBridge,
+    std::string{GENPLUSGX_APP_NAME} + "/" + GENPLUSGX_VERSION};
+  genplusgx::achievements::CredentialStore achievementCredentials;
   genplusgx::EmulationWorker worker{
     64U,
     64U,
@@ -789,7 +823,8 @@ int main(int argc, char* argv[])
     audioOutput.ringBuffer(),
     backupStore,
     recordingServiceStarted ? recordingService : nullptr,
-    netplayBridge};
+    netplayBridge,
+    achievementBridge};
   const auto workerStarted = worker.start();
   if (!workerStarted) {
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
@@ -807,6 +842,14 @@ int main(int argc, char* argv[])
         "The emulation service could not start, so the application must close.\n\n%1")
         .arg(QString::fromStdString(workerStarted.message)));
     return 1;
+  }
+  std::uint64_t achievementOperationId = 845'000U;
+  const auto initialAchievementSettings = worker.submit(
+    genplusgx::EmulationCommand::updateAchievementSettings(
+      ++achievementOperationId, achievementSettings));
+  if (!initialAchievementSettings) {
+    recordStartupIssue(
+      "RetroAchievements runtime", initialAchievementSettings.message);
   }
   std::uint64_t rewindSettingsOperationId = 850'000U;
   const auto initialRewindSettings = worker.submit(
@@ -849,6 +892,98 @@ int main(int argc, char* argv[])
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
     });
+  window.setAchievementSettings(achievementSettings);
+  const auto restoreAchievementSession =
+    [&achievementCredentials, &achievementOperationId,
+     &achievementSettings, &window, &worker](const std::string& username) {
+      achievementCredentials.readToken(username,
+        [&achievementOperationId, &achievementSettings, &window, &worker,
+         username](genplusgx::achievements::CredentialResult result) mutable {
+          if (!achievementSettings.enabled ||
+              achievementSettings.username != username) {
+            std::fill(result.token.begin(), result.token.end(), '\0');
+            return;
+          }
+          if (!result.succeeded) {
+            window.showAchievementError(result.detail);
+            return;
+          }
+          if (!result.found) {
+            return;
+          }
+          const auto submitted = worker.submit(
+            genplusgx::EmulationCommand::achievementTokenLogin(
+              ++achievementOperationId, std::move(username),
+              std::move(result.token)));
+          if (!submitted) {
+            window.showAchievementError(submitted.message);
+          }
+        });
+    };
+  window.setAchievementSettingsSink(
+    [&achievementOperationId, &achievementSettings,
+     &achievementSettingsStore, &restoreAchievementSession, &window, &worker](
+      const genplusgx::achievements::Settings& settings) {
+      const auto previous = achievementSettings;
+      const auto saved = achievementSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::updateAchievementSettings(
+          ++achievementOperationId, settings));
+      if (!submitted) {
+        const auto rolledBack = achievementSettingsStore.save(previous);
+        std::string detail = submitted.message;
+        if (!rolledBack) {
+          detail +=
+            " The previous achievement settings also could not be restored: " +
+            rolledBack.message;
+        }
+        return genplusgx::PersistenceStatus{
+          genplusgx::PersistenceError::invalidData, std::move(detail)};
+      }
+      achievementSettings = settings;
+      window.setAchievementSettings(settings);
+      if (settings.enabled && !settings.username.empty() &&
+          (!previous.enabled || previous.username != settings.username)) {
+        restoreAchievementSession(settings.username);
+      }
+      return genplusgx::PersistenceStatus{};
+    });
+  window.setAchievementLoginSink(
+    [&achievementOperationId, &worker](std::string username,
+      std::string password) {
+      const auto submitted = worker.submit(
+        genplusgx::EmulationCommand::achievementPasswordLogin(
+          ++achievementOperationId, std::move(username), std::move(password)));
+      if (!submitted) {
+        qWarning().noquote() << "RetroAchievements sign-in command rejected:"
+                             << QString::fromStdString(submitted.message);
+      }
+    });
+  window.setAchievementLogoutSink(
+    [&achievementCredentials, &achievementOperationId,
+     &achievementSettings, &window, &worker] {
+      if (!achievementSettings.username.empty()) {
+        achievementCredentials.deleteToken(achievementSettings.username,
+          [&window](genplusgx::achievements::CredentialResult result) {
+            if (!result.succeeded) {
+              window.showAchievementError(result.detail);
+            }
+          });
+      }
+      const auto submitted = worker.submit(genplusgx::EmulationCommand::simple(
+        genplusgx::EmulationCommandType::achievementLogout,
+        ++achievementOperationId));
+      if (!submitted) {
+        window.showAchievementError(submitted.message);
+      }
+    });
+  if (achievementSettings.enabled &&
+      !achievementSettings.username.empty()) {
+    restoreAchievementSession(achievementSettings.username);
+  }
   std::set<std::int64_t> libraryScansInFlight;
   std::uint64_t libraryScanOperationId = 5'000'000U;
   genplusgx::BoundedQueue<
@@ -1975,6 +2110,7 @@ int main(int argc, char* argv[])
     [&applicationPaths, &audioOutput, &biosManager, &controllerInput,
      &diagnosticLoadedGame,
      &diagnosticLoadedRegion, &diagnosticLoadedSystem, &frontendLogger,
+     &achievementBridge, &achievementNetwork,
      &netplayBridge, &netplaySession, &recordingService, &rewindSettings,
      &runAheadSettings, &speedSettings,
      &translationManager, &window, &worker] {
@@ -2114,6 +2250,32 @@ int main(int argc, char* argv[])
       snapshot.netplayRollbacks = workerMetrics.netplayRollbacks;
       snapshot.netplayHistoryFrames = workerMetrics.netplayHistoryFrames;
       snapshot.netplayHistoryBytes = workerMetrics.netplayHistoryBytes;
+      snapshot.achievementsState = !workerMetrics.achievementsEnabled
+        ? "Disabled"
+        : !workerMetrics.achievementsAuthenticated
+          ? "Enabled; signed out"
+          : workerMetrics.achievementsGameLoaded
+            ? "Authenticated; recognized game active"
+            : "Authenticated; no recognized game";
+      snapshot.achievementsHardcore = workerMetrics.achievementsHardcore;
+      snapshot.achievementRequestQueueDepth =
+        workerMetrics.achievementRequestQueueDepth;
+      snapshot.achievementResponseQueueDepth =
+        workerMetrics.achievementResponseQueueDepth;
+      snapshot.achievementQueueCapacity = achievementBridge->metrics().capacity;
+      snapshot.rejectedAchievementRequests =
+        workerMetrics.rejectedAchievementRequests;
+      snapshot.rejectedAchievementResponses =
+        workerMetrics.rejectedAchievementResponses;
+      const auto achievementNetworkMetrics = achievementNetwork.metrics();
+      snapshot.activeAchievementRequests =
+        achievementNetworkMetrics.activeRequests;
+      snapshot.completedAchievementRequests =
+        achievementNetworkMetrics.completedRequests;
+      snapshot.failedAchievementRequests =
+        achievementNetworkMetrics.failedRequests;
+      snapshot.lastAchievementNetworkError =
+        achievementNetworkMetrics.lastError;
       const auto recordingMetrics = recordingService->metrics();
       snapshot.recordingActive = recordingMetrics.active;
       snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
@@ -2634,8 +2796,9 @@ int main(int argc, char* argv[])
      &stateOperationId,
      &stateServiceFailureReported, &stateSessionAvailable, &stateStorage,
      &releasePhysicalTarget, &reportRuntimeFailure, &runtimeFailureReported,
-     &worker, &window,
+     &worker, &window, &achievementCredentials, &achievementNetwork,
      automatedQuitMilliseconds, automatedQuitWhenGameReady] {
+    achievementNetwork.pump();
     static_cast<void>(controllerInput.pollEvents());
     while (auto outgoing = netplayBridge->pollOutgoing()) {
       if (!netplayRuntimeActive ||
@@ -2816,6 +2979,37 @@ int main(int argc, char* argv[])
       nextInstrumentationLog = instrumentationNow + std::chrono::seconds{5};
     }
     while (auto event = worker.pollEvent()) {
+      if (event->type ==
+          genplusgx::EmulationEventType::achievementEvent) {
+        auto achievementEvent = std::move(event->achievement);
+        if (achievementEvent.type ==
+              genplusgx::achievements::EventType::loginSucceeded &&
+            !achievementEvent.sessionToken.empty()) {
+          auto token = std::move(achievementEvent.sessionToken);
+          achievementEvent.sessionToken.clear();
+          achievementCredentials.writeToken(
+            achievementEvent.snapshot.username, std::move(token),
+            [&window](genplusgx::achievements::CredentialResult result) {
+              if (!result.succeeded) {
+                window.showAchievementError(result.detail);
+              }
+            });
+        }
+        window.presentAchievementEvent(achievementEvent);
+        if (achievementEvent.type ==
+              genplusgx::achievements::EventType::loginFailed ||
+            achievementEvent.type ==
+              genplusgx::achievements::EventType::gameLoadFailed ||
+            achievementEvent.type ==
+              genplusgx::achievements::EventType::serverError) {
+          const auto detail = achievementEvent.detail.empty()
+            ? achievementEvent.snapshot.detail : achievementEvent.detail;
+          qWarning().noquote() << "RetroAchievements operation failed:"
+                               << QString::fromStdString(detail);
+          window.showAchievementError(detail);
+        }
+        continue;
+      }
       if (window.isGameLoaded() &&
           (event->workerState == genplusgx::EmulationWorkerState::paused ||
            event->workerState == genplusgx::EmulationWorkerState::running)) {
@@ -2932,7 +3126,8 @@ int main(int argc, char* argv[])
                 event->frameNumber,
                 std::move(event->rawState),
                 pendingState->name,
-                pendingState->thumbnailPng));
+                pendingState->thumbnailPng,
+                std::move(event->achievementProgress)));
             if (!submitted) {
               const auto operation = pendingState->operation;
               pendingState.reset();
@@ -3502,7 +3697,8 @@ int main(int argc, char* argv[])
           pendingAutomaticResume->phase ==
             AutomaticResumePhase::loadingCheckpoint) {
         const auto restored = worker.submit(genplusgx::EmulationCommand::restore(
-          event->operationId, event->rawPayload));
+          event->operationId, event->rawPayload,
+          event->achievementProgress));
         if (restored) {
           pendingAutomaticResume->phase =
             AutomaticResumePhase::restoringCheckpoint;
@@ -3535,7 +3731,8 @@ int main(int argc, char* argv[])
           pendingState->phase == PendingStatePhase::loading) {
         window.setStateSlotViews(stateSlotViews(event->slotSummaries));
         const auto restored = worker.submit(genplusgx::EmulationCommand::restore(
-          event->operationId, event->rawPayload));
+          event->operationId, event->rawPayload,
+          event->achievementProgress));
         if (!restored) {
           const auto operation = pendingState->operation;
           pendingState.reset();
@@ -3977,7 +4174,8 @@ int main(int argc, char* argv[])
   }
   const bool resumeCheckpointRequested = result == 0 &&
     sessionSettings.resumeOnLaunch && window.isGameLoaded() &&
-    !window.loadedGameTarget().isPhysicalMedia() && !pendingAutomaticResume;
+    !window.loadedGameTarget().isPhysicalMedia() && !pendingAutomaticResume &&
+    !worker.metrics().achievementsHardcore;
   if (resumeCheckpointRequested && gameGeneration != 0U &&
       stateSessionAvailable &&
       (worker.state() == genplusgx::EmulationWorkerState::paused ||
@@ -4043,7 +4241,8 @@ int main(int argc, char* argv[])
             captureId,
             gameGeneration,
             captured->frameNumber,
-            std::move(captured->rawState)));
+            std::move(captured->rawState),
+            std::move(captured->achievementProgress)));
         const auto stateEvent = stored ? waitForStateOperation(captureId)
                                       : std::nullopt;
         if (!stored || !stateEvent || !stateEvent->succeeded() ||
@@ -4129,6 +4328,9 @@ int main(int argc, char* argv[])
   window.setDiagnosticsSnapshotProvider({});
   window.setDebugRequestSink({});
   window.setNetplayRequestSink({});
+  window.setAchievementSettingsSink({});
+  window.setAchievementLoginSink({});
+  window.setAchievementLogoutSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});

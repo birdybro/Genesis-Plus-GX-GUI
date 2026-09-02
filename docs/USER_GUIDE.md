@@ -301,6 +301,21 @@ play may require manual TCP port forwarding or a peer VPN; the application perfo
 automatic router configuration. See [Netplay](NETPLAY.md) for security, rollback,
 diagnostics, and current limitations.
 
+## RetroAchievements
+
+Open **Tools → RetroAchievements…** to opt in, select Hardcore/Unofficial/Encore
+preferences, and sign in with your own account. The password is never persisted; the
+returned session token uses the operating system's secure credential store with no
+plaintext fallback. Once a supported loaded game is recognized, the dialog displays
+scores, achievement status and measured progress, and rich presence. Network loss does
+not stop emulation.
+
+Active Hardcore Mode enforces restrictions on the core-owning thread: save states and
+automatic resume, rewind, run-ahead, slowdown, frame advance, cheats, netplay, and
+debugger access are unavailable. Fast-forward remains permitted. See the complete
+[RetroAchievements guide](ACHIEVEMENTS.md) for privacy, recognition, state-format, and
+troubleshooting details.
+
 ## Run-ahead latency reduction
 
 For cartridge games, choose **Emulation → Run-Ahead** to display a future frame while

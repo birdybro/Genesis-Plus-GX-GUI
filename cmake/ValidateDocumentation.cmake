@@ -14,6 +14,7 @@ set(required_documents
   CHANGELOG.md
   CONTRIBUTING.md
   THIRD_PARTY_NOTICES.md
+  docs/ACHIEVEMENTS.md
   docs/ARCHITECTURE.md
   docs/BUILDING.md
   docs/DEVELOPMENT.md
@@ -89,6 +90,8 @@ foreach(component IN ITEMS
     "SDL 3"
     "Genesis Plus GX"
     "librashader"
+    "rcheevos"
+    "QtKeychain"
     "libchdr"
     "zlib"
     "zstd"
@@ -110,6 +113,7 @@ foreach(menu_text IN ITEMS
     "Audio → Audio Settings"
     "Input → Controller Configuration"
     "Tools → Cheats"
+    "Tools → RetroAchievements"
     "Tools → Game Information"
     "Tools → BIOS Settings"
     "Tools → Log and Diagnostics"

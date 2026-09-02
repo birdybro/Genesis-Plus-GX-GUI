@@ -284,3 +284,13 @@ verify the changed emulated RAM marker, unchanged source file, distinct patched 
 GUI/CLI selection, and checkpoint restoration. The patch applies only to the original
 project-authored fixture, contains no commercial game bytes, and is dedicated to
 CC0-1.0. No patch file or patched ROM survives its temporary directory.
+
+## Mocked RetroAchievements service data
+
+`unit.achievements` and `integration.achievement_worker` pass short project-authored
+JSON login responses directly through the bounded in-memory provider bridge. They use
+invented usernames, scores, URLs, and tokens solely to exercise the official rcheevos
+client and secure handoff contract. No response is fetched from RetroAchievements and
+no real credential, achievement definition, badge, game database, or account data is
+stored. The worker case reuses the generated Genesis RAM marker ROM documented above;
+all additional response text is dedicated to CC0-1.0.
