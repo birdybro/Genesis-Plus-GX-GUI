@@ -47,8 +47,8 @@ localization verification through 2026-09-01
   `538eedb8b4be7aa305ffbaca3091044a6870be3a`
 - Exact portable-mode cross-platform release-gate and hosted evidence baseline:
   `a87c6c0791fcd89fccfa6a824595036d944dbfa7`
-- Localization implementation: the current uncommitted candidate; exact hosted evidence
-  remains a milestone gate before it can be marked complete
+- Exact localization implementation and hosted evidence baseline:
+  `58e624e573e9d7e9d8768edb04e4f77617f07602`
 - Branch: `master`
 - Application/package version: `0.1.1`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
@@ -276,7 +276,9 @@ exercises RTL inheritance and keyboard navigation. A fourth test enters the actu
 desktop event loop with the pseudo preference and checks the structured requested,
 effective, and fallback record. The fifth statically enforces the Qt 6.8-compatible
 catalog-output grammar that the local Qt 6.11 parser would otherwise be unable to
-distinguish from a newer-only API.
+distinguish from a newer-only API. The sixth exercises the production macOS package
+verifier against a canonical Resources catalog and an intentionally duplicated
+executable-directory catalog.
 
 Warning-as-error Debug, optimized Release, ASan/UBSan, Clang 22, and CHD-disabled
 graphs pass 109/109; the shader-disabled graph passes all 107 applicable tests. The
@@ -285,8 +287,8 @@ TGZ contain the compiled catalog and Localization guide, pass the production pac
 verifier and checksum, exclude `portable-data`, resolve all 22 ELF files, and run the
 extracted executable without an external library path. The package's actual event-loop
 smoke loads the pseudo catalog from the installed location. Exact Linux, Windows, Apple
-Silicon, and Intel macOS CI plus full-log/artifact inspection remain required after the
-cross-platform link correction is pushed.
+Silicon, and Intel macOS CI, complete-log inspection, and the six-distributable native
+artifact audit pass at the final implementation baseline described below.
 
 The initial implementation run `33566053906` exposed and led to correction of a Qt
 6.9-only translation-output argument before compilation on the pinned Qt 6.8.3 matrix.
@@ -295,8 +297,7 @@ the complete 15,593-line audit found eight duplicate-static-library warnings fro
 Apple linker (two affected targets in four macOS configurations). The localization API
 and implementation dependencies have been separated so both link commands now contain
 the archive once. Fresh GCC Debug, Release, ASan/UBSan, and Clang 22 graphs pass 108/108,
-and fresh staged/package verification passes; replacement exact hosted evidence is the
-remaining closure gate.
+and fresh staged/package verification passes.
 
 Link-corrected run `33569528033` passed all ten jobs. Its complete 15,243-line log is
 free of compiler/linker warnings, sanitizer signatures, test failures, timeouts,
@@ -304,7 +305,33 @@ unfinished messages, and the prior duplicate-library warning. The install trace 
 made a redundant macOS catalog visible in both `Contents/MacOS/translations` and the
 conventional `Contents/Resources/translations`. Build-tree placement now targets bundle
 Resources directly, and a new cross-host package fixture requires that canonical layout
-and rejects the obsolete duplicate; final exact CI and artifact evidence remain pending.
+and rejects the obsolete duplicate.
+
+Final implementation run
+[`33571825217`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33571825217)
+passes all ten jobs at `58e624e573e9d7e9d8768edb04e4f77617f07602`. Its first
+Intel macOS Release attempt stopped before configure when the SDL setup action could
+not connect to `api.github.com`; a same-commit retry passed dependency setup, configure,
+build, all 109 tests, native package verification, and ZIP/DMG upload. The complete
+successful log is 15,235 lines and 2,063,769 bytes with no compiler/linker diagnostic,
+duplicate-library warning, sanitizer/runtime finding, failed test, or timeout. Nine
+catalog builds each report 991 finished and zero unfinished messages. All nine test
+graphs pass 109/109; the only capability skip is the documented real-OpenGL shader
+render on Windows.
+
+The six distributables are 40,300,794-byte Linux TGZ, 52,772,814-byte Windows ZIP,
+32,187,545-byte arm64 ZIP, 32,137,415-byte arm64 DMG, 33,017,360-byte x86_64 ZIP,
+and 32,931,496-byte x86_64 DMG. Every SHA-256 manifest and archive-member safety check
+passes. The production package verifier accepts all extracted layouts, the two macOS
+ZIP/DMG pairs match byte-for-byte, symlinks remain relative and contained, and no ROM,
+BIOS, save/state, secret, or pre-created user-data payload exists. Each distribution
+contains the Localization guide and the same compiled catalog hash
+`d919b36fd7dc380d922c4279777105709caecd8d3e7c097f5ab9d9ec2381426e`.
+Each macOS package contains exactly one catalog in `Contents/Resources/translations`
+and no executable-directory duplicate. All 16 Mach-O files per Apple architecture and
+27 Windows application/runtime PE files have the intended architecture; all 22 Linux
+ELF files resolve, and the downloaded Linux application passes version, help, and real
+event-loop pseudo-language startup smoke without an external library path.
 
 Initial implementation run
 [`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)

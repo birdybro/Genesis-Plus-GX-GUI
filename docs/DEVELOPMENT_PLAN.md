@@ -102,7 +102,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 88 Overlays and bezels | COMPLETE | Add local artwork overlays and safe viewport composition | video/resources/UI | geometry, alpha, path, GUI, hosted matrix | Local assets never alter core output or input geometry silently | `1698eaa` |
 | 89 Cheat import and search | COMPLETE | Add local cheat-list import and memory-backed search workflows | cheats/debug/UI/docs | six local graphs; ten-job exact hosted/artifact audit | Invalid/untrusted lists cannot silently patch memory | `63eaa55` |
 | 90 Portable mode | COMPLETE | Add explicit relocatable application-data mode | platform paths/CLI/UI/docs/package gates | 103-test local graphs; path isolation, fail-closed startup, package and hosted matrix | Portable mode is opt-in and never redirects normal user data | `a87c6c0` |
-| 91 Localization | IN PROGRESS | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; extraction, fallback, layout, package, hosted matrix | English fallback, locale behavior, and stable object names remain intact | pending |
+| 91 Localization | COMPLETE | Add translation catalogs and locale-safe UI coverage | localization/settings/UI/resources/package/docs | 109-test local graphs; ten-job exact hosted and six-package artifact audit | English fallback, locale behavior, and stable object names remain intact | `58e624e` |
 | 92 Advanced debugger | PLANNED | Add instruction stepping, symbols, tracing, and external integration where safe | debug protocol/worker/UI | core ownership, bounds, GUI, hosted matrix | Debug-only functionality remains hidden and cannot race the core | pending |
 | 93 Physical optical media | PLANNED | Add platform-gated physical Sega CD media access where practical | platform/disc/UI | mocked services, optional hardware, hosted matrix | Image workflows remain primary and portable | pending |
 | 94 Netplay | PLANNED | Add deterministic peer play without weakening local emulation | networking/session/UI | protocol, rollback, security, hosted matrix | Disabled-by-default networking is authenticated and bounded | pending |
@@ -4162,7 +4162,7 @@ cross-platform release-gate correction `a87c6c0791fcd89fccfa6a824595036d944dbfa7
 
 ## Milestone 91 detail
 
-**Status:** IN PROGRESS
+**Status:** COMPLETE
 
 **Goal:** Add a secure Qt Linguist localization boundary, persisted language choice,
 English fallback, packaged catalog, and locale/layout regression coverage without
@@ -4200,9 +4200,10 @@ Qt extraction emits no context warning. A strict inherited Unix libretro build/l
 clean succeeds. A fresh staged Linux install and TGZ pass the production package
 verifier and checksum, contain the catalog and guide, exclude portable user data, run
 the installed pseudo-language event-loop smoke, resolve all 22 ELF files, and start the
-extracted executable with no external library path. Workflow YAML parses. A replacement
-exact ten-job hosted matrix, complete-log audit, and native artifact audit are still
-pending after the cross-platform link correction; no Milestone 92 work may start first.
+extracted executable with no external library path. Workflow YAML parses. Exact hosted
+run `33571825217` passes the ten-job matrix at the final implementation SHA after one
+GitHub API connectivity retry, and its complete logs and all six distributables pass
+the audit below. No Milestone 92 work began before these gates completed.
 
 Initial implementation run
 [`33566053906`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33566053906)
@@ -4234,8 +4235,28 @@ sanitizer signature, failed test, timeout, unfinished message, or duplicate-libr
 warning. The packaging trace then exposed that macOS carried the catalog both beside
 the executable and under `Contents/Resources`. Build-tree catalog placement now uses
 `TARGET_BUNDLE_CONTENT_DIR`, and the production verifier plus a portable synthetic
-macOS fixture reject the obsolete duplicate directory. A final replacement hosted run
-and artifact inspection remain required.
+macOS fixture reject the obsolete duplicate directory.
+
+Final implementation run
+[`33571825217`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33571825217)
+passes all ten jobs at `58e624e573e9d7e9d8768edb04e4f77617f07602`. Its first
+Intel macOS Release attempt stopped in `setup-sdl` when `api.github.com` was unavailable;
+the same-commit retry passed dependency setup, configure, build, all 109 tests, package
+verification, and ZIP/DMG upload. The complete successful 15,235-line,
+2,063,769-byte log has no compiler/linker diagnostic, duplicate-library warning,
+sanitizer/runtime finding, failed test, or timeout. All nine catalogs report 991
+finished and zero unfinished messages; every graph passes 109/109, with only the
+documented real-OpenGL capability skip on Windows.
+
+All Linux TGZ, Windows ZIP, macOS arm64 ZIP/DMG, and macOS x86_64 ZIP/DMG checksums and
+archive paths pass. The production verifier accepts all six extracted distributions;
+both ZIP/DMG pairs match byte-for-byte. Every macOS distribution has exactly one catalog
+under `Contents/Resources/translations` and none beside the executable, and all six
+catalogs share SHA-256
+`d919b36fd7dc380d922c4279777105709caecd8d3e7c097f5ab9d9ec2381426e`.
+The Linux artifact resolves all 22 ELF files and passes installed real-process pseudo
+smoke; architecture, symlink-containment, documentation, prohibited-payload, and clean
+user-data-layout checks pass across the matrix.
 
 **Acceptance criteria:** Translation is installed before widgets exist; preferences
 cannot select arbitrary files; missing/invalid catalogs leave a complete English UI;
@@ -4247,7 +4268,9 @@ review.
 
 **Commit SHA:** implementation `a9891e1c482332c7316c2b6e494b21aab0ccefb2`;
 Qt 6.8 baseline correction `aba5546001798cd25d05befdc065d669c82b2d5c`;
-Apple static-link correction pending
+Apple static-link correction `dd1bd30797d04542c7435d2a37fa5f2a74d3602c`;
+canonical macOS package correction and exact hosted baseline
+`58e624e573e9d7e9d8768edb04e4f77617f07602`
 
 ## Milestone 83 detail
 
