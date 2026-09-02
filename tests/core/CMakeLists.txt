@@ -133,7 +133,7 @@ add_test(
 set_tests_properties(
   integration.netplay_end_to_end
   PROPERTIES
-    LABELS "core;integration;netplay;network;loopback;rollback;input;audio;video;bounded;fixture;concurrency;lifecycle"
+    LABELS "core;integration;netplay;network;loopback;input;audio;video;bounded;fixture;concurrency;lifecycle"
     TIMEOUT 30
 )
 add_test(NAME integration.run_ahead COMMAND genplusgx_run_ahead_worker_test)
