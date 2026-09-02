@@ -89,6 +89,13 @@ worker/core path.
 
 ## Supporting layers
 
+Signed update coverage is split across `unit.signed_updates`,
+`integration.signed_update_https`, `gui.signed_updates`, and
+`infrastructure.signed_update_manifest`. Together they cover the Ed25519 trust root,
+strict manifest parser, highest-seen rollback state, real TLS/redirect/bounds behavior,
+streamed atomic package verification, user-controlled handoff, release tooling, and
+tamper rejection without contacting GitHub or using a production private key.
+
 CTest labels allow focused gates: `unit`, `core`, `integration`, `gui`, `persistence`,
 `filesystem`, `security`, `parser`, `timing`, `audio`, `input`, `database`, `fuzz`, and
 `smoke`. A milestone

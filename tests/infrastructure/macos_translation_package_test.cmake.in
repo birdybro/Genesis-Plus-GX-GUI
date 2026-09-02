@@ -17,10 +17,12 @@ foreach(runtime IN ITEMS
     Contents/Resources/documentation/NETPLAY.md
     Contents/Resources/documentation/ACHIEVEMENTS.md
     Contents/Resources/documentation/CLOUD_SYNC.md
+    Contents/Resources/documentation/UPDATES.md
     Contents/Resources/documentation/ONLINE_METADATA.md
     Contents/Resources/licenses/librashader-MPL-2.0.md
     Contents/Resources/licenses/rcheevos-MIT.txt
-    Contents/Resources/licenses/QtKeychain-BSD-3-Clause.txt)
+    Contents/Resources/licenses/QtKeychain-BSD-3-Clause.txt
+    Contents/Resources/licenses/Monocypher-BSD-2-Clause-or-CC0.md)
   get_filename_component(parent "${bundle}/${runtime}" DIRECTORY)
   file(MAKE_DIRECTORY "${parent}")
   file(WRITE "${bundle}/${runtime}" "package verification fixture")

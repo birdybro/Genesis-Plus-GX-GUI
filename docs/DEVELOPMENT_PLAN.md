@@ -109,7 +109,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 95 Achievements | COMPLETE | Add opt-in achievement-service integration | service/privacy/UI | API seam, offline fallback, hosted matrix | Credentials remain secret and emulation works fully offline | `95695f2` |
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
-| 98 Signed updates | PLANNED | Add authenticated update discovery and platform-safe handoff | release/platform/UI | signature, rollback, package, hosted matrix | No unsigned payload is installed automatically | pending |
+| 98 Signed updates | IN PROGRESS | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | pending |
 | 99 TAS, movies, and streaming | PLANNED | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
 
 ## Execution policy
@@ -3782,6 +3782,76 @@ all package layouts; and every applicable local gate passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
+
+## Milestone 98 detail
+
+**Status:** IN PROGRESS — implementation and all local configuration, sanitizer,
+package, workflow-lint, and adversarial gates pass; exact hosted CI and downloaded
+cross-platform package evidence remain required after the implementation commit.
+
+**Goal:** Add authenticated application-update discovery and verified package download
+without granting a remote service authority to silently install code, weakening normal
+offline use, or placing network/cryptographic work on the emulation thread.
+
+**Files changed:**
+
+- `desktop/updates/` versioned settings, canonical manifest model, Ed25519 verification,
+  bounded HTTPS client, and bounded worker service
+- `desktop/ui/` accessible update dialog, Help action, Settings-center routing, and
+  stable test identifiers
+- `desktop/app/main.cpp` opt-in scheduling, event composition, privacy-aware logging,
+  diagnostics, and ordered shutdown
+- `cmake/Monocypher.cmake`, release manifest creation/verification tools, package
+  verification, and the tag-release workflow
+- unit, real loopback TLS, GUI, release-tool, package-fixture, diagnostics, and
+  localization tests under `tests/` and `translations/`
+- root/user/architecture/build/testing/release/legal/package documentation and the
+  dedicated `docs/UPDATES.md` trust and recovery guide
+
+**Tests added:** `unit.signed_updates` exercises schema/defaults, atomic persistence,
+strict canonical parsing, RFC 8032 verification, compiled-key identity, platform asset
+selection, rollback, daily automatic-check scheduling, bounded service queue/restart,
+and cancellation. `integration.signed_update_https` exercises the real Qt Network path
+against a private loopback TLS fixture, including manifest/signature/package redirects,
+untrusted redirects, loops, deadlines, size/hash failures, unsafe names, atomic-file
+preservation, and clean stop. `gui.signed_updates` drives every accessible dialog state,
+manual checking, verified download/open handoff, opt-in persistence, failures, and
+disabled-build behavior. `infrastructure.signed_update_manifest` creates the exact six
+release assets, checks byte-canonical JSON and the detached Ed25519 signature, rejects
+tampering/noncanonical signatures/malformed repositories, and rehashes every package.
+Existing MainWindow, Settings, diagnostics, localization, documentation, Windows/macOS
+package-fixture, and package-metadata tests are extended.
+
+**Local gate evidence:** Warning-as-error GCC Debug and optimized Release builds each
+pass 131/131 tests; ASan+UBSan passes 131/131 with leak detection and halt-on-error;
+and warning-as-error Clang 22 Release passes 131/131 with authored code clean. Fresh
+CHD-disabled and default-online-service-disabled graphs pass 131/131; signed-updates-
+disabled, shaders-disabled, and cloud-plus-achievements-disabled graphs each pass all
+129 applicable tests. The 131-test default graph consists of 12 infrastructure, 20
+core, 13 integration, 50 unit, and 36 GUI/process registrations. The strict inherited
+Unix libretro target builds, links as x86-64 ELF, and cleans; pinned `actionlint` 1.7.7
+accepts both workflows.
+
+The staged 105-entry Linux Release package passes the production layout verifier,
+installed `--version`, portable pseudo-language event-loop startup, dependency closure,
+TGZ integrity, and its SHA-256 sidecar. It contains Qt Network, Monocypher's license,
+the update guide, and no ROM, disc image, firmware, save/state, private key,
+certificate, or pre-created user data. An adversarial pass additionally made malformed
+repository ports fail with controlled errors and made package verification honor an
+explicit signed-updates-disabled build. The production private key is present only as
+the protected GitHub Actions secret; it was never retrieved, printed, packaged, or
+committed.
+
+**Acceptance criteria:** Automatic checks are opt-in and rate-limited by attempts;
+signature verification precedes JSON parsing; manifests bind immutable exact-version
+packages to the trusted project/key; HTTPS redirects, response sizes, deadlines,
+filenames, hashes, rollback, disk commits, and queues are bounded and fail closed; no
+package is silently executed or installed; offline emulation is independent; required
+licenses and public trust material ship; every local and hosted native gate passes;
+and complete successful logs/packages contain no actionable issue or unintended secret.
+
+**Commit SHA:** pending (resolve after the implementation commit; a commit cannot
+contain its own SHA)
 
 ## Milestone 97 detail
 

@@ -13,6 +13,8 @@
 #include "genplusgx/library/game_library_database.h"
 #include "genplusgx/library/game_library_scanner.h"
 #include "genplusgx/library/online_metadata_settings.h"
+#include "genplusgx/updates/update_settings.h"
+#include "genplusgx/updates/update_types.h"
 #include "genplusgx/core_system_settings.h"
 #include "genplusgx/platform/bios_manager.h"
 #include "genplusgx/settings/appearance_settings.h"
@@ -147,6 +149,10 @@ public:
   using CloudSyncSink = std::function<void(std::string)>;
   using OnlineMetadataSettingsSink = std::function<PersistenceStatus(
     const library::OnlineMetadataSettings&)>;
+  using UpdateSettingsSink = std::function<PersistenceStatus(
+    const updates::Settings&)>;
+  using UpdateCheckSink = std::function<void()>;
+  using UpdateDownloadSink = std::function<void(const updates::Asset&)>;
 
   explicit MainWindow(QWidget* parent = nullptr);
 
@@ -198,6 +204,16 @@ public:
   void setOnlineMetadataSettings(library::OnlineMetadataSettings settings);
   void setOnlineMetadataSettingsSink(OnlineMetadataSettingsSink sink);
   void showOnlineMetadataSettings();
+  void setUpdateSettings(updates::Settings settings);
+  void setUpdateSettingsSink(UpdateSettingsSink sink);
+  void setUpdateCheckSink(UpdateCheckSink sink);
+  void setUpdateDownloadSink(UpdateDownloadSink sink);
+  void showUpdateDialog();
+  void setUpdateBusy(bool busy, bool downloading = false);
+  void presentUpdateCheck(updates::CheckResult result);
+  void presentUpdateCheckFailure(const std::string& detail);
+  void presentUpdateDownload(updates::DownloadResult result);
+  void presentUpdateDownloadFailure(const std::string& detail);
   void presentDebugResponse(CoreDebugResponse response);
   void showDebugRequestError(
     const std::string& detail, std::uint64_t clientToken);
@@ -509,10 +525,15 @@ private:
   CloudAccountSink cloudForgetSink_;
   CloudSyncSink cloudSyncSink_;
   OnlineMetadataSettingsSink onlineMetadataSettingsSink_;
+  UpdateSettingsSink updateSettingsSink_;
+  UpdateCheckSink updateCheckSink_;
+  UpdateDownloadSink updateDownloadSink_;
   achievements::Settings achievementSettings_;
   achievements::Snapshot achievementSnapshot_;
   cloud::Settings cloudSettings_;
   library::OnlineMetadataSettings onlineMetadataSettings_;
+  updates::Settings updateSettings_;
+  bool updateBusy_{false};
   bool cloudSyncBusy_{false};
   netplay::NetplaySessionState netplayState_{
     netplay::NetplaySessionState::disconnected};

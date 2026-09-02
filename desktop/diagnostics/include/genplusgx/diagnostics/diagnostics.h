@@ -172,6 +172,11 @@ struct DiagnosticsSnapshot final {
   bool cloudSyncStates{false};
   bool cloudSyncOnStartup{false};
   bool cloudSyncOnGameClose{false};
+  std::string signedUpdateState;
+  bool automaticUpdateChecks{false};
+  std::string updateSigningKeyId;
+  std::string highestVerifiedUpdate;
+  std::string lastUpdateCheckUtc;
   bool recordingActive{false};
   std::size_t recordingQueuedFrames{0};
   std::size_t recordingQueueCapacity{0};

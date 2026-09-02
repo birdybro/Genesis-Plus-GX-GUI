@@ -18,6 +18,7 @@
 #include "genplusgx/ui/help_dialog.h"
 #include "genplusgx/ui/input_configuration_dialog.h"
 #include "genplusgx/ui/online_metadata_dialog.h"
+#include "genplusgx/ui/update_dialog.h"
 #include "genplusgx/ui/per_game_settings_dialog.h"
 #include "genplusgx/ui/physical_media_dialog.h"
 #include "genplusgx/ui/rewind_settings_dialog.h"
@@ -38,6 +39,7 @@
 #include <QDateTime>
 #include <QDebug>
 #include <QDropEvent>
+#include <QDesktopServices>
 #include <QKeyCombination>
 #include <QKeyEvent>
 #include <QKeySequence>
@@ -821,6 +823,13 @@ void MainWindow::buildMenus()
     *help, tr("&Keyboard Shortcuts"), "keyboardShortcutsAction");
   connect(shortcuts, &QAction::triggered,
     this, &MainWindow::showKeyboardShortcuts);
+  auto* updates = addAction(
+    *help, tr("Check for &Updates…"), "checkForUpdatesAction");
+  connect(updates, &QAction::triggered, this, &MainWindow::showUpdateDialog);
+#if !defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  updates->setEnabled(false);
+  updates->setToolTip(tr("This build does not include signed update support."));
+#endif
   help->addSeparator();
   auto* about = addAction(*help, tr("&About Genesis Plus GX GUI"), "aboutAction");
   connect(about, &QAction::triggered, this, &MainWindow::showAboutDialog);
@@ -1361,6 +1370,123 @@ void MainWindow::showOnlineMetadataSettings()
     return PersistenceStatus{};
   });
   dialog->show();
+}
+
+void MainWindow::setUpdateSettings(updates::Settings settings)
+{
+  updateSettings_ = std::move(settings);
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->setSettings(updateSettings_);
+  }
+  refreshSettingsDialog();
+}
+
+void MainWindow::setUpdateSettingsSink(UpdateSettingsSink sink)
+{
+  updateSettingsSink_ = std::move(sink);
+}
+
+void MainWindow::setUpdateCheckSink(UpdateCheckSink sink)
+{
+  updateCheckSink_ = std::move(sink);
+}
+
+void MainWindow::setUpdateDownloadSink(UpdateDownloadSink sink)
+{
+  updateDownloadSink_ = std::move(sink);
+}
+
+void MainWindow::showUpdateDialog()
+{
+#if !defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  return;
+#else
+  if (auto* existing = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    existing->show();
+    existing->raise();
+    existing->activateWindow();
+    return;
+  }
+  auto* dialog = new UpdateDialog(this);
+  dialog->setAttribute(Qt::WA_DeleteOnClose);
+  dialog->setSettings(updateSettings_);
+  dialog->setCurrentVersion(GENPLUSGX_VERSION);
+  dialog->setSettingsSink([this](const updates::Settings& settings) {
+    if (updateSettingsSink_) {
+      const auto saved = updateSettingsSink_(settings);
+      if (!saved) {
+        return saved;
+      }
+    }
+    setUpdateSettings(settings);
+    return PersistenceStatus{};
+  });
+  dialog->setCheckSink([this] {
+    if (updateCheckSink_) {
+      updateCheckSink_();
+    }
+  });
+  dialog->setDownloadSink([this](const updates::Asset& asset) {
+    if (updateDownloadSink_) {
+      updateDownloadSink_(asset);
+    }
+  });
+  dialog->setUrlSink([](const std::string& value) {
+    return QDesktopServices::openUrl(QUrl{QString::fromStdString(value)});
+  });
+  dialog->setFileSink([](const std::filesystem::path& path) {
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(pathToQString(path)));
+  });
+  dialog->setBusy(updateBusy_);
+  dialog->show();
+#endif
+}
+
+void MainWindow::setUpdateBusy(bool busy, bool downloading)
+{
+  updateBusy_ = busy;
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->setBusy(busy, downloading);
+  }
+}
+
+void MainWindow::presentUpdateCheck(updates::CheckResult result)
+{
+  updateBusy_ = false;
+  const bool available = result.updateAvailable;
+  const auto version = result.manifest.version.toString();
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->presentCheck(std::move(result));
+  }
+  if (available) {
+    statusBar()->showMessage(tr("Verified application update %1 is available.")
+      .arg(QString::fromStdString(version)), 10'000);
+  }
+}
+
+void MainWindow::presentUpdateCheckFailure(const std::string& detail)
+{
+  updateBusy_ = false;
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->presentCheckFailure(detail);
+  }
+}
+
+void MainWindow::presentUpdateDownload(updates::DownloadResult result)
+{
+  updateBusy_ = false;
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->presentDownload(std::move(result));
+  }
+  statusBar()->showMessage(tr("Verified update package downloaded."), 5'000);
+}
+
+void MainWindow::presentUpdateDownloadFailure(const std::string& detail)
+{
+  updateBusy_ = false;
+  if (auto* dialog = findChild<UpdateDialog*>(QStringLiteral("updateDialog"))) {
+    dialog->presentDownloadFailure(detail);
+  }
 }
 
 void MainWindow::updateCloudDialogState()
@@ -2450,6 +2576,9 @@ void MainWindow::showSettings(SettingsPage page)
       case SettingsPageAction::onlineMetadata:
         showOnlineMetadataSettings();
         break;
+      case SettingsPageAction::signedUpdates:
+        showUpdateDialog();
+        break;
     }
   });
   dialog->openPage(page);
@@ -3469,6 +3598,7 @@ SettingsOverview MainWindow::settingsOverview() const
     .session = sessionSettings_,
     .speed = speedSettings_,
     .onlineMetadata = onlineMetadataSettings_,
+    .updates = updateSettings_,
     .paths = applicationPaths_,
     .connectedControllerCount = controllers_.size(),
     .pathsAvailable = applicationPathsAvailable_,

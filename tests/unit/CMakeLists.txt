@@ -1,5 +1,32 @@
 find_package(Threads REQUIRED)
 
+if(GENPLUSGX_ENABLE_SIGNED_UPDATES)
+  add_executable(genplusgx_signed_updates_test signed_updates_test.cpp)
+  target_link_libraries(genplusgx_signed_updates_test PRIVATE
+    GenesisPlusGX::Updates GenesisPlusGX::Monocypher
+    genplusgx_project_warnings Qt6::Core)
+  add_test(NAME unit.signed_updates COMMAND genplusgx_signed_updates_test
+    "${PROJECT_SOURCE_DIR}/desktop/resources/update-signing-public-key.pem")
+  set_tests_properties(unit.signed_updates PROPERTIES
+    LABELS "unit;integration;updates;network;security;cryptography;persistence;bounded"
+    TIMEOUT 30)
+
+  qt_add_executable(genplusgx_signed_update_https_test signed_update_https_test.cpp)
+  set_target_properties(genplusgx_signed_update_https_test PROPERTIES AUTOMOC ON)
+  target_link_libraries(genplusgx_signed_update_https_test PRIVATE
+    GenesisPlusGX::Updates genplusgx_project_warnings Qt6::Network Qt6::Test)
+  add_test(NAME integration.signed_update_https
+    COMMAND genplusgx_signed_update_https_test)
+  set_tests_properties(integration.signed_update_https PROPERTIES
+    ENVIRONMENT "GENPLUSGX_TEST_FIXTURES=${PROJECT_SOURCE_DIR}/tests/fixtures"
+    LABELS "integration;updates;network;tls;security;filesystem;bounded"
+    TIMEOUT 30)
+  if(APPLE)
+    set_property(TEST integration.signed_update_https APPEND PROPERTY
+      ENVIRONMENT "QT_SSL_USE_TEMPORARY_KEYCHAIN=1")
+  endif()
+endif()
+
 add_executable(genplusgx_online_metadata_test online_metadata_test.cpp)
 target_link_libraries(
   genplusgx_online_metadata_test

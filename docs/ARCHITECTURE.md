@@ -1402,8 +1402,8 @@ Shutdown is an explicit, idempotent workflow:
 
 1. stop the GUI event pump, disconnect window/input producers and renderer sinks, and
    disable new commands;
-2. cooperatively cancel and join cloud synchronization so no HTTPS worker retains
-   application-data paths or transient credentials;
+2. cooperatively cancel and join cloud synchronization and signed-update HTTPS work so
+   no network worker retains application-data paths or transient credentials;
 3. wake the emulation worker, stop frame execution, atomically flush available
    SRAM/BRAM on the core-owning thread, shut down the core, and join the worker even
    when a save failed;
@@ -1432,3 +1432,25 @@ Core source paths remain unchanged. Core compile definitions are centralized in 
 CMake target and adaptations are confined to desktop bridge files whenever possible.
 Any unavoidable core patch must be minimal, separately documented, and covered by core
 regression tests. Existing makefiles/frontends remain independently buildable.
+
+## Signed update boundary
+
+Signed updates are a frontend/platform service and never touch the emulator core:
+
+```text
+Help/Settings UI -> bounded update command queue -> dedicated HTTPS worker
+                                                   | manifest + signature (bounded)
+                                                   v
+                                       Ed25519 verify before JSON parse
+                                                   |
+                                  trusted OS/architecture asset selection
+                                                   |
+                         streamed QSaveFile + signed length/SHA-256 verification
+                                                   v
+                            explicit user action -> operating-system file handler
+```
+
+The GUI observes immutable results through the bounded event queue. It cannot issue a
+second check/download while one is pending. The private signing key exists only in the
+release workflow secret; runtime code contains the public key. Automatic checks use the
+same path as manual checks, are opt-in, and do not trigger download or installation.

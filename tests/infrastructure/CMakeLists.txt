@@ -7,6 +7,15 @@ target_link_libraries(
 add_test(NAME infrastructure.version COMMAND genplusgx_infrastructure_test)
 set_tests_properties(infrastructure.version PROPERTIES LABELS "unit;infrastructure")
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
+add_test(NAME infrastructure.signed_update_manifest
+  COMMAND "${Python3_EXECUTABLE}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/signed_update_manifest_test.py"
+    "${PROJECT_SOURCE_DIR}")
+set_tests_properties(infrastructure.signed_update_manifest PROPERTIES
+  LABELS "unit;infrastructure;release;updates;security;cryptography;packaging"
+  TIMEOUT 30)
+
 if(GENPLUSGX_BUILD_DESKTOP)
   configure_file(
     package_metadata_test.cmake.in

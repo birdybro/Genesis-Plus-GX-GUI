@@ -1478,6 +1478,36 @@ Qt Network, and its platform TLS support. No ROM, disc image, BIOS/firmware, sav
 state, private key, certificate, cache, or downloaded artwork is present. Milestone 97
 is complete.
 
+## Milestone 98 signed application updates
+
+Signed updates are locally release-gated. The default graph contains 131 registrations:
+12 infrastructure, 20 core, 13 integration, 50 unit, and 36 GUI/process tests. New
+coverage proves versioned opt-in settings, byte-canonical manifests, the production
+public-key identity, RFC 8032 Ed25519 verification, exact platform selection, rollback,
+once-per-day attempt scheduling, bounded worker lifecycle, real Qt TLS and redirect
+policy, streamed atomic downloads, hash/size/deadline failures, UI behavior, diagnostics,
+release tooling, and package/license presence.
+
+| Configuration | CTest | Result |
+| --- | ---: | --- |
+| GCC Debug, warnings as errors | 131/131 | Passed |
+| GCC Release, warnings as errors | 131/131 | Passed |
+| ASan + UBSan | 131/131 | Passed; no finding |
+| Clang Release, warnings as errors | 131/131 | Passed |
+| CHD disabled | 131/131 | Passed |
+| Cloud synchronization and RetroAchievements disabled | 129/129 | Passed |
+| Signed updates disabled | 129/129 | Passed; no Monocypher dependency |
+| Libretro shaders disabled | 129/129 | Passed |
+| Inherited Unix libretro | Build/link/clean | Passed; x86-64 ELF, warning-clean |
+
+Pinned `actionlint` 1.7.7 accepts both workflows. A fresh Linux Release stage passes
+the production package verifier, installed version and portable pseudo-language
+event-loop smokes. CPack produces a checksum-verified 105-entry
+`Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz` containing Qt Network, the Monocypher
+license, and `UPDATES.md`; its dependency and prohibited-payload scans pass. Exact
+hosted CI, complete successful-run log inspection, and all downloaded Windows/Linux/
+macOS package audits remain the milestone's final gate after its implementation commit.
+
 ## Adversarial review
 
 Production frontend, tests, CMake, workflows, and documentation were searched for

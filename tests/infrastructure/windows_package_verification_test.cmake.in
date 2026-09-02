@@ -17,10 +17,12 @@ foreach(runtime IN ITEMS
     share/doc/Genesis-Plus-GX-GUI/librashader-MPL-2.0.md
     share/doc/Genesis-Plus-GX-GUI/rcheevos-MIT.txt
     share/doc/Genesis-Plus-GX-GUI/QtKeychain-BSD-3-Clause.txt
+    share/doc/Genesis-Plus-GX-GUI/Monocypher-BSD-2-Clause-or-CC0.md
     share/doc/Genesis-Plus-GX-GUI/PHYSICAL_MEDIA.md
     share/doc/Genesis-Plus-GX-GUI/NETPLAY.md
     share/doc/Genesis-Plus-GX-GUI/ACHIEVEMENTS.md
     share/doc/Genesis-Plus-GX-GUI/CLOUD_SYNC.md
+    share/doc/Genesis-Plus-GX-GUI/UPDATES.md
     share/doc/Genesis-Plus-GX-GUI/ONLINE_METADATA.md
     plugins/platforms/qwindows.dll)
   file(WRITE "${fixture_directory}/${runtime}" "package verification fixture")
@@ -62,6 +64,28 @@ if(NOT complete_result EQUAL 0)
   message(FATAL_ERROR
     "Complete Windows package fixture was rejected:\n${complete_output}${complete_error}")
 endif()
+
+file(REMOVE
+  "${fixture_directory}/share/doc/Genesis-Plus-GX-GUI/Monocypher-BSD-2-Clause-or-CC0.md")
+execute_process(
+  COMMAND
+    "@CMAKE_COMMAND@"
+    "-DPACKAGE_ROOT=${fixture_directory}"
+    -DVERIFY_PLATFORM=windows
+    -DVERIFY_SIGNED_UPDATES=OFF
+    -P "@PROJECT_SOURCE_DIR@/cmake/VerifyPackage.cmake"
+  RESULT_VARIABLE updates_disabled_result
+  OUTPUT_VARIABLE updates_disabled_output
+  ERROR_VARIABLE updates_disabled_error
+)
+if(NOT updates_disabled_result EQUAL 0)
+  message(FATAL_ERROR
+    "Package verification required Monocypher with signed updates disabled:\n"
+    "${updates_disabled_output}${updates_disabled_error}")
+endif()
+file(WRITE
+  "${fixture_directory}/share/doc/Genesis-Plus-GX-GUI/Monocypher-BSD-2-Clause-or-CC0.md"
+  "package verification fixture")
 
 file(MAKE_DIRECTORY "${fixture_directory}/bin/portable-data")
 execute_process(

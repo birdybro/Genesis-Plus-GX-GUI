@@ -65,6 +65,10 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     snapshot.cloudSyncState = "Enabled; idle";
     snapshot.cloudSyncSaves = true;
     snapshot.cloudSyncStates = true;
+    snapshot.signedUpdateState = "Available; idle";
+    snapshot.updateSigningKeyId = "704e04b184a939a4";
+    snapshot.highestVerifiedUpdate = "1.2.3";
+    snapshot.lastUpdateCheckUtc = "2026-09-02T18:00:00.000Z";
     snapshot.normalSpeedPercent = 125U;
     snapshot.slowMotionSpeedPercent = 50U;
     snapshot.fastForwardSpeedPercent = 800U;
@@ -126,6 +130,10 @@ void DiagnosticsDialogTest::reportIsPrivateInspectableCopyableAndRefreshable()
     QStringLiteral("Cloud synchronization: Enabled; idle")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Cloud content: saves enabled, states enabled")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Update signing key: 704e04b184a939a4")));
+  QVERIFY(report->toPlainText().contains(
+    QStringLiteral("Last update attempt: 2026-09-02T18:00:00.000Z")));
   QVERIFY(report->toPlainText().contains(
     QStringLiteral("Configured speeds: Normal 125%, slow motion 50%, fast forward 800%")));
   QVERIFY(report->toPlainText().contains(

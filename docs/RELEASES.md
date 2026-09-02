@@ -37,9 +37,13 @@ The release remains a draft while each asset uploads independently; failed uploa
 retried up to three times, and publication occurs only after the final successful upload.
 
 The workflow uses the scoped GitHub token with `contents: write` only in the final job.
-It requires no repository signing, notarization, firmware, ROM, controller, or hardware
-secrets. No release is created by ordinary branch pushes, pull requests, or manual
-rehearsals.
+Its assembly step additionally requires the protected
+`UPDATE_SIGNING_PRIVATE_KEY_B64` secret: a base64-encoded PKCS#8 Ed25519 private PEM.
+The key is decoded only in the runner temporary directory, given owner-only permissions,
+used to sign the canonical update manifest, verified against the committed public PEM,
+and destroyed by an exit trap. It requires no notarization, firmware, ROM, controller,
+or hardware secrets. No release is created by ordinary branch pushes, pull requests, or
+manual rehearsals.
 
 ## Published outputs
 
@@ -52,6 +56,7 @@ A complete version publishes:
 - `Genesis-Plus-GX-GUI-<version>-macos-x86_64.zip`
 - `Genesis-Plus-GX-GUI-<version>-macos-x86_64.dmg`
 - one neighboring `.sha256` file per package and aggregate `SHA256SUMS.txt`
+- canonical `update-manifest.json` and detached `update-manifest.json.sig`
 
 Verify a downloaded package on Linux with:
 
@@ -66,3 +71,9 @@ macOS development packages are unsigned. Windows packages are portable ZIP files
 than signed installers. See `docs/PACKAGING.md` for the signing, notarization, and
 platform deployment model. Do not replace a published tag or release asset silently; fix
 the issue, advance the version, and publish a new tag.
+
+The manifest binds all six immutable packages to their byte lengths, SHA-256 digests,
+platforms, architectures, release URLs, version, timestamp, and signing-key ID. The
+assembly job refuses publication if the secret is absent or public verification/local
+asset comparison fails. Key rotation and compromise recovery are documented in
+[UPDATES.md](UPDATES.md).

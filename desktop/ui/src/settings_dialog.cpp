@@ -297,10 +297,20 @@ SettingsDialog::SettingsDialog(SettingsOverview overview, QWidget* parent)
         SettingsPageAction::perGame},
       {tr("Online Metadata and Artwork…"), "configureOnlineMetadataButton",
         SettingsPageAction::onlineMetadata},
+      {tr("Signed Application Updates…"), "configureSignedUpdatesButton",
+        SettingsPageAction::signedUpdates},
       {tr("Log and Diagnostics…"), "openDiagnosticsButton",
         SettingsPageAction::diagnostics},
     }));
   perGameButton_ = findChild<QPushButton*>(QStringLiteral("configurePerGameButton"));
+#if !defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  if (auto* updatesButton = findChild<QPushButton*>(
+        QStringLiteral("configureSignedUpdatesButton"))) {
+    updatesButton->setEnabled(false);
+    updatesButton->setToolTip(
+      tr("This build does not include signed update support."));
+  }
+#endif
   navigation->addWidget(pages_, 1);
   root->addLayout(navigation, 1);
 
@@ -440,11 +450,16 @@ void SettingsDialog::refresh()
         return QString::fromLatin1(
           name.data(), static_cast<qsizetype>(name.size()));
       }());
+  const auto updateSummary = tr("Signed update checks: %1")
+    .arg(overview_.updates.automaticChecks ? tr("automatic daily checks enabled")
+                                          : tr("manual only"));
   advancedSummary_->setText(overview_.gameLoaded
-    ? tr("%1\n%2\n%3\n%4\nPer-game overrides are available. Diagnostics omit personal secrets.")
-        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary)
-    : tr("%1\n%2\n%3\n%4\nLoad a game to configure per-game overrides. Diagnostics remain available.")
-        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary));
+    ? tr("%1\n%2\n%3\n%4\n%5\nPer-game overrides are available. Diagnostics omit personal secrets.")
+        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary,
+          updateSummary)
+    : tr("%1\n%2\n%3\n%4\n%5\nLoad a game to configure per-game overrides. Diagnostics remain available.")
+        .arg(speedSummary, rewindSummary, runAheadSummary, metadataSummary,
+          updateSummary));
   perGameButton_->setEnabled(overview_.gameLoaded);
 }
 

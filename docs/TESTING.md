@@ -188,6 +188,16 @@ members plus an M3U-driven generated Sega CD disc change through the real core a
 The GUI suite covers archive selection, cancellation, drag/drop/open source identity,
 playlist action gating, and an isolated executable ZIP resume workflow.
 
+`unit.signed_updates` verifies RFC 8032 Ed25519 behavior, signature-before-parse
+rejection, strict schemas/URLs/semantic versions, rollback protection, atomic settings,
+platform selection, and bounded worker lifetime. `integration.signed_update_https`
+uses the local TLS fixture to exercise trusted and untrusted certificates, bounded
+responses, approved redirects, cancellation, streamed atomic downloads, exact length,
+SHA-256 acceptance, and corrupt-file removal. `gui.signed_updates` covers opt-in
+settings and the check/download/handoff state machine. The infrastructure manifest test
+recreates all six package inputs, canonicalizes and signs them with the public RFC test
+key, verifies them through the release tool, and proves asset tampering fails.
+
 `unit.physical_media` uses an injected mixed-mode optical backend to validate table of
 contents and CUE generation, raw-sector bounds, the Sega CD signature, exact complete
 SHA-256 cache verification, same-size tamper rejection, atomic commit/removal, injected

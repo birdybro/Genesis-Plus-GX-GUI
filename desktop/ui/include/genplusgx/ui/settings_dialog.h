@@ -13,6 +13,7 @@
 #include "genplusgx/settings/session_settings.h"
 #include "genplusgx/settings/speed_settings.h"
 #include "genplusgx/settings/video_settings.h"
+#include "genplusgx/updates/update_settings.h"
 
 #include <QDialog>
 
@@ -54,6 +55,7 @@ enum class SettingsPageAction {
   speed,
   runAhead,
   onlineMetadata,
+  signedUpdates,
 };
 
 struct SettingsOverview final {
@@ -69,6 +71,7 @@ struct SettingsOverview final {
   settings::SessionSettings session;
   EmulationSpeedConfiguration speed;
   library::OnlineMetadataSettings onlineMetadata;
+  updates::Settings updates;
   ApplicationPaths paths;
   std::size_t connectedControllerCount{0U};
   bool pathsAvailable{false};

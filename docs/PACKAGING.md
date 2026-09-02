@@ -63,6 +63,11 @@ Normal packages must also contain the platform librashader runtime, the original
 treats each as required. Custom user shader packs are never copied into or downloaded
 by packaging.
 
+Packages also include the Monocypher dual-license text used by the statically linked
+Ed25519 release-manifest verifier. The update signing public key is compiled into the
+application; no private key, release signature input, or repository credential is
+installed. See [UPDATES.md](UPDATES.md).
+
 Every package also contains `genplusgx_en_XA.qm` in its platform translation resource
 directory. This expanded catalog is the deterministic localization/layout test and is
 compiled by Qt `lrelease` as part of the desktop target. The verifier rejects a package

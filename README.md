@@ -82,6 +82,9 @@ rewritten.
 - Disabled-by-default licensed online library enrichment with local SHA-256 matching,
   explicit attribution, bounded caching, Retronian Genesis metadata, an open manifest
   protocol for other systems, and strict rejection of unlicensed artwork
+- Ed25519-authenticated release discovery with opt-in daily checks, rollback defense,
+  exact platform selection, streamed size/SHA-256 package verification, and explicit
+  operating-system handoff instead of silent self-installation
 - Header metadata and SHA-256 game information, Game Genie/PAR cheats, bounded
   RetroArch/plain-text cheat import, live RAM search, and sparse per-game overrides
 - System/light/dark themes, structured rotating logs, and copyable privacy-filtered
@@ -205,6 +208,12 @@ Licensed Manifest provider can cover the other systems but must attach an approv
 license and attribution to every accepted record and image. See the [online metadata
 and artwork guide](docs/ONLINE_METADATA.md).
 
+To check for a newer application build, choose **Help → Check for Updates…**. Release
+metadata is accepted only after verification by the public key built into the app, and
+the selected package must match its signed size and SHA-256 digest. Automatic checks
+are opt-in and installation is always a user-controlled operating-system handoff. See
+the [signed update guide](docs/UPDATES.md).
+
 The complete operating guide is [USER_GUIDE.md](docs/USER_GUIDE.md). Focused guides
 cover [input](docs/INPUT_CONFIGURATION.md), [save states](docs/SAVE_STATES.md),
 [the game library](docs/GAME_LIBRARY.md), [cheats](docs/CHEATS.md), and
@@ -303,6 +312,7 @@ See [TESTING.md](docs/TESTING.md), [TEST_MATRIX.md](docs/TEST_MATRIX.md), the
 - [RetroAchievements](docs/ACHIEVEMENTS.md)
 - [Cloud synchronization](docs/CLOUD_SYNC.md)
 - [Online metadata and artwork](docs/ONLINE_METADATA.md)
+- [Signed application updates](docs/UPDATES.md)
 - [Packaging](docs/PACKAGING.md) and [releases](docs/RELEASES.md)
 - [Upstream maintenance](docs/UPSTREAM_MAINTENANCE.md)
 - [Development plan and milestone evidence](docs/DEVELOPMENT_PLAN.md)

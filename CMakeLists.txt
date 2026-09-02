@@ -47,6 +47,11 @@ option(
   "Enable opt-in HTTPS WebDAV save and state synchronization"
   ON
 )
+option(
+  GENPLUSGX_ENABLE_SIGNED_UPDATES
+  "Enable signed release discovery and verified package downloads"
+  ON
+)
 set(
   GENPLUSGX_WINDOWS_REDIST
   ""
@@ -89,6 +94,9 @@ if(GENPLUSGX_ENABLE_ACHIEVEMENTS)
 endif()
 if(GENPLUSGX_ENABLE_ACHIEVEMENTS OR GENPLUSGX_ENABLE_CLOUD_SYNC)
   include(QtKeychain)
+endif()
+if(GENPLUSGX_ENABLE_SIGNED_UPDATES)
+  include(Monocypher)
 endif()
 
 execute_process(
@@ -138,6 +146,7 @@ message(STATUS "SDL3: ${SDL3_VERSION}")
 message(STATUS "Netplay: authenticated direct TCP peer sessions")
 message(STATUS "RetroAchievements: ${GENPLUSGX_ENABLE_ACHIEVEMENTS}")
 message(STATUS "Cloud synchronization: ${GENPLUSGX_ENABLE_CLOUD_SYNC}")
+message(STATUS "Signed updates: ${GENPLUSGX_ENABLE_SIGNED_UPDATES}")
 message(STATUS "Libretro shaders: ${GENPLUSGX_ENABLE_LIBRETRO_SHADERS}")
 message(STATUS "Desktop frontend: ${GENPLUSGX_BUILD_DESKTOP}")
 message(STATUS "Tests: ${BUILD_TESTING}")
@@ -159,6 +168,7 @@ add_subdirectory(desktop/platform)
 add_subdirectory(desktop/localization)
 add_subdirectory(desktop/settings)
 add_subdirectory(desktop/library)
+add_subdirectory(desktop/updates)
 
 if(GENPLUSGX_BUILD_DESKTOP)
   add_subdirectory(desktop/ui)

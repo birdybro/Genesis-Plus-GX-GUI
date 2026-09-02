@@ -74,6 +74,7 @@ foreach(document IN ITEMS
     TESTING.md
     TEST_MATRIX.md
     UPSTREAM_MAINTENANCE.md
+    UPDATES.md
     USER_GUIDE.md)
   list(APPEND genplusgx_documentation "${PROJECT_SOURCE_DIR}/docs/${document}")
 endforeach()

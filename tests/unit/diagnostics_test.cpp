@@ -147,6 +147,11 @@ int main()
   snapshot.cloudSyncStates = true;
   snapshot.cloudSyncOnStartup = true;
   snapshot.cloudSyncOnGameClose = true;
+  snapshot.signedUpdateState = "Available; idle";
+  snapshot.automaticUpdateChecks = true;
+  snapshot.updateSigningKeyId = "704e04b184a939a4";
+  snapshot.highestVerifiedUpdate = "1.2.3";
+  snapshot.lastUpdateCheckUtc = "2026-09-02T18:00:00.000Z";
   snapshot.recordingActive = true;
   snapshot.recordingQueuedFrames = 2U;
   snapshot.recordingQueueCapacity = 8U;
@@ -193,6 +198,9 @@ int main()
                report.find("RetroAchievements: Authenticated; recognized game active (Hardcore active)") != std::string::npos &&
                report.find("RetroAchievements bridge: 1 requests / 2 responses / 32 capacity") != std::string::npos &&
                report.find("RetroAchievements HTTPS: 1 active, 8 completed, 2 failed") != std::string::npos &&
+               report.find("Signed updates: Available; idle") != std::string::npos &&
+               report.find("Update signing key: 704e04b184a939a4") != std::string::npos &&
+               report.find("Last update attempt: 2026-09-02T18:00:00.000Z") != std::string::npos &&
                report.find("Cloud synchronization: Synchronizing automatically") != std::string::npos &&
                report.find("Cloud content: saves enabled, states enabled") != std::string::npos &&
                report.find("Cloud automatic sync: startup enabled, game close enabled") != std::string::npos &&

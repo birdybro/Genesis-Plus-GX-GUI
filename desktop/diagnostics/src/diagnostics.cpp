@@ -475,6 +475,16 @@ std::string formatDiagnostics(
          << (snapshot.cloudSyncOnStartup ? "enabled" : "disabled")
          << ", game close "
          << (snapshot.cloudSyncOnGameClose ? "enabled" : "disabled") << '\n'
+         << "Signed updates: "
+         << safeLine(snapshot.signedUpdateState, detectedHome) << '\n'
+         << "Automatic update checks: "
+         << (snapshot.automaticUpdateChecks ? "enabled" : "disabled") << '\n'
+         << "Update signing key: "
+         << safeLine(snapshot.updateSigningKeyId, detectedHome) << '\n'
+         << "Highest verified update: "
+         << safeLine(snapshot.highestVerifiedUpdate, detectedHome) << '\n'
+         << "Last update attempt: "
+         << safeLine(snapshot.lastUpdateCheckUtc, detectedHome) << '\n'
          << "Lossless recording: "
          << (snapshot.recordingActive ? "Active" : "Inactive") << '\n'
          << "Recording queue: " << snapshot.recordingQueuedFrames << " / "

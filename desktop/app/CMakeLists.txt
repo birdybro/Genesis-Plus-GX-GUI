@@ -185,6 +185,19 @@ if(GENPLUSGX_ENABLE_ACHIEVEMENTS OR GENPLUSGX_ENABLE_CLOUD_SYNC)
   )
 endif()
 
+if(GENPLUSGX_ENABLE_SIGNED_UPDATES)
+  if(APPLE)
+    set(genplusgx_monocypher_license_destination
+      "genesis-plus-gx-gui.app/Contents/Resources/licenses")
+  else()
+    set(genplusgx_monocypher_license_destination
+      "${CMAKE_INSTALL_DATADIR}/doc/Genesis-Plus-GX-GUI")
+  endif()
+  install(FILES "${GENPLUSGX_MONOCYPHER_LICENSE}"
+    DESTINATION "${genplusgx_monocypher_license_destination}"
+    RENAME "Monocypher-BSD-2-Clause-or-CC0.md")
+endif()
+
 if(UNIX AND NOT APPLE)
   set(genplusgx_linux_plugins
     Qt6::QXcbIntegrationPlugin

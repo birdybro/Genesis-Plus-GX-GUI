@@ -126,6 +126,7 @@ Useful cache options are:
 | `GENPLUSGX_ENABLE_LIBRETRO_SHADERS` | `ON` | Fetch/build the pinned librashader OpenGL runtime and ship Slang preset support; requires Rust 1.88+ |
 | `GENPLUSGX_ENABLE_ACHIEVEMENTS` | `ON` | Fetch/build pinned rcheevos and QtKeychain integration; Linux requires `libsecret-1` headers |
 | `GENPLUSGX_ENABLE_CLOUD_SYNC` | `ON` | Build opt-in HTTPS WebDAV save/state synchronization and QtKeychain credentials; Linux requires `libsecret-1` headers |
+| `GENPLUSGX_ENABLE_SIGNED_UPDATES` | `ON` | Fetch/build pinned Monocypher 4.0.2 and enable authenticated release discovery/download verification |
 | `GENPLUSGX_WINDOWS_REDIST` | empty | Official `vc_redist.x64.exe` included in Windows packages |
 | `GENPLUSGX_ENABLE_EXTERNAL_FIXTURE_TESTS` | `OFF` | Register user-owned BIOS fixture tests |
 

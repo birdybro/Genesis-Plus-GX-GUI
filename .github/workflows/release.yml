@@ -401,6 +401,40 @@ jobs:
             -DRELEASE_VERSION="$release_version" \
             -P cmake/VerifyReleaseAssets.cmake
 
+      - name: Create and sign update manifest
+        env:
+          UPDATE_SIGNING_PRIVATE_KEY_B64: ${{ secrets.UPDATE_SIGNING_PRIVATE_KEY_B64 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$UPDATE_SIGNING_PRIVATE_KEY_B64" ]]; then
+            echo "::error::UPDATE_SIGNING_PRIVATE_KEY_B64 is not configured"
+            exit 1
+          fi
+          private_key="$RUNNER_TEMP/update-signing-key.pem"
+          raw_signature="$RUNNER_TEMP/update-manifest.sig.raw"
+          trap 'shred -u "$private_key" "$raw_signature" 2>/dev/null || true' EXIT
+          printf '%s' "$UPDATE_SIGNING_PRIVATE_KEY_B64" | base64 --decode > "$private_key"
+          chmod 600 "$private_key"
+          release_version="${RELEASE_TAG#v}"
+          python3 cmake/CreateUpdateManifest.py \
+            --asset-directory release-assets \
+            --version "$release_version" \
+            --repository "https://github.com/${GITHUB_REPOSITORY}" \
+            --key-id 704e04b184a939a4 \
+            --published-at "$(date -u +'%Y-%m-%dT%H:%M:%S.000Z')" \
+            --output release-assets/update-manifest.json
+          openssl pkeyutl -sign -rawin -inkey "$private_key" \
+            -in release-assets/update-manifest.json -out "$raw_signature"
+          base64 -w 0 "$raw_signature" > release-assets/update-manifest.json.sig
+          printf '\n' >> release-assets/update-manifest.json.sig
+          python3 cmake/VerifyUpdateManifest.py \
+            --manifest release-assets/update-manifest.json \
+            --signature release-assets/update-manifest.json.sig \
+            --public-key desktop/resources/update-signing-public-key.pem \
+            --asset-directory release-assets \
+            --repository "https://github.com/${GITHUB_REPOSITORY}" \
+            --key-id 704e04b184a939a4
+
       - name: Upload verified release candidate
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.0
         with:
@@ -411,6 +445,8 @@ jobs:
             release-assets/*.dmg
             release-assets/*.sha256
             release-assets/SHA256SUMS.txt
+            release-assets/update-manifest.json
+            release-assets/update-manifest.json.sig
           if-no-files-found: error
           compression-level: 0
 
@@ -426,6 +462,8 @@ jobs:
             release-assets/*.dmg
             release-assets/*.sha256
             release-assets/SHA256SUMS.txt
+            release-assets/update-manifest.json
+            release-assets/update-manifest.json.sig
           )
 
           if ! gh release view "$RELEASE_TAG" >/dev/null 2>&1; then

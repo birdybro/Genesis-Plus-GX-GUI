@@ -19,6 +19,7 @@ set(required_documents
   docs/BUILDING.md
   docs/CLOUD_SYNC.md
   docs/ONLINE_METADATA.md
+  docs/UPDATES.md
   docs/DEVELOPMENT.md
   docs/DEBUG_TOOLS.md
   docs/TESTING.md
@@ -94,6 +95,7 @@ foreach(component IN ITEMS
     "librashader"
     "rcheevos"
     "QtKeychain"
+    "Monocypher"
     "Retronian GameDB"
     "libchdr"
     "zlib"
@@ -122,8 +124,11 @@ foreach(menu_text IN ITEMS
     "Tools → BIOS Settings"
     "Tools → Log and Diagnostics"
     "Help → User Guide")
+  # Kept outside the older menu inventory above because update checks are a
+  # separately gated network feature rather than an emulator control.
   require_document_text(docs/USER_GUIDE.md "${menu_text}")
 endforeach()
+require_document_text(docs/USER_GUIDE.md "Help → Check for Updates")
 
 set(stale_phrases
   "end-user guide will expand through the remaining milestones"

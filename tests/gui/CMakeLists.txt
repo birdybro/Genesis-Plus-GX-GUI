@@ -13,6 +13,16 @@ qt_add_executable(genplusgx_cloud_sync_dialog_test
 qt_add_executable(genplusgx_online_metadata_dialog_test
   online_metadata_dialog_test.cpp
 )
+
+qt_add_executable(genplusgx_update_dialog_test update_dialog_test.cpp)
+set_target_properties(genplusgx_update_dialog_test PROPERTIES AUTOMOC ON)
+target_link_libraries(genplusgx_update_dialog_test PRIVATE
+  genplusgx::ui genplusgx_project_warnings Qt6::Test Qt6::Widgets)
+add_test(NAME gui.signed_updates COMMAND genplusgx_update_dialog_test)
+set_tests_properties(gui.signed_updates PROPERTIES
+  ENVIRONMENT "QT_QPA_PLATFORM=offscreen;GENPLUSGX_FORCE_SOFTWARE_VIDEO=1"
+  LABELS "gui;unit;integration;updates;security;persistence;accessibility"
+  TIMEOUT 30)
 set_target_properties(genplusgx_online_metadata_dialog_test PROPERTIES AUTOMOC ON)
 target_link_libraries(
   genplusgx_online_metadata_dialog_test

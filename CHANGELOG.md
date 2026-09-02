@@ -14,6 +14,12 @@ platform documentation.
 
 ### Added
 
+- Ed25519-authenticated application-update discovery with a pinned project key,
+  disabled-by-default automatic checks, highest-seen-version rollback defense, strict
+  HTTPS/release URL validation, exact native-package selection, bounded atomic
+  downloads, signed size/SHA-256 verification, explicit OS handoff, diagnostics,
+  release-manifest signing automation, and unit/TLS/GUI/tooling regressions.
+
 - Disabled-by-default licensed online game-library enrichment, with exact SHA-256
   identity, a locally matched Retronian Genesis index, a documented manifest API for
   all supported systems, bounded asynchronous HTTPS/cache handling, durable provider

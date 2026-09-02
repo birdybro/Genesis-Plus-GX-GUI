@@ -88,7 +88,7 @@ Arguments:
     <context>
         <name>QObject</name>
         <message>
-            <location filename="../desktop/app/main.cpp" line="+422" />
+            <location filename="../desktop/app/main.cpp" line="+425" />
             <source>Portable Mode Unavailable</source>
             <translation>⟦Ƥöŕŧåƀŀë Ḿöðë Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -102,7 +102,7 @@ Arguments:
 %1⟧</translation>
         </message>
         <message>
-            <location line="+467" />
+            <location line="+488" />
             <source>Unable to Start Emulation</source>
             <translation>⟦Üńåƀŀë ŧö Šŧåŕŧ Ëḿüŀåŧïöń~~~~~~⟧</translation>
         </message>
@@ -273,7 +273,7 @@ Arguments:
             <translation>⟦Ƥŕöƒïŀë ~~%1⟧</translation>
         </message>
         <message>
-            <location filename="../desktop/ui/src/main_window.cpp" line="+95" />
+            <location filename="../desktop/ui/src/main_window.cpp" line="+97" />
             <source> — Portable</source>
             <translation>⟦ — Ƥöŕŧåƀŀë~~⟧</translation>
         </message>
@@ -3155,12 +3155,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+3149" />
+            <location line="+3276" />
             <source>Libretro Shader Error</source>
             <translation>⟦Ŀïƀŕëŧŕö Šħåðëŕ Ëŕŕöŕ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-3145" />
+            <location line="-3272" />
             <source>Local video artwork was not applied.</source>
             <translation>⟦Ŀöçåŀ ṽïðëö åŕŧŵöŕҡ ŵåš ńöŧ åƥƥŀïëð.~~~~~~~~⟧</translation>
         </message>
@@ -3241,12 +3241,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
-            <location line="+2075" />
+            <location line="+2199" />
             <source>Start Lossless A/V &amp;Recording…</source>
             <translation>⟦Šŧåŕŧ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ…~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2074" />
+            <location line="-2198" />
             <source>Ctrl+Shift+F12</source>
             <translation>Ctrl+Shift+F12</translation>
         </message>
@@ -3267,12 +3267,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+1415" />
+            <location line="+1539" />
             <source>&amp;Pause</source>
             <translation>⟦&amp;Ƥåüšë~~⟧</translation>
         </message>
         <message>
-            <location line="-1415" />
+            <location line="-1539" />
             <source>Space</source>
             <translation>Space</translation>
         </message>
@@ -3468,12 +3468,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+5" />
-            <location line="+3974" />
+            <location line="+4102" />
             <source>&amp;Eject Disc</source>
             <translation>⟦&amp;Ëĵëçŧ Ðïšç~~~⟧</translation>
         </message>
         <message>
-            <location line="-3969" />
+            <location line="-4097" />
             <source>&amp;Video</source>
             <translation>⟦&amp;Ṽïðëö~~⟧</translation>
         </message>
@@ -3585,12 +3585,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
-            <location line="+2835" />
+            <location line="+2962" />
             <source>Custom Libretro Preset</source>
             <translation>⟦Çüšŧöḿ Ŀïƀŕëŧŕö Ƥŕëšëŧ~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2804" />
+            <location line="-2931" />
             <source>Load Libretro &amp;Preset…</source>
             <translation>⟦Ŀöåð Ŀïƀŕëŧŕö &amp;Ƥŕëšëŧ…~~~~~⟧</translation>
         </message>
@@ -3862,6 +3862,16 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+4" />
+            <source>Check for &amp;Updates…</source>
+            <translation>⟦Çħëçҡ ƒöŕ &amp;Üƥðåŧëš…~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>This build does not include signed update support.</source>
+            <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë šïɠńëð üƥðåŧë šüƥƥöŕŧ.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
             <source>&amp;About Genesis Plus GX GUI</source>
             <translation>⟦&amp;Åƀöüŧ Ɠëńëšïš Ƥŀüš ƓẊ ƓÜÏ~~~~~~⟧</translation>
         </message>
@@ -3872,35 +3882,35 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+93" />
-            <location line="+3349" />
+            <location line="+3470" />
             <source>No game loaded</source>
             <translation>⟦Ńö ɠåḿë ŀöåðëð~~~⟧</translation>
         </message>
         <message>
-            <location line="-3348" />
-            <location line="+2301" />
-            <location line="+867" />
+            <location line="-3469" />
+            <location line="+2421" />
+            <location line="+868" />
             <location line="+181" />
             <source>System: —</source>
             <translation>⟦Šÿšŧëḿ: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3348" />
-            <location line="+2301" />
-            <location line="+867" />
+            <location line="-3469" />
+            <location line="+2421" />
+            <location line="+868" />
             <location line="+181" />
             <source>Region: —</source>
             <translation>⟦Ŕëɠïöń: —~~⟧</translation>
         </message>
         <message>
-            <location line="-3348" />
-            <location line="+3169" />
+            <location line="-3469" />
+            <location line="+3290" />
             <location line="+180" />
             <source>0.0 FPS</source>
             <translation>⟦0.0 ƑƤŠ~⟧</translation>
         </message>
         <message>
-            <location line="-3347" />
+            <location line="-3468" />
             <source>Speed 100%</source>
             <translation>⟦Šƥëëð 100%~~⟧</translation>
         </message>
@@ -3970,7 +3980,17 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Öńŀïńë ḿëŧåðåŧå šëŧŧïńɠš šåṽëð.~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+91" />
+            <location line="+93" />
+            <source>Verified application update %1 is available.</source>
+            <translation>⟦Ṽëŕïƒïëð åƥƥŀïçåŧïöń üƥðåŧë ~~~~~~~%1 ïš åṽåïŀåƀŀë.~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+19" />
+            <source>Verified update package downloaded.</source>
+            <translation>⟦Ṽëŕïƒïëð üƥðåŧë ƥåçҡåɠë ðöŵńŀöåðëð.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+96" />
             <source>The emulation command could not be queued.</source>
             <translation>⟦Ŧħë ëḿüŀåŧïöń çöḿḿåńð çöüŀð ńöŧ ƀë ǫüëüëð.~~~~~~~~~⟧</translation>
         </message>
@@ -4138,24 +4158,24 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         <message>
             <location line="+3" />
             <location line="+47" />
-            <location line="+1743" />
+            <location line="+1747" />
             <location line="+521" />
             <source>Finalizing lossless recording…</source>
             <translation>⟦Ƒïńåŀïžïńɠ ŀöššŀëšš ŕëçöŕðïńɠ…~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2300" />
+            <location line="-2304" />
             <source>Recording failed</source>
             <translation>⟦Ŕëçöŕðïńɠ ƒåïŀëð~~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
-            <location line="+2303" />
+            <location line="+2307" />
             <source>Lossless Recording Error</source>
             <translation>⟦Ŀöššŀëšš Ŕëçöŕðïńɠ Ëŕŕöŕ~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="-2251" />
+            <location line="-2255" />
             <source>Stop Lossless A/V &amp;Recording</source>
             <translation>⟦Šŧöƥ Ŀöššŀëšš Å/Ṽ &amp;Ŕëçöŕðïńɠ~~~~~~⟧</translation>
         </message>
@@ -4195,7 +4215,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦Åƥƥëåŕåńçë šëŧŧïńɠš åƥƥŀïëð.~~~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+128" />
+            <location line="+131" />
             <source>Rewind settings applied.</source>
             <translation>⟦Ŕëŵïńð šëŧŧïńɠš åƥƥŀïëð.~~~~~~⟧</translation>
         </message>
@@ -4375,12 +4395,12 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+1" />
-            <location line="+967" />
+            <location line="+968" />
             <source>Region: %1</source>
             <translation>⟦Ŕëɠïöń: ~~%1⟧</translation>
         </message>
         <message>
-            <location line="-925" />
+            <location line="-926" />
             <source>Replacement disc inserted.</source>
             <translation>⟦Ŕëƥŀåçëḿëńŧ ðïšç ïńšëŕŧëð.~~~~~~⟧</translation>
         </message>
@@ -4430,7 +4450,7 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
             <translation>⟦ (ḿüŧëð)~~⟧</translation>
         </message>
         <message>
-            <location line="+113" />
+            <location line="+114" />
             <source>Physical Media Unavailable</source>
             <translation>⟦Ƥħÿšïçåŀ Ḿëðïå Üńåṽåïŀåƀŀë~~~~~~⟧</translation>
         </message>
@@ -5455,11 +5475,21 @@ Change emulator hotkeys under Input → Controller Configuration → Hotkeys.</s
         </message>
         <message>
             <location line="+2" />
+            <source>Signed Application Updates…</source>
+            <translation>⟦Šïɠńëð Åƥƥŀïçåŧïöń Üƥðåŧëš…~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
             <source>Log and Diagnostics…</source>
             <translation>⟦Ŀöɠ åńð Ðïåɠńöšŧïçš…~~~~~⟧</translation>
         </message>
         <message>
-            <location line="+58" />
+            <location line="+9" />
+            <source>This build does not include signed update support.</source>
+            <translation>⟦Ŧħïš ƀüïŀð ðöëš ńöŧ ïńçŀüðë šïɠńëð üƥðåŧë šüƥƥöŕŧ.~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+57" />
             <source>Theme: %1
 Language: %2 (changes after restart)
 High-DPI policy: operating-system scaling
@@ -5617,17 +5647,19 @@ Logs: %9</source>
             <translation>⟦Öńŀïńë ḿëŧåðåŧå: ~~~~%1 (%2)⟧</translation>
         </message>
         <message>
-            <location line="+9" />
-            <source>%1
-%2
-%3
-%4
-Per-game overrides are available. Diagnostics omit personal secrets.</source>
-            <translation>⟦%1
-%2
-%3
-%4
-Ƥëŕ~-game öṽëŕŕïðëš åŕë åṽåïŀåƀŀë. Ðïåɠńöšŧïçš öḿïŧ ƥëŕšöńåŀ šëçŕëŧš.~~~~~~~~~~~~~⟧</translation>
+            <location line="+8" />
+            <source>Signed update checks: %1</source>
+            <translation>⟦Šïɠńëð üƥðåŧë çħëçҡš: ~~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>automatic daily checks enabled</source>
+            <translation>⟦åüŧöḿåŧïç ðåïŀÿ çħëçҡš ëńåƀŀëð~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>manual only</source>
+            <translation>⟦ḿåńüåŀ öńŀÿ~~~⟧</translation>
         </message>
         <message>
             <location line="+2" />
@@ -5635,11 +5667,28 @@ Per-game overrides are available. Diagnostics omit personal secrets.</source>
 %2
 %3
 %4
+%5
+Per-game overrides are available. Diagnostics omit personal secrets.</source>
+            <translation>⟦%1
+%2
+%3
+%4
+%5
+Ƥëŕ~-game öṽëŕŕïðëš åŕë åṽåïŀåƀŀë. Ðïåɠńöšŧïçš öḿïŧ ƥëŕšöńåŀ šëçŕëŧš.~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>%1
+%2
+%3
+%4
+%5
 Load a game to configure per-game overrides. Diagnostics remain available.</source>
             <translation>⟦%1
 %2
 %3
 %4
+%5
 Ŀöåð å ɠåḿë ŧö çöńƒïɠüŕë ƥëŕ~~~~~~-game öṽëŕŕïðëš. Ðïåɠńöšŧïçš ŕëḿåïń åṽåïŀåƀŀë.~~~~~~~~~⟧</translation>
         </message>
     </context>
@@ -5970,6 +6019,128 @@ Load a game to configure per-game overrides. Diagnostics remain available.</sour
             <location line="+5" />
             <source>Disabling either accuracy option is intended only for incompatible demos or homebrew.</source>
             <translation>⟦Ðïšåƀŀïńɠ ëïŧħëŕ åççüŕåçÿ öƥŧïöń ïš ïńŧëńðëð öńŀÿ ƒöŕ ïńçöḿƥåŧïƀŀë ðëḿöš öŕ ħöḿëƀŕëŵ.~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+    </context>
+    <context>
+        <name>genplusgx::ui::UpdateDialog</name>
+        <message>
+            <location filename="../desktop/ui/src/update_dialog.cpp" line="+18" />
+            <source>Signed Application Updates</source>
+            <translation>⟦Šïɠńëð Åƥƥŀïçåŧïöń Üƥðåŧëš~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Verification and privacy</source>
+            <translation>⟦Ṽëŕïƒïçåŧïöń åńð ƥŕïṽåçÿ~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+5" />
+            <source>Release metadata must carry a valid Ed25519 signature from the public key built into this application. Downloads are written atomically and must match the signed byte length and SHA-256 digest before they can be opened. The application never silently installs or replaces itself.</source>
+            <translation>⟦Ŕëŀëåšë ḿëŧåðåŧå ḿüšŧ çåŕŕÿ å ṽåŀïð Ëð25519 šïɠńåŧüŕë ƒŕöḿ ŧħë ƥüƀŀïç ҡëÿ ƀüïŀŧ ïńŧö ŧħïš åƥƥŀïçåŧïöń. Ðöŵńŀöåðš åŕë ŵŕïŧŧëń åŧöḿïçåŀŀÿ åńð ḿüšŧ ḿåŧçħ ŧħë šïɠńëð ƀÿŧë ŀëńɠŧħ åńð ŠĦÅ-256 ðïɠëšŧ ƀëƒöŕë ŧħëÿ çåń ƀë öƥëńëð. Ŧħë åƥƥŀïçåŧïöń ńëṽëŕ šïŀëńŧŀÿ ïńšŧåŀŀš öŕ ŕëƥŀåçëš ïŧšëŀƒ.~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+8" />
+            <source>Check automatically at startup (at most once daily)</source>
+            <translation>⟦Çħëçҡ åüŧöḿåŧïçåŀŀÿ åŧ šŧåŕŧüƥ (åŧ ḿöšŧ öńçë ðåïŀÿ)~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Disabled by default. Checks only this project's public GitHub releases.</source>
+            <translation>⟦Ðïšåƀŀëð ƀÿ ðëƒåüŀŧ. Çħëçҡš öńŀÿ ŧħïš ƥŕöĵëçŧ'š ƥüƀŀïç ƓïŧĦüƀ ŕëŀëåšëš.~~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+18" />
+            <source>Check Now</source>
+            <translation>⟦Çħëçҡ Ńöŵ~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Download Verified Package</source>
+            <translation>⟦Ðöŵńŀöåð Ṽëŕïƒïëð Ƥåçҡåɠë~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Release Page</source>
+            <translation>⟦Ŕëŀëåšë Ƥåɠë~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Open Download</source>
+            <translation>⟦Öƥëń Ðöŵńŀöåð~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+85" />
+            <source>Update verification failed.</source>
+            <translation>⟦Üƥðåŧë ṽëŕïƒïçåŧïöń ƒåïŀëð.~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+18" />
+            <source>The package was not accepted.</source>
+            <translation>⟦Ŧħë ƥåçҡåɠë ŵåš ńöŧ åççëƥŧëð.~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+12" />
+            <source>Update settings could not be saved.</source>
+            <translation>⟦Üƥðåŧë šëŧŧïńɠš çöüŀð ńöŧ ƀë šåṽëð.~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+6" />
+            <source>Update settings saved.</source>
+            <translation>⟦Üƥðåŧë šëŧŧïńɠš šåṽëð.~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+12" />
+            <source>Downloading and verifying package…</source>
+            <translation>⟦Ðöŵńŀöåðïńɠ åńð ṽëŕïƒÿïńɠ ƥåçҡåɠë…~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Downloading and verifying signed manifest…</source>
+            <translation>⟦Ðöŵńŀöåðïńɠ åńð ṽëŕïƒÿïńɠ šïɠńëð ḿåńïƒëšŧ…~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>No package will be offered unless every verification succeeds.</source>
+            <translation>⟦Ńö ƥåçҡåɠë ŵïŀŀ ƀë öƒƒëŕëð üńŀëšš ëṽëŕÿ ṽëŕïƒïçåŧïöń šüççëëðš.~~~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Verified package downloaded.</source>
+            <translation>⟦Ṽëŕïƒïëð ƥåçҡåɠë ðöŵńŀöåðëð.~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+1" />
+            <source>Saved to: %1
+Open it to hand installation to your operating system.</source>
+            <translation>⟦Šåṽëð ŧö: ~~%1
+Öƥëń ïŧ ŧö ħåńð ïńšŧåŀŀåŧïöń ŧö ÿöüŕ öƥëŕåŧïńɠ šÿšŧëḿ.~~~~~~~~~~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>A verified update is available: %1 (installed: %2)</source>
+            <translation>⟦Å ṽëŕïƒïëð üƥðåŧë ïš åṽåïŀåƀŀë: ~~~~~~~%1 (ïńšŧåŀŀëð: ~~~%2)⟧</translation>
+        </message>
+        <message>
+            <location line="+3" />
+            <source>Genesis Plus GX GUI %1 is up to date.</source>
+            <translation>⟦Ɠëńëšïš Ƥŀüš ƓẊ ƓÜÏ ~~~~%1 ïš üƥ ŧö ðåŧë.~~~⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Signature key: %1
+Published: %2</source>
+            <translation>⟦Šïɠńåŧüŕë ҡëÿ: ~~~%1
+Ƥüƀŀïšħëð: ~~~%2⟧</translation>
+        </message>
+        <message>
+            <location line="+4" />
+            <source>Installed version: %1</source>
+            <translation>⟦Ïńšŧåŀŀëð ṽëŕšïöń: ~~~~%1⟧</translation>
+        </message>
+        <message>
+            <location line="+2" />
+            <source>Select Check Now to contact the project's GitHub release endpoint.</source>
+            <translation>⟦Šëŀëçŧ Çħëçҡ Ńöŵ ŧö çöńŧåçŧ ŧħë ƥŕöĵëçŧ'š ƓïŧĦüƀ ŕëŀëåšë ëńðƥöïńŧ.~~~~~~~~~~~~~~⟧</translation>
         </message>
     </context>
     <context>

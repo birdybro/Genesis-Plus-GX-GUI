@@ -6,6 +6,10 @@ foreach(required IN ITEMS PACKAGE_ROOT VERIFY_PLATFORM)
   endif()
 endforeach()
 
+if(NOT DEFINED VERIFY_SIGNED_UPDATES)
+  set(VERIFY_SIGNED_UPDATES ON)
+endif()
+
 file(REAL_PATH "${PACKAGE_ROOT}" package_root)
 if(NOT IS_DIRECTORY "${package_root}")
   message(FATAL_ERROR "Package root does not exist: ${package_root}")
@@ -44,6 +48,8 @@ if(VERIFY_PLATFORM STREQUAL "windows")
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/rcheevos-MIT.txt")
   set(qtkeychain_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/QtKeychain-BSD-3-Clause.txt")
+  set(monocypher_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/Monocypher-BSD-2-Clause-or-CC0.md")
   set(portable_data_directory "${package_root}/bin/portable-data")
   set(translation_directory
     "${package_root}/share/Genesis-Plus-GX-GUI/translations")
@@ -68,6 +74,8 @@ elseif(VERIFY_PLATFORM STREQUAL "macos")
     "${bundle}/Contents/Resources/licenses/rcheevos-MIT.txt")
   set(qtkeychain_license
     "${bundle}/Contents/Resources/licenses/QtKeychain-BSD-3-Clause.txt")
+  set(monocypher_license
+    "${bundle}/Contents/Resources/licenses/Monocypher-BSD-2-Clause-or-CC0.md")
   set(portable_data_directory "${package_root}/portable-data")
   set(translation_directory "${bundle}/Contents/Resources/translations")
   set(forbidden_translation_directory
@@ -124,6 +132,8 @@ elseif(VERIFY_PLATFORM STREQUAL "linux")
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/rcheevos-MIT.txt")
   set(qtkeychain_license
     "${package_root}/share/doc/Genesis-Plus-GX-GUI/QtKeychain-BSD-3-Clause.txt")
+  set(monocypher_license
+    "${package_root}/share/doc/Genesis-Plus-GX-GUI/Monocypher-BSD-2-Clause-or-CC0.md")
   set(portable_data_directory "${package_root}/bin/portable-data")
   set(translation_directory
     "${package_root}/share/Genesis-Plus-GX-GUI/translations")
@@ -149,6 +159,9 @@ require_file(
 require_file("${librashader_license}" "librashader MPL-2.0 license")
 require_file("${rcheevos_license}" "rcheevos MIT license")
 require_file("${qtkeychain_license}" "QtKeychain BSD-3-Clause license")
+if(VERIFY_SIGNED_UPDATES)
+  require_file("${monocypher_license}" "Monocypher BSD-2-Clause or CC0 license")
+endif()
 require_file(
   "${translation_directory}/genplusgx_en_XA.qm"
   "pseudo-localization catalog")
@@ -172,6 +185,9 @@ require_file(
 require_file(
   "${documentation_directory}/CLOUD_SYNC.md"
   "cloud synchronization guide")
+require_file(
+  "${documentation_directory}/UPDATES.md"
+  "signed application updates guide")
 require_file(
   "${documentation_directory}/ONLINE_METADATA.md"
   "online metadata and artwork guide")

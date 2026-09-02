@@ -5,6 +5,7 @@
 #include "genplusgx/ui/run_ahead_settings_dialog.h"
 #include "genplusgx/ui/settings_dialog.h"
 #include "genplusgx/ui/speed_settings_dialog.h"
+#include "genplusgx/ui/update_dialog.h"
 #include "genplusgx/ui/video_settings_dialog.h"
 
 #include <QAction>
@@ -48,6 +49,7 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     .session = genplusgx::settings::defaultSessionSettings(),
     .speed = genplusgx::settings::defaultSpeedSettings(),
     .onlineMetadata = genplusgx::library::defaultOnlineMetadataSettings(),
+    .updates = genplusgx::updates::defaultSettings(),
     .paths = genplusgx::ApplicationPaths{
       root, genplusgx::ApplicationDataMode::portable},
     .connectedControllerCount = 2U,
@@ -120,13 +122,25 @@ void SettingsDialogTest::eightPagesExposeCurrentValuesAndTypedActions()
     Qt::LeftButton);
   QTest::mouseClick(dialog.findChild<QPushButton*>(
     QStringLiteral("configureOnlineMetadataButton")), Qt::LeftButton);
-  const std::vector expectedActions{
+  auto* signedUpdatesButton = dialog.findChild<QPushButton*>(
+    QStringLiteral("configureSignedUpdatesButton"));
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  QVERIFY(signedUpdatesButton->isEnabled());
+  QTest::mouseClick(signedUpdatesButton, Qt::LeftButton);
+#else
+  QVERIFY(!signedUpdatesButton->isEnabled());
+  QVERIFY(!signedUpdatesButton->toolTip().isEmpty());
+#endif
+  std::vector<genplusgx::ui::SettingsPageAction> expectedActions{
     genplusgx::ui::SettingsPageAction::video,
     genplusgx::ui::SettingsPageAction::playerAssignments,
     genplusgx::ui::SettingsPageAction::speed,
     genplusgx::ui::SettingsPageAction::rewind,
     genplusgx::ui::SettingsPageAction::runAhead,
     genplusgx::ui::SettingsPageAction::onlineMetadata};
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  expectedActions.push_back(genplusgx::ui::SettingsPageAction::signedUpdates);
+#endif
   QCOMPARE(actions, expectedActions);
 
   auto* perGame =
@@ -211,6 +225,21 @@ void SettingsDialogTest::mainWindowPreferencesRoutesThroughOneSettingsCenter()
       QStringLiteral("onlineMetadataDialog"));
   QVERIFY(onlineMetadata != nullptr);
   onlineMetadata->reject();
+
+  auto* signedUpdatesButton = center->findChild<QPushButton*>(
+    QStringLiteral("configureSignedUpdatesButton"));
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  QVERIFY(signedUpdatesButton->isEnabled());
+  QTest::mouseClick(signedUpdatesButton, Qt::LeftButton);
+  QApplication::processEvents();
+  auto* updates = window.findChild<genplusgx::ui::UpdateDialog*>(
+    QStringLiteral("updateDialog"));
+  QVERIFY(updates != nullptr);
+  updates->reject();
+#else
+  QVERIFY(!signedUpdatesButton->isEnabled());
+  QVERIFY(!signedUpdatesButton->toolTip().isEmpty());
+#endif
 
   settingsAction->trigger();
   QApplication::processEvents();

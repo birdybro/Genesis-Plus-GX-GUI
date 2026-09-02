@@ -717,7 +717,10 @@ incomplete shutdown and returns a nonzero process status for launchers and autom
 
 **Help → User Guide** opens a keyboard-accessible getting-started reference without a
 browser or network connection. **Help → Keyboard Shortcuts** lists the active default
-application shortcuts. **Help → About Genesis Plus GX GUI** shows the frontend version,
+application shortcuts. **Help → Check for Updates…** performs an explicitly requested
+Ed25519-authenticated project release check; its disabled-by-default daily option,
+verified download, and operating-system handoff are described in [UPDATES.md](UPDATES.md).
+**Help → About Genesis Plus GX GUI** shows the frontend version,
 Git commit, upstream relationship, and non-commercial license notice; **About Qt** shows
 the deployed Qt notice. Source builds are documented in [BUILDING.md](BUILDING.md),
 automated gates in [TESTING.md](TESTING.md), and contributor workflow in

@@ -25,6 +25,8 @@
 #include "genplusgx/library/game_metadata_service.h"
 #include "genplusgx/library/online_metadata_service.h"
 #include "genplusgx/library/online_metadata_settings.h"
+#include "genplusgx/updates/update_service.h"
+#include "genplusgx/updates/update_settings.h"
 #include "genplusgx/localization/localization.h"
 #include "genplusgx/netplay/netplay_bridge.h"
 #include "genplusgx/netplay/netplay_session.h"
@@ -53,6 +55,7 @@
 #include <QCoreApplication>
 #include <QCryptographicHash>
 #include <QDataStream>
+#include <QDateTime>
 #include <QDebug>
 #include <QLocale>
 #include <QMessageBox>
@@ -492,6 +495,16 @@ int main(int argc, char* argv[])
       "Online metadata settings", loadedOnlineMetadataSettings.status.message);
   }
   auto onlineMetadataSettings = loadedOnlineMetadataSettings.settings;
+  genplusgx::updates::SettingsStore updateSettingsStore{
+    applicationPaths.configDirectory() / "signed-updates.json"};
+  auto loadedUpdateSettings = updateSettingsStore.load();
+  if (!loadedUpdateSettings.status) {
+    qWarning().noquote() << QString::fromStdString(
+      loadedUpdateSettings.status.message);
+    recordStartupIssue("Signed update settings",
+      loadedUpdateSettings.status.message);
+  }
+  auto updateSettings = loadedUpdateSettings.settings;
   const auto translationApplied = translationManager.apply(
     appearanceSettings.language);
   if (!translationApplied) {
@@ -812,6 +825,14 @@ int main(int argc, char* argv[])
     recordStartupIssue(
       "Online metadata service", onlineMetadataServiceStarted.message);
   }
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  genplusgx::updates::Service updateService;
+  const auto updateServiceStarted = updateService.start();
+  if (!updateServiceStarted) {
+    qWarning().noquote() << QString::fromStdString(updateServiceStarted.message);
+    recordStartupIssue("Signed update service", updateServiceStarted.message);
+  }
+#endif
   const auto physicalMediaCache =
     applicationPaths.cacheDirectory() / "physical-media";
   genplusgx::platform::PhysicalMediaService physicalMediaService{
@@ -878,6 +899,9 @@ int main(int argc, char* argv[])
     qCritical().noquote() << QString::fromStdString(workerStarted.message);
     static_cast<void>(metadataService.stop());
     static_cast<void>(onlineMetadataService.stop());
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+    static_cast<void>(updateService.stop());
+#endif
     static_cast<void>(physicalMediaService.stop());
     static_cast<void>(stateStorage.stop());
     static_cast<void>(screenshotService.stop());
@@ -950,6 +974,74 @@ int main(int argc, char* argv[])
       window.setOnlineMetadataSettings(settings);
       return genplusgx::PersistenceStatus{};
     });
+  window.setUpdateSettings(updateSettings);
+  window.setUpdateSettingsSink(
+    [&updateSettings, &updateSettingsStore, &window](
+      const genplusgx::updates::Settings& settings) {
+      const auto saved = updateSettingsStore.save(settings);
+      if (!saved) {
+        return saved;
+      }
+      updateSettings = settings;
+      window.setUpdateSettings(settings);
+      return genplusgx::PersistenceStatus{};
+    });
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  std::uint64_t updateOperationId = 9'700'000U;
+  std::optional<std::uint64_t> pendingUpdateOperation;
+  bool pendingUpdateDownload = false;
+  const auto requestUpdateCheck = [&updateOperationId, &pendingUpdateDownload,
+      &pendingUpdateOperation, &updateService, &updateSettings,
+      &updateSettingsStore, &window](bool automatic) {
+    if (pendingUpdateOperation) {
+      return;
+    }
+    updateSettings.lastCheckUtc = QDateTime::currentDateTimeUtc()
+      .toString(Qt::ISODateWithMs).toStdString();
+    const auto attemptSaved = updateSettingsStore.save(updateSettings);
+    if (!attemptSaved) {
+      qWarning().noquote() << "Signed update attempt time could not be saved:"
+                           << QString::fromStdString(attemptSaved.message);
+      if (automatic) {
+        return;
+      }
+    } else {
+      window.setUpdateSettings(updateSettings);
+    }
+    const auto operationId = ++updateOperationId;
+    const auto submitted = updateService.requestCheck(
+      operationId, updateSettings, GENPLUSGX_VERSION);
+    if (!submitted) {
+      window.presentUpdateCheckFailure(submitted.message);
+      return;
+    }
+    pendingUpdateOperation = operationId;
+    pendingUpdateDownload = false;
+    window.setUpdateBusy(true, false);
+    qInfo() << "Signed update check requested.";
+  };
+  window.setUpdateCheckSink(
+    [&requestUpdateCheck] { requestUpdateCheck(false); });
+  window.setUpdateDownloadSink(
+    [&applicationPaths, &updateOperationId, &pendingUpdateDownload,
+     &pendingUpdateOperation, &updateService, &window](
+      const genplusgx::updates::Asset& asset) {
+      if (pendingUpdateOperation) {
+        return;
+      }
+      const auto operationId = ++updateOperationId;
+      const auto submitted = updateService.requestDownload(operationId, asset,
+        applicationPaths.cacheDirectory() / "updates");
+      if (!submitted) {
+        window.presentUpdateDownloadFailure(submitted.message);
+        return;
+      }
+      pendingUpdateOperation = operationId;
+      pendingUpdateDownload = true;
+      window.setUpdateBusy(true, true);
+      qInfo() << "Verified update package download requested.";
+    });
+#endif
   window.displayWidget()->setRendererFailureSink(
     [&window](std::string detail) {
       window.showStartupIssues({"Video renderer: " + std::move(detail)});
@@ -2421,7 +2513,10 @@ int main(int argc, char* argv[])
      &cloudCredentialReadPending, &cloudOperationAutomatic, &cloudSettings,
      &pendingCloudOperation,
      &netplayBridge, &netplaySession, &recordingService, &rewindSettings,
-     &runAheadSettings, &speedSettings,
+     &runAheadSettings, &speedSettings, &updateSettings,
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+     &pendingUpdateDownload, &pendingUpdateOperation,
+#endif
      &translationManager, &window, &worker] {
       auto snapshot = genplusgx::diagnostics::staticDiagnosticsSnapshot();
       snapshot.applicationDataMode = std::string{
@@ -2595,6 +2690,20 @@ int main(int argc, char* argv[])
       snapshot.cloudSyncStates = cloudSettings.syncStates;
       snapshot.cloudSyncOnStartup = cloudSettings.syncOnStartup;
       snapshot.cloudSyncOnGameClose = cloudSettings.syncOnGameClose;
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+      snapshot.signedUpdateState = pendingUpdateOperation
+        ? (pendingUpdateDownload ? "Downloading and verifying package"
+                                 : "Checking and verifying manifest")
+        : "Available; idle";
+      snapshot.updateSigningKeyId = genplusgx::updates::productionTrust().keyId;
+#else
+      snapshot.signedUpdateState = "Not included in this build";
+#endif
+      snapshot.automaticUpdateChecks = updateSettings.automaticChecks;
+      snapshot.highestVerifiedUpdate = updateSettings.highestSeenVersion.empty()
+        ? "None" : updateSettings.highestSeenVersion;
+      snapshot.lastUpdateCheckUtc = updateSettings.lastCheckUtc.empty()
+        ? "Never" : updateSettings.lastCheckUtc;
       const auto recordingMetrics = recordingService->metrics();
       snapshot.recordingActive = recordingMetrics.active;
       snapshot.recordingQueuedFrames = recordingMetrics.queuedFrames;
@@ -3095,6 +3204,10 @@ int main(int argc, char* argv[])
      &onlineMetadataSettings, &pendingOnlineMetadataAutomatic,
      &pendingOnlineMetadataGameId, &pendingOnlineMetadataOperation,
      &startNextAutomaticMetadata,
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+     &pendingUpdateDownload, &pendingUpdateOperation, &updateService,
+     &updateSettings, &updateSettingsStore,
+#endif
      &loggedAudioOverruns, &loggedAudioUnderruns, &loggedLateFrames,
      &loggedPresentationCoalesces, &loggedVideoProducerDrops,
      &loggedVideoSkippedFrames,
@@ -3240,6 +3353,80 @@ int main(int argc, char* argv[])
       }
       startNextAutomaticMetadata();
     }
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+    while (auto event = updateService.pollEvent()) {
+      using EventType = genplusgx::updates::EventType;
+      if (event->type == EventType::serviceStarted) {
+        qInfo() << "Signed update service started.";
+        continue;
+      }
+      if (event->type == EventType::serviceStopped) {
+        if (pendingUpdateOperation) {
+          const std::string detail =
+            "The signed update service stopped before completing the operation.";
+          if (pendingUpdateDownload) {
+            window.presentUpdateDownloadFailure(detail);
+          } else {
+            window.presentUpdateCheckFailure(detail);
+          }
+        }
+        pendingUpdateOperation.reset();
+        pendingUpdateDownload = false;
+        continue;
+      }
+      if (!pendingUpdateOperation ||
+          event->operationId != *pendingUpdateOperation) {
+        continue;
+      }
+      pendingUpdateOperation.reset();
+      const bool wasDownload = pendingUpdateDownload;
+      pendingUpdateDownload = false;
+      if (event->type == EventType::checkCompleted && event->check.status) {
+        updateSettings.lastCheckUtc = QDateTime::currentDateTimeUtc()
+          .toString(Qt::ISODateWithMs).toStdString();
+        const auto verifiedVersion = event->check.manifest.version.toString();
+        const auto previous = genplusgx::updates::parseSemanticVersion(
+          updateSettings.highestSeenVersion);
+        const bool highestAdvanced =
+          !previous || event->check.manifest.version > *previous;
+        if (highestAdvanced) {
+          updateSettings.highestSeenVersion = verifiedVersion;
+        }
+        const auto saved = updateSettingsStore.save(updateSettings);
+        if (!saved) {
+          qWarning().noquote() << "Signed update rollback state could not be saved:"
+                               << QString::fromStdString(saved.message);
+          if (highestAdvanced && event->check.updateAvailable) {
+            window.presentUpdateCheckFailure(
+              "The verified release could not be offered because its rollback "
+              "protection marker could not be stored.");
+            continue;
+          }
+        } else {
+          window.setUpdateSettings(updateSettings);
+        }
+        qInfo().noquote() << "Signed update manifest verified:"
+                          << QString::fromStdString(verifiedVersion)
+                          << "available" << event->check.updateAvailable;
+        window.presentUpdateCheck(std::move(event->check));
+      } else if (event->type == EventType::downloadCompleted &&
+                 event->download.status) {
+        qInfo().noquote() << "Signed update package verified and saved:"
+                          << QString::fromStdString(event->download.path.string());
+        window.presentUpdateDownload(std::move(event->download));
+      } else {
+        const auto detail = wasDownload ? event->download.status.message
+                                        : event->check.status.message;
+        qWarning().noquote() << "Signed update operation failed:"
+                             << QString::fromStdString(detail);
+        if (wasDownload) {
+          window.presentUpdateDownloadFailure(detail);
+        } else {
+          window.presentUpdateCheckFailure(detail);
+        }
+      }
+    }
+#endif
     achievementNetwork.pump();
     static_cast<void>(controllerInput.pollEvents());
     while (auto outgoing = netplayBridge->pollOutgoing()) {
@@ -4573,6 +4760,14 @@ int main(int argc, char* argv[])
     }
   });
   eventPump.start();
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  const auto updateNow = QDateTime::currentDateTimeUtc()
+    .toString(Qt::ISODateWithMs).toStdString();
+  if (genplusgx::updates::automaticCheckDue(updateSettings, updateNow)) {
+    QTimer::singleShot(0, &window,
+      [&requestUpdateCheck] { requestUpdateCheck(true); });
+  }
+#endif
   window.show();
   qInfo().noquote() << "Renderer selected:"
                     << (window.displayWidget()->usesAcceleratedRenderer()
@@ -4809,6 +5004,9 @@ int main(int argc, char* argv[])
   window.setCloudForgetSink({});
   window.setCloudSyncSink({});
   window.setOnlineMetadataSettingsSink({});
+  window.setUpdateSettingsSink({});
+  window.setUpdateCheckSink({});
+  window.setUpdateDownloadSink({});
   window.setVideoSettingsSink({});
   window.setAudioSettingsSink({});
   window.setSystemSettingsSink({});
@@ -4827,6 +5025,10 @@ int main(int argc, char* argv[])
   recordCleanup("Cloud synchronization service", cloudSyncServiceStopped);
   const auto onlineMetadataServiceStopped = onlineMetadataService.stop();
   recordCleanup("Online metadata service", onlineMetadataServiceStopped);
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  const auto updateServiceStopped = updateService.stop();
+  recordCleanup("Signed update service", updateServiceStopped);
+#endif
   const auto workerStopped = worker.stop();
   recordCleanup("Emulation worker", workerStopped);
   const auto physicalMediaServiceStopped = physicalMediaService.stop();

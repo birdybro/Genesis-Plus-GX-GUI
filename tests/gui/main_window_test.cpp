@@ -239,6 +239,14 @@ void MainWindowTest::menusAndActionsHaveStableSemantics()
     QVERIFY2(action != nullptr, name);
     QVERIFY2(action->isEnabled(), name);
   }
+  auto* updateAction = window.findChild<QAction*>(
+    QStringLiteral("checkForUpdatesAction"));
+  QVERIFY(updateAction != nullptr);
+#if defined(GENPLUSGX_HAVE_SIGNED_UPDATES)
+  QVERIFY(updateAction->isEnabled());
+#else
+  QVERIFY(!updateAction->isEnabled());
+#endif
 
   const char* gameOnlyNames[]{
     "closeGameAction", "screenshotAction", "recordingAction", "pauseAction", "resetAction",
