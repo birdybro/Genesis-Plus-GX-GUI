@@ -1616,9 +1616,27 @@ the required hosted Linux job. The supplied NAS ROM mount is empty; generated CC
 Genesis fixtures execute through the production worker/video/audio/input/capture paths,
 and no proprietary ROM-derived material enters the tree or package.
 
-Exact hosted CI, complete successful-log inspection, and cross-platform package audit
-will be recorded here after the implementation commit is pushed. Milestone 99 remains
-open until that exact run passes.
+Exact implementation run
+[`33696326354`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33696326354)
+at `a363a9a152ab2f912175de5bc25a3e2487e6d2d8` passed all ten required jobs. Linux
+Debug/Release/ASan+UBSan and macOS arm64/x86_64 Debug/Release passed 136/136 tests;
+Windows MSVC x64 Debug/Release passed 135 with only the expected real-OpenGL
+capability skip; the legacy libretro gate passed. The complete 17,883-line,
+2,414,463-byte log audit found no failed test, sanitizer finding, compiler error,
+packaging failure, or runtime error. It did find one actionable warning in all four
+Apple builds: the capture static archive appeared both directly and through the UI's
+public dependency edge. The redundant direct executable edge has been removed; the
+UI retains the necessary public link because its public API exposes capture types,
+and the resulting Linux executable link line contains the archive exactly once.
+
+After that correction, GCC Debug/Release, Clang Release, leak-detecting ASan+UBSan,
+CHD-disabled, shader-disabled, online-services-disabled, and signed-updates-disabled
+suites all pass again; the workflow-disabled graph and strict legacy libretro gate
+also pass. A fresh staged and extracted Linux package passes layout, version, and
+portable pseudo-language event-loop verification. Its 41,308,475-byte TGZ matches
+SHA-256 `36611edb2e56d4e48d278dab2b39064a28ac7524953350340babb9a85594e0e7`. Milestone
+99 remains open until exact corrective hosted CI proves the warning absent and all
+cross-platform artifacts pass inspection.
 
 ## Adversarial review
 

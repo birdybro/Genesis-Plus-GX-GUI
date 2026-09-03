@@ -3786,8 +3786,9 @@ cannot contain its own SHA)
 ## Milestone 99 detail
 
 **Status:** IMPLEMENTED — all local compiler, test, sanitizer, compatibility,
-packaging, and adversarial gates pass; exact hosted CI and artifact inspection are
-pending the milestone commit.
+packaging, and adversarial gates pass. The implementation run passed every hosted
+job; a complete-log audit found and locally corrected one macOS duplicate-library
+link warning. Exact corrective hosted CI and artifact inspection remain pending.
 
 **Goal:** Add deterministic input-movie recording/playback, an accessible TAS timeline
 editor, and bounded loopback A/V streaming without moving core access off its owner
@@ -3847,6 +3848,25 @@ and contains the two new manuals plus Qt Network. Native XCB smoke awaits hosted
 because this workstation image does not contain `xvfb-run`. No proprietary ROM was
 copied or generated; the previously supplied NAS mount is empty, so the required new
 workflows use documented generated CC0 programs through the same production paths.
+
+Exact implementation run
+[`33696326354`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33696326354)
+at `a363a9a152ab2f912175de5bc25a3e2487e6d2d8` passed all ten jobs: Linux Debug,
+Release/package, ASan+UBSan, and legacy libretro; Windows MSVC x64 Debug and
+Release/package; and macOS arm64 and x86_64 Debug and Release/package. All native
+jobs registered 136 tests. Linux and macOS passed 136/136; each Windows job passed
+135 and made the single documented real-OpenGL capability skip. The complete
+17,883-line, 2,414,463-byte log audit found no test, sanitizer, compiler, packaging,
+or runtime failure. It did expose one repeated Apple linker diagnostic: the desktop
+executable named `GenesisPlusGX::Capture` directly while `genplusgx::ui` already
+publishes that dependency because its public API uses capture types. Removing the
+redundant direct edge retains the required transitive linkage and leaves exactly one
+capture archive on the Linux link line. The full local matrix was rerun after that
+correction: all default, sanitizer, Clang, feature-disabled, package, workflow, and
+legacy gates above remain green. A fresh corrective TGZ is 41,308,475 bytes, matches
+SHA-256 `36611edb2e56d4e48d278dab2b39064a28ac7524953350340babb9a85594e0e7`, and passes
+both staged and extracted layout/event-loop verification. The corrective commit's
+exact hosted run must be green and warning-audited before this milestone closes.
 
 **Acceptance criteria:** Movie input is captured and replayed only at authoritative
 frame boundaries; initial state, game, deterministic settings, and exact core build are
