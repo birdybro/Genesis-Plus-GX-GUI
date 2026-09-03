@@ -1763,6 +1763,45 @@ verifier, version command, portable pseudo-language offscreen event-loop smoke, 
 `Genesis-Plus-GX-GUI-0.1.2-linux-x86_64.tar.gz`, 41,310,178 bytes, with SHA-256
 `389ef3924da060b4ad29123a4ff5956e6b4439e447904a97d179722dc41ee2af`.
 Its payload scan found no proprietary game/firmware file, save/state, private key, or
-pre-created portable data. This host lacks `xvfb-run`, so native XCB package startup,
-the complete Windows/macOS matrices, release signing, asset assembly, and final hosted
-log/archive audit remain mandatory before publication.
+pre-created portable data. This host lacks `xvfb-run`; exact candidate run
+[`33705129560`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33705129560)
+provided that native XCB gate and passed all ten jobs at
+`3eadf2bda7f07ac4e812d6afe1438992b5cca585`. Linux Debug/Release/ASan+UBSan and macOS
+arm64/x86_64 Debug/Release passed 136/136. Windows Debug/Release each registered 136,
+passed 135, and capability-skipped only the known real-OpenGL test on the hosted
+software renderer. The 35,530-line, 3,728,519-byte candidate log audit found no project
+compiler warning, failed test, sanitizer finding, timeout, or error annotation. All six
+candidate packages passed checksum, layout, architecture, containment, dependency, and
+safe-payload checks.
+
+Annotated tag `v0.1.2` resolves to that exact commit. Tagged release run
+[`33707720216`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33707720216)
+passed release identity, four native Release package jobs, Linux ASan/UBSan 136/136,
+legacy libretro, signed-manifest assembly, and publication. Its complete 24,862-line,
+3,608,321-byte log set has no authored compiler warning, test failure, sanitizer
+finding, timeout, or GitHub error annotation. The Windows job has the same single
+capability skip. The only warnings are inside current pinned upstream actions:
+`setup-sdl` supplies two unused macOS CMake cache variables on a cache miss, and
+`download-artifact@v8` calls deprecated Node `Buffer()` compatibility code.
+
+GitHub release
+[`Genesis Plus GX GUI 0.1.2`](https://github.com/birdybro/Genesis-Plus-GX-GUI/releases/tag/v0.1.2)
+is latest, non-draft, and non-prerelease. All 15 assets were downloaded independently.
+The six package sidecars and aggregate checksum ledger verify; the signed schema-1
+update manifest validates against committed key ID `704e04b184a939a4`; all extracted
+TGZ, ZIP, and DMG layouts pass the production verifier. Final package evidence is:
+
+| Package | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Linux x86-64 TGZ | 42,191,521 | `d53c37f52110bd710e64b1cc2941c2d5200a7bb524206db135691dca6855ff28` |
+| Windows x86-64 ZIP | 53,355,832 | `4f8b8fee7b19891483b32f65232f171e4435a463e861b86def07666852815447` |
+| macOS arm64 ZIP | 34,276,186 | `7b999556d2a75a346e0953641e4c31062fe418ae465f28ce6763b327a4bd7579` |
+| macOS arm64 DMG | 34,202,554 | `bf5e34fbcac937cd1171d74dcda933ec3225235f6d9be65c8f7ff80e2de26e99` |
+| macOS x86-64 ZIP | 35,140,471 | `1c24e165056581c1330469966e5a3d5b1c156e07be7938ab84d8ef5a7d0e9387` |
+| macOS x86-64 DMG | 35,036,544 | `d28bb141a3245178265892a13d7781be9479023fef1f4b05f45cde2119daa3ac` |
+
+Binaries identify as ELF x86-64, PE32+ x86-64, Mach-O arm64, and Mach-O x86_64. The
+downloaded Linux build reports `0.1.2`, completes portable pseudo-language offscreen
+startup/shutdown, and resolves all 23 packaged ELF dependency graphs. Archive
+containment and payload scans found no ROM, firmware, save/state, private key, or
+pre-created portable-data content. Milestone 100 is complete.

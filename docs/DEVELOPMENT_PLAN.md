@@ -111,7 +111,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
 | 98 Signed updates | COMPLETE | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | `c257953` |
 | 99 TAS, movies, and streaming | COMPLETE | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | `c5d807c` |
-| 100 Version 0.1.2 release | IMPLEMENTED — HOSTED CI PENDING | Version, validate, tag, and publish the complete post-0.1.1 feature set | version/changelog/release docs/workflow | local release gates; exact branch CI; tag release workflow; asset/log audit | No tag is created until its exact source commit is green | pending |
+| 100 Version 0.1.2 release | COMPLETE | Version, validate, tag, and publish the complete post-0.1.1 feature set | version/changelog/release docs/workflow | local release gates; exact branch CI; tag release workflow; asset/log audit | Public signed release is bound to an exact green source commit | `3eadf2b` |
 
 ## Execution policy
 
@@ -3786,8 +3786,8 @@ cannot contain its own SHA)
 
 ## Milestone 100 detail
 
-**Status:** IMPLEMENTED — release identity and documentation are prepared locally;
-exact branch CI must pass before the immutable tag is created.
+**Status:** COMPLETE — version `0.1.2` is published as the latest non-draft,
+non-prerelease GitHub release from the exact validated source commit.
 
 **Goal:** Publish the complete Milestone 64–99 feature and hardening set as version
 `0.1.2`, with the tag bound to a fully validated source commit and every signed-update
@@ -3815,13 +3815,45 @@ matches SHA-256
 This workstation does not provide `xvfb-run`; the required native XCB package smoke
 remains a hosted Linux gate.
 
+**Hosted candidate evidence:** Exact-source run
+[`33705129560`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33705129560)
+passes all ten jobs at `3eadf2bda7f07ac4e812d6afe1438992b5cca585`. Linux Debug,
+Release, and ASan/UBSan plus both macOS architectures in Debug/Release pass all
+136/136 tests. Windows Debug/Release each register 136, execute 135 successfully, and
+capability-skip only the established real-OpenGL test on the hosted software renderer.
+The legacy libretro gate passes. The complete 35,530-line, 3,728,519-byte log audit
+found no authored compiler warning, failed test, sanitizer finding, timeout, or GitHub
+error annotation. Six downloaded candidate packages verify their sidecars, layouts,
+architectures, archive containment, and safe payload contents.
+
+**Published release evidence:** Annotated tag `v0.1.2` resolves to the exact candidate
+commit above. Release run
+[`33707720216`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33707720216)
+passes identity, four native Release packages, 136/136 Linux ASan/UBSan, legacy
+libretro, and signed asset assembly. Its 24,862 log lines (3,608,321 bytes) contain no
+project compiler warning, test failure, sanitizer finding, timeout, or error annotation.
+Windows capability-skips only the same real-context test. The remaining diagnostics
+come from current pinned upstream actions: two unused SDL CMake cache variables on a
+macOS cache miss and a Node `Buffer()` deprecation inside `download-artifact@v8`.
+
+The public latest release is
+[`Genesis Plus GX GUI 0.1.2`](https://github.com/birdybro/Genesis-Plus-GX-GUI/releases/tag/v0.1.2).
+All 15 published assets download successfully. Every package sidecar and the aggregate
+`SHA256SUMS.txt` verify; the schema-1 six-platform-asset update manifest validates with
+the committed Ed25519 public key and key ID `704e04b184a939a4`. All ZIP/TGZ/DMG layouts
+pass the production verifier; executable identities are ELF x86-64, PE32+ x86-64,
+Mach-O arm64, and Mach-O x86_64. The public Linux binary reports `0.1.2`, all 23 ELF
+objects resolve, and its portable pseudo-language offscreen event-loop smoke passes.
+Archive-containment and prohibited-payload scans pass.
+
 **Acceptance criteria:** `0.1.2` is consistent across source, executable, packages,
 documentation, tag, manifest, and GitHub release; the exact source commit passes
 ordinary CI before tagging; the exact tag passes every release job; all successful
 logs and every uploaded asset are independently audited; the release is non-draft and
 the working tree remains clean and synchronized.
 
-**Commit SHA:** pending until the release-preparation commit is created.
+**Commit SHA:** `3eadf2b` (tagged release source); publication-audit documentation is in
+the later commit containing this ledger entry.
 
 ## Milestone 99 detail
 
