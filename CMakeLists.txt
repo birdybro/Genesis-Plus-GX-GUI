@@ -12,7 +12,7 @@ endif()
 
 project(
   GenesisPlusGXGUI
-  VERSION 0.1.1
+  VERSION 0.1.2
   DESCRIPTION "Native desktop frontend for Genesis Plus GX"
   HOMEPAGE_URL "https://github.com/birdybro/Genesis-Plus-GX-GUI"
   LANGUAGES C CXX

@@ -5,7 +5,7 @@ emulation core. It turns this fork into a standalone application for Windows, Li
 and macOS while keeping the emulator core isolated and authoritative. It is not an
 official upstream Genesis Plus GX project and is not endorsed by Sega.
 
-The application is currently version 0.1.1. It does not include games, Sega firmware,
+The application is currently version 0.1.2. It does not include games, Sega firmware,
 or box art.
 
 ## Screenshots

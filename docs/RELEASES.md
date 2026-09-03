@@ -10,13 +10,13 @@ installing dependencies or building packages.
 The Release workflow supports an explicitly non-publishing manual run:
 
 ```bash
-gh workflow run release.yml --ref master -f release_tag=v0.1.1
+gh workflow run release.yml --ref master -f release_tag=v0.1.2
 ```
 
 This path performs the same version validation, native Release builds, complete tests,
 Linux sanitizer suite, legacy libretro regression, package creation, runtime smoke
 checks, checksum validation, and final asset assembly as a tagged release. It uploads a
-`release-candidate-v0.1.1` workflow artifact but cannot execute the GitHub release step.
+`release-candidate-v0.1.2` workflow artifact but cannot execute the GitHub release step.
 
 ## Publishing a release
 
@@ -61,7 +61,7 @@ A complete version publishes:
 Verify a downloaded package on Linux with:
 
 ```bash
-sha256sum -c Genesis-Plus-GX-GUI-0.1.1-linux-x86_64.tar.gz.sha256
+sha256sum -c Genesis-Plus-GX-GUI-0.1.2-linux-x86_64.tar.gz.sha256
 ```
 
 Use `shasum -a 256 -c` on macOS. PowerShell users can compare

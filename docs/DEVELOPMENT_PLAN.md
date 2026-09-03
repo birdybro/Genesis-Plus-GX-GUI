@@ -111,6 +111,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
 | 98 Signed updates | COMPLETE | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | `c257953` |
 | 99 TAS, movies, and streaming | COMPLETE | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | `c5d807c` |
+| 100 Version 0.1.2 release | IMPLEMENTED — HOSTED CI PENDING | Version, validate, tag, and publish the complete post-0.1.1 feature set | version/changelog/release docs/workflow | local release gates; exact branch CI; tag release workflow; asset/log audit | No tag is created until its exact source commit is green | pending |
 
 ## Execution policy
 
@@ -3782,6 +3783,45 @@ all package layouts; and every applicable local gate passes.
 
 **Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
 cannot contain its own SHA)
+
+## Milestone 100 detail
+
+**Status:** IMPLEMENTED — release identity and documentation are prepared locally;
+exact branch CI must pass before the immutable tag is created.
+
+**Goal:** Publish the complete Milestone 64–99 feature and hardening set as version
+`0.1.2`, with the tag bound to a fully validated source commit and every signed-update
+manifest/package asset assembled by the guarded release workflow.
+
+**Files changed:** the root CMake version, promoted changelog, README version,
+release-rehearsal default/examples, final test report identity, and this ledger.
+
+**Tests added:** no new runtime test is required for a metadata-only release bump;
+existing version, release-tag, package-name, documentation, full regression, sanitizer,
+legacy, cross-platform CI, and release-assembly gates validate the change.
+
+**Local gate evidence:** Warning-as-error GCC Debug and Release, Clang Release, and
+leak-detecting ASan/UBSan configurations each pass all 136 tests. CHD-disabled passes
+136/136; shader-disabled, online-service-disabled, and signed-update-disabled graphs
+each pass all 134 applicable tests. The desktop-disabled workflow graph and strict
+inherited Unix libretro target build successfully, with the latter identified as an
+x86-64 ELF shared object and cleaned afterward. A staged Linux install and extracted
+CPack TGZ both pass the production layout verifier, report version `0.1.2`, and complete
+portable pseudo-language offscreen event-loop startup/shutdown. All 23 packaged ELF
+objects resolve their dependencies; the archive contains no prohibited game, firmware,
+save, state, secret, or pre-created portable-data payload. The 41,310,178-byte archive
+matches SHA-256
+`389ef3924da060b4ad29123a4ff5956e6b4439e447904a97d179722dc41ee2af`.
+This workstation does not provide `xvfb-run`; the required native XCB package smoke
+remains a hosted Linux gate.
+
+**Acceptance criteria:** `0.1.2` is consistent across source, executable, packages,
+documentation, tag, manifest, and GitHub release; the exact source commit passes
+ordinary CI before tagging; the exact tag passes every release job; all successful
+logs and every uploaded asset are independently audited; the release is non-draft and
+the working tree remains clean and synchronized.
+
+**Commit SHA:** pending until the release-preparation commit is created.
 
 ## Milestone 99 detail
 

@@ -7,6 +7,8 @@ platform documentation.
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-09-02
+
 ### Changed
 
 - The desktop Qt baseline is now 6.8 so the same supported Qt Linguist source-target
@@ -293,5 +295,6 @@ platform documentation.
   and disc-swap boundaries; absolute, traversal, missing, empty, and symlink-escaping
   track references are rejected before the inherited core parser opens them.
 
-[Unreleased]: https://github.com/birdybro/Genesis-Plus-GX-GUI/commits/master
+[Unreleased]: https://github.com/birdybro/Genesis-Plus-GX-GUI/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/birdybro/Genesis-Plus-GX-GUI/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/birdybro/Genesis-Plus-GX-GUI/releases/tag/v0.1.1

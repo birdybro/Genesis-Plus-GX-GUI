@@ -1,6 +1,6 @@
 # Final Test Report
 
-This report records the Genesis Plus GX GUI 0.1.1 release-candidate verification,
+This report records the Genesis Plus GX GUI 0.1.2 release-candidate verification,
 Linux startup correction, tagged-release audits, and the post-release Libretro shader,
 debugger, rewind, automatic-session-resume, configurable-speed, archive/playlist,
 cartridge soft-patch, enhanced save-state, bounded-recording, run-ahead, display
@@ -66,7 +66,7 @@ editing, and bounded loopback A/V streaming.
 - Exact cloud-synchronization implementation and hosted baseline:
   `4a73a085b30eb93dbaf165e871613b8f2f889f47`
 - Branch: `master`
-- Application/package version: `0.1.1`
+- Application/package version: `0.1.2`
 - Local host: CachyOS Linux x86-64, GCC 16.1.1, CMake 4.4.2, Ninja 1.13.2,
   Qt 6.11.1, and SDL 3.4.14
 - Final report/ledger closure: the commit containing this file; use
@@ -1743,3 +1743,26 @@ directories.
 
 These limitations do not leave an advertised control inert and do not weaken the
 defined standalone-emulator workflows.
+
+## Version 0.1.2 publication gate
+
+The `0.1.2` release identity is consistent across the root CMake project, executable,
+README, changelog, release documentation, workflow rehearsal default, Linux package,
+and release-tag validator. The validator accepts `v0.1.2` and rejects the prior
+`v0.1.1` identity against this source tree.
+
+Before the candidate commit, warning-as-error GCC Debug and Release, Clang Release,
+and ASan/UBSan each passed 136/136 tests. CHD-disabled passed 136/136; shader-disabled,
+online-service-disabled, and signed-update-disabled builds each passed their 134
+applicable tests. The desktop-disabled workflow graph and strict inherited Unix
+libretro build passed. No sanitizer finding or project compiler failure was observed.
+
+The optimized staged Linux install and extracted archive passed the production package
+verifier, version command, portable pseudo-language offscreen event-loop smoke, and all
+23 ELF dependency checks. The archive is
+`Genesis-Plus-GX-GUI-0.1.2-linux-x86_64.tar.gz`, 41,310,178 bytes, with SHA-256
+`389ef3924da060b4ad29123a4ff5956e6b4439e447904a97d179722dc41ee2af`.
+Its payload scan found no proprietary game/firmware file, save/state, private key, or
+pre-created portable data. This host lacks `xvfb-run`, so native XCB package startup,
+the complete Windows/macOS matrices, release signing, asset assembly, and final hosted
+log/archive audit remain mandatory before publication.

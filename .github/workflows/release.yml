@@ -9,7 +9,7 @@ on:
       release_tag:
         description: Version to validate in a non-publishing release rehearsal
         required: true
-        default: v0.1.1
+        default: v0.1.2
 
 permissions:
   contents: read
