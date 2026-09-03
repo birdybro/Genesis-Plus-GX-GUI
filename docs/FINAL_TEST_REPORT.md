@@ -1635,8 +1635,38 @@ suites all pass again; the workflow-disabled graph and strict legacy libretro ga
 also pass. A fresh staged and extracted Linux package passes layout, version, and
 portable pseudo-language event-loop verification. Its 41,308,475-byte TGZ matches
 SHA-256 `36611edb2e56d4e48d278dab2b39064a28ac7524953350340babb9a85594e0e7`. Milestone
-99 remains open until exact corrective hosted CI proves the warning absent and all
-cross-platform artifacts pass inspection.
+99's exact corrective hosted evidence follows.
+
+Exact corrective run
+[`33698408515`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33698408515)
+at `c5d807c3e006d3738ad7e716812f78a85d7533c6` passes all ten jobs. Linux
+Debug/Release/ASan+UBSan and macOS arm64/x86_64 Debug/Release pass 136/136 tests;
+Windows MSVC x64 Debug/Release each pass 135 plus the expected headless real-OpenGL
+capability skip; legacy libretro passes. The complete 19,062-line, 3,041,777-byte log
+contains no project compiler/linker warning, failed test, sanitizer finding, packaging
+failure, or runtime error. The duplicate Apple link diagnostic is absent. The one
+remaining warning originates in the current pinned upstream `setup-sdl` action when
+SDL ignores two action-supplied cache-miss variables; it is outside this project build
+and has no functional effect. The Windows deployer intentionally skips Qt's OpenSSL
+backend while packaging the native Schannel backend.
+
+Every hosted checksum sidecar verifies. Package evidence is:
+
+| Package | Bytes | SHA-256 |
+| --- | ---: | --- |
+| Linux x86-64 TGZ | 42,188,604 | `341e0be7d854e1f0c002ba202f1e167ad5ee596f32b061bba4ffe4b513252a9c` |
+| Windows x86-64 ZIP | 53,354,495 | `0a1c916dec831f0d25bca20a6873dd34ba3ebcbd34a8611c7127eed586303b5b` |
+| macOS arm64 ZIP | 34,274,929 | `9cc3993a5b94fb5320c6859a84d05e85d908272545beb213f4d373f79a058a56` |
+| macOS arm64 DMG | 34,202,161 | `ad4694da92fe34d1319c92e650c537f6287b1bd3568ae7cae0952b99ef23f292` |
+| macOS x86_64 ZIP | 35,139,231 | `77cb66a39542ff9492a8e5143d174702865181ac27aade2ebf46d92c1e5bd6f1` |
+| macOS x86_64 DMG | 35,030,554 | `96df523d5f5ce3786401826ad7ee97ee2c626e81b31f94bf66c886782309a678` |
+
+Linux, Windows, both macOS ZIPs, and both extracted DMGs pass their production layout
+verifiers. Binaries identify as ELF x86-64, PE32+ x86-64, Mach-O arm64, and Mach-O
+x86_64. Archive containment, version `0.1.1`, the two new manuals, expected file
+counts, and absence of proprietary fixtures, saves/states, secrets, and pre-created
+portable data were checked. Native hosted XCB and independent downloaded-Linux
+offscreen portable pseudo-language event-loop smokes pass. Milestone 99 is complete.
 
 ## Adversarial review
 

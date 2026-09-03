@@ -110,7 +110,7 @@ Status values: `IN PROGRESS`, `PLANNED`, `COMPLETE`, and `BLOCKED`.
 | 96 Cloud synchronization | COMPLETE | Add opt-in save/state synchronization with conflict recovery | service/persistence/UI | conflict, privacy, real TLS/WebDAV, hosted matrix | Local data stays authoritative and recoverable | `4a73a08` |
 | 97 Online metadata and art | COMPLETE | Add opt-in licensed metadata/art providers | library/service/UI | cache, attribution, privacy, hosted matrix | No scraping or unlicensed assets are enabled | `896090f` |
 | 98 Signed updates | COMPLETE | Add authenticated update discovery and platform-safe handoff | update service/settings/UI, release signing, packages/docs | Ed25519, rollback, real TLS, package, GUI, hosted matrix | No unsigned payload is installed automatically | `c257953` |
-| 99 TAS, movies, and streaming | IMPLEMENTED — HOSTED CI PENDING | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | pending |
+| 99 TAS, movies, and streaming | COMPLETE | Add deterministic input movies and capture/streaming integration | input/capture/UI | determinism, compatibility, lifecycle, hosted matrix | Tooling remains separate from authoritative core algorithms | `c5d807c` |
 
 ## Execution policy
 
@@ -3785,10 +3785,9 @@ cannot contain its own SHA)
 
 ## Milestone 99 detail
 
-**Status:** IMPLEMENTED — all local compiler, test, sanitizer, compatibility,
-packaging, and adversarial gates pass. The implementation run passed every hosted
-job; a complete-log audit found and locally corrected one macOS duplicate-library
-link warning. Exact corrective hosted CI and artifact inspection remain pending.
+**Status:** COMPLETE — all local compiler, test, sanitizer, compatibility, packaging,
+and adversarial gates pass. Exact corrective hosted CI passes all ten jobs; its full
+logs and all six cross-platform packages have been inspected successfully.
 
 **Goal:** Add deterministic input-movie recording/playback, an accessible TAS timeline
 editor, and bounded loopback A/V streaming without moving core access off its owner
@@ -3865,8 +3864,29 @@ capture archive on the Linux link line. The full local matrix was rerun after th
 correction: all default, sanitizer, Clang, feature-disabled, package, workflow, and
 legacy gates above remain green. A fresh corrective TGZ is 41,308,475 bytes, matches
 SHA-256 `36611edb2e56d4e48d278dab2b39064a28ac7524953350340babb9a85594e0e7`, and passes
-both staged and extracted layout/event-loop verification. The corrective commit's
-exact hosted run must be green and warning-audited before this milestone closes.
+both staged and extracted layout/event-loop verification. Exact corrective run
+[`33698408515`](https://github.com/birdybro/Genesis-Plus-GX-GUI/actions/runs/33698408515)
+at `c5d807c3e006d3738ad7e716812f78a85d7533c6` passes all ten jobs. Linux Debug,
+Release, and ASan+UBSan and macOS arm64/x86_64 Debug/Release pass 136/136; Windows
+MSVC x64 Debug/Release each pass 135 plus the expected headless real-OpenGL
+capability skip; legacy libretro passes. The complete 19,062-line, 3,041,777-byte
+log contains no project compiler/linker warning, test failure, sanitizer finding,
+packaging failure, or runtime error, and the previous Apple duplicate-library warning
+is absent. The only warning is produced inside the current pinned `setup-sdl` action
+while SDL itself ignores two legacy cache-miss configuration variables; the pinned
+commit is the action's current upstream `main`, and the message does not involve this
+project's build. Windows deployment intentionally omits Qt's OpenSSL backend while
+including the native Schannel backend used by the application.
+
+All hosted sidecars verify independently. Linux TGZ is 42,188,604 bytes, Windows ZIP
+is 53,354,495 bytes, macOS arm64 ZIP/DMG are 34,274,929/34,202,161 bytes, and macOS
+x86_64 ZIP/DMG are 35,139,231/35,030,554 bytes. Extracted layouts pass the production
+Linux, Windows, and macOS verifiers; both DMGs also extract to the same valid app
+layouts. Executables identify as ELF x86-64, PE32+ x86-64, Mach-O arm64, and Mach-O
+x86_64. Archive containment, manuals, version `0.1.1`, file counts, and absence of
+ROM/disc/save/state/private-key fixtures or pre-created portable data were checked.
+The hosted native XCB smoke and an independent downloaded-Linux offscreen portable
+pseudo-language event-loop smoke pass.
 
 **Acceptance criteria:** Movie input is captured and replayed only at authoritative
 frame boundaries; initial state, game, deterministic settings, and exact core build are
@@ -3876,8 +3896,8 @@ loopback, rejects excess/slow clients, and cannot block emulation; every action 
 accessible, diagnosable, and lifecycle-safe; and all local and hosted native gates pass
 without an authored warning or sanitizer finding.
 
-**Commit SHA:** pending (resolve with `git log -1 -- docs/DEVELOPMENT_PLAN.md`; a commit
-cannot contain its own SHA)
+**Commit SHA:** `a363a9a152ab2f912175de5bc25a3e2487e6d2d8` (implementation) and
+`c5d807c3e006d3738ad7e716812f78a85d7533c6` (cross-platform log correction)
 
 ## Milestone 98 detail
 
